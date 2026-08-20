@@ -89,11 +89,19 @@ function refusedBy(verdict, id, message) {
 }
 
 const sha = (value) => crypto.createHash("sha256").update(value).digest("hex");
+// A synthetic version, deliberately outside any real release line. These are
+// FIXTURE identities, not statements about this repository's version; when a
+// fixture literal happens to equal the declared skill version it silently
+// starts agreeing with production and stops testing anything (freeze criterion
+// 9 / P8.9). The registered skill-version-declaration suite refuses any literal
+// bound to skill_version outside assets/runtime-manifest.json.
+const FIXTURE_SKILL_VERSION = "0.0.1";
+
 const IDENTITY = Object.freeze({
   repository: "excel-inflow",
   source_commit: COMMIT,
   source_tree: TREE,
-  skill_version: "3.7.7",
+  skill_version: FIXTURE_SKILL_VERSION,
   runtime_code_closure_sha256: CLOSURE,
   runtime_code_closure_file_count: 332,
   runtime_code_closure_identity_source: "test fixture",
@@ -921,7 +929,7 @@ check(validatePortableDossierApproval(approval, { now: "whenever", subject: SUBJ
     repository: "excel-inflow",
     source_commit: COMMIT,
     source_tree: TREE,
-    skill_version: "3.7.7",
+    skill_version: FIXTURE_SKILL_VERSION,
     package_mode: PORTABLE_CERTIFIED_PACKAGE_MODE,
     deployment_status: "not_installed",
     runtime_code_closure_sha256: CLOSURE,
@@ -1015,7 +1023,7 @@ check(validatePortableDossierApproval(approval, { now: "whenever", subject: SUBJ
     approval: document,
     recordedAt: NOW,
     release: {
-      repository: "excel-inflow", source_commit: COMMIT, source_tree: TREE, skill_version: "3.7.7",
+      repository: "excel-inflow", source_commit: COMMIT, source_tree: TREE, skill_version: FIXTURE_SKILL_VERSION,
       package_mode: PORTABLE_CERTIFIED_PACKAGE_MODE, deployment_status: "not_installed",
       runtime_code_closure_sha256: CLOSURE, complete_package_inventory_sha256: null,
       archive_sha256: null, release_package_attestation_sha256: null,

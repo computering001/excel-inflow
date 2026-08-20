@@ -493,6 +493,15 @@
       "concern": "semantic manifest",
       "target_owner": "Canonical graph compiler (Phase 3)"
     },
+    "lib/skill_version_declaration.mjs": {
+      "count": 7,
+      "families": {
+        "release_identity": 7
+      },
+      "classification": "validator",
+      "concern": "P8.9 freeze criterion 9 — the single skill-version declaration and the enumerated hard-coded-literal scan; READS the declaration and reports, never writes a version",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
     "lib/solver.mjs": {
       "count": 1,
       "families": {

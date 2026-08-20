@@ -1,8 +1,13 @@
-# Excel Inflow v3.7.6 development — known limitations
+# Excel Inflow development candidate — known limitations
 
-(Version tracks assets/runtime-manifest.json. The 3.7.7 flip is P8.8 and touches four
-independent tripwires plus this file; the blocker corpus records the 3.7.5->3.7.6 flip going
-red at exact head for missing one of them.)
+(This file deliberately carries NO version literal. Freeze criterion 9 is closed: the skill
+version is declared exactly once, at `assets/runtime-manifest.json#/skill_version`, and every
+other site derives it through `scripts/lib/skill_version_declaration.mjs`. A version flip is
+now a one-field edit to that manifest, and the registered `skill-version-declaration` suite
+fails if a second literal is introduced anywhere in the shipped or checked surface. Before
+P8.9 the version was stated independently in this heading and in four suite "tripwires"; the
+blocker corpus records the previous flip going red at exact head for missing one of them, and
+the same failure reproduced at head for the next flip.)
 
 - This is a development candidate. Its package identity is `development / not_installed`; it is not production-certified or production-promoted.
 - Citrix/Rogo installation and activation have not been performed for these bytes.

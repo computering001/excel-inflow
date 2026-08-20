@@ -215,13 +215,17 @@ check(policy.clauses.rollback_is_not_run_resume.binding.distinguished_from
 // 3. A real, attestable rollback target.
 // ---------------------------------------------------------------------------
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "release-rollback-proof-"));
+// A synthetic version, deliberately outside any real release line: a fixture
+// literal that equals the declared skill version silently starts agreeing with
+// production and stops testing anything (freeze criterion 9 / P8.9).
+const FIXTURE_SKILL_VERSION = "0.0.1";
 const goodRoot = path.join(scratch, "known-good-package");
 await fs.mkdir(path.join(goodRoot, "scripts"), { recursive: true });
 await fs.writeFile(path.join(goodRoot, "scripts", "entry.mjs"), "export const ok = true;\n");
 const goodClosure = hex64("known-good-closure");
 const goodManifest = {
   releaseName: "Excel Inflow rollback-target fixture",
-  skillVersion: "3.7.7",
+  skillVersion: FIXTURE_SKILL_VERSION,
   packageMode: "development",
   identity: productIdentity({
     repository: "computering001/excel-inflow",
@@ -313,7 +317,7 @@ const releaseBlock = ({ closure, status, mode = "development" }) => ({
   repository: "computering001/excel-inflow",
   source_commit: hex40(`commit-${closure}`),
   source_tree: hex40(`tree-${closure}`),
-  skill_version: "3.7.7",
+  skill_version: FIXTURE_SKILL_VERSION,
   package_mode: mode,
   deployment_status: status,
   runtime_code_closure_sha256: closure,

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateIdentityConvergence, validatePerformanceEvidence } from "./lib/release_identity_governance.mjs";
+import { assertSkillVersionShape, declaredSkillVersion } from "./lib/skill_version_declaration.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const auditRoot = path.join(root, "audit", "v375-governance");
@@ -41,9 +42,17 @@ const expected = {
 };
 assert.deepEqual(validateIdentityConvergence(identity, expected), []);
 assert.deepEqual(validatePerformanceEvidence(performance, expected), []);
-// DELIBERATE TRIPWIRE (see run_release_identity_governance_tests.mjs):
-// update this literal IN THE SAME COMMIT as any runtime-manifest bump.
-assert.equal(runtime.skill_version, "3.7.6");
+// Freeze criterion 9 (P8.9): DERIVED, not a tripwire copy. The property this
+// suite actually needs is not "the version is <literal>" but "the ACTIVE
+// version is not the historical one this audit evidence belongs to" -- which is
+// asserted below and now stated directly, against the single declaration.
+assertSkillVersionShape(runtime.skill_version);
+assert.equal(runtime.skill_version, declaredSkillVersion(root));
+assert.notEqual(
+  runtime.skill_version,
+  expected.expectedVersion,
+  "Historical audit evidence is being read against a runtime manifest of the same version.",
+);
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(

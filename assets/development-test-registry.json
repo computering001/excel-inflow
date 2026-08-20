@@ -2299,6 +2299,24 @@
       "test_class": "unit"
     },
     {
+      "id": "skill-version-declaration",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_skill_version_declaration_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "certified-runtime-code-closure",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_certified_code_closure_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "reviewed-repair-contract",
       "phase": "proof",
       "runtime": "node",

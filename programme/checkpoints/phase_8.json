@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "aa715cadbbd5ac084bf3f26c5b3a9431497d2d6a",
-  "source_tree": "7bde0afeda450ce4c8728993d262974e0df8f5a4",
+  "commit": "5fd1b2af6f7d8f1d4a875a4edc7a7ff320b16661",
+  "source_tree": "d5693f70b9957e799a0a066648789697bccaeae1",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -38,9 +38,15 @@
       "commit": "102ada3",
       "invariant": "a portable dossier assembles hash-bound or refuses, with permanent exclusions unmistakable from pending work",
       "note": "five typed absences; waiver register argued out of existence"
+    },
+    {
+      "package": "P8.9",
+      "commit": "",
+      "invariant": "the skill version is declared once and derived everywhere; the certified runtime code closure is recorded on an artifact that can never be a member of it",
+      "note": "freeze criteria 9 and 11 closed; the flip is proven one-field green in scratch and the tree stays at 3.7.6 for P8.8 to bump; the recorded closure digest must be renewed on the frozen tree"
     }
   ],
-  "sealed_package_count": 5,
+  "sealed_package_count": 6,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",

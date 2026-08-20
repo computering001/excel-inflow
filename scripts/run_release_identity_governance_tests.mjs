@@ -8,6 +8,7 @@ import {
   validateIdentityConvergence,
   validatePerformanceEvidence,
 } from "./lib/release_identity_governance.mjs";
+import { assertSkillVersionShape, declaredSkillVersion } from "./lib/skill_version_declaration.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
@@ -26,13 +27,27 @@ const options = {
 
 assert.deepEqual(validateIdentityConvergence(identity, options), []);
 assert.deepEqual(validatePerformanceEvidence(performance, options), []);
-// DELIBERATE TRIPWIRE, not derivation: the literal names the version this
-// suite was consciously reviewed against, so a skill_version bump fails here
-// until the bump owner re-reads the identity-governance expectations. The
-// 3.7.6 bump missed this line and the registered gate ran red at exact head
-// for a full release cycle (P0.3 of the finalisation programme). Update the
-// literal IN THE SAME COMMIT as any future runtime-manifest version bump.
-assert.equal(runtime.skill_version, "3.7.6");
+// Freeze criterion 9 (P8.9). This line used to read "DELIBERATE TRIPWIRE, not
+// derivation": a copy of the version literal, kept so that a bump would fail
+// here until an owner re-read the identity-governance expectations. It did not
+// work. The previous bump missed this line and the registered gate ran red at
+// exact head for a full release cycle (P0.3), and the same failure reproduced
+// at head for the next flip before this package repaired it -- so the tripwire
+// was not enforcing review, it was deferring a red build.
+//
+// The review discipline it was reaching for is now STRUCTURAL rather than
+// per-site: the version is declared once and derived everywhere, and the
+// registered skill-version-declaration suite fails if a new literal appears
+// anywhere in the shipped or checked surface. The property this suite needs --
+// that the ACTIVE candidate is not the historical release whose audit evidence
+// it validates -- is asserted directly below.
+assertSkillVersionShape(runtime.skill_version);
+assert.equal(runtime.skill_version, declaredSkillVersion(root));
+assert.notEqual(
+  runtime.skill_version,
+  options.expectedVersion,
+  "Historical identity evidence is being read against a runtime manifest of the same version.",
+);
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(

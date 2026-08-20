@@ -18,5 +18,18 @@
     "native_spreadsheet_control_restoration",
     "visual_review",
     "installed_fresh_session_test"
-  ]
+  ],
+  "certified_runtime_code_closure_sha256": "e2337e74af4221a08f54ab2f21266d50311d5e7a3d2ecbe8d2dabd4459418116",
+  "certified_runtime_code_closure": {
+    "definition": "certified-runtime-code-closure/1.0",
+    "roots": "assets/deployment-profile.json#/script_entry_points",
+    "membership_rule": "the transitive ES-module import graph under scripts/, walked from the shipped entry points; assets, references, resources, vendored bytes and Python modules are NOT members",
+    "module_count": 150,
+    "publisher": "assets/runtime-manifest.json",
+    "publisher_is_a_member": false,
+    "self_reference_note": "The publisher is an ASSET and this closure admits only modules, so the artifact that records the digest is structurally outside the set the digest is taken over. No file list is recorded here: a verifier that read a member list out of this artifact would be checking the artifact against itself.",
+    "recorded_by": "scripts/run_certified_code_closure_tests.mjs --record",
+    "verified_by": "node scripts/run_certified_code_closure_tests.mjs",
+    "certification_claim": false
+  }
 }

@@ -10,17 +10,29 @@ import {
   assertCertifiedProductionIdentity,
 } from "./lib/source_identity.mjs";
 import { generatedInstructionSurfaces } from "./generate_canonical_instructions.mjs";
+import {
+  declaredReleaseName,
+  declaredSkillVersion,
+} from "./lib/skill_version_declaration.mjs";
+const skillRoot = new URL("../", import.meta.url).pathname;
 const exec = promisify(execFile);
-const identity = await resolveSourceIdentity({ skillRoot: new URL("../", import.meta.url).pathname });
+const identity = await resolveSourceIdentity({ skillRoot });
 assert.ok(identity.source_commit);
 assert.ok(identity.source_tree);
 assert.equal(identity.schema_version, "source-identity/2.0");
 assert.equal(identity.product_identity.schema_version, "product-identity/2.0");
 assert.equal(identity.package_mode, "development");
 assert.equal(identity.deployment_status, "not_installed");
-// DELIBERATE TRIPWIRE: update with every runtime-manifest version bump.
-assert.equal(identity.skill_version, "3.7.6");
-assert.equal(identity.release_name, "Excel Inflow v3.7.6");
+// Freeze criterion 9 (P8.9): DERIVED, not a tripwire copy. These two are the
+// load-bearing half of the criterion: `identity` comes out of the whole
+// resolveSourceIdentity pipeline (package manifest, attestation, env overrides,
+// runtime manifest), and the expectation comes from the single declaration.
+// They agree only if that pipeline really derives the version and composes the
+// release name from the deployment profile's product stem -- so a regression
+// that let a stale release-manifest or an env override supply the version still
+// fails here, which is exactly what a hard-coded literal used to catch.
+assert.equal(identity.skill_version, declaredSkillVersion(skillRoot));
+assert.equal(identity.release_name, declaredReleaseName(skillRoot));
 assert.equal(
   identity.runtime_code_closure_sha256,
   identity.product_identity.package.runtime_code_closure.sha256,

@@ -1237,6 +1237,30 @@ if (!certifyNow && !developmentNow && !portableCertifyNow) {
       ].join("\n"),
     );
   }
+  // P8.9 / freeze criterion 11. Two DIFFERENT closures have been written under
+  // this one field name, and comparing them would report a false mutation.
+  //   * the PACKAGE closure computed here: scripts + Python modules + declared
+  //     assets + declared resources + vendored bytes;
+  //   * the certified runtime CODE closure recorded by
+  //     scripts/lib/certified_runtime_code_closure.mjs: the transitive module
+  //     import graph only.
+  // The code closure is the one that can be recorded in this asset at all: the
+  // package closure CONTAINS assets/runtime-manifest.json (asset_allowlist
+  // declares it), so writing the package digest here changes the bytes the
+  // digest is taken over and no fixed point exists. A manifest that names its
+  // closure definition is therefore refused by name rather than compared
+  // against a quantity it is not.
+  const recordedClosureDefinition =
+    runtimeManifest.certified_runtime_code_closure?.definition ?? null;
+  if (recordedClosureDefinition) {
+    throw new Error(
+      [
+        `assets/runtime-manifest.json records its certified closure under definition ${recordedClosureDefinition}, which is NOT the package closure this comparison computes.`,
+        "  The package closure covers scripts, Python modules, assets, resources and vendored bytes; the recorded definition covers modules only.",
+        "  Comparing them would report a mutation that did not happen. Verify the recorded closure with `node scripts/run_certified_code_closure_tests.mjs`, and record a package-closure digest here only from an artifact that is not itself a member of it.",
+      ].join("\n"),
+    );
+  }
   if (recordedDigest !== closureDigest) {
     const recordedFiles =
       runtimeManifest.certified_runtime_code_closure_files ??
