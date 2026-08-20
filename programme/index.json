@@ -346,8 +346,12 @@
   },
   "last_green_commit": "4857acb",
   "open_blockers": [
-    "final head-green gate receipt pending (run in progress)",
-    "Rogo-dependent items excluded by user directive"
+    "P4.9 in flight: D28/MG-1 (equation graph omits statement.tax_expense -> cash.cfo, which closes a cycle the convergence contract does not declare) and D30/MG-3 (convergence is not scale-invariant, so an issuer reporting in thousands is refused for economics an issuer in millions is served). BOTH must land before P7.8 freezes, or the freeze pins them as reference behaviour.",
+    "P7.8 (behavioural freeze) and P8.8 (immutable tag) not started; they are the gate for Phases 9-10.",
+    "Freeze criterion 9 OPEN: skill_version is still 3.7.6 across four independent tripwires plus KNOWN_LIMITATIONS.md. The corpus already records this exact failure mode from the 3.7.5->3.7.6 flip, so the literal must be centralised before the 3.7.7 flip rather than after.",
+    "Freeze criterion 11 OPEN: assets/runtime-manifest.json carries no certified_runtime_code_closure_sha256, so post-tag mutation cannot invalidate certification. P8.1 computes and states the value; recording it is P8.8's.",
+    "12 defects remain open in programme/gap-reports/DEFECT_REGISTER.md, mostly contract-vocabulary absences (no NOL stock, no IAS 23 capitalised borrowing cost, no stub-period vocabulary, no direct-method roles) plus the frozen cohort's two failures. A decision is owed on whether any block the freeze or are declared as known limitations within it.",
+    "Rogo-dependent items excluded by user directive (P5.7, P8.3, P8.4, P8.5, installed half of P8.6, Phase 10 rollout rings). P5.6 deferred on the owner's challenge: the pack says 'redesign charts' but charts do not exist and drawings are forbidden."
   ],
   "next_gate": "P0.8 phase seal after P0.6 (this package) and P0.7 (architecture census)",
   "owner": "principal engineering model (session-based); user owns merges and Rogo installs",
