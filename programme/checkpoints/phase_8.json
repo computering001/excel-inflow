@@ -1,0 +1,47 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 8,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P8.0",
+      "commit": "e3f3ba2",
+      "invariant": "the release vocabulary admits a portable certified tier with native evidence recorded as permanent declared exclusions",
+      "note": "the freeze unblocker; --certify was structurally unsatisfiable before it"
+    },
+    {
+      "package": "P8.1",
+      "commit": "b7bbf5a",
+      "invariant": "two clean checkouts build a byte-identical package, with differences localised to member, offset and JSON path",
+      "note": "found that the package did not build at head; profile repaired"
+    },
+    {
+      "package": "P8.2a",
+      "commit": "3a94bf2",
+      "invariant": "one runtime-closure definition; active closure asserted at run start and recorded at delivery",
+      "note": "freeze criterion 6 run-start half; A/B package proof is P8.1"
+    },
+    {
+      "package": "P8.6a",
+      "commit": "7289482",
+      "invariant": "a release rollback is a declared, authorised, evidence-preserving procedure recorded in an append-only hash-chained journal",
+      "note": "installed-host legs declared EXCLUDED_INSTALLED_HOST per standing directive"
+    }
+  ],
+  "sealed_package_count": 4,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}

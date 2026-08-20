@@ -1,0 +1,47 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 6,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P6.0a",
+      "commit": "e0618e2",
+      "invariant": "no controller path ends in an uncaught throw or an unlawful category crossing",
+      "note": "TOC.D crossings 2/3 and the P6.7 rewiring remain on the work order"
+    },
+    {
+      "package": "P6.1",
+      "commit": "39c97e4",
+      "invariant": "one persisted monotonic run clock; a resume, retry or new turn cannot restore spent budget",
+      "note": "STAGE_FLOOR_MS bounded not removed; a non-finite budget now refuses"
+    },
+    {
+      "package": "P6.6",
+      "commit": "26a9ae5",
+      "invariant": "the performance receipt's spans measure what they are named, reconcile against the total, and checkpoint reuse is a lawful zero",
+      "note": "invalid receipt is a typed finding; delivery preserved by design"
+    },
+    {
+      "package": "P6.7",
+      "commit": "c39672e",
+      "invariant": "an unfit host is refused before expensive work, with every precondition typed and unknown never rounded up into a pass",
+      "note": "found the live Pillow/numpy render-lane gap on this host; controller wiring deferred, CLI ships as an entry point"
+    }
+  ],
+  "sealed_package_count": 4,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}

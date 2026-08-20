@@ -1,0 +1,65 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 4,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P4.1",
+      "commit": "d627849",
+      "invariant": "every opening instrument records its candidate universe, selected source and typed not-selected register",
+      "note": "bridge citation of candidate ids and coverage-side validation follow on"
+    },
+    {
+      "package": "P4.2",
+      "commit": "8ce43a3",
+      "invariant": "opening-debt residuals decompose into a schema-validated bridge; unexplained residual refuses typed",
+      "note": "coverage.mjs migration to consume the bridge on the work order"
+    },
+    {
+      "package": "P4.3",
+      "commit": "5c89526",
+      "invariant": "every RCF/acquisition/cash period quantity carries a typed state; period count derives from the case",
+      "note": "typed shadows additive; downstream dual-read is P4.4/P4.7"
+    },
+    {
+      "package": "P4.4a",
+      "commit": "c82772e",
+      "invariant": "the release roll-forward invariant accounts for every movement that lawfully changes an instrument balance (defect D10)",
+      "note": "seven-term identity; archetypes re-pinned to assert the repair"
+    },
+    {
+      "package": "P4.5",
+      "commit": "426bb44",
+      "invariant": "workbook formulas are built from a typed AST with computed depth and an enforced budget; unimplemented operators refuse typed",
+      "note": "byte-identical emission; 264 raw template literals inventoried for the follow-on"
+    },
+    {
+      "package": "P4.6",
+      "commit": "bd4bcfd",
+      "invariant": "the economic layer is edge-bound to the statement layer and no graph can drift from another unseen",
+      "note": "coverage gap declared for 7 node families and re-derived by the validator"
+    },
+    {
+      "package": "P4.8",
+      "commit": "b7bbf5a",
+      "invariant": "the solver fixed point, RCF sweep from cash need and debt roll-forward are recomputed independently in another language",
+      "note": "7,737 quantities across 33 cases, zero disagreement; independently derived P4.4a's identity"
+    }
+  ],
+  "sealed_package_count": 7,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}

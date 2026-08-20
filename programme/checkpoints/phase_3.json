@@ -1,0 +1,71 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 3,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P3.1",
+      "commit": "dab1952",
+      "invariant": "a canonical Economic IR is compiled in shadow with typed values throughout and a deterministic seal in the receipts",
+      "note": "forecast/schedule numbers type unresolved until a later phase feeds solved values; delivery ungated"
+    },
+    {
+      "package": "P3.2",
+      "commit": "f203749",
+      "invariant": "the completion census covers every economically-owned cell with an executable producer witness; parity is re-verified after Build",
+      "note": "post-Build assertion wired in the controller by the coordinator"
+    },
+    {
+      "package": "P3.3",
+      "commit": "c1dfdc8",
+      "invariant": "the ETR path is present and provably acyclic in the equation graph, and its operators are declared not prefix-detected",
+      "note": null
+    },
+    {
+      "package": "P3.4",
+      "commit": "33c8209",
+      "invariant": "forecast ownership is scored and persisted per period with a family aggregate, and the recovery pass is a declared code path",
+      "note": "implementing agent lost after implementation; card authored from the verified diff (see card provenance note)"
+    },
+    {
+      "package": "P3.5",
+      "commit": "HEAD (this commit)",
+      "invariant": "every forecast_capture_* write routes through capture_transition field-custody primitives; census gate enforces",
+      "note": "full seal; authority/formula multi-writer stays the v3.8 target"
+    },
+    {
+      "package": "P3.6a",
+      "commit": "d73c5e5",
+      "invariant": "group joins bind on keys not labels (typed violation on absent nodes); rows_by_id mints guarded with explicit collision allowlist",
+      "note": "pre-P3.6 defect slice; full crosswalk remains P3.6"
+    },
+    {
+      "package": "P3.7",
+      "commit": "9c007eb",
+      "invariant": "internal forecast/solve failures carry registered reason codes and the five payload fields",
+      "note": "typed-outcome slice; resume recipes stay on the work order"
+    },
+    {
+      "package": "P3.8",
+      "commit": "73c3401",
+      "invariant": "the authority seal binds all five compiled economic artifacts and localises which one moved",
+      "note": "embedding discovered not tabulated; over-reports rather than under-reports"
+    }
+  ],
+  "sealed_package_count": 8,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}

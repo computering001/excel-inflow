@@ -1,0 +1,77 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 2,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P2.1",
+      "commit": "1219436",
+      "invariant": "every scope-dropped row/statement is recorded typed; printed unit labels reconcile fail-closed",
+      "note": "consumer-side wiring + P2.2 XBRL crosswalk follow on"
+    },
+    {
+      "package": "P2.2",
+      "commit": "02889fb",
+      "invariant": "inline-XBRL facts reconcile against visible face rows with per-period provenance; material disagreement fails closed",
+      "note": "runtime-members closure entry + ESEF/HTML-native lanes follow on"
+    },
+    {
+      "package": "P2.3",
+      "commit": "649fcb8",
+      "invariant": "every non-accepted classification reaches terminal resolution through the ledger; ambiguity surfaces as a question",
+      "note": "auto-stamp path dead; answer-round closure of QUESTION rows on the work order"
+    },
+    {
+      "package": "P2.4",
+      "commit": "02b2e0c",
+      "invariant": "a required-role closure is sealed before forecast compilation over the full contract-required set, alias-aware",
+      "note": "custody baseline unchanged; net_interest_expense contract/taxonomy split reported"
+    },
+    {
+      "package": "P2.5",
+      "commit": "4d4e17c",
+      "invariant": "unfooted material statement-family totals refuse typed; empty member-sets recorded; protected roles declared",
+      "note": "residual-line minting (compiler layer) on the work order"
+    },
+    {
+      "package": "P2.6",
+      "commit": "9c007eb",
+      "invariant": "period-support stitching is schema-legal and fail-closed on dimension mismatch",
+      "note": "schema + gate slice; extractor emission stays on the work order"
+    },
+    {
+      "package": "P2.7",
+      "commit": "7b51c3e",
+      "invariant": "every policy family binds to a versioned registry entry; rcf/cash/lease bound end to end",
+      "note": "13 families declared_only pending binding in forbidden-file modules"
+    },
+    {
+      "package": "P2.8",
+      "commit": "687424d",
+      "invariant": "unsupported cases stop typed at the controller preflight before any model stage",
+      "note": "wire slice only; remaining P2.8 shapes (direct-method, discontinued detection, restatement detection, 53-week normalisation) stay on the work order"
+    },
+    {
+      "package": "P2.9",
+      "commit": "c633d6f",
+      "invariant": "a printed caption is read as a declared alias wrapped in qualifiers, resolving at most one role on evidence (defects D1-D3)",
+      "note": "an evidence-withholding alternative was proven to weaken the margin validator and reverted"
+    }
+  ],
+  "sealed_package_count": 9,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}

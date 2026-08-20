@@ -80,6 +80,53 @@ for (const entry of await fs.readdir(PROGRAMME)) {
   check(lintCard(broken, "synthetic") !== null, "a card without a rollback plan MUST be rejected");
 }
 
+// 4b. Phase checkpoints (freeze criterion 1). A checkpoint is a DERIVED record
+// of which packages sealed, so it must agree with programme/index.json exactly:
+// a checkpoint naming a package the index does not seal, or omitting one it
+// does, is drift. Approvals stay null because approving a phase is a human act;
+// automation records the facts and does not sign them off.
+{
+  const checkpointDir = path.join(PROGRAMME, "checkpoints");
+  const entries = await fs.readdir(checkpointDir).catch(() => []);
+  const files = entries.filter((entry) => /^phase_\d+\.json$/.test(entry));
+  check(files.length > 0, "programme/checkpoints must hold at least one phase checkpoint");
+  const indexed = new Map();
+  for (const [packageId, record] of Object.entries(index.sealed_packages ?? {})) {
+    const phase = packageId.split(".")[0].replace("P", "");
+    if (!indexed.has(phase)) indexed.set(phase, new Map());
+    indexed.get(phase).set(packageId, record?.commit ?? null);
+  }
+  for (const file of files.sort()) {
+    const phase = file.replace(/^phase_|\.json$/g, "");
+    const body = JSON.parse(await fs.readFile(path.join(checkpointDir, file), "utf8"));
+    check(
+      body.schema_version === "excel-inflow-phase-checkpoint/1.0",
+      `${file} must declare the phase-checkpoint schema`,
+    );
+    const expected = indexed.get(phase);
+    check(Boolean(expected), `${file} names phase ${phase}, which seals no package in the index`);
+    const named = new Map((body.sealed_packages ?? []).map((row) => [row.package, row.commit]));
+    for (const [packageId, commit] of expected) {
+      check(named.has(packageId), `${file} omits sealed package ${packageId}`);
+      check(
+        named.get(packageId) === commit,
+        `${file} records ${packageId} at ${named.get(packageId)}, the index seals it at ${commit}`,
+      );
+    }
+    for (const packageId of named.keys()) {
+      check(expected.has(packageId), `${file} names ${packageId}, which the index does not seal`);
+    }
+    check(
+      body.sealed_package_count === (body.sealed_packages ?? []).length,
+      `${file} miscounts its own sealed packages`,
+    );
+    for (const [role, value] of Object.entries(body.approvals ?? {})) {
+      if (role === "note") continue;
+      check(value === null, `${file} approvals.${role} must be null: approving a phase is a human act`);
+    }
+  }
+}
+
 // 5. Handover freshness: any HANDOVER_*.md naming a commit that is not an
 // ancestor-or-equal of HEAD is stale and invalid.
 const { stdout: headCommit } = await exec("git", ["rev-parse", "HEAD"], { cwd: ROOT });

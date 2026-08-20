@@ -1,0 +1,59 @@
+{
+  "schema_version": "excel-inflow-phase-checkpoint/1.0",
+  "phase": 7,
+  "release": "v3.7.7",
+  "seal_status": "SEALED_PACKAGES_RECORDED",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "branch": "agent/excel-inflow-v377-behavioural-closure",
+  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
+  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "working_tree_clean": false,
+  "sealed_packages": [
+    {
+      "package": "P7.1a",
+      "commit": "86ca5ba",
+      "invariant": "every value the support envelope claims is joined to scanned evidence in a declared tier, or reported as a typed gap",
+      "note": "report mode only; 27 unproven values are the narrowing decision input"
+    },
+    {
+      "package": "P7.1b",
+      "commit": "24027a8",
+      "invariant": "33 economics/period/tax/schedule archetypes carry typed checkable expectations",
+      "note": "found 8 further defects (D10-D19)"
+    },
+    {
+      "package": "P7.1c",
+      "commit": "f412160",
+      "invariant": "29 presentation/structure archetypes carry typed checkable expectations, not compiles-clean",
+      "note": "found 9 defects (DEFECT_REGISTER D1-D9); non-vacuity proven over all 234 leaves"
+    },
+    {
+      "package": "P7.2",
+      "commit": "596d7cc",
+      "invariant": "the behavioural-golden mechanism is sealed and NOTHING is frozen; the genesis freeze awaits a named human",
+      "note": "a false record attributing approval to the owner was withdrawn, not merged"
+    },
+    {
+      "package": "P7.3",
+      "commit": "ef6c325",
+      "invariant": "generated cases are a stratified sample of a declared space, replayable by seed and shrinkable",
+      "note": "291bn-point space; found 15 defects incl. D11 in freshly-sealed P4.1 code"
+    },
+    {
+      "package": "P7.6a",
+      "commit": "3f529eb",
+      "invariant": "every verify oracle is census-visible and AST-proven production-import-free; detection rates are computed, not claimed",
+      "note": "five synthetic domains now honestly marked NOT_INDEPENDENTLY_PROVEN"
+    }
+  ],
+  "sealed_package_count": 6,
+  "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
+  "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+  "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
+  "approvals": {
+    "engineering": null,
+    "product": null,
+    "runtime_release": null,
+    "note": "Approvals are HUMAN acts. Automation records the facts above; it does not approve a phase. Empty is the truthful state."
+  }
+}
