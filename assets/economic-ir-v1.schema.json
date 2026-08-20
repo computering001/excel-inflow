@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excel-inflow.local/economic-ir-v1.schema.json",
+  "title": "Excel Inflow canonical Economic IR (shadow)",
+  "description": "The canonical, workbook-independent economic object: one node per economic concept, every value slot a typed financial value (typed_financial_value v1.0.0, twelve states, structurally never zero), plus the per-forecast-period typed schedule state the proof projection omits. The IR is compiled in SHADOW mode beside model_ir_v3's proof projection: it is computed, sealed and hashed, and it gates nothing. Phase 7 freezes its seal; Phase 9 diffs its content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mode",
+    "gates_delivery",
+    "case_id",
+    "case_sha256",
+    "evidence_epoch_sha256",
+    "contracts",
+    "periods",
+    "nodes",
+    "schedules",
+    "coverage",
+    "seal"
+  ],
+  "properties": {
+    "schema_version": { "const": "economic-ir/1.0" },
+    "mode": {
+      "const": "shadow",
+      "description": "The IR is only ever compiled in shadow mode. A gating IR would be a different contract with a different version."
+    },
+    "gates_delivery": { "const": false },
+    "case_id": { "type": "string", "minLength": 1 },
+    "case_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidence_epoch_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typed_financial_value",
+        "schedule_typed_states",
+        "proof_projection_schema_version"
+      ],
+      "properties": {
+        "typed_financial_value": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "schedule_typed_states": { "type": "string", "minLength": 1 },
+        "proof_projection_schema_version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "periods": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["historical", "forecast"],
+      "properties": {
+        "historical": { "type": "array", "items": { "$ref": "#/$defs/period" } },
+        "forecast": { "type": "array", "items": { "$ref": "#/$defs/forecastPeriod" } }
+      }
+    },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/economicNode" } },
+    "schedules": { "type": "array", "items": { "$ref": "#/$defs/schedulePeriod" } },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "seal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_sha256", "sealed_slots"],
+      "properties": {
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "sha256 over the canonical IR content EXCLUDING this seal object."
+        },
+        "sealed_slots": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "valueState": {
+      "enum": [
+        "reported_number",
+        "reported_zero",
+        "reported_blank",
+        "nil",
+        "missing",
+        "parse_failure",
+        "period_support_required",
+        "prior_filing_support",
+        "derived_number",
+        "captured",
+        "not_applicable",
+        "unresolved"
+      ]
+    },
+    "typedValue": {
+      "description": "A typed_financial_value. The authoritative union check is the generated typed_financial_value contract validator; this schema pins the envelope and closes the field set so a bare number can never occupy the slot.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "state"],
+      "properties": {
+        "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "state": { "$ref": "#/$defs/valueState" },
+        "value": { "type": "number" },
+        "raw_text": { "type": "string" },
+        "currency": { "type": "string" },
+        "unit_scale": { "type": "number" },
+        "precision": { "type": "integer", "minimum": 0, "maximum": 12 },
+        "failure_reason": { "type": "string" },
+        "period": { "type": "string" },
+        "capture_parent_id": { "type": "string" },
+        "source_location": { "type": "object" },
+        "derivation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operator", "refs"],
+          "properties": {
+            "operator": { "type": "string", "minLength": 1 },
+            "refs": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "provenance": { "type": "object" }
+      }
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period_index", "period_id", "status"],
+      "properties": {
+        "period_index": { "type": "integer", "minimum": 0 },
+        "period_id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 }
+      }
+    },
+    "forecastPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period_index", "forecast_index", "period_id", "status"],
+      "properties": {
+        "period_index": { "type": "integer", "minimum": 0 },
+        "forecast_index": { "type": "integer", "minimum": 0 },
+        "period_id": { "type": "string", "minLength": 1 },
+        "status": { "const": "forecast" }
+      }
+    },
+    "economicNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "economic_concept_id",
+        "display_id",
+        "section",
+        "label",
+        "semantic_role",
+        "projection_status",
+        "definition_signature",
+        "source_line_ids",
+        "historical_basis",
+        "historical",
+        "forecast"
+      ],
+      "properties": {
+        "economic_concept_id": { "type": "string", "minLength": 1 },
+        "display_id": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "semantic_role": { "$ref": "#/$defs/nullableString" },
+        "projection_status": { "type": "string", "minLength": 1 },
+        "definition_signature": { "type": "object" },
+        "source_line_ids": { "type": "array", "items": { "type": "string" } },
+        "historical_basis": {
+          "enum": [
+            "filed_face_series",
+            "reported_total_reconciled",
+            "model_projection",
+            "structural_header",
+            "no_plan_row"
+          ],
+          "description": "Which series the historical lane reads, decided by the SAME rule the P2.5 footing pass uses to decide what counts as filed history."
+        },
+        "historical": { "type": "array", "items": { "$ref": "#/$defs/historicalSlot" } },
+        "forecast": { "type": "array", "items": { "$ref": "#/$defs/forecastSlot" } }
+      }
+    },
+    "historicalSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period_index", "period_id", "value"],
+      "properties": {
+        "period_index": { "type": "integer", "minimum": 0 },
+        "period_id": { "type": "string", "minLength": 1 },
+        "value": { "$ref": "#/$defs/typedValue" }
+      }
+    },
+    "forecastSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_index",
+        "period_index",
+        "period_id",
+        "producer_type",
+        "authority_status",
+        "method",
+        "source_kind",
+        "source_id",
+        "capture_parent_display_id",
+        "formula_operator",
+        "formula_refs",
+        "period_relation",
+        "value"
+      ],
+      "properties": {
+        "forecast_index": { "type": "integer", "minimum": 0 },
+        "period_index": { "type": "integer", "minimum": 0 },
+        "period_id": { "type": "string", "minLength": 1 },
+        "producer_type": { "type": "string", "minLength": 1 },
+        "authority_status": { "enum": ["resolved", "unresolved"] },
+        "method": { "$ref": "#/$defs/nullableString" },
+        "source_kind": { "$ref": "#/$defs/nullableString" },
+        "source_id": { "$ref": "#/$defs/nullableString" },
+        "capture_parent_display_id": { "$ref": "#/$defs/nullableString" },
+        "formula_operator": { "$ref": "#/$defs/nullableString" },
+        "formula_refs": { "type": "array", "items": { "type": "string" } },
+        "period_relation": { "type": "string", "minLength": 1 },
+        "value": { "$ref": "#/$defs/typedValue" }
+      }
+    },
+    "schedulePeriod": {
+      "description": "One period of the P4.3 typed schedule shadow, compiled by scripts/lib/schedule_typed_states.mjs.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "period_id",
+        "period_index",
+        "period_count",
+        "rcf",
+        "acquisition",
+        "cash"
+      ],
+      "properties": {
+        "schema_version": { "const": "schedule-typed-states/1.0" },
+        "period_id": { "type": "string", "minLength": 1 },
+        "period_index": { "type": "integer", "minimum": 0 },
+        "period_count": { "type": "integer", "minimum": 1 },
+        "rcf": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instrument_id",
+            "opening_balance",
+            "draw",
+            "repayment",
+            "ending_balance"
+          ],
+          "properties": {
+            "instrument_id": { "$ref": "#/$defs/nullableString" },
+            "opening_balance": { "$ref": "#/$defs/typedValue" },
+            "draw": { "$ref": "#/$defs/typedValue" },
+            "repayment": { "$ref": "#/$defs/typedValue" },
+            "ending_balance": { "$ref": "#/$defs/typedValue" }
+          }
+        },
+        "acquisition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "debt_addition",
+            "debt_proceeds",
+            "cash_consideration",
+            "debt_repayment",
+            "debt_ending_balance"
+          ],
+          "properties": {
+            "debt_addition": { "$ref": "#/$defs/typedValue" },
+            "debt_proceeds": { "$ref": "#/$defs/typedValue" },
+            "cash_consideration": { "$ref": "#/$defs/typedValue" },
+            "debt_repayment": { "$ref": "#/$defs/typedValue" },
+            "debt_ending_balance": { "$ref": "#/$defs/typedValue" }
+          }
+        },
+        "cash": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ending_cash", "buckets", "aggregates"],
+          "properties": {
+            "ending_cash": { "$ref": "#/$defs/typedValue" },
+            "buckets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["bucket_id", "label", "opening_balance", "ending_balance"],
+                "properties": {
+                  "bucket_id": { "type": "string", "minLength": 1 },
+                  "label": { "$ref": "#/$defs/nullableString" },
+                  "opening_balance": { "$ref": "#/$defs/typedValue" },
+                  "ending_balance": { "$ref": "#/$defs/typedValue" }
+                }
+              }
+            },
+            "aggregates": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reported_cash",
+                "cash_flow_cash",
+                "liquidity_cash",
+                "net_debt_eligible_cash",
+                "interest_eligible_cash"
+              ],
+              "properties": {
+                "reported_cash": { "$ref": "#/$defs/typedValue" },
+                "cash_flow_cash": { "$ref": "#/$defs/typedValue" },
+                "liquidity_cash": { "$ref": "#/$defs/typedValue" },
+                "net_debt_eligible_cash": { "$ref": "#/$defs/typedValue" },
+                "interest_eligible_cash": { "$ref": "#/$defs/typedValue" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typed_slots",
+        "historical_slots",
+        "forecast_slots",
+        "schedule_slots",
+        "value_bearing_slots",
+        "never_zero_slots",
+        "bare_number_slots",
+        "by_state"
+      ],
+      "properties": {
+        "typed_slots": { "type": "integer", "minimum": 0 },
+        "historical_slots": { "type": "integer", "minimum": 0 },
+        "forecast_slots": { "type": "integer", "minimum": 0 },
+        "schedule_slots": { "type": "integer", "minimum": 0 },
+        "value_bearing_slots": { "type": "integer", "minimum": 0 },
+        "never_zero_slots": { "type": "integer", "minimum": 0 },
+        "bare_number_slots": {
+          "const": 0,
+          "description": "A bare number where a typed state is required is a contract violation, not a tolerated count."
+        },
+        "by_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reported_number",
+            "reported_zero",
+            "prior_filing_support",
+            "derived_number",
+            "reported_blank",
+            "nil",
+            "missing",
+            "parse_failure",
+            "period_support_required",
+            "captured",
+            "not_applicable",
+            "unresolved"
+          ],
+          "properties": {
+            "reported_number": { "type": "integer", "minimum": 0 },
+            "reported_zero": { "type": "integer", "minimum": 0 },
+            "prior_filing_support": { "type": "integer", "minimum": 0 },
+            "derived_number": { "type": "integer", "minimum": 0 },
+            "reported_blank": { "type": "integer", "minimum": 0 },
+            "nil": { "type": "integer", "minimum": 0 },
+            "missing": { "type": "integer", "minimum": 0 },
+            "parse_failure": { "type": "integer", "minimum": 0 },
+            "period_support_required": { "type": "integer", "minimum": 0 },
+            "captured": { "type": "integer", "minimum": 0 },
+            "not_applicable": { "type": "integer", "minimum": 0 },
+            "unresolved": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

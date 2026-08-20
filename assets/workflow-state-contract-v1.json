@@ -1,0 +1,246 @@
+{
+  "schema_version": "workflow-state-contract/1.0",
+  "blocker_classes": [
+    "INTERNAL_WORK",
+    "USER_EVIDENCE",
+    "USER_DECISION",
+    "FATAL_SOURCE"
+  ],
+  "user_blocking_classes": [
+    "USER_EVIDENCE",
+    "USER_DECISION",
+    "FATAL_SOURCE"
+  ],
+  "vnext_quality_modes": {
+    "VERIFIED": "Every selected model authority is source-bound and verified.",
+    "DEGRADED": "Optional evidence was quarantined or a lower authority rung was used; the model remains buildable and no value was invented.",
+    "INPUT_REQUIRED": "The complete authority waterfall left a material economic node unresolved; one consolidated user decision is required.",
+    "INTERNAL_WORK": "Controller-owned work or a workflow defect remains; it is not a user question and must resume or be repaired internally.",
+    "FATAL": "A narrow source, identity, opening-debt, equation-system or workbook-integrity boundary prevents a defensible model."
+  },
+  "visible_journey": {
+    "schema_version": "visible-journey/1.0",
+    "display_rule": "Only this six-milestone journey is user-visible. Five-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
+    "milestones": [
+      { "id": "company", "label": "Company" },
+      { "id": "filings", "label": "Filings" },
+      { "id": "brokers", "label": "Brokers" },
+      { "id": "debt", "label": "Debt" },
+      { "id": "build", "label": "Build" },
+      { "id": "deliver", "label": "Deliver" }
+    ],
+    "checkpoints": {
+      "inputs": {
+        "label": "INPUT PACK",
+        "completed_milestones": 0,
+        "active_milestone": "company",
+        "next_milestone": "company"
+      },
+      "evidence_review": {
+        "label": "INPUT PACK REVIEW",
+        "completed_milestones": 4,
+        "active_milestone": null,
+        "next_milestone": "build"
+      },
+      "decisions": {
+        "label": "MODEL DECISIONS",
+        "completed_milestones": 4,
+        "active_milestone": null,
+        "next_milestone": "build"
+      },
+      "build_checks": {
+        "label": "BUILD AND CHECKS",
+        "completed_milestones": 4,
+        "active_milestone": "build",
+        "next_milestone": "deliver"
+      },
+      "delivery": {
+        "label": "DELIVERY",
+        "completed_milestones": 5,
+        "active_milestone": "deliver",
+        "next_milestone": null
+      }
+    },
+    "response_contract": {
+      "ACTION_REQUIRED": {
+        "requires_explicit_reply": true,
+        "automatic_continuation": false
+      },
+      "IN_PROGRESS": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true
+      },
+      "COMPLETE": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true
+      },
+      "BLOCKED_INTERNAL": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true,
+        "user_visible": false
+      }
+    }
+  },
+  "delivery_blocker_constitution": {
+    "schema_version": "delivery-blocker-constitution/1.0",
+    "fatal_reasons": {
+      "issuer_or_reporting_period_unresolved": "The issuer identity or reporting-period basis cannot be established safely after controlled acquisition and reconciliation.",
+      "opening_debt_unresolved": "No defensible material opening-debt position remains after DCS, filings and explicit supplements are exhausted.",
+      "equation_system_unsolved": "The sealed economic equation graph cannot solve or reconcile without inventing an input.",
+      "workbook_delivery_failed": "The workbook cannot be emitted, validated or opened without corruption."
+    },
+    "non_delivery_blocking_domains": [
+      "broker_capture",
+      "broker_table_reconciliation",
+      "broker_semantics",
+      "broker_coverage"
+    ],
+    "broker_degradation_order": [
+      "retry_rendered_region",
+      "inherit_certified_page_continuation",
+      "quarantine_affected_cell",
+      "exclude_affected_mapping",
+      "select_complete_primary_house",
+      "forecast_waterfall",
+      "deliver_with_visible_warning"
+    ],
+    "invariants": [
+      "A broker conflict may quarantine only the affected cell or mapping.",
+      "A broker house or report remains preserved when one cell is quarantined.",
+      "Broker uncertainty alone cannot terminate model delivery.",
+      "No degraded path may invent or silently substitute a broker value."
+    ],
+    "blocked_outcomes": {
+      "run_case_mutated_during_pause": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "bad_evidence": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "bad_inputs": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "filings_incomplete": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "entity_stop": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "reconciliation_stop": { "fatal_reason": "opening_debt_unresolved", "domain": "opening_debt" },
+      "awaiting_reexport": { "fatal_reason": "opening_debt_unresolved", "domain": "opening_debt" },
+      "decision_replay_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "decision_graph_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "case_recompile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "workbook_build_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workbook_build" },
+      "delivery_attestation_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "delivery_attestation" }
+    }
+  },
+  "layers": {
+    "broker_intake": {
+      "states": {
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true },
+        "COMPLETE": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "COMPLETE"],
+        "COMPLETE": ["COMPLETE"]
+      }
+    },
+    "broker": {
+      "states": {
+        "NEEDS_VISION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_RESOLUTION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false },
+        "PASS_DEGRADED": { "blocker_classes": [null], "user_blocking": false, "description": "Bounded reconciliation exhausted on ordinary readable evidence; the smallest defensible regions are quarantined model_use=prohibited, all raw evidence is preserved, and the lane is CLOSED. Broker uncertainty degrades broker authority; it never terminates delivery (delivery_blocker_constitution)." }
+      },
+      "transitions": {
+        "NEEDS_VISION": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_RESOLUTION": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_CROSSWALK": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS", "PASS_DEGRADED"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "BLOCKED_INTERNAL"],
+        "PASS_DEGRADED": ["PASS_DEGRADED", "PASS", "BLOCKED_INTERNAL"]
+      }
+    },
+    "dcs": {
+      "states": {
+        "NEEDS_CROSSWALK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_CROSSWALK": ["NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_CROSSWALK_REVIEW", "NEEDS_CROSSWALK", "BLOCKED_INTERNAL", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL"]
+      }
+    },
+    "attachment": {
+      "states": {
+        "NEEDS_INTERNAL_WORK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_INTERNAL_WORK": ["NEEDS_INTERNAL_WORK", "BLOCKED_INTERNAL", "BLOCKED_INPUT", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_INTERNAL_WORK", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_INTERNAL_WORK", "BLOCKED_INTERNAL"]
+      }
+    },
+    "filings": {
+      "states": {
+        "NEEDS_EXTRACTION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_EXTRACTION_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_EXTRACTION": ["NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_EXTRACTION_REVIEW": ["NEEDS_EXTRACTION_REVIEW", "NEEDS_EXTRACTION", "BLOCKED_INTERNAL", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL"]
+      }
+    },
+    "vnext": {
+      "states": {
+        "NEEDS_INTERNAL_WORK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true },
+        "BLOCKED": { "blocker_classes": ["FATAL_SOURCE"], "user_blocking": true },
+        "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_INTERNAL_WORK": ["NEEDS_INTERNAL_WORK", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "NEEDS_INTERNAL_WORK", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "BLOCKED": ["BLOCKED"],
+        "PASS_PENDING_MANUAL": ["PASS_PENDING_MANUAL"]
+      }
+    },
+    "user_flow": {
+      "states": {
+        "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "brokers", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["inputs", "decisions"] },
+        "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false, "stages": ["delivery"] }
+      },
+      "transitions": {
+        "SCREEN": ["SCREEN"],
+        "PAUSED": ["PAUSED", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "PAUSED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "BLOCKED": ["BLOCKED", "PAUSED", "ACTION_REQUIRED", "PASS_PENDING_MANUAL"],
+        "PASS_PENDING_MANUAL": ["PASS_PENDING_MANUAL"]
+      }
+    },
+    "stage_receipt": {
+      "states": {
+        "success": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "action_required": { "stages": ["decisions"] },
+        "blocked": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "failed": { "stages": ["build_checks", "delivery"] }
+      }
+    }
+  }
+}

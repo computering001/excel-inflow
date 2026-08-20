@@ -1,0 +1,64 @@
+{
+  "$id": "forecast-plan/2.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "forecast_periods", "states", "candidate_ledger", "status", "unresolved_material_count"],
+  "properties": {
+    "schema_version": { "const": "forecast-plan/2.0" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "forecast_periods": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "string", "format": "date" } },
+    "states": { "type": "array", "items": { "$ref": "#/$defs/state" } },
+    "candidate_ledger": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+    "status": { "enum": ["PASS", "BLOCKED"] },
+    "unresolved_material_count": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_id", "row_id", "section", "forecast_index", "period_end", "behavior", "producer_type", "method", "material", "selected_candidate_id", "producer_witness", "render_state", "status"],
+      "properties": {
+        "state_id": { "type": "string", "minLength": 1 },
+        "row_id": { "type": "string", "minLength": 1 },
+        "section": { "enum": ["income_statement", "cash_flow", "operating_metric"] },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "period_end": { "type": "string", "format": "date" },
+        "behavior": { "type": "string", "minLength": 1 },
+        "producer_type": { "enum": ["formula", "schedule", "broker_link", "source_assumption", "explicit_zero", "captured", "not_applicable", "unresolved"] },
+        "method": { "type": "string", "minLength": 1 },
+        "material": { "type": "boolean" },
+        "selected_candidate_id": { "type": "string", "minLength": 1 },
+        "value": { "type": ["number", "null"] },
+        "formula_spec": { "type": ["object", "null"] },
+        "source_bindings": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "producer_witness": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["producer_kind", "producer_id", "executable", "reason"],
+          "properties": {
+            "producer_kind": { "type": "string", "minLength": 1 },
+            "producer_id": { "type": ["string", "null"] },
+            "executable": { "type": "boolean" },
+            "reason": { "type": ["string", "null"] }
+          }
+        },
+        "render_state": { "enum": ["formula", "link", "input", "zero", "blank_grey", "block"] },
+        "status": { "enum": ["RESOLVED", "BLOCKED"] },
+        "rationale": { "type": "string" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["candidate_id", "state_id", "method", "origin", "selected"],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "state_id": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 1 },
+        "origin": { "type": "string", "minLength": 1 },
+        "selected": { "type": "boolean" },
+        "rejection_reason": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

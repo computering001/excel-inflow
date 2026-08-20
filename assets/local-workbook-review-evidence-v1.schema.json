@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "local-workbook-review-evidence/1.0",
+  "title": "Excel Inflow portable local workbook review evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "evidence_class",
+    "gate_scope",
+    "total_violations",
+    "attested_workbook",
+    "semantic_inventory",
+    "show_formulas_derivative",
+    "modes",
+    "checklist",
+    "summary",
+    "human_visual_review",
+    "native_excel_review"
+  ],
+  "properties": {
+    "schema_version": { "const": "local-workbook-review-evidence/1.0" },
+    "status": { "enum": ["PASS", "BLOCKED"] },
+    "evidence_class": { "const": "AUTOMATED_LOCAL_REVIEW_ONLY" },
+    "gate_scope": { "const": "PORTABLE_NON_NATIVE_PHASE_13" },
+    "total_violations": { "type": "integer", "minimum": 0 },
+    "attested_workbook": { "$ref": "#/$defs/file" },
+    "semantic_inventory": {
+      "allOf": [
+        { "$ref": "#/$defs/file" },
+        {
+          "type": "object",
+          "required": ["inventory_schema_version"],
+          "properties": {
+            "inventory_schema_version": { "const": "workbook-semantic-inventory/1.0" }
+          }
+        }
+      ]
+    },
+    "show_formulas_derivative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "source_workbook_sha256",
+        "purpose",
+        "delivery_eligible",
+        "transformation"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "source_workbook_sha256": { "$ref": "#/$defs/sha256" },
+        "purpose": { "const": "LOCAL_SHOW_FORMULAS_REVIEW_COPY" },
+        "delivery_eligible": { "const": false },
+        "transformation": { "const": "SET_SHOW_FORMULAS_ON_EVERY_VISIBLE_SHEET_ONLY" }
+      }
+    },
+    "modes": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/valuesMode" },
+        { "$ref": "#/$defs/formulasMode" }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "checklist": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checklist" },
+      "minItems": 24,
+      "maxItems": 24
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_checks", "passed_checks", "visible_sheet_count", "rendered_page_count"],
+      "properties": {
+        "required_checks": { "const": 24 },
+        "passed_checks": { "type": "integer", "minimum": 0, "maximum": 24 },
+        "visible_sheet_count": { "type": "integer", "minimum": 1 },
+        "rendered_page_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "human_visual_review": { "$ref": "#/$defs/unperformed" },
+    "native_excel_review": { "$ref": "#/$defs/unperformed" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "inventory_schema_version": { "type": "string" }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sheet", "page_index", "path", "sha256", "bytes"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(values|show_formulas):.+:[1-9][0-9]*$" },
+        "sheet": { "type": "string", "minLength": 1 },
+        "page_index": { "type": "integer", "minimum": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "modeBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "workbook_sha256", "render_report", "visible_sheets", "pages"],
+      "properties": {
+        "mode": { "enum": ["values", "show_formulas"] },
+        "workbook_sha256": { "$ref": "#/$defs/sha256" },
+        "render_report": { "$ref": "#/$defs/file" },
+        "visible_sheets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "pages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/page" },
+          "minItems": 1
+        }
+      }
+    },
+    "valuesMode": {
+      "allOf": [
+        { "$ref": "#/$defs/modeBase" },
+        { "properties": { "mode": { "const": "values" } } }
+      ]
+    },
+    "formulasMode": {
+      "allOf": [
+        { "$ref": "#/$defs/modeBase" },
+        { "properties": { "mode": { "const": "show_formulas" } } }
+      ]
+    },
+    "checklist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "section", "status", "review_class", "evidence_page_ids", "checks"],
+      "properties": {
+        "mode": { "enum": ["values", "show_formulas"] },
+        "section": {
+          "enum": [
+            "control_panel",
+            "income_statement",
+            "ebitda_bridge",
+            "cash_flow",
+            "debt_schedule",
+            "leverage_liquidity",
+            "rcf_sweep",
+            "interest_schedule",
+            "adjustment_columns",
+            "pro_forma_columns",
+            "broker_sheets",
+            "quality_panel"
+          ]
+        },
+        "status": { "enum": ["PASS", "BLOCKED"] },
+        "review_class": { "const": "AUTOMATED_LOCAL" },
+        "evidence_page_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["render_complete", "semantic_inventory_bound", "section_evidence_bound"],
+          "properties": {
+            "render_complete": { "const": "PASS" },
+            "semantic_inventory_bound": { "const": "PASS" },
+            "section_evidence_bound": { "const": "PASS" }
+          }
+        }
+      }
+    },
+    "unperformed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "claimed_as_pass"],
+      "properties": {
+        "status": { "const": "NOT_PERFORMED" },
+        "claimed_as_pass": { "const": false }
+      }
+    }
+  }
+}
