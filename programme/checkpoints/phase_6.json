@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "c28fbccdd106183bd31e14363afe28b0fece91bc",
-  "source_tree": "51d504de4aa82d11381fb3199aa8e3cb4aee631b",
+  "commit": "b92eeee2c3e5afa6e7e2a8659fc161bd7b1d04d2",
+  "source_tree": "8483734c1f5d64f19aa73bf34dd39057bd50d4b2",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -34,6 +34,18 @@
       "note": "declares and measures but deliberately does not skip; a dishonest key is recorded, not served"
     },
     {
+      "package": "P6.4",
+      "commit": "",
+      "invariant": "a change invalidates exactly the work it should, and the reuse a run claims is the reuse it performed",
+      "note": "the declared map disagreed with the measured graph on 8 of 12 entries, every one in the unsafe direction"
+    },
+    {
+      "package": "P6.5",
+      "commit": "",
+      "invariant": "concurrency is bounded by declared resource limits and mandatory work has budget priority over optional",
+      "note": "the circuit breaker became a real breaker; a missing asset declaration would ship a package the controller needs and no test catches it"
+    },
+    {
       "package": "P6.6",
       "commit": "26a9ae5",
       "invariant": "the performance receipt's spans measure what they are named, reconcile against the total, and checkpoint reuse is a lawful zero",
@@ -46,7 +58,7 @@
       "note": "found the live Pillow/numpy render-lane gap on this host; controller wiring deferred, CLI ships as an entry point"
     }
   ],
-  "sealed_package_count": 6,
+  "sealed_package_count": 8,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",

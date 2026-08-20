@@ -2,14 +2,23 @@
   "schema_version": "critical-invariant-oracle-matrix/2.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "08048030c6bb74233504ca1a3f6a7c3cd12044b9c332c8504462373d8d6ff04a",
+    "oracle_sha256": "372ddcee0f3eea4f111b658578211d2622bad6e25f063f666903c0a73de6645d",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "edcc409d178688c9b83dd46b7d39cc05a4953de3b6896a84750c7d03ecac0fea"
+    "registry_sha256": "331e8ad4cdb09581e8764e0bbdaf8723aa052319dd35969242e9b627400b6ebd"
   },
   "artifact_oracle": {
     "test_id": "emitted-candidate-independent-oracle",
     "artifact_origin": "real_candidate_emission_with_sealed_source_arithmetic",
     "required_production_imports": []
+  },
+  "physical_mutation_oracle": {
+    "suite_path": "scripts/run_physical_authority_mutation_tests.py",
+    "oracle_path": "scripts/verify/physical_authority_mutation_oracle.py",
+    "reader_path": "scripts/verify/plan_reconstruction_oracle.py",
+    "mutation_scope": "emitted_workbook_cell",
+    "reader_origin": "P5.4 -- the physical oracle judges, it does not read; no second reader was introduced",
+    "registry_status": "PENDING_REGISTRATION",
+    "why_pending": "assets/development-test-registry.json is outside P5.5's allowed files. The suite is bound here by PATH and driven by this matrix's oracle on every run; registration is the tracked follow-on. This field must be corrected the moment the suite is registered -- validate_matrix refuses a PENDING_REGISTRATION claim once the registry names the script."
   },
   "domains": [
     {
@@ -38,7 +47,8 @@
         }
       ],
       "evidence_scope": "synthetic_unit_only",
-      "independence": "NOT_INDEPENDENTLY_PROVEN"
+      "independence": "NOT_INDEPENDENTLY_PROVEN",
+      "unproven_reason": "an instrument-id-to-balance binding is not derivable from the emitted cells alone on this corpus: the debt schedule prints the revolver's FACILITY CAPACITY rather than its opening balance, and one instrument's opening balance collides with an unrelated acquisition cell, so the only unambiguous binding is the build's own row map -- precisely the forward expectation P5.4 exists not to consume. A physical proof needs an independently derivable identity binding."
     },
     {
       "domain": "interest_lineage",
@@ -66,7 +76,8 @@
         }
       ],
       "evidence_scope": "synthetic_unit_only",
-      "independence": "NOT_INDEPENDENTLY_PROVEN"
+      "independence": "NOT_INDEPENDENTLY_PROVEN",
+      "unproven_reason": "the certified representative emits no impairment line at all: no cell on any of the three sheets carries an impairment label and the case text never names one, so there is no production cell whose inclusion in the D&A addback could be mutated. A physical proof needs a corpus case carrying an impairment adjustment; test-fixtures/** is outside P5.5's allowed files."
     },
     {
       "domain": "forecast_ownership",
@@ -80,7 +91,21 @@
           "mutation_id": "duplicate-forecast-writer"
         }
       ],
-      "evidence_scope": "emitted_candidate_artifact"
+      "evidence_scope": "emitted_candidate_artifact",
+      "physical_cell_mutations": [
+        {
+          "mutation_id": "derived-authority-cell-hardcoded"
+        },
+        {
+          "mutation_id": "broker-authority-cell-loses-its-link"
+        },
+        {
+          "mutation_id": "broker-authority-cell-marking-repainted"
+        },
+        {
+          "mutation_id": "live-authority-cell-blanked"
+        }
+      ]
     },
     {
       "domain": "rcf_financing_cash",
@@ -94,7 +119,21 @@
           "mutation_id": "drop-rcf-draw-capture"
         }
       ],
-      "evidence_scope": "emitted_candidate_artifact"
+      "evidence_scope": "emitted_candidate_artifact",
+      "physical_cell_mutations": [
+        {
+          "mutation_id": "capture-child-regains-live-writer"
+        },
+        {
+          "mutation_id": "capture-parent-cell-blanked"
+        },
+        {
+          "mutation_id": "capture-scope-dropped-from-absorbing-identity"
+        },
+        {
+          "mutation_id": "capture-child-row-relabelled"
+        }
+      ]
     },
     {
       "domain": "broker_period",
@@ -108,7 +147,8 @@
         }
       ],
       "evidence_scope": "synthetic_unit_only",
-      "independence": "NOT_INDEPENDENTLY_PROVEN"
+      "independence": "NOT_INDEPENDENTLY_PROVEN",
+      "unproven_reason": "the emitted package carries no broker DEMAND record: the proof contract's broker_evidence is null and the workbook prints only the SELECTED period headers, so demand-to-selection parity has no counterpart cell to mutate. A physical proof needs the broker pipeline's demand ledger emitted beside the workbook; the broker pipeline is outside P5.5's allowed files."
     },
     {
       "domain": "broker_consensus_membership",
@@ -139,7 +179,8 @@
         }
       ],
       "evidence_scope": "synthetic_unit_only",
-      "independence": "NOT_INDEPENDENTLY_PROVEN"
+      "independence": "NOT_INDEPENDENTLY_PROVEN",
+      "unproven_reason": "the certified representative resolves everything: the build reports unresolved_caches 0 and all 138 forecast-ledger entries carry status 'resolved', so no emitted cell holds an unresolved state that could be mutated to zero. A physical proof needs a corpus case carrying an unresolved state; test-fixtures/** is outside P5.5's allowed files."
     },
     {
       "domain": "debt_classification",
@@ -163,11 +204,15 @@
       ],
       "mutations": [
         {
-          "mutation_id": "remote_value_error"
+          "mutation_id": "remote-cell-carries-an-error"
+        },
+        {
+          "mutation_id": "cell-reads-as-an-error-without-the-error-type"
         }
       ],
-      "evidence_scope": "synthetic_unit_only",
-      "independence": "NOT_INDEPENDENTLY_PROVEN"
+      "evidence_scope": "emitted_workbook_cell",
+      "independence": "PROVEN_AGAINST_EMITTED_CELLS",
+      "promoted_from": "synthetic_unit_only -- the toy string comparison over a three-entry dictionary is deleted; the scan now reads every cell of every sheet out of the emitted .xlsx and is killed by a real error injected into the remotest populated cell of each sheet."
     },
     {
       "domain": "acquisition_cash_debt_interest",
@@ -243,5 +288,166 @@
       ],
       "evidence_scope": "emitted_candidate_artifact"
     }
-  ]
+  ],
+  "rendered_geometry_scope": {
+    "scope": "rendered_geometry",
+    "declared_by_package": "P5.8",
+    "audit_class": "visual_manual",
+    "artifact_origin": "real_workbook_emission_rendered_through_libreoffice",
+    "why_not_a_domains_entry": "the `domains` array above is pinned element-for-element by `required_domains` in scripts/run_critical_invariant_oracle_matrix_tests.py, and every entry there must carry evidence_scope `emitted_candidate_artifact` or `synthetic_unit_only`. rendered geometry is neither: its evidence is a LibreOffice conversion of the emitted .xlsx plus a per-page pixel diff. Rather than widen a pinned enum from the asset side (which would silently change what fifteen other domains are allowed to claim), the scope is declared here, additively, and carries its own oracle and its own kill record. It is a declared domain of the matrix, not an absence.",
+    "pairing_oracle": "scripts/run_visual_mutation_pairing_tests.py",
+    "claim_scope": "REAL_RENDERED_GEOMETRY_WITH_EXPLICITLY_UNPAIRED_SCREEN_ONLY_SURFACES",
+    "readers": {
+      "file_geometry_reader": {
+        "path": "scripts/verify/plan_reconstruction_oracle.py",
+        "entry": "verify_workbook",
+        "origin": "P5.4",
+        "reads": "the .xlsx bytes, reconstructing 24 workbook aspects (widths, heights, hidden flags, merges, freeze panes, fonts, fills, borders, alignment, number formats, gridline visibility, page setup) and diffing them against the recorded plan"
+      },
+      "style_authority_reader": {
+        "path": "scripts/verify/provenance_authority_oracle.py",
+        "entry": "verify",
+        "origin": "P5.3",
+        "reads": "emitted cell font colour bound to the authority record that licenses it, independently of the emitter's own regex"
+      },
+      "visual_reader": {
+        "path": "scripts/render/check_render.py",
+        "entry": "run_case",
+        "reads": "a real LibreOffice PDF conversion: clipping, presence, overlap, alignment, structural fill sampling, declared conditional formats, font set, page count and a per-page pixel diff against an approved baseline"
+      },
+      "design_contract_mutation_harness": {
+        "path": "scripts/run_standardised_design_contract_mutations.mjs",
+        "validator": "scripts/validate_standardised_design_contract.mjs",
+        "prior_census_disposition": "ORPHANED_BARE_RUNNABLE",
+        "verdict": "ADOPTED_AS_SUBORDINATE_ORACLE",
+        "adopted_by": "scripts/run_visual_mutation_pairing_tests.py",
+        "why_not_deleted": "it is the only mutation proof that the standardised design contract's validator is non-vacuous: 15 mutations, 15 kills, 556 checks visited per candidate, over assets/standardised-design-contract.v4.json — an asset three other scripts read (run_frozen_cohort.mjs, run_authority_projection_mutations.mjs, validate_authority_projection.mjs). Its mutation set IS the style/geometry mutation half this scope needs. It was orphaned for want of a caller, not for want of value; the pairing oracle is now that caller and asserts its verdict, its kill count and its non-vacuity.",
+        "style_geometry_mutations": [
+          "M03_EMPTY_STYLE_TABLE",
+          "M04_EMPTY_DXF_TABLE",
+          "M07_PRINT_SILENCE_DROPPED",
+          "M08_WRONG_FIT_WIDTH",
+          "M11_FALSE_COLUMN_AGREEMENT",
+          "M12_COLUMN_DRIFT",
+          "M13_RED_FONT"
+        ]
+      }
+    },
+    "host_requirements": {
+      "soffice": "a LibreOffice binary able to convert .xlsx to PDF",
+      "python_modules": ["openpyxl", "fitz (PyMuPDF)"],
+      "unavailable_here": {
+        "module": "reportlab",
+        "blocks": "scripts/render/selftest.py, which lays out a synthetic PDF with known geometry to prove each render check fires without LibreOffice",
+        "consequence": "the render CHECKS are exercised in this scope only through real conversions of real mutants; their synthetic per-check self-test remains unrun and needs a host carrying reportlab"
+      },
+      "on_an_unfit_host": "the pairing oracle exits BLOCKED (non-zero). It never reports a pairing it did not observe."
+    },
+    "pairings": [
+      {
+        "mutation_id": "column_width_collapse",
+        "ooxml_part": "xl/worksheets/sheet1.xml",
+        "mutation": "the label column's <col> width is collapsed from 46 to 6 characters",
+        "reader_sees": "every row label truncated, and the sheet spilling onto an extra page",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_COLUMN_MISMATCH"
+        },
+        "visual_detector": {
+          "oracle": "scripts/render/check_render.py",
+          "check": "check_clipping (with check_overlap and a page-count change corroborating)",
+          "signal": "clipping_defects"
+        },
+        "pairing_status": "PAIRED"
+      },
+      {
+        "mutation_id": "model_row_hidden",
+        "ooxml_part": "xl/worksheets/sheet1.xml",
+        "mutation": "hidden=\"1\" is set on the first row carrying a visible statement label",
+        "reader_sees": "a whole statement line missing from the model",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_ROW_MISMATCH"
+        },
+        "visual_detector": {
+          "oracle": "scripts/render/check_render.py",
+          "check": "check_presence — planned cells that the render cannot locate",
+          "signal": "presence_defects"
+        },
+        "pairing_status": "PAIRED"
+      },
+      {
+        "mutation_id": "section_band_fill_recoloured",
+        "ooxml_part": "xl/styles.xml",
+        "mutation": "the darkest solid fill in the style table (the section-band colour) is repainted green",
+        "reader_sees": "every section header band in a different colour",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_FILL_MISMATCH"
+        },
+        "visual_detector": {
+          "oracle": "scripts/render/check_render.py",
+          "check": "per-page pixel regression against the approved baseline. check_structure alone does NOT catch this: it samples the render against the FILE's own declared fill, so a styles.xml edit moves both sides together and stays self-consistent. Only the baseline is external to the file.",
+          "signal": "pixel_regression_unattributed"
+        },
+        "pairing_status": "PAIRED"
+      },
+      {
+        "mutation_id": "source_font_colour_black",
+        "ooxml_part": "xl/styles.xml",
+        "mutation": "the plain blue provenance font (FF0000FF) is blackened to FF000000",
+        "reader_sees": "sourced inputs that read as model-owned numbers — the provenance convention silently inverted",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_FONT_MISMATCH",
+          "corroborating_oracle": "scripts/verify/provenance_authority_oracle.py",
+          "style_authority_status": "BLOCK"
+        },
+        "visual_detector": {
+          "oracle": "scripts/render/check_render.py",
+          "check": "per-page pixel regression. No render check samples glyph colour: check_structure samples cell FILLS only. The pixel baseline is the sole visual detector of a font-colour defect.",
+          "signal": "pixel_regression_unattributed"
+        },
+        "pairing_status": "PAIRED"
+      },
+      {
+        "mutation_id": "freeze_pane_removed",
+        "ooxml_part": "xl/worksheets/sheet1.xml",
+        "mutation": "the frozen <pane> is deleted from the sheet view",
+        "reader_sees": "period headers and row labels scrolling away — the model becomes unreadable past the first screen",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_FREEZE_PANE_MISMATCH"
+        },
+        "visual_detector": null,
+        "pairing_status": "NO_VISUAL_DETECTOR",
+        "audit_class": "visual_manual",
+        "unpaired_reason": "a frozen pane has no printed representation. The render lane's evidence is a paginated PDF, so the mutant renders PIXEL-IDENTICAL to the baseline — zero changed pixels on every page. This is proven blindness, not an unwritten check: no addition to check_render could see it. Detecting it requires the live workbook in a spreadsheet application, which is the installed/native tier this repository excludes, or a human. Hence audit class visual_manual.",
+        "needs": "a native-host or human check of the live workbook"
+      },
+      {
+        "mutation_id": "gridlines_shown",
+        "ooxml_part": "xl/worksheets/sheet1.xml",
+        "mutation": "sheetView showGridLines is flipped from 0 to 1",
+        "reader_sees": "the spreadsheet grid showing through the whole model on screen",
+        "file_detector": {
+          "oracle": "scripts/verify/plan_reconstruction_oracle.py",
+          "finding_code": "RECON_SHOW_GRIDLINES_MISMATCH"
+        },
+        "visual_detector": null,
+        "pairing_status": "NO_VISUAL_DETECTOR",
+        "audit_class": "visual_manual",
+        "unpaired_reason": "showGridLines governs the SCREEN; printing gridlines is a separate printOptions/gridLines flag. The paginated render therefore shows zero changed pixels, and again this is proven rather than assumed. Same conclusion as freeze_pane_removed: screen-only surfaces are outside what any print-render can witness.",
+        "needs": "a native-host or human check of the live workbook"
+      }
+    ],
+    "visual_manual_audit_class": {
+      "status": "IN_USE",
+      "previously": "declared in assets/development-test-registry.json metadata_contract.allowed_audit_classes and referred to by nothing",
+      "meaning": "reader-visible workbook state whose only detector is a human, or a native spreadsheet host, looking at the live workbook — because the print-render lane is PROVABLY blind to it (zero changed pixels against an approved baseline), not merely unimplemented.",
+      "carried_by": ["freeze_pane_removed", "gridlines_shown"],
+      "enforced_by": "scripts/run_visual_mutation_pairing_tests.py asserts the class is in the registry's allowed_audit_classes, that this scope carries it, and that every NO_VISUAL_DETECTOR pairing declares it",
+      "outstanding_registry_defect": "metadata_contract.audit_class_by_test_class maps no test_class to visual_manual, so no REGISTERED TEST can ever carry the class even though it is allowed. assets/development-test-registry.json is outside this package's allowed files; the mapping is a handover item for its owner."
+    }
+  }
 }

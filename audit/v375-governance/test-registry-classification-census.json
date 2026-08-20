@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 66,
-      "cross_layer_integration": 79,
+      "cross_layer_integration": 82,
       "independent_economic_oracle": 4,
       "installed_host": 1,
       "real_corpus": 7,
@@ -18,11 +18,11 @@
     },
     "by_profile": {
       "custody": 12,
-      "portable": 189
+      "portable": 192
     },
     "self_confirmation_risk": {
       "false": 13,
-      "true": 188
+      "true": 191
     }
   },
   "full_record_policy": "The generator emits one owner, declared test class, canonical audit class, expected-exit contract, profile and self-confirmation classification for every registry id.",
@@ -31,8 +31,8 @@
   "interpretation": "This is a classification census, not an assertion that all classes are independent. Unit, component-integration and cross-layer-integration tests are explicitly counted as carrying self-confirmation risk. Installed-host evidence remains custody-bound and may be BLOCKED in portable CI.",
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "edcc409d178688c9b83dd46b7d39cc05a4953de3b6896a84750c7d03ecac0fea",
-    "test_count": 201
+    "sha256": "331e8ad4cdb09581e8764e0bbdaf8723aa052319dd35969242e9b627400b6ebd",
+    "test_count": 204
   },
   "schema_version": "development-test-classification-census-summary/1.0"
 }

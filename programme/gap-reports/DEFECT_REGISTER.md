@@ -291,3 +291,34 @@ programme repeatedly finds. The fallback may well be correct, but a throw on the
 means the preview path fails on input it should handle, and nothing named that until now.
 Open question for the owner: is the throw expected for a broker pack of this shape (then the
 catch should be a declared branch, not an exception), or is it a real preview defect?
+
+## D26 — the change-invalidation map licensed reuse of work a change had already invalidated (FIXED by P6.4)
+`CHANGE_INVALIDATION` in `scripts/lib/flow_runtime.mjs` was a 12-entry literal with ZERO
+callers. P6.4 gave it a caller and recomputed it from P6.3's measured node graph: it
+DISAGREED on 8 of 12 entries, and every single disagreement was `later_than_measured` —
+declaring a change invalidates from a LATER stage than it actually does, i.e. licensing reuse
+of work the change had already invalidated.
+
+  source_file / filing / debt_export / broker_forecast / prior_case
+      declared evidence_review, measured inputs
+  user_answer / assumption / transaction_input
+      declared build_checks, measured decisions
+
+Verified empirically rather than by inspection: a probe under `broker_pack` moves
+`files.evidence_run` and misses an `inputs` node; one changed answer misses exactly the eight
+`decisions` nodes and nothing above. The literal is retained but no longer trusted — the
+disagreement count is recomputed from the graph and pinned at zero, with the historical map
+kept so the suite pins the eight failures rather than asserting the corrections.
+
+Why it was invisible: with zero callers the map was never exercised, so being wrong cost
+nothing until something tried to use it. A dead literal that looks authoritative is worse than
+an absent one.
+
+## D27 — reused_stages claimed reuse the run did not perform (FIXED by P6.4)
+A warm answered run reported `["inputs","evidence_review","decisions"]` while FIVE nodes
+re-executed for 1260.5ms inside those stages. P6.4 made the claim true rather than narrowing
+it — narrowing would have turned six assertions across four registered suites red, which is
+its own signal that the claim was load-bearing. `decisions` is now genuinely enacted (all 8
+nodes reused, 228.3ms → 0); `evidence_review` CANNOT be enacted (its key includes an artifact
+its own work produces, and its intake plan carries live option handlers no artifact can hold)
+and now says so, reporting mode "verified" with its 884.5ms cost visible.

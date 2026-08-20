@@ -1,0 +1,65 @@
+{
+  "schema_version": "excel-inflow-lane-resource-policy/1.0",
+  "work_package": "P6.5",
+  "invariant": "Evidence-lane concurrency is bounded by DECLARED resource limits rather than by however many lanes happen to exist; mandatory work has budget priority over optional work; and every lane records what it consumed.",
+  "precedent": "Stage 4 already sizes its own concurrency from a measured resource (orchestrate_release.mjs validator_concurrency, by workbook bytes). This asset is the same convention for evidence lanes, moved out of a ternary and into a declaration two runtimes can read.",
+  "criticality_source": "assets/product-constitution-v1.json#evidence_lanes.<lane>.criticality",
+  "optional_criticalities": ["optional"],
+  "worker_reservation": {
+    "cpu_per_worker": 1,
+    "memory_mib_per_worker": 1536,
+    "reserved_cpu": 1,
+    "reserved_memory_mib": 1024,
+    "note": "One core and 1.5 GiB per concurrent lane worker; one core and 1 GiB held back for the controller process itself and its node parent."
+  },
+  "worker_tiers": [
+    { "min_usable_memory_mib": 0, "max_workers": 1 },
+    { "min_usable_memory_mib": 3072, "max_workers": 2 },
+    { "min_usable_memory_mib": 6144, "max_workers": 3 }
+  ],
+  "max_workers_ceiling": 3,
+  "assumed_total_memory_mib": 4096,
+  "budget_priority": {
+    "classes": {
+      "mandatory": { "rank": 0, "may_be_starved": false },
+      "optional": { "rank": 1, "may_be_starved": true }
+    },
+    "mandatory_floor_ms": 60000,
+    "mandatory_floor_source": "scripts/lib/run_deadline.mjs#STAGE_FLOOR_MS",
+    "mandatory_reserve_stage_count": 4,
+    "mandatory_reserve_ms": 240000,
+    "mandatory_reserve_source": "STAGE_FLOOR_MS x the mandatory stages still downstream of the evidence half (decisions, build_checks, delivery, stage-4 outer) = STAGE_FLOOR_STAGE_COUNT - 2",
+    "optional_envelope_ms": 720000,
+    "optional_envelope_source": "scripts/lib/runtime_budget_policy.mjs#DEFAULT_RUNTIME_BUDGETS_MS.broker_global",
+    "optional_floor_ms": 60000,
+    "note": "Optional work draws only on the surplus above the mandatory reserve. An optional grant that would fall below optional_floor_ms is zero: the lane is not started, and its fault containment closes it at zero authority. Mandatory work is never reduced below mandatory_floor_ms and is never starved."
+  },
+  "budget_clock": {
+    "ledger_env": "EXCEL_INFLOW_RUN_DEADLINE",
+    "reader_only": true,
+    "note": "P6.1's one persisted monotonic run clock is READ here and never written. Absence of a ledger means the declared lane budgets apply unchanged."
+  },
+  "receipt": {
+    "schema_version": "lane-resource-receipt/1.0",
+    "cpu_attributions": ["exclusive", "pool_shared"],
+    "budget_sources": ["declared_only", "run_deadline_ledger"],
+    "required_fields": [
+      "schema_version",
+      "lane",
+      "priority_class",
+      "criticality",
+      "worker_slot",
+      "pool_max_workers",
+      "reserved_cpu",
+      "reserved_memory_mib",
+      "requested_budget_ms",
+      "granted_budget_ms",
+      "budget_source",
+      "consumed_wall_ms",
+      "cpu_attribution",
+      "budget_headroom_ms",
+      "starved",
+      "late_enrichment_after_seal"
+    ]
+  }
+}

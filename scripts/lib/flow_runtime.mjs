@@ -1,5 +1,10 @@
 import { canonicalise, hashValue } from "./run_store.mjs";
 import {
+  CHANGE_KEY_COMPONENTS,
+  invalidatedNodesForChange,
+  invalidatedStagesForChange,
+} from "./evidence_work_graph.mjs";
+import {
   assertWorkflowState,
   VISIBLE_JOURNEY_CONTRACT,
   WORKFLOW_STATE_CONTRACT,
@@ -144,7 +149,56 @@ export function visibleJourneyProgress(stageId, status = "in progress") {
 // The earliest user stage that must be rerun after a targeted change. These
 // are user-flow stages, not internal graph nodes. Internal dependency hashes
 // still decide which work inside the selected stage can be reused.
+//
+// P6.4 — THIS MAP WAS WRONG, AND HAD NO CALLER TO FIND OUT.
+//
+// It was a twelve-entry literal with zero callers anywhere in the repository.
+// When it was finally checked against the evidence work graph P6.3 measured,
+// EIGHT of the twelve entries disagreed, and every single one disagreed in the
+// UNSAFE direction (`later_than_measured`): each named a LATER stage than the
+// work actually keyed on the change, which is a licence to reuse work that the
+// change has already invalidated. Only the four entries that could not be
+// wrong — the two with no evidence-half node keyed on them, the ambient-code
+// entry, and `company_name` — agreed.
+//
+//   source_file, filing, debt_export, broker_forecast, prior_case
+//     said `evidence_review`. All five live inside the ONE evidence-run
+//     envelope whose file hash is `evidence_validation`'s only declared key
+//     component, and `evidence_validation` is a stage-`inputs` node. Measured:
+//     adding a single key under `broker_pack` moves `files.evidence_run` and
+//     misses `evidence_validation`. The truth is `inputs`.
+//   user_answer said `build_checks`, a whole stage too late. Measured: changing
+//     one answer misses exactly the eight `decisions` nodes — the answered case
+//     recompile, the decision replay and the six compilations below them — and
+//     nothing in `inputs` or `evidence_review`. The truth is `decisions`.
+//   assumption and transaction_input said `build_checks` for the same reason
+//     and are corrected the same way.
+//
+//
+// The literal is kept — a declaration a human can read is worth having — but it
+// is no longer TRUSTED: `changeInvalidationDisagreements()` recomputes every
+// entry from the measured graph and is pinned at zero by the suite, so an entry
+// can never again drift away from the work it is describing.
 export const CHANGE_INVALIDATION = Object.freeze({
+  company_name: "inputs",
+  source_file: "inputs",
+  filing: "inputs",
+  debt_export: "inputs",
+  broker_forecast: "inputs",
+  prior_case: "inputs",
+  user_answer: "decisions",
+  assumption: "decisions",
+  transaction_input: "decisions",
+  formatting: "build_checks",
+  delivery_wording: "delivery",
+  controller_code: "inputs",
+});
+
+/**
+ * The historical literal, kept so the suite can pin the disagreement it had
+ * with the measured graph rather than merely asserting the corrected values.
+ */
+export const SUPERSEDED_CHANGE_INVALIDATION = Object.freeze({
   company_name: "inputs",
   source_file: "evidence_review",
   filing: "evidence_review",
@@ -158,6 +212,78 @@ export const CHANGE_INVALIDATION = Object.freeze({
   delivery_wording: "delivery",
   controller_code: "inputs",
 });
+
+/**
+ * The stage floor for a change no evidence-half node is keyed on. A change to
+ * presentation or delivery wording invalidates nothing in the evidence half, so
+ * the graph cannot answer for it and the declaration is the only answer there
+ * is — which is exactly why it is confined to these two.
+ */
+export const NON_EVIDENCE_CHANGE_FLOOR = Object.freeze({
+  formatting: "build_checks",
+  delivery_wording: "delivery",
+});
+
+/**
+ * The MEASURED earliest invalidated stage: which nodes the declared work graph
+ * says fall when this change moves, and the earliest user stage those nodes
+ * belong to. Computed, never asserted.
+ */
+export function measuredEarliestInvalidatedStage(change) {
+  const stages = invalidatedStagesForChange(change);
+  if (stages.length === 0) {
+    const floor = NON_EVIDENCE_CHANGE_FLOOR[change];
+    if (!floor) {
+      throw new Error(
+        `${change} invalidates no evidence work node and declares no non-evidence stage floor`,
+      );
+    }
+    return stageById(floor);
+  }
+  let earliest = null;
+  for (const stageId of stages) {
+    const stage = stageById(stageId);
+    if (!stage) throw new Error(`the work graph names a stage the flow does not declare: ${stageId}`);
+    if (!earliest || stage.number < earliest.number) earliest = stage;
+  }
+  return earliest;
+}
+
+/**
+ * Every entry whose declared stage does not equal the measured one, with the
+ * direction named. `later_than_measured` is the dangerous direction: it permits
+ * reuse of work a change has already invalidated.
+ */
+export function changeInvalidationDisagreements(declared = CHANGE_INVALIDATION) {
+  const disagreements = [];
+  for (const change of Object.keys(CHANGE_KEY_COMPONENTS)) {
+    if (!Object.hasOwn(declared, change)) {
+      disagreements.push({ change, declared: null, measured: null, direction: "undeclared" });
+      continue;
+    }
+    const declaredStage = stageById(declared[change]);
+    const measured = measuredEarliestInvalidatedStage(change);
+    if (!declaredStage) {
+      disagreements.push({ change, declared: declared[change], measured: measured.id, direction: "unknown_stage" });
+      continue;
+    }
+    if (declaredStage.id === measured.id) continue;
+    disagreements.push({
+      change,
+      declared: declaredStage.id,
+      measured: measured.id,
+      nodes: invalidatedNodesForChange(change),
+      direction:
+        declaredStage.number > measured.number ? "later_than_measured" : "earlier_than_measured",
+    });
+  }
+  for (const change of Object.keys(declared)) {
+    if (!Object.hasOwn(CHANGE_KEY_COMPONENTS, change)) {
+      disagreements.push({ change, declared: declared[change], measured: null, direction: "no_measured_components" });
+    }
+  }
+  return disagreements;
+}
 
 export function earliestInvalidatedStage(changes) {
   const list = Array.isArray(changes) ? changes : [changes];

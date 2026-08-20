@@ -7,6 +7,7 @@
   ],
   "members": [
     "assets/attachment-evidence-controller.schema.json",
+    "assets/lane-resource-policy-v1.json",
     "assets/attachment-evidence-run-state.schema.json",
     "assets/broker-degraded-close-receipt-v1.schema.json",
     "assets/broker-intake-choice-v1.schema.json",

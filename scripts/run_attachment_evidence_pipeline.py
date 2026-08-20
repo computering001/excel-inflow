@@ -17,10 +17,12 @@ import json
 import math
 import os
 import re
+import resource
 import subprocess
 import signal
 import sys
 import tempfile
+import threading
 import time
 import atexit
 from pathlib import Path
@@ -347,6 +349,368 @@ def lane_requires_execution(kind: str, reusable_mandatory_lanes: dict[str, dict[
     return kind == "broker" or kind not in reusable_mandatory_lanes
 
 
+# ---------------------------------------------------------------------------
+# P6.5 — bounded parallelism, budget priority, per-lane resource receipts.
+#
+# The lane pool used to take its worker count straight from the number of
+# concurrent declarations: as many workers as there happened to be lanes, with
+# no cpu, memory or budget bound.
+# Worker count now derives from DECLARED resource limits, following stage 4's
+# `validator_concurrency` precedent (size the concurrency from a measured
+# resource) rather than inventing a second convention.
+#
+# The remaining run budget is READ from P6.1's one persisted monotonic ledger
+# and never written here: there is still exactly one clock and one writer.
+# Absence of a ledger means the declared lane budgets apply unchanged.
+# ---------------------------------------------------------------------------
+LANE_RESOURCE_POLICY_PATH = ROOT / "assets" / "lane-resource-policy-v1.json"
+PRODUCT_CONSTITUTION_PATH = ROOT / "assets" / "product-constitution-v1.json"
+LANE_RESOURCE_POLICY_SCHEMA = "excel-inflow-lane-resource-policy/1.0"
+LANE_RESOURCE_PLAN_SCHEMA = "lane-resource-plan/1.0"
+LANE_RESOURCE_RECEIPT_SCHEMA = "lane-resource-receipt/1.0"
+LANE_RESOURCE_RECEIPTS_SCHEMA = "lane-resource-receipts/1.0"
+# P6.1 owns this variable. This controller is a READER of that ledger.
+RUN_DEADLINE_ENV_NAME = "EXCEL_INFLOW_RUN_DEADLINE"
+
+
+def load_lane_resource_policy() -> dict[str, Any]:
+    """The declared resource limits. A malformed policy is never used."""
+    policy = read_json(LANE_RESOURCE_POLICY_PATH, "lane resource policy")
+    if policy.get("schema_version") != LANE_RESOURCE_POLICY_SCHEMA:
+        raise ValueError("Lane resource policy has the wrong schema version")
+    for section in ("worker_reservation", "budget_priority"):
+        if not isinstance(policy.get(section), dict):
+            raise ValueError(f"Lane resource policy lacks a {section} declaration")
+    tiers = policy.get("worker_tiers")
+    if not isinstance(tiers, list) or not tiers:
+        raise ValueError("Lane resource policy declares no worker tiers")
+    return policy
+
+
+def lane_criticalities() -> dict[str, str]:
+    """Lane criticality is declared ONCE, in the product constitution."""
+    constitution = read_json(PRODUCT_CONSTITUTION_PATH, "product constitution")
+    lanes = constitution.get("evidence_lanes") or {}
+    return {
+        str(lane): str((declaration or {}).get("criticality") or "")
+        for lane, declaration in lanes.items()
+    }
+
+
+def lane_priority_class(criticality: str, policy: dict[str, Any]) -> str:
+    """Optional only when the constitution says so; never optional by default."""
+    return "optional" if str(criticality) in (policy.get("optional_criticalities") or []) else "mandatory"
+
+
+def host_resources(policy: dict[str, Any]) -> tuple[int, int]:
+    """The measured host, with a declared fallback when it cannot be read."""
+    try:
+        cpu_count = int(os.cpu_count() or 1)
+    except (TypeError, ValueError):
+        cpu_count = 1
+    total_memory_mib = 0
+    try:
+        total_memory_mib = int(
+            (os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")) / (1024 * 1024)
+        )
+    except (AttributeError, ValueError, OSError):
+        total_memory_mib = 0
+    if total_memory_mib <= 0:
+        total_memory_mib = int(policy.get("assumed_total_memory_mib") or 4096)
+    return max(1, cpu_count), max(1, total_memory_mib)
+
+
+def resolve_lane_worker_count(
+    policy: dict[str, Any], lane_count: int, cpu_count: int, total_memory_mib: int
+) -> int:
+    """Worker count from the DECLARED limits. Lane count is the LAST bound."""
+    lanes = int(lane_count)
+    if lanes < 1:
+        raise ValueError("A lane pool needs a positive lane count")
+    reservation = policy["worker_reservation"]
+    cpus = max(1, int(cpu_count or 1))
+    memory_mib = int(total_memory_mib or 0) or int(policy["assumed_total_memory_mib"])
+    usable_memory_mib = max(0, memory_mib - int(reservation["reserved_memory_mib"]))
+    tier_workers = 1
+    for tier in policy["worker_tiers"]:
+        if usable_memory_mib >= int(tier["min_usable_memory_mib"]):
+            tier_workers = int(tier["max_workers"])
+    memory_workers = max(
+        1, min(tier_workers, usable_memory_mib // int(reservation["memory_mib_per_worker"]))
+    )
+    cpu_workers = max(
+        1, (cpus - int(reservation["reserved_cpu"])) // int(reservation["cpu_per_worker"])
+    )
+    return max(1, min(lanes, memory_workers, cpu_workers, int(policy["max_workers_ceiling"])))
+
+
+def run_deadline_remaining_ms() -> int | None:
+    """Remaining compute on P6.1's ONE persisted clock. Read-only, never written.
+
+    Any unreadable, foreign or absent ledger yields None, which means the
+    declared lane budgets apply unchanged — exactly the behaviour that shipped
+    before this package.
+    """
+    ledger_path = os.environ.get(RUN_DEADLINE_ENV_NAME)
+    if not ledger_path:
+        return None
+    try:
+        ledger = read_json(Path(ledger_path), "run deadline ledger")
+    except (OSError, ValueError):
+        return None
+    if not str(ledger.get("schema_version") or "").startswith("excel-inflow-run-deadline/"):
+        return None
+    try:
+        ceiling = int(ledger["hard_deadline_compute_ms"])
+        elapsed = int(ledger.get("compute_elapsed_ms") or 0)
+    except (KeyError, TypeError, ValueError):
+        return None
+    return max(0, ceiling - elapsed)
+
+
+def lane_budget_caps(policy: dict[str, Any], remaining_compute_ms: int | None) -> dict[str, Any]:
+    """The two caps this pool draws on: mandatory first, optional on the surplus."""
+    priority = policy["budget_priority"]
+    remaining = None
+    if remaining_compute_ms is not None:
+        try:
+            remaining = max(0, int(remaining_compute_ms))
+        except (TypeError, ValueError):
+            remaining = None
+    if remaining is None:
+        return {
+            "budget_source": "declared_only",
+            "remaining_compute_ms": None,
+            "mandatory_reserve_ms": int(priority["mandatory_reserve_ms"]),
+            "mandatory_cap_ms": None,
+            "optional_cap_ms": None,
+        }
+    return {
+        "budget_source": "run_deadline_ledger",
+        "remaining_compute_ms": remaining,
+        "mandatory_reserve_ms": int(priority["mandatory_reserve_ms"]),
+        # Mandatory work is bounded by the clock but never below its floor.
+        "mandatory_cap_ms": max(int(priority["mandatory_floor_ms"]), remaining),
+        # Optional work sees only the surplus above the mandatory reserve.
+        "optional_cap_ms": min(
+            int(priority["optional_envelope_ms"]),
+            max(0, remaining - int(priority["mandatory_reserve_ms"])),
+        ),
+    }
+
+
+def grant_lane_budget_ms(
+    policy: dict[str, Any], caps: dict[str, Any], priority_class: str, requested_ms: int
+) -> dict[str, Any]:
+    """One lane's grant. Optional work can be starved; mandatory work cannot."""
+    priority = policy["budget_priority"]
+    requested = int(requested_ms)
+    if requested <= 0:
+        raise ValueError("A lane budget request must be a positive number of milliseconds")
+    cap = caps["optional_cap_ms"] if priority_class == "optional" else caps["mandatory_cap_ms"]
+    if cap is None:
+        return {"requested_ms": requested, "granted_ms": requested, "starved": False}
+    if priority_class == "optional":
+        granted = min(requested, int(cap))
+        if granted < int(priority["optional_floor_ms"]):
+            # Too small to do anything with: the lane is not started, and its
+            # existing fault containment closes it at zero authority.
+            return {"requested_ms": requested, "granted_ms": 0, "starved": True}
+        return {"requested_ms": requested, "granted_ms": granted, "starved": False}
+    return {
+        "requested_ms": requested,
+        "granted_ms": max(int(priority["mandatory_floor_ms"]), min(requested, int(cap))),
+        "starved": False,
+    }
+
+
+def resolve_lane_pool_plan(
+    *,
+    lane_kinds: list[str],
+    remaining_compute_ms: int | None = None,
+    cpu_count: int | None = None,
+    total_memory_mib: int | None = None,
+    policy: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The declared plan this pool runs under: workers, caps and lane classes."""
+    resolved_policy = policy or load_lane_resource_policy()
+    measured_cpu, measured_memory = host_resources(resolved_policy)
+    cpus = int(cpu_count) if cpu_count else measured_cpu
+    memory_mib = int(total_memory_mib) if total_memory_mib else measured_memory
+    criticalities = lane_criticalities()
+    max_workers = resolve_lane_worker_count(resolved_policy, len(lane_kinds), cpus, memory_mib)
+    reservation = resolved_policy["worker_reservation"]
+    return {
+        "schema_version": LANE_RESOURCE_PLAN_SCHEMA,
+        "policy_schema_version": resolved_policy["schema_version"],
+        "policy_sha256": sha256_file(LANE_RESOURCE_POLICY_PATH),
+        "order": list(lane_kinds),
+        "lane_count": len(lane_kinds),
+        "max_workers": max_workers,
+        "host": {
+            "cpu_count": cpus,
+            "total_memory_mib": memory_mib,
+            "usable_memory_mib": max(0, memory_mib - int(reservation["reserved_memory_mib"])),
+        },
+        "worker_reservation": dict(reservation),
+        "caps": lane_budget_caps(resolved_policy, remaining_compute_ms),
+        "lanes": {
+            kind: {
+                "criticality": criticalities.get(kind, ""),
+                "priority_class": lane_priority_class(criticalities.get(kind, ""), resolved_policy),
+            }
+            for kind in lane_kinds
+        },
+    }
+
+
+def execute_lane_pool(
+    *,
+    plan: dict[str, Any],
+    declarations: dict[str, dict[str, Any]],
+    execute: Any,
+) -> tuple[dict[str, Any], dict[str, int], dict[str, Any]]:
+    """Run the declared lanes under a pool bounded by the PLAN, not by count.
+
+    Returns the lane states, the lane durations and one resource OBSERVATION
+    per lane. A lane that shared the pool with another lane declares its cpu
+    reading as shared rather than claiming a per-lane measurement the operating
+    system never gave it.
+    """
+    max_workers = max(1, int(plan["max_workers"]))
+    order = [kind for kind in (plan.get("order") or list(declarations)) if kind in declarations]
+    states: dict[str, Any] = {}
+    durations: dict[str, int] = {}
+    observations: dict[str, Any] = {}
+    guard = threading.Lock()
+    active: set[str] = set()
+    shared: set[str] = set()
+    next_slot = [0]
+
+    def worker(kind: str) -> tuple[dict[str, Any], int]:
+        with guard:
+            slot = next_slot[0] % max_workers
+            next_slot[0] += 1
+            if active:
+                shared.add(kind)
+                shared.update(active)
+            active.add(kind)
+        before = resource.getrusage(resource.RUSAGE_CHILDREN)
+        started = time.monotonic()
+        try:
+            return execute(kind, declarations[kind])
+        finally:
+            after = resource.getrusage(resource.RUSAGE_CHILDREN)
+            wall_ms = round((time.monotonic() - started) * 1000)
+            with guard:
+                active.discard(kind)
+                exclusive = kind not in shared
+                observations[kind] = {
+                    "worker_slot": slot,
+                    "wall_ms": wall_ms,
+                    "cpu_ms": (
+                        round(
+                            (
+                                (after.ru_utime + after.ru_stime)
+                                - (before.ru_utime + before.ru_stime)
+                            )
+                            * 1000
+                        )
+                        if exclusive
+                        else None
+                    ),
+                    "cpu_attribution": "exclusive" if exclusive else "pool_shared",
+                    "peak_rss_mib": children_peak_rss_mib(after) if exclusive else None,
+                }
+
+    if order:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {kind: executor.submit(worker, kind) for kind in order}
+            for kind in order:
+                states[kind], durations[kind] = futures[kind].result()
+    return states, durations, observations
+
+
+def children_peak_rss_mib(usage: Any) -> int:
+    """High-water resident memory across this process's children."""
+    raw = int(getattr(usage, "ru_maxrss", 0) or 0)
+    divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
+    return max(0, raw // divisor)
+
+
+def compile_lane_resource_receipt(
+    *,
+    plan: dict[str, Any],
+    kind: str,
+    grant: dict[str, Any],
+    observation: dict[str, Any],
+    late_enrichment_after_seal: bool = False,
+) -> dict[str, Any]:
+    """What one lane was reserved, what it was granted and what it consumed."""
+    lane_plan = (plan.get("lanes") or {}).get(kind) or {}
+    reservation = plan["worker_reservation"]
+    caps = plan["caps"]
+    receipt = {
+        "schema_version": LANE_RESOURCE_RECEIPT_SCHEMA,
+        "lane": kind,
+        "priority_class": lane_plan.get("priority_class", "mandatory"),
+        "criticality": lane_plan.get("criticality", ""),
+        "worker_slot": int(observation.get("worker_slot") or 0),
+        "pool_max_workers": int(plan["max_workers"]),
+        "reserved_cpu": int(reservation["cpu_per_worker"]),
+        "reserved_memory_mib": int(reservation["memory_mib_per_worker"]),
+        "requested_budget_ms": int(grant["requested_ms"]),
+        "granted_budget_ms": int(grant["granted_ms"]),
+        "budget_source": caps["budget_source"],
+        "remaining_compute_ms_at_grant": caps["remaining_compute_ms"],
+        "consumed_wall_ms": int(observation.get("wall_ms") or 0),
+        "consumed_cpu_ms": observation.get("cpu_ms"),
+        "cpu_attribution": observation.get("cpu_attribution") or "pool_shared",
+        "peak_children_rss_mib": observation.get("peak_rss_mib"),
+        "budget_headroom_ms": int(grant["granted_ms"]) - int(observation.get("wall_ms") or 0),
+        "starved": bool(grant["starved"]),
+        "late_enrichment_after_seal": bool(late_enrichment_after_seal),
+    }
+    receipt["receipt_sha256"] = sha256_value(receipt)
+    return receipt
+
+
+"""The budget slice granted to each lane currently in flight, in ms.
+
+Written by the pool before the lane starts and read by `run_lane` when it sets
+the lane's watchdog. It is a registry rather than a `run_lane` parameter
+because `run_lane`'s four-argument boundary is the one the lane test doubles
+stand on; the grant is per-lane-kind and written by the same thread that reads
+it, so concurrent lanes never contend.
+"""
+ACTIVE_LANE_BUDGET_MS: dict[str, int] = {}
+
+
+def effective_lane_timeout_seconds(kind: str, request_path: Path) -> int:
+    """The lane's declared watchdog, bounded by the pool's budget grant.
+
+    A grant can SHORTEN a lane's own timer; it can never lengthen it. With no
+    grant recorded the declared budget applies unchanged.
+    """
+    declared = lane_timeout_budget(kind, request_path)
+    granted_ms = ACTIVE_LANE_BUDGET_MS.get(kind)
+    if granted_ms is None:
+        return declared
+    return max(1, min(declared, int(granted_ms) // 1000))
+
+
+def assert_lane_resource_receipts_complete(
+    executed_lane_kinds: list[str], receipts: list[dict[str, Any]]
+) -> None:
+    """A lane that RAN and recorded nothing is a refusal, not a silence."""
+    seen = {str(receipt.get("lane")) for receipt in receipts}
+    missing = [kind for kind in executed_lane_kinds if kind not in seen]
+    if missing:
+        raise ValueError(
+            "These lanes ran without a resource receipt: " + ", ".join(sorted(missing))
+        )
+
+
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
     request = resolve(base, declaration.get("request_path"))
     if kind == "filings":
@@ -405,10 +769,10 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             state_before = state_path.read_bytes()
         except OSError:
             state_before = None
-    completed = run(
-        command,
-        timeout_seconds=lane_timeout_budget(kind, request_path),
-    )
+    # The lane's own declared watchdog, bounded by whatever budget the pool
+    # plan granted this lane. A grant never LENGTHENS a lane's own timer.
+    lane_budget_seconds = effective_lane_timeout_seconds(kind, request_path)
+    completed = run(command, timeout_seconds=lane_budget_seconds)
     # A lane state is trusted only when THIS invocation stands behind it: the
     # controller exited cleanly (0 = closed, 2 = typed non-terminal state), or
     # it rewrote the state file during this run. A crash that left yesterday's
@@ -455,7 +819,7 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             # an internal task packet from becoming a terminal chat response.
             closed = run(
                 [*command, "--close-optional"],
-                timeout_seconds=min(180, lane_timeout_budget(kind, request_path)),
+                timeout_seconds=max(1, min(180, lane_budget_seconds)),
             )
             if closed.returncode in {0, 2} and state_path.is_file():
                 state = read_json(state_path, "broker optional-close state")
@@ -1676,13 +2040,73 @@ def main() -> int:
         migration_path = output_root / "broker-intake-runtime-migration.json"
         atomic_json(migration_path, migration)
         derived_artifacts["broker_intake_runtime_migration"] = str(migration_path)
-    def execute_lane(kind: str, declaration: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    # P6.5 — one declared resource policy, one budget reading from P6.1's clock.
+    lane_policy = load_lane_resource_policy()
+    lane_remaining_compute_ms = run_deadline_remaining_ms()
+    lane_grants: dict[str, dict[str, Any]] = {}
+    lane_observations: dict[str, dict[str, Any]] = {}
+    lane_resource_receipts: list[dict[str, Any]] = []
+    lane_plans: list[dict[str, Any]] = []
+    executed_lane_kinds: list[str] = []
+    structural_seal_monotonic_ms: float | None = None
+
+    def lane_pool_plan(lane_kinds: list[str]) -> dict[str, Any]:
+        plan = resolve_lane_pool_plan(
+            lane_kinds=lane_kinds,
+            remaining_compute_ms=lane_remaining_compute_ms,
+            policy=lane_policy,
+        )
+        lane_plans.append(plan)
+        return plan
+
+    def flush_lane_resources() -> None:
+        """Disclose what each lane reserved, was granted and consumed.
+
+        Written before every terminal state below, so a blocked run discloses
+        its resource consumption exactly as a passing one does.
+        """
+        assert_lane_resource_receipts_complete(executed_lane_kinds, lane_resource_receipts)
+        target = output_root / "lane-resource-receipts.json"
+        payload = {
+            "schema_version": LANE_RESOURCE_RECEIPTS_SCHEMA,
+            "run_id": str(spec.get("run_id") or ""),
+            "plans": lane_plans,
+            "receipts": lane_resource_receipts,
+        }
+        payload["receipt_sha256"] = sha256_value(payload)
+        atomic_json(target, payload)
+        derived_artifacts["lane_resource_receipts"] = str(target)
+
+    def execute_lane(
+        kind: str, declaration: dict[str, Any], plan: dict[str, Any]
+    ) -> tuple[dict[str, Any], int]:
         started = time.monotonic()
+        priority_class = ((plan.get("lanes") or {}).get(kind) or {}).get(
+            "priority_class", "mandatory"
+        )
+        request_path = Path(lane_command(kind, declaration, spec_path.parent, output_root)[2])
+        grant = grant_lane_budget_ms(
+            lane_policy,
+            plan["caps"],
+            priority_class,
+            lane_timeout_budget(kind, request_path) * 1000,
+        )
+        lane_grants[kind] = grant
+        executed_lane_kinds.append(kind)
         try:
             if kind == "broker" and args.force_zero_broker:
                 raise RuntimeError(
                     "The top-level optional-broker circuit breaker requested zero authority"
                 )
+            if grant["starved"]:
+                # Optional work never starts on budget the mandatory path needs.
+                # The lane's existing containment closes it at zero authority.
+                raise RuntimeError(
+                    f"Optional {kind} lane timeout before start: the remaining run budget "
+                    f"({plan['caps']['remaining_compute_ms']} ms) is reserved for mandatory work "
+                    f"({plan['caps']['mandatory_reserve_ms']} ms), leaving no optional slice"
+                )
+            ACTIVE_LANE_BUDGET_MS[kind] = grant["granted_ms"]
             state = run_lane(kind, declaration, spec_path.parent, output_root)
         except Exception as error:
             state = {
@@ -1709,9 +2133,22 @@ def main() -> int:
         lanes["filings"] = reusable_mandatory_lanes["filings"]
         lane_duration_ms["filings"] = 0
     elif spec.get("filings"):
-        lanes["filings"], lane_duration_ms["filings"] = execute_lane(
-            "filings", spec["filings"]
+        filings_plan = lane_pool_plan(["filings"])
+        filings_states, filings_durations, filings_observations = execute_lane_pool(
+            plan=filings_plan,
+            declarations={"filings": spec["filings"]},
+            execute=lambda kind, declaration: execute_lane(kind, declaration, filings_plan),
         )
+        lanes["filings"] = filings_states["filings"]
+        lane_duration_ms["filings"] = filings_durations["filings"]
+        lane_observations.update(filings_observations)
+        lane_resource_receipts.append(compile_lane_resource_receipt(
+            plan=filings_plan,
+            kind="filings",
+            grant=lane_grants["filings"],
+            observation=filings_observations["filings"],
+        ))
+    flush_lane_resources()
 
     if "filings" not in lanes:
         raise ValueError(
@@ -1738,7 +2175,10 @@ def main() -> int:
             summary={
                 "terminal_reason": "filings_topology_not_closed",
                 "descendant_lanes_started": [],
-                "performance": {"lane_duration_ms": lane_duration_ms},
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
+                },
             },
         )
         return 2
@@ -1790,7 +2230,10 @@ def main() -> int:
                     "action": "cancel_descendants_preserve_checkpoint",
                     "resume_from": "structural_ownership",
                 },
-                "performance": {"lane_duration_ms": lane_duration_ms},
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
+                },
             },
         )
         return 2
@@ -1818,10 +2261,17 @@ def main() -> int:
                 "message": "; ".join(structural_receipt.get("violations") or []),
                 "descendant_lanes_started": [],
                 "controller_signal": structural_receipt.get("controller_signal"),
-                "performance": {"lane_duration_ms": lane_duration_ms},
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
+                },
             },
         )
         return 2
+    # Structural ownership is now SEALED. Anything an optional lane selects
+    # after this instant is late enrichment unless it was projected onto the
+    # seal first (the projection immediately below).
+    structural_seal_monotonic_ms = time.monotonic() * 1000
     try:
         demand_path, projection_path = project_broker_demand_to_structural_owners(
             structural_receipt=structural_receipt,
@@ -1864,7 +2314,10 @@ def main() -> int:
                     "action": "cancel_descendants_preserve_checkpoint",
                     "resume_from": "structural_ownership",
                 },
-                "performance": {"lane_duration_ms": lane_duration_ms},
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
+                },
             },
         )
         return 2
@@ -1874,14 +2327,37 @@ def main() -> int:
     elif spec.get("dcs"):
         concurrent_declarations["dcs"] = spec["dcs"]
     if concurrent_declarations:
-        with ThreadPoolExecutor(max_workers=len(concurrent_declarations)) as executor:
-            futures = {
-                kind: executor.submit(execute_lane, kind, declaration)
-                for kind, declaration in concurrent_declarations.items()
-            }
-            for kind in ("broker", "dcs"):
-                if kind in futures:
-                    lanes[kind], lane_duration_ms[kind] = futures[kind].result()
+        # The pool is bounded by the DECLARED resource limits and by the budget
+        # slice left on P6.1's clock — never by however many lanes exist.
+        pool_plan = lane_pool_plan(list(concurrent_declarations))
+        pool_states, pool_durations, pool_observations = execute_lane_pool(
+            plan=pool_plan,
+            declarations=dict(concurrent_declarations),
+            execute=lambda kind, declaration: execute_lane(kind, declaration, pool_plan),
+        )
+        lane_observations.update(pool_observations)
+        for kind in ("broker", "dcs"):
+            if kind in pool_states:
+                lanes[kind], lane_duration_ms[kind] = pool_states[kind], pool_durations[kind]
+        for kind in pool_plan["order"]:
+            lane_class = (pool_plan["lanes"].get(kind) or {}).get("priority_class", "mandatory")
+            lane_summary = (pool_states.get(kind) or {}).get("summary") or {}
+            lane_resource_receipts.append(compile_lane_resource_receipt(
+                plan=pool_plan,
+                kind=kind,
+                grant=lane_grants[kind],
+                observation=pool_observations[kind],
+                # An optional lane that selected authority after structural
+                # ownership was sealed, WITHOUT having been projected onto that
+                # seal first, is a late enrichment against a sealed decision.
+                late_enrichment_after_seal=bool(
+                    lane_class == "optional"
+                    and structural_seal_monotonic_ms is not None
+                    and int(lane_summary.get("cell_count") or 0) > 0
+                    and "broker_demand_ownership_projection" not in derived_artifacts
+                ),
+            ))
+        flush_lane_resources()
 
     for kind in ("broker", "dcs"):
         if kind not in lanes:
@@ -1989,6 +2465,7 @@ def main() -> int:
                 "lane_statuses": {kind: state.get("pipeline_status") for kind, state in lanes.items()},
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
                     "broker_and_debt_execution": "concurrent_after_filings",
                     "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                 },
@@ -2109,6 +2586,7 @@ def main() -> int:
                 "evidence_run_sha256": sha256_file(Path(artifacts["evidence_run"])),
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
+                    "lane_resource_receipts": lane_resource_receipts,
                     "broker_and_debt_execution": "concurrent_after_filings",
                     "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                     "filings": (lanes.get("filings", {}).get("summary") or {}).get("performance", {}),

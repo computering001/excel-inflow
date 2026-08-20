@@ -32,6 +32,7 @@ import {
 } from "./lib/flow.mjs";
 import {
   FLOW_CONTROLLER_VERSION,
+  earliestInvalidatedStage,
   nextStageId,
 } from "./lib/flow_runtime.mjs";
 import {
@@ -64,6 +65,16 @@ import {
   hashValue,
 } from "./lib/run_store.mjs";
 import { createEvidenceWorkGraph } from "./lib/evidence_work_graph.mjs";
+// P6.4 — the error classification table and the attempt ledger. Every evidence
+// work node execution becomes an attempt with a receipt; a failure gets a CLASS
+// that decides its retry budget, its cache-reuse rule, its downstream
+// invalidation scope and its registered terminal outcome; and a failure the
+// table cannot classify is REFUSED admission to that machinery (recorded with
+// the repair it needs) and rethrown unchanged.
+import {
+  createAttemptLedger,
+  errorClassificationTable,
+} from "./lib/error_classification.mjs";
 import { runProcessTree } from "./lib/process_tree.mjs";
 import {
   runCarrierMigrationStageInput,
@@ -126,6 +137,12 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 let ACTIVE_RUN_GUARD = null;
+// P6.4 — the evidence work graph and its attempt ledger, held at module scope
+// for the same reason the run guard is: `finish()` is the one place every exit
+// passes through, and the reuse a result CLAIMS has to be sealed against what
+// the graph RECORDED before that result is written.
+let ACTIVE_WORK_GRAPH = null;
+let ACTIVE_ATTEMPT_LEDGER = null;
 let ACTIVE_RUN_DEADLINE = null;
 // The whole invocation measured as ONE span against the persisted clock.
 // Compute charged by stages and by the stage-4 subprocess is credited out of
@@ -409,6 +426,30 @@ async function finish({ runDir, result, screen = null, machine = false }) {
   // separately measured stage and stage-4 spans) so no interval stays
   // unattributed and no interval is counted twice.
   await chargeInvocationToRunDeadline();
+  // P6.4 — SEAL THE REUSE CLAIM. `reused_stages` used to be a list of stages
+  // whose RECEIPT was reused; it said nothing about whether the work inside
+  // them ran, and on a warm answered run it reported three stages as reused
+  // while five nodes re-executed inside them. The graph now checks the claim:
+  // every node in a claimed stage must either have been SKIPPED, or have
+  // re-executed and reproduced EXACTLY the output the receipt it rests on
+  // recorded, or be the controller's own recorded degradation. Anything else
+  // is a dishonest claim and is REFUSED here — never quietly corrected, and
+  // never dropped from the list to make the check pass.
+  if (ACTIVE_WORK_GRAPH) {
+    const sealed = await ACTIVE_WORK_GRAPH.sealReuseClaim(result?.reused_stages ?? []);
+    await writeJsonAtomic(path.join(runDir, "reuse-enactment.json"), {
+      schema_version: "reuse-enactment/1.0",
+      run_id: result?.run_id ?? null,
+      controller_version: FLOW_CONTROLLER_VERSION,
+      ...sealed,
+    });
+    if (sealed.violations.length > 0) {
+      throw new Error(
+        `The run claimed reuse it did not perform: ${sealed.violations.join("; ")}`,
+      );
+    }
+  }
+  if (ACTIVE_ATTEMPT_LEDGER) await ACTIVE_ATTEMPT_LEDGER.close();
   if (ACTIVE_RUN_GUARD) {
     const closing = await assertRuntimeIntegrityUnchanged(ACTIVE_RUN_GUARD.integrity, ROOT);
     await writeIsolationJson(path.join(runDir, "skill-integrity.json"), {
@@ -642,11 +683,34 @@ async function main() {
   // hoisting this work behind its keys is P6.4's differential invalidation, and
   // a DAG that changed what is computed would not be additive. See
   // scripts/lib/evidence_work_graph.mjs.
+  //
+  // P6.4 wires the attempt ledger through it, and hoists the stage-3 reuse
+  // check ABOVE the answered-case recompile and the decision replay so a run
+  // that reports the decisions stage as reused has actually skipped them.
+  const attemptLedger = createAttemptLedger({
+    runDir,
+    runId,
+    controllerVersion: FLOW_CONTROLLER_VERSION,
+    downstreamScope: (change) => earliestInvalidatedStage(change)?.id ?? null,
+  });
+  ACTIVE_ATTEMPT_LEDGER = attemptLedger;
   const workGraph = createEvidenceWorkGraph({
     runDir,
     runId,
     controllerVersion: FLOW_CONTROLLER_VERSION,
     runtimeDigest: runtimeClosure.digest,
+    attemptLedger,
+  });
+  ACTIVE_WORK_GRAPH = workGraph;
+  // The classification table, with its downstream-invalidation column computed
+  // from the corrected CHANGE_INVALIDATION map rather than restated here.
+  await writeJsonAtomic(path.join(runDir, "error-classification.json"), {
+    schema_version: "error-classification/1.0",
+    run_id: runId,
+    controller_version: FLOW_CONTROLLER_VERSION,
+    classes: errorClassificationTable({
+      changeInvalidationStage: (change) => earliestInvalidatedStage(change)?.id ?? null,
+    }),
   });
   const carrierMigrationInput = (stageId) =>
     runCarrierMigrationStageInput(verifiedCarrier, stageId);
@@ -1388,8 +1452,60 @@ async function main() {
   const selectedAuthorityContractPath = path.join(stage3Dir, "selected-authority-contract.json");
   const runConstitutionGraphPath = path.join(stage3Dir, "run-constitution-graph.json");
   let answeredCase;
+  // P6.4 — THE HOIST.
+  //
+  // The stage-3 reuse check used to sit BELOW the answered-case recompile and
+  // the decision replay, so a warm run recompiled the case and replayed every
+  // recorded decision, threw both results away, read the cached model case off
+  // disk, and then reported the decisions stage as REUSED. Measured on the
+  // acquisition fixture: 228ms of work inside a stage the run said it had
+  // reused, on every warm run, for ever.
+  //
+  // Nothing forced that order. Stage 3's cache key is `{ stage2_receipt,
+  // answers, runtime, carrier }` — the stage-2 receipt hash, the ANSWER FILE's
+  // hash, the runtime closure digest and the carrier migration input. Not one
+  // of those four needs the recompile or the replay to exist: the answer file
+  // can be hashed straight off disk. So the key is computed first, the reuse
+  // check is asked first, and the recompile and the replay run only when the
+  // answer is that the stage must re-run.
+  //
+  // Two things make this safe rather than merely faster. The receipt is only
+  // resumable when its status is `success`, so a stage that stopped for
+  // questions or blocked on an incomplete answer file can never be skipped
+  // here — those exits keep their original position, above the check. And the
+  // work being skipped is work whose result the reuse path already discarded:
+  // `answeredCase` was read from the cached `model-case.json` either way. The
+  // warm-equals-cold proof in run_differential_invalidation_tests.mjs is the
+  // evidence, not the argument.
   let answerHash;
   if (intakeResult.outcome === "questions") {
+    answerHash = options.answers
+      ? await hashFile(path.resolve(options.answers))
+      : ANSWERS_NOT_SUPPLIED;
+  } else {
+    answerHash = ANSWERS_NOT_REQUIRED;
+  }
+  const stage3Inputs = stage3InputsFor(answerHash);
+  const stage3Outputs = {
+    model_case: answeredCasePath,
+    forecast_plan: forecastPlanPath,
+    forecast_plan_json: forecastPlanJsonPath,
+    forecast_behavior_map: forecastBehaviorPath,
+    model_demand_graph: modelDemandGraphPath,
+    selected_authority_contract: selectedAuthorityContractPath,
+    run_constitution_graph: runConstitutionGraphPath,
+    case_source: answeredCaseSourcePath,
+    case_compile_report: answeredCompileReportPath,
+  };
+  const cached3 = await readUsableStage({
+    runDir,
+    runId,
+    stageId: "decisions",
+    inputHashes: stage3Inputs,
+    previousReceiptHash: receipt2.receipt_hash,
+    outputs: stage3Outputs,
+  });
+  if (!cached3.reusable && intakeResult.outcome === "questions") {
     if (!options.answers) {
       const questionResult = path.join(stage3Dir, "question-result.json");
       const questionScreen = path.join(stage3Dir, "question-screen.txt");
@@ -1622,36 +1738,14 @@ async function main() {
       ...(answeredCase.stage_three_answers ?? {}),
       ...Object.fromEntries(recordedDecisionMap(answeredCaseSource)),
     };
-    answerHash = await hashFile(path.resolve(options.answers));
-  } else {
+  } else if (!cached3.reusable) {
     answeredCase = intakeResult.working_case;
     await writeJsonAtomic(answeredCaseSourcePath, validation.handoff.case_source);
     await writeJsonAtomic(
       answeredCompileReportPath,
       activeCaseCompileReport,
     );
-    answerHash = ANSWERS_NOT_REQUIRED;
   }
-  const stage3Inputs = stage3InputsFor(answerHash);
-  const stage3Outputs = {
-    model_case: answeredCasePath,
-    forecast_plan: forecastPlanPath,
-    forecast_plan_json: forecastPlanJsonPath,
-    forecast_behavior_map: forecastBehaviorPath,
-    model_demand_graph: modelDemandGraphPath,
-    selected_authority_contract: selectedAuthorityContractPath,
-    run_constitution_graph: runConstitutionGraphPath,
-    case_source: answeredCaseSourcePath,
-    case_compile_report: answeredCompileReportPath,
-  };
-  const cached3 = await readUsableStage({
-    runDir,
-    runId,
-    stageId: "decisions",
-    inputHashes: stage3Inputs,
-    previousReceiptHash: receipt2.receipt_hash,
-    outputs: stage3Outputs,
-  });
   let receipt3;
   if (cached3.reusable) {
     answeredCase = await readJson(answeredCasePath, "cached answered case");

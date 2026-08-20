@@ -78,7 +78,7 @@ const DISPOSITIONS = {
   // Bare-runnable green suites with no caller and no registration; recorded
   // as orphans for the same Phase 9 disposition decision.
   "run_broker_tier1_demand_tests.py": "ORPHANED_BARE_RUNNABLE",
-  "run_standardised_design_contract_mutations.mjs": "ORPHANED_BARE_RUNNABLE",
+  "run_standardised_design_contract_mutations.mjs": "SUBORDINATE_ORACLE",
   // P6.0a suite committed at e0618e2 with neither registration nor
   // disposition; bare-runnable and green, no caller. Flagged by P7.6a as
   // deserving real registration in the development test registry.

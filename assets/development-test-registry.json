@@ -1652,6 +1652,33 @@
       "test_class": "mutation"
     },
     {
+      "id": "differential-invalidation",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_differential_invalidation_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "bounded-parallelism",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_bounded_parallelism_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "visual-mutation-pairing",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_visual_mutation_pairing_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "emitted-formula-derivability",
       "phase": "proof",
       "runtime": "node",

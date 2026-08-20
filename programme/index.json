@@ -307,6 +307,21 @@
       "commit": "cf2e2f8",
       "invariant": "every emitted formula is an expression in the closed typed vocabulary, and the adjustment gate is applied and recognised structurally",
       "note": "all 2980 parse and re-render byte-identically; 2213 raw literals recorded per formula with locus"
+    },
+    "P5.8": {
+      "commit": "",
+      "invariant": "a style or geometry mutation a reader would see is provably detected, and blindness is proven rather than inferred",
+      "note": "two mutations proven blind at 0 changed pixels; the design-contract harness adopted, not deleted"
+    },
+    "P6.5": {
+      "commit": "",
+      "invariant": "concurrency is bounded by declared resource limits and mandatory work has budget priority over optional",
+      "note": "the circuit breaker became a real breaker; a missing asset declaration would ship a package the controller needs and no test catches it"
+    },
+    "P6.4": {
+      "commit": "",
+      "invariant": "a change invalidates exactly the work it should, and the reuse a run claims is the reuse it performed",
+      "note": "the declared map disagreed with the measured graph on 8 of 12 entries, every one in the unsafe direction"
     }
   },
   "evidence_baseline": {

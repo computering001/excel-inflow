@@ -255,6 +255,189 @@ export function evidenceWorkNode(id) {
   return NODES_BY_ID.get(id) ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// P6.4 — WHAT A CHANGE ACTUALLY INVALIDATES.
+//
+// `CHANGE_INVALIDATION` in flow_runtime.mjs is a hand-written map from a
+// user-flow change type to the earliest stage that must re-run. It had zero
+// callers, and nothing had ever checked it against the work that really exists.
+// These two declarations are the check. The map below names only the cache-key
+// COMPONENTS a change moves — a small, local, falsifiable claim, each one
+// demonstrable by moving that component and watching the node miss — and the
+// DAG then decides which nodes fall, by keying and by dependency. The stage
+// answer is computed from the graph, never asserted twice.
+//
+// `AMBIENT_KEY_COMPONENTS` are the two components the graph injects into every
+// node's key, so a change to either invalidates the entire graph.
+// ---------------------------------------------------------------------------
+export const AMBIENT_KEY_COMPONENTS = Object.freeze(["code.controller", "code.runtime_closure"]);
+
+export const CHANGE_KEY_COMPONENTS = Object.freeze({
+  // Every one of these lives INSIDE the single evidence-run envelope whose
+  // file hash is `evidence_validation`'s only declared key component, so each
+  // of them moves `evidence_run` whatever else it also moves. Measured: adding
+  // one key under `broker_pack` moves `files.evidence_run` and misses
+  // `evidence_validation`, a stage-`inputs` node.
+  company_name: Object.freeze(["evidence_run", "case_source"]),
+  source_file: Object.freeze(["evidence_run", "case_evidence"]),
+  filing: Object.freeze(["evidence_run", "case_evidence"]),
+  debt_export: Object.freeze(["evidence_run", "case_evidence"]),
+  broker_forecast: Object.freeze([
+    "evidence_run",
+    "broker_pack",
+    "broker_source_tables",
+    "broker_crosswalk_receipt",
+  ]),
+  prior_case: Object.freeze(["evidence_run", "case_source"]),
+  // An answer is recorded into the answered case source and replayed as a
+  // prior answer. Measured: changing one answer misses exactly the eight
+  // decisions nodes and nothing in `inputs` or `evidence_review`.
+  user_answer: Object.freeze(["answered_case_source", "prior_answers"]),
+  assumption: Object.freeze(["answered_case", "planning_case"]),
+  transaction_input: Object.freeze(["answered_case_source", "answered_case", "planning_case"]),
+  // Nothing in the evidence half is keyed on presentation or wording.
+  formatting: Object.freeze([]),
+  delivery_wording: Object.freeze([]),
+  controller_code: Object.freeze(["code.controller", "code.runtime_closure"]),
+});
+
+/**
+ * The nodes a change invalidates: every node keyed on a moved component, plus
+ * everything transitively downstream of one, because a dependency's output
+ * digest is itself a key component. Returns node ids in declaration order.
+ */
+export function invalidatedNodesForChange(change, nodes = EVIDENCE_WORK_NODES) {
+  const moved = CHANGE_KEY_COMPONENTS[change];
+  if (!moved) throw new Error(`Unknown user-flow change type: ${change}`);
+  const movedSet = new Set(moved);
+  const ambient = moved.some((component) => AMBIENT_KEY_COMPONENTS.includes(component));
+  const invalidated = new Set();
+  for (const node of nodes) {
+    if (ambient || node.key_components.some((component) => movedSet.has(component))) {
+      invalidated.add(node.id);
+      continue;
+    }
+    if (node.depends_on.some((dependency) => invalidated.has(dependency))) {
+      invalidated.add(node.id);
+    }
+  }
+  return nodes.filter((node) => invalidated.has(node.id)).map((node) => node.id);
+}
+
+// ---------------------------------------------------------------------------
+// P6.4 — IS THE REUSE A RUN CLAIMS THE REUSE IT PERFORMED?
+//
+// `reused_stages` was a list of stages whose RECEIPT was reused. It said
+// nothing about whether the work inside them ran, and on a warm answered run
+// two of the eight `decisions` nodes and all three `evidence_review` nodes
+// re-executed inside stages the run reported as reused. This function turns the
+// claim into something checkable, per stage:
+//
+//   skipped     the node's action never ran
+//   verified    the action ran and reproduced EXACTLY the output the prior
+//               receipt recorded — the claim is true about the result even
+//               though the work was spent
+//   degraded    the action ran, threw, and produced no output either time; the
+//               controller's own recorded degradation path, neither reuse nor
+//               change
+//   unrecorded  the action ran and there was no prior recorded output to
+//               compare it with (the node has no receipt yet). This CANNOT
+//               contradict the claim, so it is not a lie — but it does not
+//               back it either, and a stage carrying one reports `unverified`
+//               rather than `verified`.
+//
+// The one remaining case is a DISHONEST CLAIM and is returned as a violation: a
+// node that ran, HAD a recorded output to be measured against, and produced
+// something different from it. A stage cannot be reported as reused while a
+// node inside it contradicts the receipt the stage is resting on. The refusal
+// is deliberately confined to what is PROVABLY false; a claim that merely
+// cannot be checked is reported as unchecked, not refused.
+// ---------------------------------------------------------------------------
+export const REUSE_ENACTMENT_MODES = Object.freeze([
+  "enacted",
+  "verified",
+  "unverified",
+  "not_claimed",
+]);
+
+export function reuseClaimLedger(decisions, claimedStages, nodes = EVIDENCE_WORK_NODES) {
+  const claimed = new Set(claimedStages ?? []);
+  const byStage = new Map();
+  for (const stage of new Set(nodes.map((node) => node.stage))) {
+    byStage.set(stage, {
+      stage,
+      claimed: claimed.has(stage),
+      skipped: [],
+      verified: [],
+      degraded: [],
+      unrecorded: [],
+      dishonest: [],
+      executed_ms: 0,
+    });
+  }
+  for (const record of decisions ?? []) {
+    const bucket = byStage.get(record.stage);
+    if (!bucket) continue;
+    if (record.executed === false) {
+      bucket.skipped.push(record.node);
+      continue;
+    }
+    bucket.executed_ms += Number(record.duration_ms ?? 0);
+    if (record.output_agreed === true) bucket.verified.push(record.node);
+    else if (record.reason === "invalid.node_threw" || record.reason === "invalid.output_not_hashable") {
+      bucket.degraded.push(record.node);
+    } else if (record.output_agreed === false) {
+      bucket.dishonest.push(`${record.node}: the output moved (${record.reason})`);
+    } else {
+      bucket.unrecorded.push(`${record.node}: no prior output to agree with (${record.reason})`);
+    }
+  }
+  const stages = [];
+  for (const bucket of byStage.values()) {
+    const executed =
+      bucket.verified.length + bucket.degraded.length + bucket.unrecorded.length + bucket.dishonest.length;
+    stages.push({
+      ...bucket,
+      mode: !bucket.claimed
+        ? "not_claimed"
+        : executed === 0
+          ? "enacted"
+          : bucket.unrecorded.length > 0
+            ? "unverified"
+            : "verified",
+      executed_node_count: executed,
+      executed_ms: Number(bucket.executed_ms.toFixed(3)),
+    });
+  }
+  stages.sort((a, b) => a.stage.localeCompare(b.stage));
+  const violations = [];
+  for (const stage of stages) {
+    if (!stage.claimed) {
+      if (stage.skipped.length > 0) {
+        violations.push(
+          `${stage.stage} was not claimed as reused, yet ${stage.skipped.join(", ")} recorded a stage-receipt reuse`,
+        );
+      }
+      continue;
+    }
+    for (const entry of stage.dishonest) {
+      violations.push(`${stage.stage} was claimed as reused, but ${entry}`);
+    }
+  }
+  return { stages, violations };
+}
+
+/** The stages those nodes belong to, in graph declaration order. */
+export function invalidatedStagesForChange(change, nodes = EVIDENCE_WORK_NODES) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const stages = [];
+  for (const id of invalidatedNodesForChange(change, nodes)) {
+    const stage = byId.get(id)?.stage;
+    if (stage && !stages.includes(stage)) stages.push(stage);
+  }
+  return stages;
+}
+
 /**
  * Refuse a declaration that is not a work DAG. A node with no declared cache
  * key is not a node — it is untracked work wearing a name.
@@ -358,6 +541,12 @@ export function createEvidenceWorkGraph({
   controllerVersion,
   runtimeDigest,
   nodes = EVIDENCE_WORK_NODES,
+  // P6.4: the optional attempt ledger. When present, every node execution —
+  // first try or retry — gets a receipt, a failure gets a CLASS, and only a
+  // class the table permits to retry is retried. The lane is the evidence half,
+  // deliberately outside the broker supervisor, which was the only lane in the
+  // repository that had a retry story at all.
+  attemptLedger = null,
 }) {
   const declarationViolations = validateEvidenceWorkGraph(nodes);
   if (declarationViolations.length > 0) {
@@ -378,6 +567,7 @@ export function createEvidenceWorkGraph({
   const executedNodes = [];
   const nodeReceipts = {};
   const timingsMs = {};
+  let reuseClaim = null;
 
   function summary() {
     const counts = { hit: 0, miss: 0, invalid: 0 };
@@ -397,12 +587,21 @@ export function createEvidenceWorkGraph({
         declared_node_count: nodes.length,
         reason_vocabulary: [...EVIDENCE_WORK_REASONS],
         summary: summary(),
+        reuse_claim: reuseClaim,
         decisions,
       })}\n`,
     );
   }
 
-  async function record({ node, reason, moved = [], detail = null, durationMs = null }) {
+  async function record({
+    node,
+    reason,
+    moved = [],
+    detail = null,
+    durationMs = null,
+    priorOutputDigest = null,
+    outputAgreed = null,
+  }) {
     if (!EVIDENCE_WORK_REASONS.includes(reason)) {
       throw new Error(`Evidence work node ${node.id} recorded a reason outside the vocabulary: ${reason}`);
     }
@@ -416,6 +615,14 @@ export function createEvidenceWorkGraph({
       key_components: [...node.key_components],
       invalidated_by: node.invalidated_by,
       enacted_reuse: false,
+      // P6.4: a decision record now says whether the node's ACTION RAN, and if
+      // it did, whether what it produced is what the prior receipt recorded.
+      // Without these two fields a claim of stage reuse cannot be checked at
+      // all — a stage whose nodes all re-ran looked exactly like one whose
+      // nodes were all skipped.
+      executed: true,
+      prior_output_digest: priorOutputDigest,
+      output_agreed: outputAgreed,
       duration_ms: durationMs,
       detail,
     };
@@ -554,7 +761,14 @@ export function createEvidenceWorkGraph({
     const started = process.hrtime.bigint();
     let value;
     try {
-      value = await action(path.join(graphDir, id));
+      value = attemptLedger
+        ? (
+            await attemptLedger.attempt(`evidence_work_node/${id}`, {
+              inputDigest,
+              action: () => action(path.join(graphDir, id)),
+            })
+          ).value
+        : await action(path.join(graphDir, id));
     } catch (error) {
       await record({
         node,
@@ -570,6 +784,17 @@ export function createEvidenceWorkGraph({
     const { digest: outputDigest, hashable } = safeOutputDigest(value);
     const outputFiles = await hashDeclaredPaths(declaredOutputs);
     outputDigests.set(id, outputDigest);
+
+    // P6.4: the prior recorded output digest, and whether this run's real
+    // recomputation agreed with it, are recorded for EVERY executed node — not
+    // only for the hit that disagreed. That is what lets a claim of stage reuse
+    // be checked against a run that actually re-did the work.
+    const priorOutputDigest =
+      prior.state === "present" && typeof prior.receipt?.output_digest === "string"
+        ? prior.receipt.output_digest
+        : null;
+    const outputAgreed =
+      priorOutputDigest === null || !hashable ? null : priorOutputDigest === outputDigest;
 
     let detail = null;
     if (!hashable) {
@@ -611,7 +836,15 @@ export function createEvidenceWorkGraph({
     const receipt = { ...body, receipt_hash: hashValue(body) };
     await atomicWrite(receiptPath(id), `${canonicalJson(receipt)}\n`);
     nodeReceipts[id] = receipt.receipt_hash;
-    const recorded = await record({ node, reason, moved, detail, durationMs });
+    const recorded = await record({
+      node,
+      reason,
+      moved,
+      detail,
+      durationMs,
+      priorOutputDigest,
+      outputAgreed,
+    });
 
     return {
       ok: true,
@@ -644,6 +877,9 @@ export function createEvidenceWorkGraph({
         key_components: [...node.key_components],
         invalidated_by: node.invalidated_by,
         enacted_reuse: true,
+        executed: false,
+        prior_output_digest: null,
+        output_agreed: null,
         duration_ms: 0,
         detail: { stage: stageId },
       });
@@ -667,9 +903,35 @@ export function createEvidenceWorkGraph({
     };
   }
 
+  /**
+   * P6.4 — seal the run's reuse CLAIM against what the graph recorded. This is
+   * a validator: it computes the per-stage enactment ledger, persists it beside
+   * the decisions it is derived from, and REPORTS violations. It repairs
+   * nothing and it rewrites no decision. The controller decides what to do with
+   * a dishonest claim; hiding one here would be the defect this exists to find.
+   */
+  async function sealReuseClaim(claimedStages) {
+    const ledger = reuseClaimLedger(decisions, claimedStages, nodes);
+    reuseClaim = {
+      claimed_stages: [...(claimedStages ?? [])],
+      stages: ledger.stages,
+      violations: ledger.violations,
+      enacted_stage_count: ledger.stages.filter((stage) => stage.mode === "enacted").length,
+      work_performed_inside_claimed_reuse_ms: Number(
+        ledger.stages
+          .filter((stage) => stage.claimed)
+          .reduce((total, stage) => total + stage.executed_ms, 0)
+          .toFixed(3),
+      ),
+    };
+    await flush();
+    return reuseClaim;
+  }
+
   return {
     runNode,
     reuseStage,
+    sealReuseClaim,
     close,
     decisions: () => decisions.map((entry) => ({ ...entry })),
     summary,
