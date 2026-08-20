@@ -3,10 +3,10 @@
   "phase": 8,
   "release": "v3.7.7",
   "seal_status": "SEALED_PACKAGES_RECORDED",
-  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
-  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "commit": "5b2feead81ea728c5eb84c9a616116f7590e37c4",
+  "source_tree": "ceac4c8b3b330e0ae9f7789eef10487acb2f87cf",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -32,9 +32,15 @@
       "commit": "7289482",
       "invariant": "a release rollback is a declared, authorised, evidence-preserving procedure recorded in an append-only hash-chained journal",
       "note": "installed-host legs declared EXCLUDED_INSTALLED_HOST per standing directive"
+    },
+    {
+      "package": "P8.7",
+      "commit": "102ada3",
+      "invariant": "a portable dossier assembles hash-bound or refuses, with permanent exclusions unmistakable from pending work",
+      "note": "five typed absences; waiver register argued out of existence"
     }
   ],
-  "sealed_package_count": 4,
+  "sealed_package_count": 5,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",

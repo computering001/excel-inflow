@@ -3,10 +3,10 @@
   "phase": 4,
   "release": "v3.7.7",
   "seal_status": "SEALED_PACKAGES_RECORDED",
-  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json \u2014 never hand-typed.",
+  "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "102ada3f5f0055ffac1320aa7da3d51d215ab9f7",
-  "source_tree": "ad1a4a33678bd36a57481fd10ee7f1cd9b362460",
+  "commit": "5b2feead81ea728c5eb84c9a616116f7590e37c4",
+  "source_tree": "ceac4c8b3b330e0ae9f7789eef10487acb2f87cf",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -28,6 +28,12 @@
       "note": "typed shadows additive; downstream dual-read is P4.4/P4.7"
     },
     {
+      "package": "P4.4",
+      "commit": "",
+      "invariant": "the nine declared modules have checked boundaries and a sealed per-module version",
+      "note": "4 of 6 invariants proven, 1 proven-partial with the remainder refused by a live blocker probe, 1 with a declared benign coarsening"
+    },
+    {
       "package": "P4.4a",
       "commit": "c82772e",
       "invariant": "the release roll-forward invariant accounts for every movement that lawfully changes an instrument balance (defect D10)",
@@ -46,13 +52,19 @@
       "note": "coverage gap declared for 7 node families and re-derived by the validator"
     },
     {
+      "package": "P4.7",
+      "commit": "",
+      "invariant": "the solve order is checked against the case's own graph, with per-SCC residuals and a recorded binding constraint",
+      "note": "hand-written order AGREES across 33 cases / 99 periods; edge-wise not rank-wise, since Gauss-Seidel legitimately interleaves"
+    },
+    {
       "package": "P4.8",
       "commit": "b7bbf5a",
       "invariant": "the solver fixed point, RCF sweep from cash need and debt roll-forward are recomputed independently in another language",
       "note": "7,737 quantities across 33 cases, zero disagreement; independently derived P4.4a's identity"
     }
   ],
-  "sealed_package_count": 7,
+  "sealed_package_count": 9,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
