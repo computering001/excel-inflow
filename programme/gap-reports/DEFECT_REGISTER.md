@@ -965,7 +965,7 @@ built to guarantee. The entry is retired and the script PROMOTED into SUBJECT_GA
 held to the same no-side-effect standard as the other five. The map is left in place and empty:
 it is the mechanism, not the list.
 
-## D50 — run_development_gate.mjs silently drops suites AND exits 0 (SEVERITY: HIGH, OPEN)
+## D50 — run_development_gate.mjs silently dropped suites AND exited 0 (FIXED)
 Beyond D45's exit-code masking, the gate does not run its full set. Measured across three runs of
 the same tree: 138 distinct suites, then 123. Fifteen were missing from the third run with no
 error and exit 0 — including mutation-adequacy, canonical-model-modules, graph-driven-solve,
@@ -973,12 +973,14 @@ scale-invariant-convergence, declared-fixed-point-completeness and never-zero-an
 The second run ended in an unhandled exception inside `runPool` (`run_development_gate.mjs:305`,
 `Array.map` at `:237`) and still reported exit 0.
 
-So the gate can report success having executed 15 fewer suites than the run before it. Every one
-of the 15 was executed individually on the quiet tree and all 15 pass, so this is a defect in the
-HARNESS, not in the product — but a release gate that silently narrows its own coverage is not a
-gate. NOT FIXED: the harness repair is out of scope for the freeze and is recorded for v3.8, with
-the explicit warning that no green from this gate may be trusted without diffing its suite list
-against the registry.
+Repair: registry selection is compiled once through `selectRegistryTests`; the complete invocation
+contract is validated before the pool starts; every selected row receives its declared timeout;
+every execution produces exactly one indexed result; and the report binds the registry hash,
+selected-test count and selected-ID digest. Any FAIL or BLOCKED result now sets a non-zero process
+exit. The registry-contract and aggregate-report mutation tests reject missing, duplicate and
+unexpected rows. The v3.7.8 frozen portable run selected all 203 portable rows from the 215-row
+registry and reported 203 results; its one initial red was the honestly surfaced ownership-census
+drift recorded during D52, not a silently dropped suite.
 
 ## D51 — external-custody symlinks were TRACKED, leaking a private filesystem layout (FIXED)
 Caught at the push boundary, by diffing what would actually be published rather than trusting the
@@ -1005,3 +1007,26 @@ mechanism and several suites reach custody through them) and `fixtures/external/
 `.gitignore` with the reason recorded. Verified after: no tracked symlinks remain anywhere, and
 nothing matching `private-test-custody` or `fixtures/external` is tracked. The custody-gated
 suites behave identically (still BLOCKED without a custody root, exactly as before).
+
+## D52 — installed mandatory filings capability unavailable after apparent activation (SEVERITY: P0, OPEN UNTIL INSTALLED CANARIES)
+The v3.7.7 Rogo candidate displayed the normal Company screen and accepted AstraZeneca, then
+failed several minutes later because the installed mandatory filings route could not execute.
+The archive contained `extract_filing_statements.py`; the unproven seams were the installed
+package closure, selected Python/PyMuPDF capability, controller routing and activation order.
+The static Company-screen fallback converted package liveness into false product liveness.
+
+Source repair in this worktree ships and wires one full-lane runtime doctor before both the
+Company screen and the run clock. One absolute Python must own fitz, openpyxl, Pillow and numpy;
+a frozen two-page PDF must be opened and semantically extracted through the shipped extractor;
+the response must retain periods, units, values, explicit zero, dash, blank and cell-local
+provenance; and the hash-bound report/host-capability receipt must validate before the secondary
+screen renderer may emit Company. Active package closure is verified before any shipped child
+entry point executes. The archive-only mutation suite removes, relocates, symlinks, chmods and
+drifts mandatory members; splits fitz/openpyxl capability; poisons PATH; breaks work/temp roots;
+changes package bytes after receipt; and proves none can emit the normal Company screen.
+
+D52 remains OPEN until the exact immutable candidate is installed to an inactive Rogo slot,
+installed member hashes and host capability pass there, two fresh candidate-bound sessions pass
+the Company-to-filings route, IFRS and US-GAAP filing canaries pass, broker/no-broker degradation
+canaries deliver, the active pointer is moved only after those receipts, pointer readback and one
+post-activation smoke pass, and the previous known-good slot remains immediately recoverable.

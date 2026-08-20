@@ -496,6 +496,7 @@ def main() -> int:
     neutral = neutral_working_capital_controller()
     print(json.dumps({
         "status": "PASS",
+        "mutations_rejected": 2,
         "checks": {
             "preflight_a_call_order": "PASS",
             "tampered_preflight_a_early_cancel": "PASS",

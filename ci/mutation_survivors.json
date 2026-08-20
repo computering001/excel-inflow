@@ -1,6 +1,6 @@
 {
   "corpus": {
-    "measurement_coverage": 0.2841,
+    "measurement_coverage": 0.3444,
     "measurement_coverage_meaning": "fraction of registry mutation-class suites whose own stdout declares how many mutations it applied. The complement is unmeasurable from outside the suite and is enumerated in measurement_gaps.",
     "observed_field_name_inventory": [
       "mutations",
@@ -25,8 +25,8 @@
       "independent_python_layered_graph_mutations",
       "workbook_semantic_oracle_mutations"
     ],
-    "registry_mutation_suites": 88,
-    "suites_reporting_a_mutation_count": 25
+    "registry_mutation_suites": 90,
+    "suites_reporting_a_mutation_count": 31
   },
   "generator": "scripts/compile_mutation_adequacy.mjs",
   "generator_command": "node scripts/compile_mutation_adequacy.mjs --profile portable --out ci/mutation_survivors.json",
@@ -56,10 +56,10 @@
     },
     {
       "corpus_membership": "registry_mutation_class",
-      "gap": "BLOCKED_ON_CUSTODY_INPUT",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
       "owner": "release-proof",
       "pointer": "scripts/run_acquisition_portable_workbook_tests.py",
-      "remedy": "run under a custody profile providing REPRESENTATIVE, PYTHON",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "acquisition-portable-workbook-restoration"
     },
     {
@@ -113,6 +113,14 @@
     {
       "corpus_membership": "registry_mutation_class",
       "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
+      "owner": "release-proof",
+      "pointer": "scripts/run_certified_code_closure_tests.mjs",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
+      "test_id": "certified-runtime-code-closure"
+    },
+    {
+      "corpus_membership": "registry_mutation_class",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
       "owner": "runtime-governance",
       "pointer": "scripts/run_ci_gate_tier_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
@@ -133,14 +141,6 @@
       "pointer": "scripts/run_classifier_caption_defect_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "classifier-caption-defects"
-    },
-    {
-      "corpus_membership": "registry_mutation_class",
-      "gap": "BLOCKED_ON_CUSTODY_INPUT",
-      "owner": "release-proof",
-      "pointer": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-      "remedy": "run under a custody profile providing REPRESENTATIVE, PYTHON, SOFFICE",
-      "test_id": "critical-invariant-independent-oracle-matrix"
     },
     {
       "corpus_membership": "registry_mutation_class",
@@ -181,14 +181,6 @@
       "pointer": "scripts/run_economic_ir_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "economic-ir"
-    },
-    {
-      "corpus_membership": "p0_gate_adjunct",
-      "gap": "BLOCKED_ON_CUSTODY_INPUT",
-      "owner": "release-proof",
-      "pointer": "scripts/run_emitted_candidate_independent_oracle_tests.py",
-      "remedy": "run under a custody profile providing REPRESENTATIVE, PYTHON, SOFFICE",
-      "test_id": "emitted-candidate-independent-oracle"
     },
     {
       "corpus_membership": "registry_mutation_class",
@@ -273,6 +265,14 @@
     {
       "corpus_membership": "registry_mutation_class",
       "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
+      "owner": "release-proof",
+      "pointer": "scripts/run_mutation_adequacy_tests.mjs",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
+      "test_id": "mutation-adequacy"
+    },
+    {
+      "corpus_membership": "registry_mutation_class",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
       "owner": "semantic-constitution",
       "pointer": "scripts/run_never_zero_and_order_invariance_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
@@ -301,6 +301,14 @@
       "pointer": "scripts/run_opening_instrument_provenance_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "opening-instrument-provenance"
+    },
+    {
+      "corpus_membership": "registry_mutation_class",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
+      "owner": "release-proof",
+      "pointer": "scripts/run_package_ab_tests.mjs",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
+      "test_id": "package-ab"
     },
     {
       "corpus_membership": "registry_mutation_class",
@@ -344,28 +352,18 @@
     },
     {
       "corpus_membership": "registry_mutation_class",
-      "gap": "BLOCKED_ON_CUSTODY_INPUT",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
       "owner": "release-proof",
       "pointer": "scripts/run_portable_finance_workbook_mutation_tests.mjs",
-      "remedy": "run under a custody profile providing REPRESENTATIVE, PYTHON",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "portable-finance-workbook-semantic-mutations"
     },
     {
       "corpus_membership": "registry_mutation_class",
-      "detail": "raise AssertionError(message)",
-      "gap": "ENVIRONMENT_DEPENDENCY_MISSING",
-      "owner": "forecast-authority",
-      "pointer": "scripts/run_prebroker_ownership_controller_tests.py",
-      "remedy": "provide the declared runtime dependency (this interpreter is missing it) and re-measure; do not lower the suite's preflight",
-      "test_id": "prebroker-ownership-controller"
-    },
-    {
-      "corpus_membership": "registry_mutation_class",
-      "detail": "usage: run_provenance_authority_tests.py [-h] --out OUT [--fixture FIXTURE]",
-      "gap": "HARNESS_INVOCATION_CONTRACT_MISMATCH",
+      "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
       "owner": "release-proof",
       "pointer": "scripts/run_provenance_authority_tests.py",
-      "remedy": "the registry's declared argument shape does not match the harness's own parser; reconcile them (registry edits are out of this package's scope)",
+      "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
       "test_id": "provenance-authority"
     },
     {
@@ -507,18 +505,18 @@
     {
       "corpus_membership": "registry_mutation_class",
       "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
-      "owner": "runtime-governance",
-      "pointer": "scripts/run_terminal_crash_path_tests.mjs",
+      "owner": "release-proof",
+      "pointer": "scripts/run_support_coverage_grid_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
-      "test_id": "terminal-crash-paths"
+      "test_id": "support-coverage-grid"
     },
     {
       "corpus_membership": "registry_mutation_class",
       "gap": "PASSES_WITHOUT_REPORTING_A_MUTATION_COUNT",
-      "owner": "evidence-authority",
-      "pointer": "scripts/run_xbrl_reconciliation_tests.mjs",
+      "owner": "runtime-governance",
+      "pointer": "scripts/run_terminal_crash_path_tests.mjs",
       "remedy": "print a mutation count on the suite's stdout JSON line; the compiler will not invent 0",
-      "test_id": "xbrl-reconciliation"
+      "test_id": "terminal-crash-paths"
     }
   ],
   "never_hand_written": "This artifact is generated. Editing it by hand is a defect: the compiler recomputes every count from the suites' own output.",
@@ -640,12 +638,21 @@
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "p0_gate_adjunct",
-      "declared_mutations": null,
+      "declared_mutations": 19,
       "declared_test_class": "independent_economic_oracle",
-      "exit_code": null,
-      "killed": 0,
-      "measurement": "BLOCKED_ON_CUSTODY",
-      "mutation_families": [],
+      "exit_code": 0,
+      "killed": 19,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "mutations",
+          "members": [
+            "mutations",
+            "mutations_caught"
+          ],
+          "population": 19
+        }
+      ],
       "mutation_scope": "production_artifact_under_mutation",
       "non_count_mutation_fields": [],
       "owner": "release-proof",
@@ -653,9 +660,12 @@
       "production_modules_loaded": 0,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
-      "reported_fields": [],
-      "reports_mutation_count": false,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "mutations",
+        "mutations_caught"
+      ],
+      "reports_mutation_count": true,
       "runtime": "python",
       "scope_override": null,
       "script": "scripts/run_emitted_candidate_independent_oracle_tests.py",
@@ -664,7 +674,7 @@
         "python_module:emit",
         "python_subprocess"
       ],
-      "status": "BLOCKED",
+      "status": "PASS",
       "survived": 0,
       "test_id": "emitted-candidate-independent-oracle"
     }
@@ -897,21 +907,21 @@
   "score": {
     "breakdown": {
       "mixed_per_domain": {
-        "killed": 0,
-        "measured_mutations": 0,
-        "score": null,
+        "killed": 142,
+        "measured_mutations": 142,
+        "score": 1,
         "suites": 1,
-        "suites_reporting_a_count": 0,
+        "suites_reporting_a_count": 1,
         "survived": 0
       },
       "production_module_or_artifact": {
         "declared_from_oracle_matrix_artifact_domains": 17,
-        "killed": 123,
-        "measured_mutations": 128,
-        "score": 0.9609,
-        "suites": 85,
-        "suites_reporting_a_count": 24,
-        "survived": 5
+        "killed": 180,
+        "measured_mutations": 180,
+        "score": 1,
+        "suites": 87,
+        "suites_reporting_a_count": 29,
+        "survived": 0
       },
       "self_fixture_only": {
         "declared_from_oracle_matrix_synthetic_domains": 6,
@@ -923,20 +933,65 @@
         "survived": 0
       }
     },
-    "killed": 127,
-    "measured_mutations": 132,
-    "mutation_score": 0.9621,
-    "production_mutation_score": 0.9609,
+    "killed": 326,
+    "measured_mutations": 326,
+    "mutation_score": 1,
+    "production_mutation_score": 1,
     "production_mutation_score_qualifier": "UPPER_BOUND — static production reach is necessary, not sufficient",
-    "survived": 5
+    "survived": 0
   },
   "score_doctrine": "The denominator is only what was MEASURED. A suite that reports no mutation count contributes to neither numerator nor denominator; it is a measurement gap with an owner. A self-fixture mutation is counted in its own bucket and can never raise production_mutation_score. production_mutation_score is an UPPER BOUND: static production reach proves a mutation COULD touch production code, not that it did.",
   "source_identity": {
-    "commit": "8641134628826fb23645716d0c04a45af82137c1",
+    "commit": "4238d779f7e7ec67c22d07a7161eaeebc7ad1b3c",
     "modified_tracked_files": [
+      "SKILL.md",
+      "architecture/current_mutation_map.md",
+      "architecture/ownership_census.json",
+      "assets/attachment-evidence-runtime-members.json",
+      "assets/broker-runtime-members.json",
+      "assets/controller-terminal-exit-inventory-v1.json",
       "assets/critical-invariant-oracle-matrix-v1.json",
+      "assets/dcs-runtime-members.json",
+      "assets/deployment-profile.json",
       "assets/development-test-registry.json",
-      "ci/test_registry_census.json"
+      "assets/excel-inflow-vnext-run.schema.json",
+      "assets/filings-runtime-members.json",
+      "assets/runtime-doctor-report-v1.schema.json",
+      "assets/runtime-manifest.json",
+      "assets/terminal-reason-registry-v1.json",
+      "audit/v375-governance/test-registry-classification-census.json",
+      "central-instructions.md",
+      "ci/mutation_survivors.json",
+      "ci/test_registry_census.json",
+      "programme/gap-reports/DEFECT_REGISTER.md",
+      "references/development-and-release-loop.md",
+      "references/runtime-core.md",
+      "scripts/compile_mutation_adequacy.mjs",
+      "scripts/compile_skill_release.mjs",
+      "scripts/lib/certified_runtime_code_closure.mjs",
+      "scripts/lib/development_gate_contract.mjs",
+      "scripts/lib/json_schema.mjs",
+      "scripts/lib/performance_receipt.mjs",
+      "scripts/lib/runtime_doctor.mjs",
+      "scripts/lib/source_identity.mjs",
+      "scripts/run_attachment_evidence_pipeline.py",
+      "scripts/run_certified_code_closure_tests.mjs",
+      "scripts/run_controller_exit_inventory_tests.mjs",
+      "scripts/run_development_gate.mjs",
+      "scripts/run_excel_inflow_vnext.mjs",
+      "scripts/run_filings_pipeline.mjs",
+      "scripts/run_internal_fixed_point_tests.py",
+      "scripts/run_ownership_census_tests.mjs",
+      "scripts/run_performance_receipt_honesty_tests.mjs",
+      "scripts/run_performance_receipt_tests.mjs",
+      "scripts/run_prebroker_ownership_controller_tests.py",
+      "scripts/run_runtime_doctor.mjs",
+      "scripts/run_runtime_doctor_tests.mjs",
+      "scripts/run_runtime_slo_tests.mjs",
+      "scripts/run_test_registry_contract_tests.mjs",
+      "scripts/run_user_flow.mjs",
+      "scripts/run_user_flow_tests.mjs",
+      "scripts/run_xbrl_reconciliation_tests.mjs"
     ],
     "survivor_attribution_caveat": "When worktree_dirty is true a survivor may be caused by an uncommitted edit in modified_tracked_files rather than by HEAD. Re-run against a clean HEAD worktree to attribute it.",
     "worktree_dirty": true
@@ -974,18 +1029,20 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": null,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "BLOCKED_ON_CUSTODY",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_artifact_under_mutation",
-      "non_count_mutation_fields": [],
+      "non_count_mutation_fields": [
+        "opening_cash_cache_mutation"
+      ],
       "owner": "release-proof",
       "phase": "proof",
       "production_modules_loaded": 0,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "python",
@@ -995,7 +1052,7 @@
         "python_module:emit",
         "python_subprocess"
       ],
-      "status": "BLOCKED",
+      "status": "PASS",
       "survived": 0,
       "test_id": "acquisition-portable-workbook-restoration"
     },
@@ -1145,6 +1202,7 @@
       "script": "scripts/run_bounded_parallelism_tests.mjs",
       "spawn_evidence": [
         "entrypoint:run_attachment_evidence_pipeline.py",
+        "entrypoint:run_filings_pipeline.mjs",
         "node_child_process"
       ],
       "status": "PASS",
@@ -1362,9 +1420,9 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": 1,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "SURVIVOR",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
@@ -1373,15 +1431,18 @@
       "production_modules_loaded": 1,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "node",
       "scope_override": null,
       "script": "scripts/run_certified_code_closure_tests.mjs",
-      "spawn_evidence": [],
-      "status": "FAIL",
-      "survived": 1,
+      "spawn_evidence": [
+        "entrypoint:run_filings_pipeline.mjs",
+        "entrypoint:run_user_flow.mjs"
+      ],
+      "status": "PASS",
+      "survived": 0,
       "test_id": "certified-runtime-code-closure"
     },
     {
@@ -1474,29 +1535,78 @@
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
-      "declared_mutations": null,
+      "declared_mutations": 142,
       "declared_test_class": "mutation",
-      "exit_code": null,
-      "killed": 0,
-      "measurement": "BLOCKED_ON_CUSTODY",
-      "mutation_families": [],
+      "exit_code": 0,
+      "killed": 142,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "artifact_mutations",
+          "members": [
+            "artifact_mutations_caught"
+          ],
+          "population": 19
+        },
+        {
+          "family": "governance_mutations",
+          "members": [
+            "governance_mutations_caught"
+          ],
+          "population": 9
+        },
+        {
+          "family": "mutations",
+          "members": [
+            "mutations_detected",
+            "mutations_total"
+          ],
+          "population": 31
+        },
+        {
+          "family": "physical_mutation_suite_checks",
+          "members": [
+            "physical_mutation_suite_checks"
+          ],
+          "population": 60
+        },
+        {
+          "family": "physical_mutations",
+          "members": [
+            "physical_mutations_caught",
+            "physical_mutations_total"
+          ],
+          "population": 23
+        }
+      ],
       "mutation_scope": "mixed_per_domain",
-      "non_count_mutation_fields": [],
+      "non_count_mutation_fields": [
+        "mutation_detection_rate",
+        "physical_mutation_suite"
+      ],
       "owner": "release-proof",
       "phase": "proof",
       "production_modules_loaded": 0,
       "production_reach_evidence": "NO_PRODUCTION_REACH_FOUND",
       "report_line_defect": null,
-      "report_line_parsed": false,
-      "reported_fields": [],
-      "reports_mutation_count": false,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "artifact_mutations_caught",
+        "governance_mutations_caught",
+        "mutations_detected",
+        "mutations_total",
+        "physical_mutation_suite_checks",
+        "physical_mutations_caught",
+        "physical_mutations_total"
+      ],
+      "reports_mutation_count": true,
       "runtime": "python",
       "scope_override": "oracle_matrix_per_domain_split",
       "script": "scripts/run_critical_invariant_oracle_matrix_tests.py",
       "spawn_evidence": [
         "python_subprocess"
       ],
-      "status": "BLOCKED",
+      "status": "PASS",
       "survived": 0,
       "test_id": "critical-invariant-independent-oracle-matrix"
     },
@@ -2101,6 +2211,53 @@
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
+      "declared_mutations": 41,
+      "declared_test_class": "mutation",
+      "exit_code": 0,
+      "killed": 41,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "mutations",
+          "members": [
+            "mutations"
+          ],
+          "population": 41
+        }
+      ],
+      "mutation_scope": "production_module_under_mutation",
+      "non_count_mutation_fields": [],
+      "owner": "release-proof",
+      "phase": "proof",
+      "production_modules_loaded": 5,
+      "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
+      "report_line_defect": null,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "mutations"
+      ],
+      "reports_mutation_count": true,
+      "runtime": "node",
+      "scope_override": null,
+      "script": "scripts/run_installed_filings_capability_tests.mjs",
+      "spawn_evidence": [
+        "entrypoint:compile_skill_release.mjs",
+        "entrypoint:extract_filing_statements.py",
+        "entrypoint:extract_inline_xbrl.py",
+        "entrypoint:run_excel_inflow_vnext.mjs",
+        "entrypoint:run_filings_pipeline.mjs",
+        "entrypoint:run_raw_input_black_box_canary.mjs",
+        "entrypoint:run_runtime_doctor.mjs",
+        "entrypoint:run_user_flow.mjs",
+        "node_child_process"
+      ],
+      "status": "PASS",
+      "survived": 0,
+      "test_id": "installed-filings-capability"
+    },
+    {
+      "collapsed_same_population_families": [],
+      "corpus_membership": "registry_mutation_class",
       "declared_mutations": 12,
       "declared_test_class": "mutation",
       "exit_code": 0,
@@ -2206,9 +2363,9 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": 1,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "SURVIVOR",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
@@ -2217,7 +2374,7 @@
       "production_modules_loaded": 3,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "node",
@@ -2226,8 +2383,8 @@
       "spawn_evidence": [
         "entrypoint:compile_mutation_adequacy.mjs"
       ],
-      "status": "FAIL",
-      "survived": 1,
+      "status": "PASS",
+      "survived": 0,
       "test_id": "mutation-adequacy"
     },
     {
@@ -2380,9 +2537,9 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": 1,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "SURVIVOR",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
@@ -2391,7 +2548,7 @@
       "production_modules_loaded": 3,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "node",
@@ -2401,8 +2558,8 @@
         "entrypoint:compile_skill_release.mjs",
         "node_child_process"
       ],
-      "status": "FAIL",
-      "survived": 1,
+      "status": "PASS",
+      "survived": 0,
       "test_id": "package-ab"
     },
     {
@@ -2673,9 +2830,9 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": null,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "BLOCKED_ON_CUSTODY",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "self_fixture_only",
       "non_count_mutation_fields": [],
@@ -2684,7 +2841,7 @@
       "production_modules_loaded": 0,
       "production_reach_evidence": "NO_PRODUCTION_REACH_FOUND",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "node",
@@ -2693,19 +2850,27 @@
       "spawn_evidence": [
         "node_child_process"
       ],
-      "status": "BLOCKED",
+      "status": "PASS",
       "survived": 0,
       "test_id": "portable-finance-workbook-semantic-mutations"
     },
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
-      "declared_mutations": null,
+      "declared_mutations": 2,
       "declared_test_class": "mutation",
-      "exit_code": 1,
-      "killed": 0,
-      "measurement": "UNMEASURABLE",
-      "mutation_families": [],
+      "exit_code": 0,
+      "killed": 2,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "mutations",
+          "members": [
+            "mutations_rejected"
+          ],
+          "population": 2
+        }
+      ],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
       "owner": "forecast-authority",
@@ -2713,9 +2878,11 @@
       "production_modules_loaded": 1,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
-      "reported_fields": [],
-      "reports_mutation_count": false,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "mutations_rejected"
+      ],
+      "reports_mutation_count": true,
       "runtime": "python",
       "scope_override": null,
       "script": "scripts/run_prebroker_ownership_controller_tests.py",
@@ -2725,19 +2892,18 @@
         "entrypoint:run_user_flow.mjs",
         "python_subprocess"
       ],
-      "status": "UNMEASURABLE",
+      "status": "PASS",
       "survived": 0,
-      "test_id": "prebroker-ownership-controller",
-      "unmeasurable_reason": "ENVIRONMENT_DEPENDENCY_MISSING"
+      "test_id": "prebroker-ownership-controller"
     },
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": 2,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "UNMEASURABLE",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_artifact_under_mutation",
       "non_count_mutation_fields": [],
@@ -2746,7 +2912,7 @@
       "production_modules_loaded": 0,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "python",
@@ -2756,10 +2922,9 @@
         "python_module:emit",
         "python_subprocess"
       ],
-      "status": "UNMEASURABLE",
+      "status": "PASS",
       "survived": 0,
-      "test_id": "provenance-authority",
-      "unmeasurable_reason": "HARNESS_INVOCATION_CONTRACT_MISMATCH"
+      "test_id": "provenance-authority"
     },
     {
       "collapsed_same_population_families": [],
@@ -2840,6 +3005,60 @@
       "status": "PASS",
       "survived": 0,
       "test_id": "real-filing-corpus-extraction-outcome-contract"
+    },
+    {
+      "collapsed_same_population_families": [
+        {
+          "family": "mutation_ids",
+          "population": 4,
+          "reason": "equals the base mutations population"
+        }
+      ],
+      "corpus_membership": "registry_mutation_class",
+      "declared_mutations": 4,
+      "declared_test_class": "mutation",
+      "exit_code": 0,
+      "killed": 4,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "mutation_ids",
+          "members": [
+            "mutation_ids"
+          ],
+          "population": 4
+        },
+        {
+          "family": "mutations",
+          "members": [
+            "mutations"
+          ],
+          "population": 4
+        }
+      ],
+      "mutation_scope": "production_artifact_under_mutation",
+      "non_count_mutation_fields": [],
+      "owner": "release-proof",
+      "phase": "proof",
+      "production_modules_loaded": 0,
+      "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
+      "report_line_defect": null,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "mutation_ids",
+        "mutations"
+      ],
+      "reports_mutation_count": true,
+      "runtime": "node",
+      "scope_override": null,
+      "script": "scripts/run_release_dependency_closure_tests.mjs",
+      "spawn_evidence": [
+        "entrypoint:compile_skill_release.mjs",
+        "node_child_process"
+      ],
+      "status": "PASS",
+      "survived": 0,
+      "test_id": "release-dependency-closure"
     },
     {
       "collapsed_same_population_families": [],
@@ -3107,6 +3326,7 @@
       "scope_override": null,
       "script": "scripts/run_runtime_doctor_tests.mjs",
       "spawn_evidence": [
+        "entrypoint:run_excel_inflow_vnext.mjs",
         "entrypoint:run_runtime_doctor.mjs",
         "entrypoint:run_user_flow.mjs",
         "node_child_process"
@@ -3521,9 +3741,9 @@
       "corpus_membership": "registry_mutation_class",
       "declared_mutations": null,
       "declared_test_class": "mutation",
-      "exit_code": 1,
+      "exit_code": 0,
       "killed": 0,
-      "measurement": "SURVIVOR",
+      "measurement": "UNREPORTED_POPULATION",
       "mutation_families": [],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
@@ -3532,15 +3752,15 @@
       "production_modules_loaded": 2,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
+      "report_line_parsed": true,
       "reported_fields": [],
       "reports_mutation_count": false,
       "runtime": "node",
       "scope_override": null,
       "script": "scripts/run_support_coverage_grid_tests.mjs",
       "spawn_evidence": [],
-      "status": "FAIL",
-      "survived": 1,
+      "status": "PASS",
+      "survived": 0,
       "test_id": "support-coverage-grid"
     },
     {
@@ -3617,12 +3837,20 @@
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
-      "declared_mutations": null,
+      "declared_mutations": 8,
       "declared_test_class": "mutation",
-      "exit_code": 1,
-      "killed": 0,
-      "measurement": "SURVIVOR",
-      "mutation_families": [],
+      "exit_code": 0,
+      "killed": 8,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "governance_mutations",
+          "members": [
+            "governance_mutations_caught"
+          ],
+          "population": 8
+        }
+      ],
       "mutation_scope": "production_artifact_under_mutation",
       "non_count_mutation_fields": [],
       "owner": "release-proof",
@@ -3630,9 +3858,11 @@
       "production_modules_loaded": 0,
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
-      "report_line_parsed": false,
-      "reported_fields": [],
-      "reports_mutation_count": false,
+      "report_line_parsed": true,
+      "reported_fields": [
+        "governance_mutations_caught"
+      ],
+      "reports_mutation_count": true,
       "runtime": "python",
       "scope_override": null,
       "script": "scripts/run_visual_mutation_pairing_tests.py",
@@ -3641,8 +3871,8 @@
         "python_module:emit",
         "python_subprocess"
       ],
-      "status": "FAIL",
-      "survived": 1,
+      "status": "PASS",
+      "survived": 0,
       "test_id": "visual-mutation-pairing"
     },
     {
@@ -3685,12 +3915,20 @@
     {
       "collapsed_same_population_families": [],
       "corpus_membership": "registry_mutation_class",
-      "declared_mutations": null,
+      "declared_mutations": 2,
       "declared_test_class": "mutation",
       "exit_code": 0,
-      "killed": 0,
-      "measurement": "UNREPORTED_POPULATION",
-      "mutation_families": [],
+      "killed": 2,
+      "measurement": "MEASURED",
+      "mutation_families": [
+        {
+          "family": "mutations",
+          "members": [
+            "mutations_detected"
+          ],
+          "population": 2
+        }
+      ],
       "mutation_scope": "production_module_under_mutation",
       "non_count_mutation_fields": [],
       "owner": "evidence-authority",
@@ -3699,8 +3937,10 @@
       "production_reach_evidence": "PRODUCTION_REACH_NECESSARY_NOT_SUFFICIENT",
       "report_line_defect": null,
       "report_line_parsed": true,
-      "reported_fields": [],
-      "reports_mutation_count": false,
+      "reported_fields": [
+        "mutations_detected"
+      ],
+      "reports_mutation_count": true,
       "runtime": "node",
       "scope_override": null,
       "script": "scripts/run_xbrl_reconciliation_tests.mjs",
@@ -3715,73 +3955,7 @@
     }
   ],
   "survivor_doctrine": "A survivor is a mutation the suite did not kill: a KNOWN OPEN HOLE in the mutation corpus, never accepted behaviour. Every survivor carries an owner and a pointer to the exact suite and reported field. The suite that reads this register FAILS when a survivor is present and unregistered, and FAILS when a registered survivor no longer reproduces, because a register entry kept past its repair asserts a hole that no longer exists. Retirement is compulsory, never optional; nothing in retired_survivors is read as a control input.",
-  "survivors": [
-    {
-      "count_basis": "UNKNOWN_POPULATION_FLOORED_AT_1",
-      "detail": "raise AssertionError(f\"VISUAL_PAIRING_FAIL: {message}\")",
-      "disposition": "OPEN",
-      "exit_code": 1,
-      "mutation_scope": "production_artifact_under_mutation",
-      "owner": "release-proof",
-      "pointer": "scripts/run_visual_mutation_pairing_tests.py",
-      "reproduced_serially": true,
-      "survived_mutations": 1,
-      "survivor_id": "visual-mutation-pairing::suite-failure",
-      "test_id": "visual-mutation-pairing"
-    },
-    {
-      "count_basis": "UNKNOWN_POPULATION_FLOORED_AT_1",
-      "detail": "AssertionError [ERR_ASSERTION]: the artifact claims 77 mutation-class suites; the registry declares 88",
-      "disposition": "OPEN",
-      "exit_code": 1,
-      "mutation_scope": "production_module_under_mutation",
-      "owner": "release-proof",
-      "pointer": "scripts/run_mutation_adequacy_tests.mjs",
-      "reproduced_serially": true,
-      "survived_mutations": 1,
-      "survivor_id": "mutation-adequacy::suite-failure",
-      "test_id": "mutation-adequacy"
-    },
-    {
-      "count_basis": "UNKNOWN_POPULATION_FLOORED_AT_1",
-      "detail": "compile: --portable-certify demands a hash-bound portable evidence dossier, not a development build :: refusal did not match /--portable-certify requires both --certification-evidence/ :: file:///Users/archiepreston/Documents/Codex/excel-inflow-v377/scripts/compile_skill_release.mjs:265 |   throw new Error( |         ^ |  | Error: --portable-certify requires --certification-evidence <manifest.json",
-      "disposition": "OPEN",
-      "exit_code": 1,
-      "mutation_scope": "production_module_under_mutation",
-      "owner": "release-proof",
-      "pointer": "scripts/run_package_ab_tests.mjs",
-      "reproduced_serially": true,
-      "survived_mutations": 1,
-      "survivor_id": "package-ab::suite-failure",
-      "test_id": "package-ab"
-    },
-    {
-      "count_basis": "UNKNOWN_POPULATION_FLOORED_AT_1",
-      "detail": "Error: SUPPORT_COVERAGE_GRID_FAIL: the committed grid was compiled against a different support envelope — regenerate it with --write",
-      "disposition": "OPEN",
-      "exit_code": 1,
-      "mutation_scope": "production_module_under_mutation",
-      "owner": "release-proof",
-      "pointer": "scripts/run_support_coverage_grid_tests.mjs",
-      "reproduced_serially": true,
-      "survived_mutations": 1,
-      "survivor_id": "support-coverage-grid::suite-failure",
-      "test_id": "support-coverage-grid"
-    },
-    {
-      "count_basis": "UNKNOWN_POPULATION_FLOORED_AT_1",
-      "detail": "AssertionError [ERR_ASSERTION]: Freeze criterion 11:",
-      "disposition": "OPEN",
-      "exit_code": 1,
-      "mutation_scope": "production_module_under_mutation",
-      "owner": "release-proof",
-      "pointer": "scripts/run_certified_code_closure_tests.mjs",
-      "reproduced_serially": true,
-      "survived_mutations": 1,
-      "survivor_id": "certified-runtime-code-closure::suite-failure",
-      "test_id": "certified-runtime-code-closure"
-    }
-  ],
+  "survivors": [],
   "zero_survivor_gate": {
     "adjunct_policy": "A P0 prover that applies mutations but is not registered test_class=mutation (the artifact-scope independent oracle) is a GATE ADJUNCT: it gates, but its counts stay out of the mutation-class corpus score so the two claims never contaminate each other.",
     "failure_rule": "status is FAIL if and only if a P0 gate member has at least one surviving mutation. A member BLOCKED on custody is UNPROVEN in this profile, never silently PASS; a member that reports no mutation count is listed so the gate cannot be satisfied by a suite that stopped mutating.",
@@ -3795,8 +3969,8 @@
       {
         "corpus_membership": "p0_gate_adjunct",
         "declared_test_class": "independent_economic_oracle",
-        "killed": 0,
-        "measurement": "BLOCKED_ON_CUSTODY",
+        "killed": 19,
+        "measurement": "MEASURED",
         "source": "derived_from_oracle_matrix_artifact_scope",
         "survived": 0,
         "test_id": "emitted-candidate-independent-oracle"
@@ -3813,13 +3987,8 @@
     ],
     "members_without_a_reported_count": [],
     "profile": "portable",
-    "status": "PASS_WITH_UNPROVEN_MEMBERS",
+    "status": "PASS",
     "survivors": [],
-    "unproven_members": [
-      {
-        "reason": "BLOCKED_ON_CUSTODY",
-        "test_id": "emitted-candidate-independent-oracle"
-      }
-    ]
+    "unproven_members": []
   }
 }

@@ -16,6 +16,8 @@
  *     [--temp-root <dir>]         the temp root to probe (else TMPDIR)
  *     [--min-free-bytes <n>]      free-space floor for the temp root (else EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES)
  *     [--out <report.json>]       also write the typed report to this path
+ *     [--capability-receipt <installed-capability-receipt.json>]
+ *                                 write the hash-bound candidate-slot receipt
  *     [--json]                    print the full typed report instead of the screen
  *
  * Exit codes: 0 = HOST_READY, 1 = REFUSED (typed), 2 = the doctor itself broke.
@@ -28,15 +30,11 @@
  * written into the repository by default, because a report legitimately
  * contains absolute host paths and shipped sources may not.
  */
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-
-import {
-  RUNTIME_DOCTOR_LANES,
-  runRuntimeDoctor,
-} from "./lib/runtime_doctor.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -109,8 +107,203 @@ function renderScreen(report) {
   return lines.join("\n");
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+async function writeAtomic(target, bytes) {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
+  await fs.writeFile(temporary, bytes, { encoding: "utf8", flag: "wx" });
+  await fs.rename(temporary, target);
+}
+
+class RuntimeBootstrapRefusal extends Error {
+  constructor(findings, preservedSourceHashes = {}) {
+    super("The installed package inventory failed before runtime modules could be loaded.");
+    this.name = "RuntimeBootstrapRefusal";
+    this.findings = findings;
+    this.preservedSourceHashes = preservedSourceHashes;
+  }
+}
+
+function safePackageMember(value) {
+  return typeof value === "string" && value.length > 0 &&
+    !value.includes("\\") && !path.posix.isAbsolute(value) &&
+    !value.split("/").some((part) => part === "" || part === "." || part === "..");
+}
+
+async function verifyInstalledPackageBootstrap() {
+  const manifestPath = path.join(ROOT, "release-manifest.json");
+  let manifest;
+  let manifestBytes;
+  try {
+    manifestBytes = await fs.readFile(manifestPath);
+    manifest = JSON.parse(manifestBytes.toString("utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      const sourceMarker = await fs.lstat(path.join(ROOT, ".git")).catch(() => null);
+      if (sourceMarker) return null; // Proven source checkout, not a compiled package.
+    }
+    throw new RuntimeBootstrapRefusal([{ path: "release-manifest.json", issue: "unreadable_or_invalid" }]);
+  }
+  const releaseManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
+  const findings = [];
+  if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
+    findings.push({ path: "release-manifest.json", issue: "missing_file_inventory" });
+  }
+  const records = new Map();
+  for (const record of manifest.files ?? []) {
+    if (!safePackageMember(record?.path) || !/^[a-f0-9]{64}$/.test(String(record?.sha256 ?? ""))) {
+      findings.push({ path: String(record?.path ?? "(missing)"), issue: "invalid_inventory_record" });
+      continue;
+    }
+    if (records.has(record.path)) {
+      findings.push({ path: record.path, issue: "duplicate_inventory_record" });
+      continue;
+    }
+    records.set(record.path, record);
+  }
+  let profile = null;
+  try {
+    profile = JSON.parse(await fs.readFile(path.join(ROOT, "assets", "deployment-profile.json"), "utf8"));
+  } catch {
+    findings.push({ path: "assets/deployment-profile.json", issue: "unreadable_or_invalid" });
+  }
+  const expectedDeclared = profile ? [
+    "SKILL.md",
+    "central-instructions.md",
+    ...(profile.reference_allowlist ?? []).map((name) => `references/${name}`),
+    ...(profile.asset_allowlist ?? []).map((name) => `assets/${name}`),
+    ...(profile.script_allowlist ?? []).map((name) => `scripts/${name}`),
+    ...(profile.python_module_allowlist ?? []).map((name) => `scripts/${name}`),
+  ] : [];
+  try {
+    const registry = JSON.parse(
+      await fs.readFile(path.join(ROOT, "assets", "terminal-reason-registry-v1.json"), "utf8"),
+    );
+    const runtimeReason = registry.reason_codes?.["INTERNAL.host_precondition_unsatisfied"];
+    if (
+      runtimeReason?.owner_layer !== "runtime_governance" ||
+      !runtimeReason?.allowed_terminal_states?.includes("INTERNAL_FAILURE")
+    ) {
+      findings.push({
+        path: "assets/terminal-reason-registry-v1.json",
+        issue: "runtime_reason_not_registered",
+      });
+    }
+  } catch {
+    findings.push({
+      path: "assets/terminal-reason-registry-v1.json",
+      issue: "runtime_reason_registry_unreadable",
+    });
+  }
+  for (const member of expectedDeclared) {
+    if (!records.has(member)) findings.push({ path: member, issue: "absent_from_package_inventory" });
+  }
+  for (const [member, record] of records) {
+    const target = path.join(ROOT, ...member.split("/"));
+    try {
+      const stat = await fs.lstat(target);
+      if (!stat.isFile() || stat.isSymbolicLink()) {
+        findings.push({ path: member, issue: "not_regular_file" });
+        continue;
+      }
+      const bytes = await fs.readFile(target);
+      const observed = createHash("sha256").update(bytes).digest("hex");
+      if (observed !== record.sha256 ||
+          (Number.isInteger(record.bytes) && bytes.length !== record.bytes)) {
+        findings.push({
+          path: member,
+          issue: "byte_identity_mismatch",
+          expected_sha256: record.sha256,
+          observed_sha256: observed,
+        });
+      }
+    } catch (error) {
+      findings.push({ path: member, issue: error?.code === "ENOENT" ? "missing" : "unreadable" });
+    }
+  }
+  const actualMembers = [];
+  const walk = async (directory, prefix = "") => {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const target = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        findings.push({ path: relative, issue: "unexpected_or_symlinked_package_member" });
+      } else if (entry.isDirectory()) {
+        await walk(target, relative);
+      } else if (entry.isFile()) {
+        actualMembers.push(relative);
+      } else {
+        findings.push({ path: relative, issue: "unsupported_package_member_type" });
+      }
+    }
+  };
+  await walk(ROOT);
+  const expectedMembers = new Set([...records.keys(), "release-manifest.json"]);
+  for (const member of actualMembers) {
+    if (!expectedMembers.has(member)) {
+      findings.push({ path: member, issue: "unexpected_package_member" });
+    }
+  }
+  if (findings.length > 0) {
+    throw new RuntimeBootstrapRefusal(findings, {
+      release_manifest_sha256: releaseManifestSha256,
+      expected_member_sha256: Object.fromEntries(
+        [...records.entries()].map(([member, record]) => [member, record.sha256]),
+      ),
+    });
+  }
+  return { file_count: records.size };
+}
+
+async function emitBootstrapRefusal(options, error) {
+  const report = {
+    schema_version: "excel-inflow-runtime-bootstrap-refusal/1.0",
+    generated_at: new Date().toISOString(),
+    verdict: "REFUSED",
+    terminal_state: "INTERNAL_FAILURE",
+    owner: "BLOCK",
+    reason_code: "INTERNAL.host_precondition_unsatisfied",
+    earliest_responsible_layer: "runtime_governance",
+    downstream_invalidation_scope: "all_runtime_lanes",
+    resumable_checkpoint_path:
+      typeof options["run-root"] === "string" ? path.resolve(options["run-root"]) : null,
+    preserved_source_hashes: error.preservedSourceHashes,
+    subordinate_execution_attempted: false,
+    package_root: ROOT,
+    findings: error.findings,
+  };
+  const bytes = `${JSON.stringify(report, null, 2)}\n`;
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const requestedReport = typeof options.out === "string" ? path.resolve(options.out) : null;
+  if (requestedReport) {
+    const directory = path.dirname(requestedReport);
+    const immutablePath = path.join(directory, `runtime-doctor-bootstrap-refusal-${sha256}.json`);
+    await writeAtomic(immutablePath, bytes);
+    await writeAtomic(requestedReport, bytes);
+    await writeAtomic(path.join(directory, "host-preflight-current.json"), `${JSON.stringify({
+      schema_version: "excel-inflow-host-preflight-pointer/1.1",
+      status: "REFUSED_BOOTSTRAP",
+      report_file: path.basename(immutablePath),
+      report_sha256: sha256,
+      receipt_file: null,
+      receipt_sha256: null,
+      receipt_self_sha256: null,
+    }, null, 2)}\n`);
+  }
+  if (options.json === true) process.stdout.write(bytes);
+  else process.stdout.write(
+    `RUNTIME DOCTOR — REFUSED before module load\n` +
+    `  reason_code: INTERNAL.host_precondition_unsatisfied\n` +
+    `  findings: ${error.findings.map((item) => `${item.path}:${item.issue}`).join(", ")}\n`,
+  );
+}
+
+async function main(options, runtimeDoctor) {
+  const {
+    RUNTIME_DOCTOR_LANES,
+    runRuntimeDoctor,
+    serializeRuntimeDoctorReport,
+    writeInstalledCapabilityArtifactSet,
+  } = runtimeDoctor;
   const lanes = typeof options.lane === "string"
     ? options.lane.split(",").map((value) => value.trim()).filter(Boolean)
     : RUNTIME_DOCTOR_LANES;
@@ -128,19 +321,47 @@ async function main() {
       : null,
   });
 
-  if (typeof options.out === "string") {
-    const target = path.resolve(options.out);
-    await fs.writeFile(target, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  if (typeof options.out === "string" || typeof options["capability-receipt"] === "string") {
+    const requestedPaths = [options.out, options["capability-receipt"]]
+      .filter((value) => typeof value === "string")
+      .map((value) => path.resolve(value));
+    const directories = [...new Set(requestedPaths.map((target) => path.dirname(target)))];
+    if (directories.length !== 1) {
+      throw new Error("--out and --capability-receipt must share one artifact directory.");
+    }
+    const artifactSet = await writeInstalledCapabilityArtifactSet({
+      artifactDirectory: directories[0],
+      report,
+    });
+    if (typeof options.out === "string") {
+      await writeAtomic(path.resolve(options.out), artifactSet.reportBytes);
+    }
+    if (typeof options["capability-receipt"] === "string") {
+      await writeAtomic(path.resolve(options["capability-receipt"]), artifactSet.receiptBytes);
+    }
   }
 
-  if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (options.json === true) process.stdout.write(serializeRuntimeDoctorReport(report));
   else process.stdout.write(`${renderScreen(report)}\n`);
 
   return report.verdict === "HOST_READY" ? 0 : 1;
 }
 
+const options = parseArgs(process.argv.slice(2));
 try {
-  process.exitCode = await main();
+  await verifyInstalledPackageBootstrap();
+} catch (error) {
+  if (error instanceof RuntimeBootstrapRefusal) {
+    await emitBootstrapRefusal(options, error);
+    process.exitCode = 1;
+  } else {
+    throw error;
+  }
+}
+
+if (process.exitCode !== 1) try {
+  const runtimeDoctor = await import("./lib/runtime_doctor.mjs");
+  process.exitCode = await main(options, runtimeDoctor);
 } catch (error) {
   // The doctor breaking is distinct from the host being unfit: exit 2, so a
   // caller never reads a broken doctor as a refused host or as a pass.

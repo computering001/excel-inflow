@@ -7,6 +7,7 @@ import {
 } from "./experience_trace.mjs";
 
 export const REQUIRED_PERFORMANCE_SPANS = Object.freeze([
+  "host_preflight",
   "source_acquisition",
   "filing_extraction",
   "broker_native_extraction",
@@ -37,6 +38,13 @@ export const REQUIRED_PERFORMANCE_SPANS = Object.freeze([
  */
 const SPAN_SPECS = Object.freeze([
   {
+    name: "host_preflight",
+    owner: "top_level_runtime_doctor",
+    measures: "mandatory evidence+workbook capability probe before the company run",
+    direct: ({ hostPreflightDurationMs, performance }) =>
+      hostPreflightDurationMs ?? performance?.host_preflight_ms,
+  },
+  {
     name: "source_acquisition",
     owner: "filings_source_custody",
     measures: "filings source acquisition inside the evidence pipeline",
@@ -53,6 +61,9 @@ const SPAN_SPECS = Object.freeze([
     owner: "broker_evidence_lane",
     measures: "broker evidence lane wall time",
     lane: (performance) => performance?.lane_duration_ms?.broker,
+    lawfulZero: (performance) => performance?.broker_intake_state === "explicitly_skipped"
+      ? "broker_explicitly_skipped"
+      : null,
   },
   {
     name: "semantic_recovery",
@@ -151,6 +162,7 @@ export function compilePerformanceReceipt({
   reusedCheckpoints,
   executedCheckpoints,
   totalDurationMs,
+  hostPreflightDurationMs,
 }) {
   const performance = attachmentPerformance ?? {};
   const timings = checkpointTimings ?? {};
@@ -160,21 +172,26 @@ export function compilePerformanceReceipt({
   const reused = new Set(reusedIds);
   const claimed = new Set();
   const spans = SPAN_SPECS.map((spec) => {
-    if (spec.lane) {
-      const duration = finiteDuration(spec.lane(performance));
+    if (spec.lane || spec.direct) {
+      const rawDuration = spec.lane
+        ? spec.lane(performance)
+        : spec.direct({ hostPreflightDurationMs, performance });
+      const lawfulZeroReason = spec.lawfulZero?.(performance) ?? null;
+      const duration = finiteDuration(rawDuration);
+      const lawfulZero = Number(rawDuration) === 0 && lawfulZeroReason !== null;
       return {
         name: spec.name,
         owner: spec.owner,
         measures: spec.measures,
         coverage_role: "leaf",
         attribution: {
-          kind: "evidence_lane",
+          kind: spec.direct ? "controller_preflight" : "evidence_lane",
           observed_checkpoint_ids: [],
           reused_checkpoint_ids: [],
         },
-        duration_ms: duration,
-        lawful_zero_reason: null,
-        status: duration === null ? "MISSING" : "PASS",
+        duration_ms: lawfulZero ? 0 : duration,
+        lawful_zero_reason: lawfulZero ? lawfulZeroReason : null,
+        status: lawfulZero ? "NOT_APPLICABLE" : duration === null ? "MISSING" : "PASS",
       };
     }
     const observed = timingIds.filter((id) => spec.checkpoint(id)).sort();
@@ -214,6 +231,9 @@ export function compilePerformanceReceipt({
   });
   const missing = spans.filter((span) => span.status === "MISSING").map((span) => span.name);
   const reusedSpanNames = spans.filter((span) => span.status === "REUSED").map((span) => span.name);
+  const notApplicableSpanNames = spans
+    .filter((span) => span.status === "NOT_APPLICABLE")
+    .map((span) => span.name);
   const unmapped = timingIds.filter((id) => !claimed.has(id)).sort();
   const unmappedMs = unmapped.reduce((sum, id) => sum + (nonNegative(timings[id]) ?? 0), 0);
   const measured = measuredSpanMs(spans);
@@ -258,6 +278,7 @@ export function compilePerformanceReceipt({
       observed_leaf_span_count: spans.length - missing.length,
       missing_span_names: missing,
       reused_span_names: reusedSpanNames,
+      not_applicable_span_names: notApplicableSpanNames,
       leaf_span_coverage_ratio: (spans.length - missing.length) / spans.length,
       root_span_substitution_allowed: false,
       measured_span_ms: measured,
@@ -294,8 +315,9 @@ export function validatePerformanceReceipt(receipt) {
     const observed = (span?.attribution?.observed_checkpoint_ids ?? []).map(String);
     const reusedObserved = (span?.attribution?.reused_checkpoint_ids ?? []).map(String);
     if (!spec) continue;
-    if (spec.lane) {
-      if (span?.attribution?.kind !== "evidence_lane" || observed.length > 0 || reusedObserved.length > 0) {
+    if (spec.lane || spec.direct) {
+      const expectedKind = spec.direct ? "controller_preflight" : "evidence_lane";
+      if (span?.attribution?.kind !== expectedKind || observed.length > 0 || reusedObserved.length > 0) {
         errors.push(`mislabelled:${span?.name}`);
       }
       continue;
@@ -328,6 +350,15 @@ export function validatePerformanceReceipt(receipt) {
         observed.length > 0 &&
         observed.every((id) => declaredReused.has(id));
       if (!lawful) errors.push("reused_zero_not_lawful");
+      continue;
+    }
+    if (span?.status === "NOT_APPLICABLE") {
+      const lawful =
+        span?.name === "broker_native_extraction" &&
+        duration === 0 &&
+        span?.attribution?.kind === "evidence_lane" &&
+        span?.lawful_zero_reason === "broker_explicitly_skipped";
+      if (!lawful) errors.push("not_applicable_zero_not_lawful");
       continue;
     }
     errors.push("duration");

@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { validateEvidenceRun } from "./lib/evidence_run.mjs";
+import { validateJsonSchema } from "./lib/json_schema.mjs";
+import {
+  installedCapabilityReceiptDigest,
+} from "./lib/runtime_doctor.mjs";
+import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 import {
   RUN_DEADLINE_ENV,
   beginComputeSpan,
@@ -137,6 +143,88 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
+const COMPANY_HANDOFF_ENV = "EXCEL_INFLOW_TOP_CONTROLLER_HANDOFF";
+
+async function assertCompanyScreenPreflight(options) {
+  const handoff = typeof options["controller-handoff"] === "string"
+    ? options["controller-handoff"]
+    : null;
+  if (
+    !handoff || handoff.length < 64 ||
+    process.env[COMPANY_HANDOFF_ENV] !== handoff
+  ) {
+    throw new Error("Company screen is a private delegate of run_excel_inflow_vnext.mjs.");
+  }
+  delete process.env[COMPANY_HANDOFF_ENV];
+  const receiptPath = typeof options["host-capability-receipt"] === "string"
+    ? path.resolve(options["host-capability-receipt"])
+    : null;
+  const reportPath = typeof options["runtime-doctor-report"] === "string"
+    ? path.resolve(options["runtime-doctor-report"])
+    : null;
+  if (!receiptPath || !reportPath) {
+    throw new Error(
+      "Company screen requires the top-level controller's current host-capability receipt; " +
+      "invoke run_excel_inflow_vnext.mjs --screen company.",
+    );
+  }
+  const [receiptBytes, reportBytes, receiptSchema, reportSchema] = await Promise.all([
+    fs.readFile(receiptPath),
+    fs.readFile(reportPath),
+    fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8")
+      .then(JSON.parse),
+    fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8")
+      .then(JSON.parse),
+  ]);
+  const receipt = JSON.parse(receiptBytes.toString("utf8"));
+  const report = JSON.parse(reportBytes.toString("utf8"));
+  const errors = [
+    ...validateJsonSchema(receipt, receiptSchema),
+    ...validateJsonSchema(report, reportSchema),
+  ];
+  if (errors.length > 0) throw new Error(`Company-screen preflight artifacts are invalid: ${errors[0]}`);
+  if (
+    receipt.status !== "HOST_READY" || report.verdict !== "HOST_READY" ||
+    !["evidence", "workbook"].every((lane) => receipt.requested_lanes.includes(lane))
+  ) {
+    throw new Error("Company-screen preflight did not certify both evidence and workbook lanes.");
+  }
+  if (installedCapabilityReceiptDigest(receipt) !== receipt.receipt_sha256) {
+    throw new Error("Company-screen capability receipt failed its self-hash.");
+  }
+  const reportSha256 = createHash("sha256").update(reportBytes).digest("hex");
+  if (reportSha256 !== receipt.runtime_doctor_sha256) {
+    throw new Error("Company-screen capability receipt does not bind the supplied runtime-doctor report bytes.");
+  }
+  const generatedAt = Date.parse(receipt.generated_at);
+  if (!Number.isFinite(generatedAt) || generatedAt > Date.now() + 60_000 || Date.now() - generatedAt > 600_000) {
+    throw new Error("Company-screen capability receipt is stale or has an invalid timestamp.");
+  }
+  const [activeNodeSha256, activePythonSha256, activeSofficeSha256] = await Promise.all([
+    fs.readFile(process.execPath).then((bytes) => createHash("sha256").update(bytes).digest("hex")),
+    fs.readFile(receipt.python.executable)
+      .then((bytes) => createHash("sha256").update(bytes).digest("hex")),
+    fs.readFile(receipt.workbook.soffice_executable)
+      .then((bytes) => createHash("sha256").update(bytes).digest("hex")),
+  ]);
+  if (
+    receipt.node.executable !== process.execPath || receipt.node.version !== process.version ||
+    receipt.node.executable_sha256 !== activeNodeSha256 ||
+    receipt.python.executable_sha256 !== activePythonSha256 ||
+    receipt.workbook.soffice_executable_sha256 !== activeSofficeSha256
+  ) {
+    throw new Error("Company-screen capability receipt belongs to different Node or Python bytes.");
+  }
+  const active = await resolveActiveSourceIdentity({ skillRoot: ROOT });
+  if (
+    receipt.source_identity.active_runtime_code_closure_sha256 !==
+      active.active_runtime_code_closure_check.active_runtime_code_closure_sha256 ||
+    receipt.source_identity.source_commit !== active.source_commit ||
+    receipt.source_identity.source_tree !== active.source_tree
+  ) {
+    throw new Error("Company-screen capability receipt belongs to different active package bytes.");
+  }
+}
 let ACTIVE_RUN_GUARD = null;
 // P6.4 — the evidence work graph and its attempt ledger, held at module scope
 // for the same reason the run guard is: `finish()` is the one place every exit
@@ -498,6 +586,7 @@ async function main() {
       throw new Error("--screen requires a stage id");
     }
     const stage = String(options.screen);
+    if (stage === "company") await assertCompanyScreenPreflight(options);
     process.stdout.write(`${renderPresentationScreen(stage)}\n`);
     return normaliseUserFlowResult({ status: "SCREEN", stage });
   }
@@ -510,7 +599,8 @@ async function main() {
         "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--json], or " +
-        "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|delivery>",
+        "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|delivery> " +
+        "[private top-controller capability handoff]",
     );
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });

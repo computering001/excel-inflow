@@ -6,6 +6,7 @@
     "scripts/workflow_state.py",
     "scripts/extract_dcs_evidence.py",
     "scripts/compile_dcs_evidence.py",
+    "scripts/verify/__init__.py",
     "scripts/verify/dcs_evidence_oracle.py",
     "assets/dcs-extraction-request-v1.schema.json",
     "assets/dcs-source-tables-v1.schema.json",

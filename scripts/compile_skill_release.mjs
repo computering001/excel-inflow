@@ -347,6 +347,10 @@ const requiredPhrases = requireList("instruction_required_phrases");
 const allowedBareImports = new Set(deploymentProfile.allowed_bare_imports ?? []);
 const vendoredDependencies = deploymentProfile.vendored_dependencies ?? [];
 const declaredOnlyAssets = deploymentProfile.declared_only_assets ?? {};
+const explicitPrivateScriptRoots = deploymentProfile.script_private_roots ?? [];
+if (!Array.isArray(explicitPrivateScriptRoots)) {
+  throw new Error("deployment-profile.json script_private_roots must be an array.");
+}
 
 const pythonEntryPoints = requireList("python_entry_points").map(posix);
 const declaredPythonModules = requireList("python_module_allowlist").map(posix);
@@ -356,6 +360,74 @@ const pythonEntryPointNotes = deploymentProfile.python_entry_point_notes ?? {};
 const pythonEntrySmoke = deploymentProfile.python_entry_point_smoke ?? {};
 const pythonRuntime = deploymentProfile.python_runtime ?? {};
 const readerDecision = deploymentProfile.xlsx_reader_consolidation_decision ?? null;
+
+// Declarative lane manifests are executable closure roots, not documentation.
+// A child spawned by filename cannot be discovered through an import walk, so
+// every *-runtime-members.json contributes private JS/Python roots and assets
+// before either language closure is computed.
+const runtimeMemberManifestNames = declaredAssets
+  .filter((name) => /runtime-members\.json$/.test(name))
+  .sort();
+const runtimeMemberScripts = new Set();
+const runtimeMemberPython = new Set();
+const runtimeMemberAssets = new Set(runtimeMemberManifestNames);
+const runtimeMemberManifestRecords = [];
+for (const manifestName of runtimeMemberManifestNames) {
+  const manifestPath = path.join(assetsDir, manifestName);
+  const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  if (!Array.isArray(manifest.members) || manifest.members.length === 0) {
+    throw new Error(`${manifestName} must declare a non-empty members array.`);
+  }
+  if (new Set(manifest.members).size !== manifest.members.length) {
+    throw new Error(`${manifestName} declares duplicate runtime members.`);
+  }
+  const record = { manifest: manifestName, members: [] };
+  for (const rawMember of manifest.members) {
+    const member = posix(String(rawMember));
+    if (
+      member !== rawMember || path.posix.isAbsolute(member) ||
+      member.split("/").includes("..") || member.startsWith("./")
+    ) {
+      throw new Error(`${manifestName} declares unsafe runtime member ${JSON.stringify(rawMember)}.`);
+    }
+    const absolute = path.join(skillDir, ...member.split("/"));
+    if (!(await exists(absolute))) {
+      throw new Error(`${manifestName} runtime member ${member} does not exist.`);
+    }
+    if (member.startsWith("scripts/") && member.endsWith(".mjs")) {
+      const relative = member.slice("scripts/".length);
+      runtimeMemberScripts.add(relative);
+      if (!declaredScripts.includes(relative)) {
+        throw new Error(`${manifestName} private JS root ${member} is absent from script_allowlist.`);
+      }
+    } else if (member.startsWith("scripts/") && member.endsWith(".py")) {
+      const relative = member.slice("scripts/".length);
+      runtimeMemberPython.add(relative);
+      if (!declaredPythonModules.includes(relative)) {
+        throw new Error(`${manifestName} private Python root ${member} is absent from python_module_allowlist.`);
+      }
+    } else if (member.startsWith("assets/")) {
+      const relative = member.slice("assets/".length);
+      runtimeMemberAssets.add(relative);
+      if (!declaredAssets.includes(relative)) {
+        throw new Error(`${manifestName} runtime asset ${member} is absent from asset_allowlist.`);
+      }
+    } else {
+      throw new Error(
+        `${manifestName} runtime member ${member} has no typed scripts/*.mjs, scripts/*.py or assets/* owner.`,
+      );
+    }
+    record.members.push(member);
+  }
+  runtimeMemberManifestRecords.push(record);
+}
+const privateScriptRoots = [...new Set([
+  ...explicitPrivateScriptRoots.map(posix),
+  ...runtimeMemberScripts,
+])].sort();
+const scriptClosureRoots = [...new Set([...entryPoints, ...privateScriptRoots])].sort();
+const privatePythonRoots = [...runtimeMemberPython].sort();
+const pythonClosureRoots = [...new Set([...pythonEntryPoints, ...privatePythonRoots])].sort();
 // Three modes, three named values. `portable_certified` is its own third
 // branch rather than a flag on `certified`, so every `=== "certified"`
 // comparison downstream keeps meaning "natively certified".
@@ -397,6 +469,14 @@ function gitIdentity(args, environmentName) {
 
 const sourceCommit = gitIdentity(["rev-parse", "HEAD"], "EXCEL_INFLOW_SOURCE_COMMIT");
 const sourceTree = gitIdentity(["rev-parse", "HEAD^{tree}"], "EXCEL_INFLOW_SOURCE_TREE");
+const sourceStatusProbe = spawnSync(
+  "git",
+  ["-C", skillDir, "status", "--porcelain=v1", "--untracked-files=all"],
+  { encoding: "utf8" },
+);
+const sourceWorktreeDirty = sourceStatusProbe.status === 0
+  ? String(sourceStatusProbe.stdout).trim().length > 0
+  : null;
 const sourceRepository =
   process.env.EXCEL_INFLOW_SOURCE_REPOSITORY ?? "computering001/excel-inflow";
 
@@ -446,6 +526,13 @@ for (const entry of entryPoints) {
   if (!declaredScripts.includes(entry)) {
     throw new Error(
       `Entry point ${entry} is not in script_allowlist. The allowlist must contain the closure, entry points included.`,
+    );
+  }
+}
+for (const entry of privateScriptRoots) {
+  if (!declaredScripts.includes(entry)) {
+    throw new Error(
+      `Private script root ${entry} is not in script_allowlist. Private roots are closure roots, not public entry points.`,
     );
   }
 }
@@ -521,7 +608,7 @@ async function walkScript(relative, importedBy) {
   }
 }
 
-for (const entry of entryPoints) {
+for (const entry of scriptClosureRoots) {
   await walkScript(entry, null);
 }
 
@@ -903,7 +990,7 @@ if (!pythonExecutable) {
 const pythonClosure = await withTempScript("closure.py", PYTHON_CLOSURE_SOURCE, async (script) => {
   const run = spawnSync(
     pythonExecutable,
-    [script, scriptsDir, JSON.stringify(pythonEntryPoints)],
+    [script, scriptsDir, JSON.stringify(pythonClosureRoots)],
     { encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 },
   );
   let payload;
@@ -944,6 +1031,53 @@ if (pythonMissingFromProfile.length > 0 || pythonExtraInProfile.length > 0) {
       .filter(Boolean)
       .join("\n"),
   );
+}
+
+// A lane runtime manifest must include the static import closure of every
+// script it names. Otherwise its cache/runtime digest can stay unchanged when
+// an executed helper changes, defeating content-addressed resume.
+const jsImportsBySource = new Map();
+for (const edge of importEdges) {
+  if (!jsImportsBySource.has(edge.from)) jsImportsBySource.set(edge.from, []);
+  jsImportsBySource.get(edge.from).push(edge.to);
+}
+const pythonImportsBySource = new Map();
+for (const [from, to] of pythonClosure.edges) {
+  if (!pythonImportsBySource.has(from)) pythonImportsBySource.set(from, []);
+  pythonImportsBySource.get(from).push(to);
+}
+function transitiveMembers(roots, edges) {
+  const seen = new Set();
+  const queue = [...roots];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    queue.push(...(edges.get(current) ?? []));
+  }
+  return seen;
+}
+for (const record of runtimeMemberManifestRecords) {
+  const declared = new Set(record.members);
+  const jsRoots = record.members
+    .filter((member) => member.startsWith("scripts/") && member.endsWith(".mjs"))
+    .map((member) => member.slice("scripts/".length));
+  const pythonRoots = record.members
+    .filter((member) => member.startsWith("scripts/") && member.endsWith(".py"))
+    .map((member) => member.slice("scripts/".length));
+  const missing = [
+    ...[...transitiveMembers(jsRoots, jsImportsBySource)]
+      .map((member) => `scripts/${member}`)
+      .filter((member) => !declared.has(member)),
+    ...[...transitiveMembers(pythonRoots, pythonImportsBySource)]
+      .map((member) => `scripts/${member}`)
+      .filter((member) => !declared.has(member)),
+  ].sort();
+  if (missing.length > 0) {
+    throw new Error(
+      `${record.manifest} omits transitive runtime members: ${missing.join(", ")}`,
+    );
+  }
 }
 
 /* --- third-party Python imports, checked both ways ----------------- */
@@ -1092,8 +1226,23 @@ for (const record of pythonThirdParty) {
 
 const NEW_URL_ASSET = /new URL\(\s*(["'])([^"']+)\1\s*,\s*import\.meta\.url\s*\)/g;
 const PATH_JOIN_ASSET = /path\.join\([^)]*["']assets["']\s*,\s*["']([^"']+)["']\s*\)/g;
+// Many production controllers bind the assets directory once (for example
+// `const ASSETS = path.join(ROOT, "assets")`) and later load a file through
+// that alias. The original closure scanner saw the directory declaration but
+// not the second join, allowing a source checkout to pass while the compiled
+// package omitted the actual runtime asset.
+const PATH_JOIN_IDENTIFIER =
+  /path\.join\(\s*([A-Za-z_$][\w$]*)\s*,\s*["']([^"']+)["']\s*\)/g;
+async function isRegularFile(target) {
+  try {
+    return (await fs.stat(target)).isFile();
+  } catch {
+    return false;
+  }
+}
 
-const computedAssets = new Set();
+const computedAssets = new Set(runtimeMemberAssets);
+const QUOTED_LITERAL = /(["'`])([^"'`\r\n]+)\1/g;
 for (const relative of computedScripts) {
   const absolute = path.join(scriptsDir, relative);
   const source = await fs.readFile(absolute, "utf8");
@@ -1106,6 +1255,37 @@ for (const relative of computedScripts) {
   for (const match of source.matchAll(PATH_JOIN_ASSET)) {
     computedAssets.add(posix(match[1]));
   }
+  for (const match of source.matchAll(PATH_JOIN_IDENTIFIER)) {
+    const [, directoryAlias, filename] = match;
+    if (
+      directoryAlias.toLowerCase().includes("asset") &&
+      await exists(path.join(assetsDir, filename))
+    ) {
+      computedAssets.add(posix(filename));
+    }
+  }
+  // Conservative runtime-resource coverage: if shipped production source
+  // names an existing asset file literally, that file is a dependency even
+  // when a helper/alias/path.resolve call hides the path shape from the more
+  // precise patterns above. False negatives break installed packages; a
+  // conservative extra asset merely invalidates the right descendants.
+  for (const match of source.matchAll(QUOTED_LITERAL)) {
+    const literal = posix(match[2]);
+    const relativeAsset = literal.startsWith("assets/")
+      ? literal.slice("assets/".length)
+      : literal;
+    if (
+      relativeAsset.length > 0 &&
+      relativeAsset.length <= 240 &&
+      !relativeAsset.includes("\0") &&
+      !relativeAsset.includes("${") &&
+      !path.posix.isAbsolute(relativeAsset) &&
+      !relativeAsset.split("/").includes("..") &&
+      await isRegularFile(path.join(assetsDir, relativeAsset))
+    ) {
+      computedAssets.add(relativeAsset);
+    }
+  }
 }
 
 // The Python closure resolves its assets by path arithmetic the JavaScript
@@ -1117,6 +1297,50 @@ const pythonAssetLoaders = {};
 for (const [asset, modules] of Object.entries(pythonClosure.assets)) {
   computedAssets.add(posix(asset));
   pythonAssetLoaders[asset] = modules.map((name) => `scripts/${name}`);
+}
+
+// JSON Schema dependencies are closure edges too. A root schema without its
+// external $ref target is the same kind of installed-package failure as a
+// missing executable child.
+const schemaQueue = [...computedAssets];
+const schemaVisited = new Set();
+while (schemaQueue.length > 0) {
+  const asset = schemaQueue.shift();
+  if (schemaVisited.has(asset) || !asset.endsWith(".json")) continue;
+  schemaVisited.add(asset);
+  let document;
+  try {
+    document = JSON.parse(await fs.readFile(path.join(assetsDir, asset), "utf8"));
+  } catch {
+    continue;
+  }
+  const stack = [document];
+  while (stack.length > 0) {
+    const value = stack.pop();
+    if (Array.isArray(value)) {
+      stack.push(...value);
+      continue;
+    }
+    if (!value || typeof value !== "object") continue;
+    if (typeof value.$ref === "string" && !value.$ref.startsWith("#")) {
+      const referencePath = value.$ref.split("#", 1)[0];
+      if (/^[a-z][a-z0-9+.-]*:/i.test(referencePath)) {
+        throw new Error(`${asset} uses unsupported external schema URI ${value.$ref}.`);
+      }
+      const resolved = posix(path.posix.normalize(path.posix.join(path.posix.dirname(asset), referencePath)));
+      if (resolved.startsWith("../") || path.posix.isAbsolute(resolved)) {
+        throw new Error(`${asset} has schema $ref outside assets/: ${value.$ref}.`);
+      }
+      if (!(await exists(path.join(assetsDir, resolved)))) {
+        throw new Error(`${asset} references missing schema asset ${resolved}.`);
+      }
+      if (!computedAssets.has(resolved)) {
+        computedAssets.add(resolved);
+        schemaQueue.push(resolved);
+      }
+    }
+    stack.push(...Object.values(value));
+  }
 }
 
 const assetsMissingFromProfile = [...computedAssets]
@@ -1149,6 +1373,49 @@ for (const name of declaredAssets) {
 for (const name of declaredReferences) {
   if (!(await exists(path.join(referencesDir, name)))) {
     throw new Error(`reference_allowlist names ${name}, which does not exist under references/.`);
+  }
+}
+
+// Markdown instructions are executable routing for an agent. Follow local
+// Markdown links recursively so a release cannot ship an instruction that
+// points at a reference present only in the source checkout.
+const MARKDOWN_LINK = /!?\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)/g;
+const BARE_REFERENCE = /\breferences\/[A-Za-z0-9._/-]+\.md\b/g;
+const markdownQueue = ["SKILL.md", "central-instructions.md"];
+const markdownVisited = new Set();
+const discoveredReferences = new Set();
+while (markdownQueue.length > 0) {
+  const documentPath = posix(markdownQueue.shift());
+  if (markdownVisited.has(documentPath)) continue;
+  markdownVisited.add(documentPath);
+  const source = await fs.readFile(path.join(skillDir, ...documentPath.split("/")), "utf8");
+  const rawTargets = [
+    ...[...source.matchAll(MARKDOWN_LINK)].map((match) => match[1]),
+    ...[...source.matchAll(BARE_REFERENCE)].map((match) => match[0]),
+  ];
+  for (const rawTarget of rawTargets) {
+    const withoutFragment = String(rawTarget).split("#", 1)[0].split("?", 1)[0];
+    if (!withoutFragment || /^[a-z][a-z0-9+.-]*:/i.test(withoutFragment)) continue;
+    const resolved = posix(path.posix.normalize(
+      withoutFragment.startsWith("references/")
+        ? withoutFragment
+        : path.posix.join(path.posix.dirname(documentPath), withoutFragment),
+    ));
+    if (!resolved.endsWith(".md") || !resolved.startsWith("references/")) continue;
+    if (resolved.startsWith("references/../") || path.posix.isAbsolute(resolved)) {
+      throw new Error(`${documentPath} has unsafe Markdown reference ${rawTarget}.`);
+    }
+    const referenceName = resolved.slice("references/".length);
+    if (!declaredReferences.includes(referenceName)) {
+      throw new Error(
+        `${documentPath} links references/${referenceName}, which is absent from reference_allowlist.`,
+      );
+    }
+    if (!(await exists(path.join(referencesDir, referenceName)))) {
+      throw new Error(`${documentPath} links missing reference references/${referenceName}.`);
+    }
+    discoveredReferences.add(referenceName);
+    markdownQueue.push(resolved);
   }
 }
 const declaredResources = [];
@@ -1724,7 +1991,7 @@ async function runSmokeTest() {
     //    whichever part an entry point happens to touch before it exits.
     const probeLines = [
       ...computedScripts
-        .filter((name) => !entryPoints.includes(name))
+        .filter((name) => !scriptClosureRoots.includes(name))
         .map((name) => `await import(${JSON.stringify(`./${name}`)});`),
       ...[...bareImports.keys()].map((name) => `await import(${JSON.stringify(name)});`),
       'console.log("closure-resolved");',
@@ -1771,6 +2038,22 @@ async function runSmokeTest() {
         );
       }
       results.push({ target: `scripts/${entry}`, status: run.status, resolved: true });
+    }
+    for (const entry of privateScriptRoots) {
+      const run = spawnSync(process.execPath, [path.join("skill", "scripts", ...entry.split("/"))], {
+        cwd: isolatedRoot,
+        env,
+        encoding: "utf8",
+        timeout: 120000,
+      });
+      const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+      if (run.error || resolutionFailure.test(output)) {
+        throw new Error(
+          `Smoke test failed: private root scripts/${entry} cannot execute from the release folder: ` +
+          `${run.error?.message ?? output.trim()}`,
+        );
+      }
+      results.push({ target: `private scripts/${entry}`, status: run.status, resolved: true });
     }
 
     /* --- Python ---------------------------------------------------- *
@@ -2115,6 +2398,7 @@ const manifest = {
   skillVersion: runtimeManifest.skill_version,
   templateVersion: runtimeManifest.template_version,
   sourceStatus: runtimeManifest.status,
+  sourceWorktreeDirty,
   generatedAt,
   centralInstructionsWords: wordCount(centralInstructions),
   profile: "assets/deployment-profile.json",
@@ -2187,12 +2471,19 @@ const manifest = {
   },
   closure: {
     entryPoints: entryPoints.map((name) => `scripts/${name}`),
+    privateEntryPoints: privateScriptRoots.map((name) => `scripts/${name}`),
+    runtimeMemberManifests: runtimeMemberManifestRecords.map((record) => ({
+      manifest: `assets/${record.manifest}`,
+      members: record.members.slice().sort(),
+    })),
     scripts: computedScripts.map((name) => `scripts/${name}`),
     assetsLoadedByScripts: [...computedAssets].sort().map((name) => `assets/${name}`),
     assetsDeclaredOnly: declaredAssets
       .filter((name) => !computedAssets.has(name))
       .sort()
       .map((name) => `assets/${name}`),
+    markdownReferenceRoots: ["SKILL.md", "central-instructions.md"],
+    markdownReferences: [...discoveredReferences].sort().map((name) => `references/${name}`),
     resourceRoots: declaredResourceRoots.slice().sort(),
     resources: declaredResources.slice().sort(),
     imports: importEdges
@@ -2212,6 +2503,7 @@ const manifest = {
       })),
     },
     entryPoints: pythonEntryPoints.map((name) => `scripts/${name}`),
+    privateEntryPoints: privatePythonRoots.map((name) => `scripts/${name}`),
     entryPointsUncommandedByInstructions: uncommandedPythonEntryPoints.map(
       (name) => `scripts/${name}`,
     ),

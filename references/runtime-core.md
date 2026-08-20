@@ -228,12 +228,25 @@ question:
 node scripts/run_excel_inflow_vnext.mjs --screen company
 ```
 
+For an engineering diagnosis of the same non-bypassable preflight, run:
+
+```text
+node scripts/run_runtime_doctor.mjs --run-root <run-folder> --lane evidence,workbook --capability-receipt <run-folder>/installed-capability-receipt.json
+```
+
+This diagnostic is not an alternate product route. The ordinary Company-screen
+command invokes the same library itself and refuses before displaying the
+screen when the receipt is not `HOST_READY`.
+
 That command's stdout IS a fenced code block (it begins with ```text and ends
 with ```). Return it verbatim and whole as the first visible response — the
 fence included — so the screen renders in monospace. Never retype it, restyle
 it as Markdown headings, or replace it with a conversational company/ticker
-question. If the command cannot be executed in this runtime, reproduce the
-canonical screen below EXACTLY, fence and all:
+question. If the command cannot execute, if its runtime doctor refuses, or if
+its stdout is not the complete canonical block, return the typed
+`INTERNAL_FAILURE` and no Company screen. Never reproduce a static success
+screen after executable failure. The block below is the exact presentation
+contract used to verify successful controller output; it is not a fallback:
 
 ```text
 +=[ EXCEL INFLOW ]==============================[ COMPANY ]=+
@@ -298,12 +311,18 @@ an implicit legacy skip. Broker extraction, OCR, reconciliation, house
 selection and fallback remain one internal non-blocking step after upload; do
 not introduce a second preview or confirmation interaction.
 
-The bare trigger is presentation-only. Do not certify the installed release,
-inspect package bytes, emit progress prose, search for tools, read evidence or
-perform any other work before returning the Company screen. Deployment
-certification belongs to the versioned installation transaction, never to an
-ordinary end-user invocation. After the Company screen is visible, later
-milestones may perform their declared checks and persist their normal receipts.
+The bare trigger performs only the bounded installed-capability preflight wired
+into the production controller: exact package/runtime identity, one Python
+interpreter, required imports, writable run/temp roots, workbook prerequisites
+and a real extraction of the frozen two-page filing fixture. It does not process
+issuer evidence, build a test model or rerun release certification. The Company
+screen is visible only after that preflight writes a hash-bound,
+content-addressed report/receipt pair and publishes `host-preflight-current.json`
+last. The receipt has `HOST_READY`; activation eligibility remains a separate
+whole-package custody decision. Deployment certification
+still belongs to the versioned installation transaction. After the Company
+screen is visible, later milestones perform their declared issuer work and
+persist their normal receipts.
 
 The entry screen collects the company only; the remaining pack arrives at its own stage as the screen states. Under `source_mode=internal`, AUTO-PULL the last three full-year filings for the resolved issuer and record the selected filing identities on the intake receipt. Under `source_mode=user_supplied`, use only the explicitly selected user filing set. Under `source_mode=internal_fallback`, use the declared fallback set and preserve the internal-source failure reason. User attachments do not override internally sourced filings merely by existing. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year

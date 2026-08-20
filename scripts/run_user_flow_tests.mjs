@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { COMPANY_SCREEN, inspectScreen, renderBrokerIntakeScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
+import { resolvePythonExecutable } from "./lib/process_tree.mjs";
 import { canonicalBrokerIntakeJson, compileBrokerIntakeChoice } from "./lib/broker_intake_choice.mjs";
 import {
   DELIVERY_BLOCKED_OUTCOMES,
@@ -29,6 +30,14 @@ const out = path.resolve(
   process.argv[3] ?? await fs.mkdtemp(path.join(os.tmpdir(), "dmu-user-flow-test-")),
 );
 await fs.mkdir(out, { recursive: true });
+const TEST_PYTHON = await resolvePythonExecutable(
+  process.env.EXCEL_INFLOW_TEST_PYTHON ??
+    process.env.EXCEL_INFLOW_PYTHON ??
+    process.env.PYTHON ??
+    "python3",
+  { env: process.env },
+);
+const TEST_SOFFICE = process.env.SOFFICE_BIN ?? null;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -40,6 +49,13 @@ async function command(script, args, { allowFailure = false } = {}) {
       cwd: path.resolve(HERE, ".."),
       timeout: 300000,
       maxBuffer: 64 * 1024 * 1024,
+      env: {
+        ...process.env,
+        EXCEL_INFLOW_PYTHON: TEST_PYTHON,
+        PYTHON: TEST_PYTHON,
+        PYTHONDONTWRITEBYTECODE: "1",
+        ...(TEST_SOFFICE ? { SOFFICE_BIN: TEST_SOFFICE } : {}),
+      },
     });
   } catch (error) {
     if (!allowFailure) throw error;
@@ -139,15 +155,19 @@ await test("bare chat invocation is routed to the canonical Company screen", asy
       `${name} still demands the full pack at entry`,
     );
     assert(
-      flatText.includes("The bare trigger is presentation-only"),
-      `${name} permits deployment work before the Company screen`,
+      flatText.includes("bounded installed-capability preflight") &&
+        flatText.includes("It does not process issuer evidence, build a test model or rerun release certification") &&
+        flatText.includes("Company screen is visible only after that preflight"),
+      `${name} does not require the bounded host preflight before Company or permits issuer/release work there`,
     );
     assert(
-      flatText.includes("Deployment certification belongs to the versioned installation transaction"),
+      flatText.includes("Deployment certification") &&
+        flatText.includes("belongs to the versioned installation transaction"),
       `${name} permits per-invocation release certification`,
     );
     assert(
-      flatText.includes("emit progress prose"),
+      flatText.includes("Return it verbatim and whole as the first visible response") &&
+        flatText.includes("return the typed `INTERNAL_FAILURE` and no Company screen"),
       `${name} permits visible pre-Company status text`,
     );
     assert(

@@ -7,8 +7,9 @@
  * remain unchanged. This controller replaces host-side stage choreography and
  * emits one typed outcome instead of surfacing internal lane states.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -21,7 +22,7 @@ import {
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
 import { compilePerformanceReceipt, validatePerformanceReceipt } from "./lib/performance_receipt.mjs";
-import { cancelProcessTreePids, resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
+import { cancelProcessTreePids, runProcessTree } from "./lib/process_tree.mjs";
 import {
   boundedStageTimeout,
   compileOwnershipPreflightControllerAction,
@@ -46,11 +47,19 @@ import {
 } from "./lib/progress_heartbeat.mjs";
 import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 import { classifySupport } from "./lib/support_envelope.mjs";
+import { assertRunRootOutsideSkill } from "./lib/runtime_isolation.mjs";
+import {
+  assertRuntimeDoctorSatisfied,
+  compileInstalledCapabilityReceipt,
+  runRuntimeDoctor,
+  writeInstalledCapabilityArtifactSet,
+} from "./lib/runtime_doctor.mjs";
 
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const CONTROLLER_VERSION = "excel-inflow-vnext/1.0";
+const COMPANY_HANDOFF_ENV = "EXCEL_INFLOW_TOP_CONTROLLER_HANDOFF";
 let ACTIVE_RUNTIME_CLOSURE = null;
 let ACTIVE_PERFORMANCE = null;
 let ACTIVE_EXPERIENCE_TRACE = null;
@@ -93,6 +102,15 @@ const { SUPPORT_ENVELOPE_IDENTITY, SUPPORT_ENVELOPE_CONTRACT } = await (async ()
 const PRE_BROKER_DEMAND_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "pre-broker-model-demand-v1.schema.json"), "utf8"),
 );
+const RUNTIME_DOCTOR_SCHEMA = JSON.parse(
+  await fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8"),
+);
+const INSTALLED_CAPABILITY_SCHEMA = JSON.parse(
+  await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8"),
+);
+const HOST_PREFLIGHT_POINTER_SCHEMA = JSON.parse(
+  await fs.readFile(path.join(ROOT, "assets", "host-preflight-pointer-v1.schema.json"), "utf8"),
+);
 
 function parseArgs(argv) {
   const options = {};
@@ -123,6 +141,61 @@ function digestBytes(value) {
 
 async function sha256File(target) {
   return digestBytes(await fs.readFile(target));
+}
+
+async function runMandatoryHostPreflight({
+  runRoot,
+  receiptPath,
+  python = null,
+  soffice = null,
+}) {
+  const report = await runRuntimeDoctor({
+    skillRoot: ROOT,
+    env: process.env,
+    lanes: ["evidence", "workbook"],
+    runRoot,
+    python,
+    soffice,
+  });
+  const reportErrors = validateJsonSchema(report, RUNTIME_DOCTOR_SCHEMA);
+  if (reportErrors.length > 0) {
+    throw new Error(`Runtime doctor emitted an invalid report: ${reportErrors.join("; ")}`);
+  }
+  const receipt = compileInstalledCapabilityReceipt(report);
+  const receiptErrors = validateJsonSchema(receipt, INSTALLED_CAPABILITY_SCHEMA);
+  if (receiptErrors.length > 0) {
+    throw new Error(`Installed capability receipt is invalid: ${receiptErrors.join("; ")}`);
+  }
+  const artifactSet = await writeInstalledCapabilityArtifactSet({
+    artifactDirectory: path.dirname(receiptPath),
+    report,
+  });
+  const pointerErrors = validateJsonSchema(artifactSet.pointer, HOST_PREFLIGHT_POINTER_SCHEMA);
+  if (pointerErrors.length > 0) {
+    throw new Error(`Host-preflight pointer is invalid: ${pointerErrors.join("; ")}`);
+  }
+  assertRuntimeDoctorSatisfied(report);
+  const pythonExecutable = report.checks.find(
+    (entry) => entry.precondition_id === "python_interpreter_custody",
+  )?.detail?.resolved_executable;
+  if (!path.isAbsolute(String(pythonExecutable ?? ""))) {
+    throw new Error("Runtime doctor passed without binding one absolute Python executable.");
+  }
+  const sofficeExecutable = report.checks.find(
+    (entry) => entry.precondition_id === "soffice_available",
+  )?.detail?.resolved_executable;
+  if (!path.isAbsolute(String(sofficeExecutable ?? ""))) {
+    throw new Error("Runtime doctor passed without binding one absolute soffice executable.");
+  }
+  return {
+    report,
+    reportPath: artifactSet.reportPath,
+    receipt,
+    receiptPath: artifactSet.receiptPath,
+    preflightPointerPath: artifactSet.pointerPath,
+    pythonExecutable,
+    sofficeExecutable,
+  };
 }
 
 async function runtimeClosure() {
@@ -285,6 +358,12 @@ async function checkpoint(id, status, target = null) {
   };
 }
 
+function terminalCheckpointProjection(events) {
+  const latest = new Map();
+  for (const event of events) latest.set(event.checkpoint_id, event);
+  return [...latest.values()];
+}
+
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
   ACTIVE_PROGRESS_HEARTBEAT?.stop({ actionRequired: false });
   ACTIVE_PROGRESS_HEARTBEAT = null;
@@ -338,7 +417,7 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
     }
   }
   const state = {
-    schema_version: "excel-inflow-vnext-run/1.0",
+    schema_version: "excel-inflow-vnext-run/1.1",
     controller_version: CONTROLLER_VERSION,
     runtime_closure_sha256: ACTIVE_RUNTIME_CLOSURE,
     // Which support-envelope contract governed this run (P0.4). Metadata
@@ -349,7 +428,8 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
     quality_mode: qualityMode,
     blocker_class: blockerClass,
     user_blocking: ["USER_DECISION", "FATAL_SOURCE"].includes(blockerClass),
-    checkpoints,
+    checkpoints: terminalCheckpointProjection(checkpoints),
+    checkpoint_events: checkpoints,
     artifacts,
     artifact_sha256: artifactHashes,
     summary: ACTIVE_PERFORMANCE ? { ...summary, performance: ACTIVE_PERFORMANCE } : summary,
@@ -379,6 +459,43 @@ async function main() {
     : {};
   ACTIVE_RUNTIME_BUDGET = resolveRuntimeBudgetPolicy(runtimeBudgetOverrides.budgets_ms ?? runtimeBudgetOverrides);
   if (options.screen) {
+    if (String(options.screen) === "company") {
+      const screenCapabilityRoot = await fs.mkdtemp(
+        path.join(os.tmpdir(), "excel-inflow-company-screen-capability-"),
+      );
+      try {
+        const preflight = await runMandatoryHostPreflight({
+          runRoot: path.join(screenCapabilityRoot, "prospective-run"),
+          receiptPath: path.join(screenCapabilityRoot, "installed-capability-receipt.json"),
+          python: String(
+            options.python ?? process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3",
+          ),
+          soffice: options.soffice ? String(options.soffice) : null,
+        });
+        const controllerHandoff = `${randomUUID()}${randomUUID()}`;
+        const screen = await run(process.execPath, [
+          path.join(HERE, "run_user_flow.mjs"),
+          "--screen",
+          String(options.screen),
+          "--controller-handoff",
+          controllerHandoff,
+          "--host-capability-receipt",
+          preflight.receiptPath,
+          "--runtime-doctor-report",
+          preflight.reportPath,
+        ], {
+          timeout: 30_000,
+          env: { ...process.env, [COMPANY_HANDOFF_ENV]: controllerHandoff },
+        });
+        if (screen.code !== 0) {
+          throw new Error(screen.stderr.trim() || `Unable to render ${options.screen} screen.`);
+        }
+        process.stdout.write(screen.stdout);
+        return;
+      } finally {
+        await fs.rm(screenCapabilityRoot, { recursive: true, force: true });
+      }
+    }
     const screen = await run(process.execPath, [
       path.join(HERE, "run_user_flow.mjs"),
       "--screen",
@@ -402,8 +519,9 @@ async function main() {
   if (out === ROOT || out.startsWith(`${ROOT}${path.sep}`)) {
     throw new Error("vNext run output must be outside the immutable skill tree.");
   }
-  await fs.mkdir(out, { recursive: true });
-  // Open THE clock before any work is spawned. It lives in the run directory,
+  await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: out });
+  // Open THE clock before the mandatory host probe or any model work is
+  // spawned. It lives in the run directory,
   // so a second invocation of this controller against the same run inherits
   // what the first one spent instead of starting the ceiling again.
   ACTIVE_RUN_DEADLINE = await openRunDeadline({
@@ -434,12 +552,20 @@ async function main() {
     "excel_inflow_active",
     { coverage_role: "root" },
   );
+  const hostPreflightStarted = Date.now();
+  const hostPreflight = await runMandatoryHostPreflight({
+    runRoot: out,
+    receiptPath: path.join(out, "installed-capability-receipt.json"),
+    python: String(
+      options.python ?? process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3",
+    ),
+    soffice: options.soffice ? String(options.soffice) : null,
+  });
+  ACTIVE_PERFORMANCE.stages.host_preflight_ms = Math.max(1, Date.now() - hostPreflightStarted);
   ACTIVE_RUNTIME_CLOSURE = await runtimeClosure();
   ACTIVE_SOURCE_IDENTITY = await resolveActiveSourceIdentity({ skillRoot: ROOT });
-  const pythonCommand = await resolvePythonExecutable(
-    String(options.python ?? process.env.PYTHON ?? "python3"),
-    { cwd: ROOT, env: process.env, timeout: 30_000 },
-  );
+  const pythonCommand = hostPreflight.pythonExecutable;
+  const sofficeCommand = hostPreflight.sofficeExecutable;
   const pythonProbe = await run(pythonCommand, [
     "-c",
     "import os, openpyxl; print(os.path.dirname(os.path.dirname(openpyxl.__file__)))",
@@ -447,8 +573,11 @@ async function main() {
   const pythonSite = pythonProbe.code === 0 ? pythonProbe.stdout.trim() : "";
   const runtimeEnv = {
     ...process.env,
+    EXCEL_INFLOW_NODE: process.execPath,
     PYTHON: pythonCommand,
     EXCEL_INFLOW_PYTHON: pythonCommand,
+    PYTHONDONTWRITEBYTECODE: "1",
+    SOFFICE_BIN: sofficeCommand,
     // Every delegate charges the SAME ledger file. This is what makes the
     // delegate's stage clock and this controller's clock one clock rather than
     // two, and it is why a paused-then-resumed run cannot double its ceiling.
@@ -459,6 +588,8 @@ async function main() {
   };
   const checkpoints = [];
   const artifacts = {};
+  artifacts.runtime_doctor_report = hostPreflight.reportPath;
+  artifacts.installed_capability_receipt = hostPreflight.receiptPath;
   artifacts.run_deadline = ACTIVE_RUN_DEADLINE.path;
   const runtimeBudgetPolicyPath = path.join(out, "runtime-budget-policy.json");
   await writeJson(runtimeBudgetPolicyPath, ACTIVE_RUNTIME_BUDGET);
@@ -655,7 +786,7 @@ async function main() {
   }
   firstArgs.push("--python", pythonCommand);
   firstArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
-  if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
+  firstArgs.push("--soffice", sofficeCommand);
   const firstExecution = await run(process.execPath, firstArgs, {
     timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.case_compilation_and_ownership,
     budgetStage: "case_compilation_and_ownership",
@@ -873,7 +1004,7 @@ async function main() {
   ];
   resumeArgs.push("--python", pythonCommand);
   resumeArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
-  if (options.soffice) resumeArgs.push("--soffice", String(options.soffice));
+  resumeArgs.push("--soffice", sofficeCommand);
   const pausedResultSha256 = await sha256File(userFlowResultPath);
   const resumeExecution = await run(process.execPath, resumeArgs, {
     // This is only the controller watchdog. Stage-4 enforces solver, build,
@@ -927,6 +1058,7 @@ async function main() {
     });
   }
   userFlowResult = await readJson(userFlowResultPath, "user-flow delivery result");
+  checkpoints.push(await checkpoint("model_decisions", "PASS", userFlowResultPath));
   checkpoints.push(await checkpoint("build_and_delivery", userFlowResult.status, userFlowResultPath));
   if (userFlowResult.status !== "PASS_PENDING_MANUAL") {
     return finish({
@@ -975,6 +1107,7 @@ async function main() {
     reusedCheckpoints: buildResult?.checkpointing?.reused ?? [],
     executedCheckpoints: buildResult?.checkpointing?.executed ?? [],
     totalDurationMs: Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms,
+    hostPreflightDurationMs: ACTIVE_PERFORMANCE.stages.host_preflight_ms,
   });
   await writeJson(performanceReceiptPath, performanceReceipt);
   artifacts.performance_receipt = performanceReceiptPath;

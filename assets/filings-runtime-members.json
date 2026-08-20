@@ -3,12 +3,14 @@
   "members": [
     "scripts/run_filings_pipeline.mjs",
     "scripts/extract_filing_statements.py",
+    "scripts/extract_inline_xbrl.py",
     "scripts/lib/filings_acquisition.mjs",
     "scripts/lib/source_ingress_security.mjs",
     "scripts/lib/workflow_state.mjs",
     "scripts/lib/face_statement_manifest.mjs",
     "scripts/lib/run_store.mjs",
     "scripts/lib/json_schema.mjs",
+    "scripts/lib/process_tree.mjs",
     "assets/workflow-state-contract-v1.json",
     "assets/source-ingress-authority-v1.json",
     "assets/filings-acquisition-request-v1.schema.json",
@@ -16,6 +18,8 @@
     "assets/filings-extraction-request-v1.schema.json",
     "assets/filings-extraction-response-v1.schema.json",
     "assets/filings-run-state.schema.json",
+    "assets/xbrl-concept-role-crosswalk-v1.json",
+    "assets/statement-semantic-taxonomy.v1.json",
     "assets/filings-acquisition-request-v2.schema.json",
     "assets/filings-source-registry-v2.schema.json"
   ]

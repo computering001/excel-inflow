@@ -20,6 +20,7 @@ import { promisify } from "node:util";
 import {
   DEVELOPMENT_GATE_PROFILES,
   canonical,
+  effectiveTestTimeoutMs,
   effectiveTestMetadata,
   selectRegistryTests,
   testIdSetSha256,
@@ -49,7 +50,7 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: run_development_gate.mjs [--phase all|graph,workflow,evidence,forecast,economics,cohort,proof,real_corpus]",
+    "Usage: run_development_gate.mjs [--phase all|workflow,evidence,graph,economic,economics,forecast,proof,real_corpus,cohort,performance]",
     "  [--profile all|portable|custody]",
     "  [--cases <case-directory>] [--representative <compiled-case.json>]",
     "  [--broker-corpus <external-corpus.json>]",
@@ -61,7 +62,7 @@ function usage() {
     "  [--real-filings-expectations <run-scoped-expectations.json>]",
     "  [--real-filing-corpus-manifest <external-corpus-manifest.json>]",
     "  [--out <report-directory>]",
-    "  [--concurrency <1-4>] [--timeout-ms <milliseconds>]",
+    "  [--concurrency <1-4>] [--timeout-ms <explicit per-test override milliseconds>]",
     "Reports contain source, registry and input hashes. Paths, commands and captured output are redacted.",
   ].join("\n");
 }
@@ -177,6 +178,7 @@ function redactedExecutionResult(result, metadata) {
     exit_code: result.exit_code ?? null,
     signal: result.signal ?? null,
     duration_ms: result.duration_ms,
+    timeout_ms: result.timeout_ms ?? null,
     missing: result.missing ?? [],
     stdout_bytes: Buffer.byteLength(stdout),
     stdout_sha256: sha256Bytes(stdout),
@@ -212,7 +214,8 @@ function phases(raw, known) {
   return selected;
 }
 
-async function runTest(test, { inputs, python, timeoutMs, out }) {
+async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
+  const timeoutMs = effectiveTestTimeoutMs(test, timeoutOverrideMs);
   const testOut = path.join(out, test.id);
   const missing = [];
   for (const requirement of test.requires ?? []) {
@@ -227,6 +230,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       status: "BLOCKED",
       exit_code: null,
       duration_ms: 0,
+      timeout_ms: timeoutMs,
       missing,
       stdout: "",
       stderr: `Missing required test custody input(s): ${missing.join(", ")}`,
@@ -246,6 +250,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       env: {
         ...process.env,
         PYTHONDONTWRITEBYTECODE: "1",
+        EXCEL_INFLOW_NODE: process.execPath,
         // Node-authored integration tests may launch the shipping Python
         // controller or Stage 4 themselves. They must inherit the exact
         // custody inputs selected for this development-gate invocation rather
@@ -262,6 +267,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       status: "PASS",
       exit_code: 0,
       duration_ms: Number(process.hrtime.bigint() - started) / 1e6,
+      timeout_ms: timeoutMs,
       command: [command, ...args],
       stdout: result.stdout,
       stderr: result.stderr,
@@ -274,6 +280,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       exit_code: Number.isInteger(error.code) ? error.code : null,
       signal: error.signal ?? null,
       duration_ms: Number(process.hrtime.bigint() - started) / 1e6,
+      timeout_ms: timeoutMs,
       command: [command, ...args],
       stdout: error.stdout ?? "",
       stderr: error.stderr ?? error.message,
@@ -339,7 +346,9 @@ if (invocationErrors.length > 0) {
 const out = options.out
   ? path.resolve(options.out)
   : await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-development-gate-"));
-const timeoutMs = Math.max(1000, Number(options["timeout-ms"] ?? 300000));
+const timeoutOverrideMs = options["timeout-ms"] === undefined
+  ? null
+  : Number(options["timeout-ms"]);
 const concurrency = Math.min(4, Math.max(1, Number(options.concurrency ?? 3)));
 await fs.mkdir(out, { recursive: true });
 
@@ -352,7 +361,7 @@ const startedAt = new Date().toISOString();
 const rawResults = await runPool(selectedTests, concurrency, {
   inputs,
   python: options.python ?? "python3",
-  timeoutMs,
+  timeoutOverrideMs,
   out,
 });
 const results = rawResults.map((result, index) => redactedExecutionResult(

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   aggregateGateReports,
+  effectiveTestTimeoutMs,
   effectiveTestMetadata,
   selectRegistryTests,
   testIdSetSha256,
@@ -41,6 +42,21 @@ assert.deepEqual(
 );
 assert.equal(testProfile(registry.tests.find((test) => test.id === "installed-host-usable-broker")), "custody");
 assert.equal(testProfile(registry.tests.find((test) => test.id === "installed-host-broker-receipt-contract")), "portable");
+assert.equal(
+  effectiveTestTimeoutMs({ id: "long", timeout_seconds: 900 }),
+  900000,
+  "the runner ignored the registry row's declared timeout",
+);
+assert.equal(
+  effectiveTestTimeoutMs({ id: "long", timeout_seconds: 900 }, 1800000),
+  1800000,
+  "an explicit CLI timeout override was not honoured",
+);
+assert.throws(
+  () => effectiveTestTimeoutMs({ id: "broken", timeout_seconds: 0 }),
+  /invalid timeout_seconds/,
+  "a dead or malformed timeout declaration was admitted",
+);
 const portable = selectRegistryTests(registry, { profile: "portable" });
 const custody = selectRegistryTests(registry, { profile: "custody" });
 assert.equal(portable.length + custody.length, registry.tests.length);
@@ -119,7 +135,7 @@ assert.doesNotMatch(
 
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 20 + (registry.tests.length * 5),
+  checks: 23 + (registry.tests.length * 5),
   registry_tests: registry.tests.length,
   portable_tests: portable.length,
   custody_tests: custody.length,

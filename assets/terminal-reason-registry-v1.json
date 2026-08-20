@@ -251,6 +251,18 @@
       "evidence_preserved": true,
       "allowed_terminal_states": ["INTERNAL_FAILURE", "CANCELLED"]
     },
+    "INTERNAL.host_precondition_unsatisfied": {
+      "owner_layer": "runtime_governance",
+      "category": "internal",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_repair",
+      "user_action": "none - engineering owns this",
+      "source_action": "none",
+      "checkpoint_required": false,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+    },
     "INTERNAL.forecast_completion_escalated": {
       "owner_layer": "forecast_completion_constitution",
       "category": "internal",

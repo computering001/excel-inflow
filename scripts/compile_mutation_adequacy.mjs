@@ -29,7 +29,12 @@ import process from "node:process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
-import { canonical, effectiveTestMetadata } from "./lib/development_gate_contract.mjs";
+import {
+  canonical,
+  effectiveTestMetadata,
+  testProfile,
+  validateRegistryInvocationContract,
+} from "./lib/development_gate_contract.mjs";
 import {
   compileMutationAdequacy,
   deriveP0InvariantSet,
@@ -57,6 +62,9 @@ const outPath = option("out") ? path.resolve(option("out")) : null;
 const profile = option("profile", "portable");
 const concurrency = Math.max(1, Number(option("concurrency", "8")));
 const python = option("python", "python3");
+const pythonInput = path.isAbsolute(python) || python.includes(path.sep) ? path.resolve(python) : python;
+const representative = option("representative") ? path.resolve(option("representative")) : null;
+const soffice = option("soffice") ? path.resolve(option("soffice")) : null;
 const only = option("only") ? new Set(option("only").split(",").map((item) => item.trim()).filter(Boolean)) : null;
 const dryRun = flag("dry-run");
 // A SURVIVOR CLAIM MUST REPRODUCE. Every pool failure is re-run alone this many
@@ -122,17 +130,32 @@ for (const test of corpus) {
 // development_gate_contract.CUSTODY_INPUTS). Treating them as unresolved would
 // have parked a measurable suite in BLOCKED and understated the corpus.
 const OUTPUT_ARGUMENT_SOURCES = new Set(["OUT_DIR", "TEST_OUT", "OUT"]);
+const PORTABLE_INPUTS = Object.freeze({
+  REPRESENTATIVE: representative,
+  PYTHON: pythonInput,
+  SOFFICE: soffice,
+});
+const invocationErrors = validateRegistryInvocationContract(
+  selected,
+  [...Object.keys(PORTABLE_INPUTS), ...OUTPUT_ARGUMENT_SOURCES],
+);
+if (invocationErrors.length > 0) {
+  throw new Error(`Mutation registry invocation contract is invalid:\n${invocationErrors.join("\n")}`);
+}
 
-function resolveArgument(value, testOut) {
+function resolveArgument(value, inputs, outputTargets) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     if (value.type === "literal") return String(value.value);
     if (OUTPUT_ARGUMENT_SOURCES.has(value.source)) {
-      fs.mkdirSync(testOut, { recursive: true });
-      return testOut;
+      const target = outputTargets[value.source];
+      if (value.type === "directory") fs.mkdirSync(target, { recursive: true });
+      else fs.mkdirSync(path.dirname(target), { recursive: true });
+      return target;
     }
-    return null; // a custody-bound source this profile does not provide
+    return inputs[value.source] ?? null;
   }
-  return String(value);
+  const match = /^\$([A-Z_]+)$/.exec(String(value));
+  return match ? inputs[match[1]] ?? null : String(value);
 }
 
 async function runSuite(test) {
@@ -141,7 +164,7 @@ async function runSuite(test) {
     return { id: test.id, status: "BLOCKED", exit_code: null, report: null, failure_detail: `missing script ${test.script}` };
   }
   const requires = test.requires ?? [];
-  if (profile === "portable" && requires.length > 0) {
+  if (profile === "portable" && testProfile(test) === "custody") {
     return {
       id: test.id,
       status: "BLOCKED",
@@ -150,11 +173,28 @@ async function runSuite(test) {
       failure_detail: `requires custody inputs not present in the portable profile: ${requires.join(", ")}`,
     };
   }
+  for (const requirement of requires) {
+    if (!PORTABLE_INPUTS[requirement]) {
+      return {
+        id: test.id,
+        status: "BLOCKED",
+        exit_code: null,
+        report: null,
+        failure_detail: `required input ${requirement} was not supplied`,
+      };
+    }
+  }
   const args = [];
-  const testOut = path.join(os.tmpdir(), `mutation-adequacy-${test.id}`);
+  const invocationRoot = fs.mkdtempSync(path.join(os.tmpdir(), `mutation-adequacy-${test.id}-`));
+  const outputTargets = {
+    OUT: path.join(invocationRoot, "out"),
+    OUT_DIR: path.join(invocationRoot, "out"),
+    TEST_OUT: path.join(invocationRoot, "test-output"),
+  };
   for (const item of test.arguments ?? []) {
-    const resolved = resolveArgument(item, testOut);
+    const resolved = resolveArgument(item, PORTABLE_INPUTS, outputTargets);
     if (resolved === null) {
+      fs.rmSync(invocationRoot, { recursive: true, force: true });
       return {
         id: test.id,
         status: "BLOCKED",
@@ -172,7 +212,17 @@ async function runSuite(test) {
       cwd: ROOT,
       timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1", EXCEL_INFLOW_TEST_PYTHON: python, TEST_OUT: testOut },
+      env: {
+        ...process.env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        EXCEL_INFLOW_NODE: process.execPath,
+        EXCEL_INFLOW_TEST_PYTHON: python,
+        EXCEL_INFLOW_PYTHON: python,
+        DEBT_OVERLAY_PYTHON: python,
+        PYTHON: python,
+        ...(soffice ? { SOFFICE_BIN: soffice } : {}),
+        TEST_OUT: outputTargets.TEST_OUT,
+      },
     });
     const report = lastJsonLine(result.stdout);
     return {
@@ -215,6 +265,8 @@ async function runSuite(test) {
       report: parsed,
       failure_detail: firstMeaningfulError(stderr) || stdout.trim().slice(-400),
     };
+  } finally {
+    fs.rmSync(invocationRoot, { recursive: true, force: true });
   }
 }
 

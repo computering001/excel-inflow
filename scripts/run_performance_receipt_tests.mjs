@@ -12,6 +12,7 @@ const receipt = compilePerformanceReceipt({
   attachmentStateSha256: "d".repeat(64),
   buildResultSha256: "e".repeat(64),
   attachmentPerformance: {
+    host_preflight_ms: 7,
     filings: { source_acquisition_ms: 11, filing_extraction_ms: 22 },
     lane_duration_ms: { broker: 33 },
     semantic_recovery_ms: 44,
@@ -34,7 +35,7 @@ const receipt = compilePerformanceReceipt({
   totalDurationMs: 999,
 });
 assert.deepEqual(validatePerformanceReceipt(receipt), []);
-assert.equal(receipt.spans.length, 10);
+assert.equal(receipt.spans.length, 11);
 assert.equal(receipt.spans.find((span) => span.name === "workbook_build").duration_ms, 77);
 assert.equal(receipt.spans.find((span) => span.name === "validation").duration_ms, 91);
 
@@ -60,7 +61,7 @@ const incomplete = compilePerformanceReceipt({
   checkpointTimings: {},
 });
 assert.equal(incomplete.status, "INCOMPLETE");
-assert.equal(incomplete.summary.missing_span_names.length, 10);
+assert.equal(incomplete.summary.missing_span_names.length, 11);
 assert.ok(validatePerformanceReceipt(incomplete).length > 0);
 
 console.log(JSON.stringify({ status: "PASS", checks: 8, mutations_rejected: mutations.length + 1, violations: 0 }, null, 2));

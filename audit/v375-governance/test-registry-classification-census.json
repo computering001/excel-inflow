@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 66,
-      "cross_layer_integration": 91,
+      "cross_layer_integration": 93,
       "independent_economic_oracle": 4,
       "installed_host": 1,
       "real_corpus": 7,
@@ -21,19 +21,19 @@
       "evidence-authority": 48,
       "finance-schedule": 22,
       "forecast-authority": 20,
-      "release-proof": 48,
+      "release-proof": 51,
       "runtime-governance": 32,
       "runtime-performance": 16,
-      "semantic-constitution": 13,
+      "semantic-constitution": 14,
       "workbook-oracle": 4
     },
     "by_profile": {
       "custody": 12,
-      "portable": 199
+      "portable": 203
     },
     "self_confirmation_risk": {
       "false": 13,
-      "true": 198
+      "true": 202
     }
   },
   "records": [
@@ -45,37 +45,23 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "acquisition-funding-integration",
-      "owner": "finance-schedule",
-      "phase": "economics",
+      "id": "workflow-state-contract",
+      "owner": "runtime-governance",
+      "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
+      "audit_class": "unit",
+      "declared_test_class": "unit",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "acquisition-plan-purity",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "acquisition-portable-workbook-restoration",
-      "owner": "release-proof",
-      "phase": "proof",
+      "id": "ci-governance-read-only",
+      "owner": "runtime-governance",
+      "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -87,23 +73,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "acquisition-solver-scenarios",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "acquisition-valuation-contract",
-      "owner": "finance-schedule",
-      "phase": "economics",
+      "id": "decision-round-batching",
+      "owner": "runtime-governance",
+      "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -115,21 +87,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "acquisition-workbook-scenarios",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "archetype-economics",
+      "id": "entity-identity",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -143,7 +101,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "archetype-presentation",
+      "id": "source-ingress-security",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -157,37 +115,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "architecture-ownership",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "attachment-evidence-controller",
+      "id": "real-filing-custody-inventory",
       "owner": "evidence-authority",
       "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "behavioural-goldens",
-      "owner": "workbook-oracle",
-      "phase": "cohort",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -206,16 +136,16 @@
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
+      "audit_class": "unit",
+      "declared_test_class": "unit",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "bounded-parallelism",
-      "owner": "runtime-performance",
-      "phase": "performance",
+      "id": "tax-rate-policy",
+      "owner": "finance-schedule",
+      "phase": "economics",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -227,21 +157,49 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "bounded-progress-heartbeat",
+      "id": "run-deadline",
       "owner": "runtime-governance",
       "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
+      "audit_class": "unit",
+      "declared_test_class": "unit",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-carrier-migration",
+      "id": "forecast-completion",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "ci-census",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "support-envelope",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -255,7 +213,315 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-consensus-compiler",
+      "id": "terminal-reason-registry",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "programme-control",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "ownership-census",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "canonical-contracts",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "typed-financial-value",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "typed-arithmetic",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "producer-boundary",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "etr-receipt-boundary",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "entity-identifier-strength",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "coercion-ban",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "dual-read-migration",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "support-preflight-wire",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "internal-outcomes",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "multipage-filing-extraction",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "layered-graph-constitution",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "equation-graph-and-scc",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "fixed-point-multi-archetype",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "custody",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "instrument-period-state",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "debt-class-contract",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "lease-roll-forward",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "instrument-interest-lineage",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "interest-economics-contract",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "independent-forecast-ownership",
       "owner": "forecast-authority",
       "phase": "forecast",
       "profile": "portable",
@@ -276,6 +542,20 @@
       "self_confirmation_risk": false
     },
     {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-consensus-compiler",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
       "audit_class": "cross_layer_integration",
       "declared_test_class": "cross_layer_integration",
       "expected_exit_contract": {
@@ -290,16 +570,282 @@
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "component_integration",
-      "declared_test_class": "component_integration",
+      "audit_class": "unit",
+      "declared_test_class": "unit",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-core-demand-quality",
+      "id": "forecast-behavior",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-observation-ledger",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "evidence-resolution-v2",
       "owner": "evidence-authority",
       "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "run-constitution-graph",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "product-constitution",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "delivery-constitution",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "controller-terminal-exits",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-dynamic-concepts",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-topology",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "statement-classifier",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "case-source-proposer",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "cash-fx-identity-workbook",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "typed-filing-values-and-row-identity",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "source-arithmetic-precision",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "source-arithmetic-authority",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "independent-source-economic-oracle",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "historical-normalisation",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "case-authorship-boundary",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "attachment-evidence-controller",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-intake-choice",
+      "owner": "runtime-governance",
+      "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -339,7 +885,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-dynamic-concepts",
+      "id": "broker-carrier-migration",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -353,65 +899,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-exit-fault-injection",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-freshness-policy",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-house-exclusion",
+      "id": "broker-preview-gate",
       "owner": "evidence-authority",
       "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-intake-choice",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-native-preflight-reuse",
-      "owner": "runtime-performance",
-      "phase": "performance",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -430,16 +920,72 @@
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-pdf-timeout-policy",
-      "owner": "runtime-performance",
-      "phase": "performance",
+      "id": "internal-evidence-fixed-point",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-work-graph",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "dcs-lossless-evidence",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "dcs-controller-fixed-point",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-physical-reconciliation",
+      "owner": "evidence-authority",
+      "phase": "evidence",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -479,7 +1025,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-physical-reconciliation",
+      "id": "broker-house-exclusion",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -493,7 +1039,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "broker-preview-gate",
+      "id": "broker-table-engine-adapter",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -512,1728 +1058,6 @@
       "phase": "real_corpus",
       "profile": "custody",
       "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "real_corpus",
-      "declared_test_class": "real_corpus",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-real-pack-completion",
-      "owner": "broker-and-real-corpus",
-      "phase": "real_corpus",
-      "profile": "custody",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-table-engine-adapter",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "broker-work-graph",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "canonical-contracts",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "canonical-graph-binding",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "canonical-model-modules",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "carrier-product-identity",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "case-authorship-boundary",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "workbook_oracle",
-      "declared_test_class": "frozen_authority",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "case-compiler-equivalence",
-      "owner": "workbook-oracle",
-      "phase": "cohort",
-      "profile": "portable",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "case-source-proposer",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "cash-fx-identity-workbook",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "certified-runtime-code-closure",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "ci-census",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "ci-gate-tiers",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "ci-governance-read-only",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "classification-resolution",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "classifier-caption-defects",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "coercion-ban",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "completion-census-scope",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "controller-terminal-exits",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "critical-invariant-independent-oracle-matrix",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "dcs-controller-fixed-point",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "dcs-lossless-evidence",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "debt-class-contract",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "decision-round-batching",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "declared-fixed-point-completeness",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "declared-value-typed-outcome",
-      "owner": "semantic-constitution",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "degraded-broker-delivery",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "delivery-constitution",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "delivery-inventory",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "differential-invalidation",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "dual-read-migration",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "ebitda-basis-contract",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "economic-authority-seal",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "economic-ir",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "independent_economic_oracle",
-      "declared_test_class": "independent_economic_oracle",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "emitted-candidate-independent-oracle",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "emitted-formula-derivability",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "entity-identifier-strength",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "entity-identity",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "envelope-terminal-legality",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "equation-graph-and-scc",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "etr-dag-safety",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "etr-receipt-boundary",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "evidence-orchestration",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "evidence-resolution-v2",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "evidence-run-compiler",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "evidence-work-graph",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "excel-value-semantics",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "experience-trace-leaf-coverage",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "experience-trace-policy",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "filings-controller",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "filings-source-mode",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "fixed-point-multi-archetype",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "custody",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "footing-tolerance-defects",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-authority-ledger",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-authority-ranking",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-behavior",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-completion",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-observation-ledger",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-ownership-physical-oracle",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-ownership-preflight",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "forecast-topology",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "formula-ast",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "full-run-performance-receipt",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "funded-acquisition-transaction",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "cross_layer_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "gate-side-effect",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "generated-case-cohort",
-      "owner": "workbook-oracle",
-      "phase": "cohort",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "graph-driven-solve",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "hard-clock",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "historical-normalisation",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "host-experience-trace",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "immutable-release-package-attestation",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "independent-forecast-ownership",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "independent-physical-workbook-binding",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "independent_economic_oracle",
-      "declared_test_class": "independent_economic_oracle",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "independent-source-economic-oracle",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "real_corpus",
-      "declared_test_class": "real_corpus",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "inline-xbrl-structured-lane",
-      "owner": "broker-and-real-corpus",
-      "phase": "real_corpus",
-      "profile": "custody",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "installed-host-broker-receipt-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "installed_host",
-      "declared_test_class": "installed_host",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "installed-host-usable-broker",
-      "owner": "broker-and-real-corpus",
-      "phase": "real_corpus",
-      "profile": "custody",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "instrument-interest-lineage",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "instrument-period-state",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "interest-economics-contract",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "internal-evidence-fixed-point",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "internal-outcomes",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "large-broker-pack-stress",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "layered-graph-constitution",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "lease-roll-forward",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "local-workbook-review-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "metamorphic-relations",
-      "owner": "workbook-oracle",
-      "phase": "cohort",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "model-owned-broker-demand",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "multipage-filing-extraction",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "mutation-adequacy",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "native-excel-all-cell-error-scan",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "native-excel-number-format-compatibility",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "never-zero-and-order-invariance",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "nonrecurring-forecast-policy",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "opening-amount-typing",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "opening-debt-bridge",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "opening-debt-reconciliation",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "opening-instrument-provenance",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "ownership-census",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "package-ab",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "performance-receipt-honesty",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "period-scoring",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "real_corpus",
-      "declared_test_class": "real_corpus",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "period-support-stitch",
-      "owner": "broker-and-real-corpus",
-      "phase": "real_corpus",
-      "profile": "custody",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "phase15-portable-fault-injection",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "phase5-operational-runtime-adversarial",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "phase9-broker-end-to-end-scenarios",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "physical-authority-mutation",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "plan-reconstruction",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "policy-registry",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "portability-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "portable-certification-tier",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "portable-finance-workbook-semantic-mutations",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "prebroker-ownership-controller",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "producer-boundary",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "product-constitution",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "production-user-flow",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "programme-control",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "protected-identity-semantic-oracle",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "provenance-authority",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "public-state-ownership",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "raw-canary-fixture-custody",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "synthetic_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "raw-input-black-box-canary",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "custody",
-      "self_confirmation_risk": true
     },
     {
       "audit_class": "real_corpus",
@@ -2264,32 +1088,18 @@
       "self_confirmation_risk": false
     },
     {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
+      "audit_class": "real_corpus",
+      "declared_test_class": "real_corpus",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "real-filing-corpus-extraction-outcome-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "real-filing-custody-inventory",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
+      "id": "inline-xbrl-structured-lane",
+      "owner": "broker-and-real-corpus",
+      "phase": "real_corpus",
+      "profile": "custody",
+      "self_confirmation_risk": false
     },
     {
       "audit_class": "real_corpus",
@@ -2299,7 +1109,21 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "real-raw-filing-black-box-canary",
+      "id": "period-support-stitch",
+      "owner": "broker-and-real-corpus",
+      "phase": "real_corpus",
+      "profile": "custody",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "real_corpus",
+      "declared_test_class": "real_corpus",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-real-pack-completion",
       "owner": "broker-and-real-corpus",
       "phase": "real_corpus",
       "profile": "custody",
@@ -2313,9 +1137,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "reconciled-parent-portable-workbook",
-      "owner": "release-proof",
-      "phase": "proof",
+      "id": "filings-controller",
+      "owner": "evidence-authority",
+      "phase": "evidence",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -2327,315 +1151,21 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "release-certification-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "release-dossier",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "release-identity-governance",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "release-rollback-policy",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "required-role-closure",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "component_integration",
-      "declared_test_class": "component_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "reviewed-repair-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "roll-forward-invariant",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "row-identity-defects",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "run-constitution-graph",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "run-deadline",
+      "id": "evidence-orchestration",
       "owner": "runtime-governance",
       "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
     {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
       "expected_exit_contract": {
         "BLOCKED": 1,
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "runtime-budget-and-cancellation-policy",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "runtime-closure",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "runtime-doctor",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "runtime-process-interpreter-lease-custody",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "runtime-slo",
-      "owner": "runtime-performance",
-      "phase": "performance",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "runtime-version-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "scale-invariant-convergence",
-      "owner": "semantic-constitution",
-      "phase": "graph",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "schedule-typed-states",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "cross_layer_integration",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "semantic-role-closure",
-      "owner": "forecast-authority",
-      "phase": "forecast",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "skill-version-declaration",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "solver-fixed-point-oracle",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "solver-hardening",
-      "owner": "finance-schedule",
-      "phase": "economic",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "source-arithmetic-authority",
+      "id": "evidence-run-compiler",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -2649,77 +1179,7 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "source-arithmetic-oracle",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "source-arithmetic-precision",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "independent_economic_oracle",
-      "declared_test_class": "independent_economic_oracle",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "source-arithmetic-topology",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": false
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "source-ingress-security",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "source-release-identity",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "stage-recipe",
+      "id": "production-user-flow",
       "owner": "runtime-governance",
       "phase": "workflow",
       "profile": "portable",
@@ -2747,65 +1207,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "statement-classifier",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "statement-family-residual",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "statement-scope-inventory",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "support-coverage-grid",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "support-envelope",
-      "owner": "evidence-authority",
-      "phase": "evidence",
+      "id": "degraded-broker-delivery",
+      "owner": "runtime-governance",
+      "phase": "workflow",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -2817,121 +1221,9 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "support-preflight-wire",
+      "id": "broker-exit-fault-injection",
       "owner": "runtime-governance",
       "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "tax-rate-policy",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "terminal-crash-paths",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "terminal-reason-registry",
-      "owner": "runtime-governance",
-      "phase": "workflow",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "cross_layer_integration",
-      "declared_test_class": "mutation",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "test-registry-contract",
-      "owner": "release-proof",
-      "phase": "proof",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "typed-arithmetic",
-      "owner": "finance-schedule",
-      "phase": "economics",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "typed-filing-values-and-row-identity",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "typed-financial-value",
-      "owner": "evidence-authority",
-      "phase": "evidence",
-      "profile": "portable",
-      "self_confirmation_risk": true
-    },
-    {
-      "audit_class": "unit",
-      "declared_test_class": "unit",
-      "expected_exit_contract": {
-        "BLOCKED": 1,
-        "FAIL": 1,
-        "PASS": 0
-      },
-      "id": "typed-product-identity-vocabulary",
-      "owner": "release-proof",
-      "phase": "proof",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -2950,6 +1242,20 @@
       "self_confirmation_risk": true
     },
     {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "phase9-broker-end-to-end-scenarios",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
       "audit_class": "cross_layer_integration",
       "declared_test_class": "mutation",
       "expected_exit_contract": {
@@ -2957,7 +1263,329 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "visual-mutation-pairing",
+      "id": "raw-canary-fixture-custody",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "real-filing-corpus-extraction-outcome-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "raw-input-black-box-canary",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "custody",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "real_corpus",
+      "declared_test_class": "real_corpus",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "real-raw-filing-black-box-canary",
+      "owner": "broker-and-real-corpus",
+      "phase": "real_corpus",
+      "profile": "custody",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "workbook_oracle",
+      "declared_test_class": "frozen_authority",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "case-compiler-equivalence",
+      "owner": "workbook-oracle",
+      "phase": "cohort",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "opening-debt-reconciliation",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "excel-value-semantics",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "protected-identity-semantic-oracle",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "independent-physical-workbook-binding",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "emitted-candidate-independent-oracle",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "reconciled-parent-portable-workbook",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "native-excel-all-cell-error-scan",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "release-certification-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "delivery-inventory",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "source-arithmetic-topology",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "critical-invariant-independent-oracle-matrix",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "cross_layer_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "semantic-role-closure",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "public-state-ownership",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "component_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-core-demand-quality",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "nonrecurring-forecast-policy",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "source-release-identity",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "release-identity-governance",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "typed-product-identity-vocabulary",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "immutable-release-package-attestation",
       "owner": "release-proof",
       "phase": "proof",
       "profile": "portable",
@@ -2985,9 +1613,65 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "workbook-semantic-inventory",
+      "id": "test-registry-contract",
       "owner": "release-proof",
       "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "portability-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "installed-host-broker-receipt-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "installed_host",
+      "declared_test_class": "installed_host",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "installed-host-usable-broker",
+      "owner": "broker-and-real-corpus",
+      "phase": "real_corpus",
+      "profile": "custody",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "source-arithmetic-oracle",
+      "owner": "evidence-authority",
+      "phase": "evidence",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -2999,9 +1683,807 @@
         "FAIL": 1,
         "PASS": 0
       },
-      "id": "workflow-state-contract",
+      "id": "filings-source-mode",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "model-owned-broker-demand",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-authority-ledger",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "classification-resolution",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "opening-debt-bridge",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "statement-family-residual",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "terminal-crash-paths",
       "owner": "runtime-governance",
       "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "economic-ir",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "opening-instrument-provenance",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "formula-ast",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "performance-receipt-honesty",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "generated-case-cohort",
+      "owner": "workbook-oracle",
+      "phase": "cohort",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "roll-forward-invariant",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "canonical-graph-binding",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "etr-dag-safety",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-slo",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "metamorphic-relations",
+      "owner": "workbook-oracle",
+      "phase": "cohort",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "physical-authority-mutation",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "differential-invalidation",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "bounded-parallelism",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "visual-mutation-pairing",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "emitted-formula-derivability",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "evidence-work-graph",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "canonical-model-modules",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "graph-driven-solve",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "scale-invariant-convergence",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "never-zero-and-order-invariance",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "declared-value-typed-outcome",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "declared-fixed-point-completeness",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "release-dossier",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "cross_layer_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "gate-side-effect",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "stage-recipe",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "mutation-adequacy",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "ci-gate-tiers",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "hard-clock",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "provenance-authority",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "economic-authority-seal",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "package-ab",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "solver-fixed-point-oracle",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "behavioural-goldens",
+      "owner": "workbook-oracle",
+      "phase": "cohort",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-doctor",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "installed-filings-capability",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "portable-certification-tier",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "envelope-terminal-legality",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "footing-tolerance-defects",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "opening-amount-typing",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "classifier-caption-defects",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "required-role-closure",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "archetype-economics",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "archetype-presentation",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "period-scoring",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "support-coverage-grid",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "completion-census-scope",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "plan-reconstruction",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "release-rollback-policy",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-closure",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "release-dependency-closure",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-plan-purity",
+      "owner": "release-proof",
+      "phase": "proof",
       "profile": "portable",
       "self_confirmation_risk": true
     },
@@ -3018,12 +2500,558 @@
       "phase": "evidence",
       "profile": "portable",
       "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "row-identity-defects",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "schedule-typed-states",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "policy-registry",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "statement-scope-inventory",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-ownership-preflight",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "prebroker-ownership-controller",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-ownership-physical-oracle",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "forecast-authority-ranking",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "funded-acquisition-transaction",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-valuation-contract",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-funding-integration",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-solver-scenarios",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-portable-workbook-restoration",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "acquisition-workbook-scenarios",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "carrier-product-identity",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "architecture-ownership",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-native-preflight-reuse",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-pdf-timeout-policy",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "experience-trace-policy",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "experience-trace-leaf-coverage",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-process-interpreter-lease-custody",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "native-excel-number-format-compatibility",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "portable-finance-workbook-semantic-mutations",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-version-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "skill-version-declaration",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "certified-runtime-code-closure",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "component_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "reviewed-repair-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "host-experience-trace",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "ebitda-basis-contract",
+      "owner": "finance-schedule",
+      "phase": "economics",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "solver-hardening",
+      "owner": "finance-schedule",
+      "phase": "economic",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "workbook-semantic-inventory",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "local-workbook-review-contract",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "component_integration",
+      "declared_test_class": "synthetic_integration",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "large-broker-pack-stress",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "full-run-performance-receipt",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "unit",
+      "declared_test_class": "unit",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "bounded-progress-heartbeat",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "runtime-budget-and-cancellation-policy",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "phase15-portable-fault-injection",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "phase5-operational-runtime-adversarial",
+      "owner": "runtime-performance",
+      "phase": "performance",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "broker-freshness-policy",
+      "owner": "forecast-authority",
+      "phase": "forecast",
+      "profile": "portable",
+      "self_confirmation_risk": true
     }
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "311ca878b1e2d8e27cd66a6df3c76a8bfb0caf719da00fbd704b29de3185b843",
-    "test_count": 213
+    "sha256": "2c2340bdd4bbaa8c4203d081d2ad4e4f3d608ba89474a16353db4f1388168ad5",
+    "test_count": 215
   },
   "schema_version": "development-test-classification-census/1.0"
 }

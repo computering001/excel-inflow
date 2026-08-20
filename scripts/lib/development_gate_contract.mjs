@@ -14,6 +14,19 @@ export const CUSTODY_INPUTS = Object.freeze([
 const CUSTODY_INPUT_SET = new Set(CUSTODY_INPUTS);
 export const DEVELOPMENT_GATE_PROFILES = Object.freeze(["all", "portable", "custody"]);
 
+export function effectiveTestTimeoutMs(test, overrideMs = null) {
+  const declaredSeconds = Number(test?.timeout_seconds);
+  if (!Number.isInteger(declaredSeconds) || declaredSeconds < 1) {
+    throw new Error(`Registry test ${test?.id ?? "<unknown>"} has an invalid timeout_seconds.`);
+  }
+  if (overrideMs === null || overrideMs === undefined) return declaredSeconds * 1000;
+  const numericOverride = Number(overrideMs);
+  if (!Number.isInteger(numericOverride) || numericOverride < 1000) {
+    throw new Error("--timeout-ms must be an integer of at least 1000.");
+  }
+  return numericOverride;
+}
+
 export function sha256Text(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }

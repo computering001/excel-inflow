@@ -65,6 +65,7 @@ const bindings = {
   buildResultSha256: "e".repeat(64),
 };
 const lanes = {
+  host_preflight_ms: 7,
   filings: { source_acquisition_ms: 11, filing_extraction_ms: 22 },
   lane_duration_ms: { broker: 33 },
   semantic_recovery_ms: 44,
@@ -88,7 +89,7 @@ const COLD_TIMINGS = {
   render: 16,
   publish: 101,
 };
-const COLD_SUM = Object.values(COLD_TIMINGS).reduce((a, b) => a + b, 0) + 11 + 22 + 33 + 44;
+const COLD_SUM = Object.values(COLD_TIMINGS).reduce((a, b) => a + b, 0) + 7 + 11 + 22 + 33 + 44;
 const cold = compilePerformanceReceipt({
   ...bindings,
   runId: "cold",
@@ -138,6 +139,29 @@ check(cold.reconciliation.unattributed_ms === 1000, "the unattributed bucket is 
 check(cold.summary.measured_span_ms === COLD_SUM, "the summary republishes the measured total");
 check(cold.reconciliation.band === "WITHIN_ALLOWANCE", "a 1s gap is inside the declared allowance");
 check(cold.status === "PASS" && validatePerformanceReceipt(cold).length === 0, "an honest cold receipt validates");
+
+const explicitBrokerSkip = compilePerformanceReceipt({
+  ...bindings,
+  runId: "explicit-broker-skip",
+  attachmentPerformance: {
+    ...lanes,
+    lane_duration_ms: { broker: 0 },
+    broker_intake_state: "explicitly_skipped",
+  },
+  checkpointTimings: COLD_TIMINGS,
+  reusedCheckpoints: [],
+  executedCheckpoints: Object.keys(COLD_TIMINGS),
+  totalDurationMs: COLD_SUM - 33 + 1000,
+});
+check(
+  span(explicitBrokerSkip, "broker_native_extraction").status === "NOT_APPLICABLE" &&
+    span(explicitBrokerSkip, "broker_native_extraction").duration_ms === 0 &&
+    span(explicitBrokerSkip, "broker_native_extraction").lawful_zero_reason ===
+      "broker_explicitly_skipped" &&
+    explicitBrokerSkip.status === "PASS" &&
+    validatePerformanceReceipt(explicitBrokerSkip).length === 0,
+  "an explicit broker skip emits one lawful zero span instead of incomplete telemetry",
+);
 
 // ----------------------------------------------------- threshold provenance
 const policyBytes = readFileSync(new URL("../assets/performance-policy-v1.json", import.meta.url), "utf8");

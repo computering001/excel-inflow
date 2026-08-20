@@ -390,7 +390,13 @@ async function main() {
   await fs.mkdir(outputRoot, { recursive: true });
   const runtimeReceiptPath = path.join(outputRoot, "filings-runtime-budget-receipt.json");
   const runtimeReceipt = {
-    schema_version: "filings-runtime-budget-receipt/1.0",
+    schema_version: "filings-runtime-budget-receipt/1.1",
+    receipt_kind: "stage_budget_only",
+    scope: ["source_acquisition", "filing_extraction"],
+    pipeline_authority: false,
+    pipeline_status_source: "filings-run-state.json",
+    status_semantics:
+      "PASS means only that the named budgeted stages passed; it never means the filings pipeline passed.",
     status: "ACTIVE",
     stages: {
       source_acquisition: { budget_ms: sourceAcquisitionTimeoutMs, duration_ms: null, outcome: "ACTIVE" },
@@ -533,7 +539,12 @@ async function main() {
     const completed = await runProcessTree(
       pythonExecutable,
       [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
-      { cwd: HERE, maxBuffer: 32 * 1024 * 1024, timeout: filingExtractionTimeoutMs },
+      {
+        cwd: HERE,
+        maxBuffer: 32 * 1024 * 1024,
+        timeout: filingExtractionTimeoutMs,
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      },
     );
     performance.filing_extraction_ms = Number(process.hrtime.bigint() - filingExtractionStarted) / 1e6;
     runtimeReceipt.stages.filing_extraction = {
@@ -674,7 +685,12 @@ async function main() {
         "--crosswalk", XBRL_CROSSWALK_PATH,
         "--taxonomy", SEMANTIC_TAXONOMY_PATH,
         "--out", xbrlArtifactPath,
-      ], { cwd: HERE, timeout: XBRL_RECONCILIATION_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 });
+      ], {
+        cwd: HERE,
+        timeout: XBRL_RECONCILIATION_TIMEOUT_MS,
+        maxBuffer: 32 * 1024 * 1024,
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      });
       xbrlReconciliation = await readJson(xbrlArtifactPath, "xbrl reconciliation artifact").catch(() => null);
       if (!xbrlReconciliation || (!completed.ok && completed.code !== 3)) {
         reconcileErrors.push(

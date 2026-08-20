@@ -27,7 +27,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const ASSETS = path.join(ROOT, "assets");
 const CASES = process.env.DEBT_OVERLAY_CASES_DIR ??
-  "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases";
+  path.join(ROOT, "test-fixtures", "cases");
 const PYTHON = process.env.EXCEL_INFLOW_PYTHON ?? "python3";
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-xbrl-recon-test-"));
 let checks = 0;
@@ -450,4 +450,4 @@ assert(
 checks += 2;
 
 await fs.rm(temp, { recursive: true, force: true });
-process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+process.stdout.write(`${JSON.stringify({ status: "PASS", checks, mutations_detected: 2 })}\n`);

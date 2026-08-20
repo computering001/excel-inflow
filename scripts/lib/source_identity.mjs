@@ -303,6 +303,8 @@ export async function resolveSourceIdentity({
     installationIdentity,
   });
   const skillVersion = release.skillVersion ?? runtime.skill_version ?? null;
+  const sourceWorktreeDirty =
+    overrides.source_worktree_dirty ?? release.sourceWorktreeDirty ?? null;
   const releaseName =
     release.releaseName ??
     (deploymentProfile.release_name && skillVersion
@@ -315,6 +317,7 @@ export async function resolveSourceIdentity({
     repository: typedIdentity.source.repository,
     source_commit: commit,
     source_tree: tree,
+    source_worktree_dirty: sourceWorktreeDirty,
     package_mode: packageMode,
     deployment_status: deploymentStatus,
     release_name: releaseName,

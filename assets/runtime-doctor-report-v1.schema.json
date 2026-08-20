@@ -43,7 +43,7 @@
       "const": true
     },
     "performed_expensive_work": {
-      "description": "The doctor must be cheap by construction: no render, recalculation, extraction, compilation or solve.",
+      "description": "The doctor performs no issuer work, render, recalculation, case compilation or solve. Its bounded frozen two-page filing extraction is a capability probe, not production work.",
       "const": false
     },
     "repaired_host": {

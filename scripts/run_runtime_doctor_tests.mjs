@@ -3,8 +3,9 @@
  * P6.7 — Runtime doctor suite.
  *
  * Proves, in order:
- *  0. THE RED PROOF. No runtime doctor existed, and the only environment probe
- *     in the system is positioned AFTER the expensive upstream half.
+ *  0. THE CLOSED RED. The runtime doctor is a shipped entry point and the one
+ *     top-level controller invokes it before the Company screen and before any
+ *     issuer work.
  *  1. Interpreter custody: a poisoned PATH must not change the resolved
  *     interpreter (reusing the same custody functions the run uses, so the
  *     doctor cannot certify one interpreter and the run spawn another).
@@ -23,6 +24,7 @@
  */
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -42,10 +44,13 @@ import {
   RUNTIME_DOCTOR_SCHEMA_VERSION,
   RuntimeDoctorRefusal,
   assertRuntimeDoctorSatisfied,
+  compileInstalledCapabilityReceipt,
   compileRuntimeDoctorReport,
+  installedCapabilityReceiptDigest,
   resolveDoctorPython,
   runRuntimeDoctor,
   typedCheck,
+  writeInstalledCapabilityArtifactSet,
 } from "./lib/runtime_doctor.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -64,12 +69,12 @@ const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "runtime-doctor-tests-")
 
 try {
   // ------------------------------------------------------------------------
-  // 0. RED PROOF — what did not exist, and why the existing probe is too late.
+  // 0. CLOSED RED — the preflight now owns the first executable boundary.
   // ------------------------------------------------------------------------
   const orchestrateSource = await fs.readFile(path.join(HERE, "orchestrate_release.mjs"), "utf8");
   const userFlowSource = await fs.readFile(path.join(HERE, "run_user_flow.mjs"), "utf8");
 
-  // The ONLY environment probe in the system is stage-4-internal.
+  // The old stage-4 probe remains as a downstream second opinion.
   check(
     orchestrateSource.includes("async function exactEnvironmentProbe("),
     "the stage-4 environment probe is no longer where the gap report found it",
@@ -80,9 +85,8 @@ try {
   check(probeCallSite > stage4MainStart, "the stage-4 probe is not called from stage-4 main");
   check(probeDefinition < probeCallSite, "probe definition/call-site ordering changed");
 
-  // ...and stage 4 is only SPAWNED after the expensive upstream half. Proven by
-  // ordering, not by brittle absolute line numbers: the controller compiles the
-  // case and replays intake BEFORE it ever spawns the stage that probes.
+  // ...and stage 4 is still spawned after the upstream half, which is why it
+  // cannot substitute for the new pre-interaction doctor.
   const spawnStage4 = userFlowSource.indexOf('"orchestrate_release.mjs"');
   const compileCaseCall = userFlowSource.indexOf("compileCase(");
   const runIntakeCall = userFlowSource.indexOf("runIntake(");
@@ -90,24 +94,39 @@ try {
   check(compileCaseCall > 0 && runIntakeCall > 0, "the upstream half is no longer where it was");
   check(
     spawnStage4 > compileCaseCall && spawnStage4 > runIntakeCall,
-    "RED PROOF INVALID: stage 4 (the only environment probe) must be spawned AFTER intake " +
-    "and case compilation — that ordering is the whole reason a missing precondition was " +
-    "discovered forty minutes late",
+    "the downstream stage-4 probe unexpectedly moved ahead of intake/case compilation",
   );
 
-  // Nothing but this work package's own three files mentions a runtime doctor.
-  const scriptEntries = await fs.readdir(HERE);
-  const doctorFiles = scriptEntries.filter((entry) => entry.includes("runtime_doctor"));
-  check(
-    doctorFiles.length === 2 &&
-    doctorFiles.includes("run_runtime_doctor.mjs") &&
-    doctorFiles.includes("run_runtime_doctor_tests.mjs"),
-    "the runtime doctor CLI and suite are not the only doctor entry points in scripts/",
+  const topControllerSource = await fs.readFile(
+    path.join(HERE, "run_excel_inflow_vnext.mjs"),
+    "utf8",
   );
   check(
-    !orchestrateSource.includes("runtime_doctor") && !userFlowSource.includes("runtime_doctor"),
-    "RED PROOF: at the time this suite was written no controller invoked the doctor; if a " +
-    "controller now does, update this pin deliberately rather than letting it rot",
+    topControllerSource.includes('from "./lib/runtime_doctor.mjs"') &&
+    topControllerSource.includes("runMandatoryHostPreflight({"),
+    "the top-level controller does not import and invoke the runtime doctor",
+  );
+  const companyBranch = topControllerSource.indexOf('String(options.screen) === "company"');
+  const companyPreflight = topControllerSource.indexOf("await runMandatoryHostPreflight({", companyBranch);
+  const companyScreenSpawn = topControllerSource.indexOf('path.join(HERE, "run_user_flow.mjs")', companyBranch);
+  check(
+    companyBranch > 0 && companyPreflight > companyBranch && companyPreflight < companyScreenSpawn,
+    "the Company screen can render before the mandatory host preflight closes",
+  );
+  const runOutGuard = topControllerSource.indexOf("if (out === ROOT");
+  const runPreflight = topControllerSource.indexOf("const hostPreflight = await runMandatoryHostPreflight", runOutGuard);
+  const clockOpen = topControllerSource.indexOf("ACTIVE_RUN_DEADLINE = await openRunDeadline", runOutGuard);
+  const issuerAttachmentWork = topControllerSource.indexOf('if (options["attachment-spec"])', runPreflight);
+  check(
+    clockOpen > runOutGuard && clockOpen < runPreflight &&
+      issuerAttachmentWork > runPreflight,
+    "the one run clock must include host preflight while issuer work remains downstream of it",
+  );
+  check(
+    !orchestrateSource.includes("runtime_doctor") &&
+      !userFlowSource.includes("runRuntimeDoctor(") &&
+      !userFlowSource.includes("compileInstalledCapabilityReceipt("),
+    "a second controller now owns runtime-doctor policy; keep one top-level owner",
   );
 
   // ------------------------------------------------------------------------
@@ -284,14 +303,13 @@ try {
     "a pre-flight refusal must say honestly that no work started and invent no checkpoint",
   );
   check(
-    refusedReport.refusal.reason_code_fidelity === "closest_available" &&
+    refusedReport.refusal.reason_code_fidelity === "exact" &&
     refusedReport.refusal.requested_reason_code === RUNTIME_DOCTOR_REQUESTED_REASON_CODE &&
-    !Object.prototype.hasOwnProperty.call(
+    Object.prototype.hasOwnProperty.call(
       registry.reason_codes,
       RUNTIME_DOCTOR_REQUESTED_REASON_CODE,
     ),
-    "the reason-code shortfall must be DECLARED: the code actually needed is named and is " +
-    "genuinely absent from the sealed registry",
+    "the host refusal must use the exact registered runtime-governance reason code",
   );
   check(
     refusedReport.refusal.unsatisfied_preconditions.length === 1 &&
@@ -555,6 +573,15 @@ try {
   const schema = JSON.parse(
     await fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8"),
   );
+  const capabilitySchema = JSON.parse(
+    await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8"),
+  );
+  const pointerSchema = JSON.parse(
+    await fs.readFile(path.join(ROOT, "assets", "host-preflight-pointer-v1.schema.json"), "utf8"),
+  );
+  const bootstrapRefusalSchema = JSON.parse(
+    await fs.readFile(path.join(ROOT, "assets", "runtime-bootstrap-refusal-v1.schema.json"), "utf8"),
+  );
   for (const report of [greenReport, refusedReport, unknownReport, laneSkipped, norepairReport]) {
     const errors = validateJsonSchema(JSON.parse(JSON.stringify(report)), schema);
     check(errors.length === 0, `a compiled report violated the shipped schema: ${errors.join("; ")}`);
@@ -596,6 +623,31 @@ try {
     JSON.parse(await fs.readFile(cliOut, "utf8")).verdict === cliReport.verdict,
     "the CLI's written artifact disagrees with what it printed",
   );
+  const cliPointerPath = path.join(path.dirname(cliOut), "host-preflight-current.json");
+  const cliPointer = JSON.parse(await fs.readFile(cliPointerPath, "utf8"));
+  check(
+    validateJsonSchema(cliPointer, pointerSchema).length === 0 &&
+      cliPointer.status === "HOST_REFUSED",
+    "an evidence-only diagnostic was mislabeled as a full HOST_READY generation",
+  );
+  const pointedReportBytes = await fs.readFile(path.join(path.dirname(cliOut), cliPointer.report_file));
+  const pointedReceiptBytes = await fs.readFile(path.join(path.dirname(cliOut), cliPointer.receipt_file));
+  check(
+    createHash("sha256").update(pointedReportBytes).digest("hex") === cliPointer.report_sha256,
+    "the standalone doctor's pointer does not bind its immutable report bytes",
+  );
+  check(
+    createHash("sha256").update(pointedReceiptBytes).digest("hex") === cliPointer.receipt_sha256,
+    "the standalone doctor's pointer does not bind its immutable receipt bytes",
+  );
+  check(
+    JSON.parse(pointedReceiptBytes).receipt_sha256 === cliPointer.receipt_self_sha256,
+    "the standalone doctor's pointer does not bind the receipt self-hash",
+  );
+  check(
+    Buffer.compare(pointedReportBytes, await fs.readFile(cliOut)) === 0,
+    "the caller-named report alias differs from the pointer-authoritative report",
+  );
   check(
     cliReport.checks.every((entry) => entry.result !== "satisfied" || entry.reason === null),
     "a real report contains a pass carrying an excuse",
@@ -605,6 +657,141 @@ try {
     cliReport.checks.find((entry) => entry.precondition_id === "soffice_available").result === "not_applicable",
     "requesting only the evidence lane must make the workbook binary not-applicable, not failed",
   );
+
+  const capabilityReceipt = compileInstalledCapabilityReceipt(cliReport);
+  check(
+    validateJsonSchema(capabilityReceipt, capabilitySchema).length === 0,
+    "the HOST_READY candidate-slot receipt violated its shipped schema",
+  );
+  const receiptBody = { ...capabilityReceipt };
+  delete receiptBody.receipt_sha256;
+  check(
+    capabilityReceipt.receipt_sha256 === installedCapabilityReceiptDigest(receiptBody),
+    "the candidate-slot receipt is not self-bound to its exact body",
+  );
+  const concurrentArtifactRoot = path.join(scratch, "concurrent-artifact-publish");
+  const concurrentPublishes = await Promise.all(
+    Array.from({ length: 8 }, () => writeInstalledCapabilityArtifactSet({
+      artifactDirectory: concurrentArtifactRoot,
+      report: cliReport,
+    })),
+  );
+  check(
+    new Set(concurrentPublishes.map((entry) => entry.reportPath)).size === 1 &&
+      new Set(concurrentPublishes.map((entry) => entry.receiptPath)).size === 1,
+    "concurrent publication did not converge on one content-addressed generation",
+  );
+  const concurrentNames = await fs.readdir(concurrentArtifactRoot);
+  check(
+    concurrentNames.filter((name) => name.includes(".tmp-")).length === 0,
+    "concurrent publication left an incomplete temporary generation",
+  );
+  const crashArtifactRoot = path.join(scratch, "crash-before-pointer");
+  const firstGeneration = await writeInstalledCapabilityArtifactSet({
+    artifactDirectory: crashArtifactRoot,
+    report: cliReport,
+  });
+  const pointerBeforeCrash = await fs.readFile(firstGeneration.pointerPath, "utf8");
+  const nextReport = structuredClone(cliReport);
+  nextReport.generated_at = new Date(Date.parse(cliReport.generated_at) + 1_000).toISOString();
+  let crashObserved = false;
+  try {
+    await writeInstalledCapabilityArtifactSet({
+      artifactDirectory: crashArtifactRoot,
+      report: nextReport,
+      beforePointer: async () => {
+        throw new Error("injected crash before pointer publication");
+      },
+    });
+  } catch (error) {
+    crashObserved = String(error?.message).includes("injected crash");
+  }
+  check(crashObserved, "the pointer-last crash injection did not execute");
+  check(
+    await fs.readFile(firstGeneration.pointerPath, "utf8") === pointerBeforeCrash,
+    "a crash before pointer publication exposed a partial generation",
+  );
+  check(
+    bootstrapRefusalSchema.properties.reason_code.const === RUNTIME_DOCTOR_REASON_CODE &&
+      bootstrapRefusalSchema.required.includes("resumable_checkpoint_path") &&
+      bootstrapRefusalSchema.required.includes("preserved_source_hashes"),
+    "the shipped bootstrap-refusal schema is not bound to the registered runtime reason/payload",
+  );
+  const refusedArtifactSet = await writeInstalledCapabilityArtifactSet({
+    artifactDirectory: path.join(scratch, "ordinary-host-refusal"),
+    report: refusedReport,
+  });
+  check(
+    refusedArtifactSet.receipt.status === "REFUSED" &&
+      refusedArtifactSet.pointer.status === "HOST_REFUSED" &&
+      validateJsonSchema(refusedArtifactSet.pointer, pointerSchema).length === 0,
+    "an ordinary host-precondition refusal published a ready or invalid pointer",
+  );
+  check(
+    capabilityReceipt.mandatory_filings_probe?.pdf_sha256 &&
+    capabilityReceipt.mandatory_filings_probe?.extractor_sha256 &&
+    capabilityReceipt.python.module_versions.fitz &&
+    capabilityReceipt.node.executable_sha256 &&
+    capabilityReceipt.python.executable_sha256,
+    "the host-capability receipt omitted the PDF, extractor, interpreter bytes or PyMuPDF identity",
+  );
+  const invalidInactiveReceipt = structuredClone(capabilityReceipt);
+  invalidInactiveReceipt.candidate_slot_ready = false;
+  invalidInactiveReceipt.candidate_slot_refusal_reason = null;
+  check(
+    validateJsonSchema(invalidInactiveReceipt, capabilitySchema).some(
+      (error) => error.includes("candidate_slot_refusal_reason"),
+    ),
+    "the local schema validator ignored the candidate-slot contract's else branch",
+  );
+  const invalidActiveReceipt = structuredClone(capabilityReceipt);
+  invalidActiveReceipt.candidate_slot_ready = true;
+  invalidActiveReceipt.candidate_slot_refusal_reason = null;
+  invalidActiveReceipt.source_identity.source_worktree_dirty = true;
+  check(
+    validateJsonSchema(invalidActiveReceipt, capabilitySchema).some(
+      (error) => error.includes("source_worktree_dirty"),
+    ),
+    "the receipt schema admitted candidate-slot readiness for dirty source bytes",
+  );
+  const invalidPromotionReceipt = structuredClone(capabilityReceipt);
+  invalidPromotionReceipt.production_promotion_eligible = true;
+  check(
+    validateJsonSchema(invalidPromotionReceipt, capabilitySchema).some(
+      (error) => error.includes("production_promotion_eligible"),
+    ),
+    "the host-capability receipt falsely admitted production promotion without external canaries",
+  );
+
+  // A broken preflight may never fall back to the prose Company screen.
+  let refusedScreenExit = 0;
+  let refusedScreenStdout = "";
+  let refusedScreenStderr = "";
+  try {
+    await execFileAsync(process.execPath, [
+      path.join(HERE, "run_excel_inflow_vnext.mjs"),
+      "--screen", "company",
+      "--python", poisonPython,
+    ], {
+      env: { ...process.env, EXCEL_INFLOW_PYTHON: poisonPython, PYTHON: poisonPython },
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } catch (error) {
+    refusedScreenExit = Number(error.code ?? -1);
+    refusedScreenStdout = String(error.stdout ?? "");
+    refusedScreenStderr = String(error.stderr ?? "");
+  }
+  check(refusedScreenExit === 1, "a broken Company-screen preflight did not refuse");
+  check(
+    !refusedScreenStdout.includes("EXCEL INFLOW") &&
+    !refusedScreenStdout.includes("COMPANY"),
+    "a static Company screen masked the broken executable route",
+  );
+  check(
+    refusedScreenStderr.includes("INTERNAL_FAILURE"),
+    "the broken Company-screen route did not return a typed internal failure",
+  );
+  mutations.push("broken_preflight_cannot_emit_static_company_screen");
 
   process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
 } finally {

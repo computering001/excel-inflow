@@ -90,6 +90,7 @@ const FILE_OWNERSHIP = {
   "lib/local_workbook_review.mjs": { role: "validator", concern: "local workbook review", target_owner: "validators stay validators" },
   "lib/ownership_census.mjs": { role: "derived_reader", concern: "ownership census view (derived, never a writer)", target_owner: "derived view of the canonical graph (Phase 3)" },
   "lib/performance_receipt.mjs": { role: "canonical_writer", concern: "performance receipts", target_owner: "Runtime governance (Phase 6)" },
+  "lib/runtime_doctor.mjs": { role: "canonical_writer", concern: "installed-host capability report, receipt and pointer state", target_owner: "Runtime governance (Phase 6)" },
   "lib/progress_heartbeat.mjs": { role: "canonical_writer", concern: "progress heartbeat state", target_owner: "Runtime governance (Phase 6)" },
   "lib/raw_canary_fixture.mjs": { role: "validator", concern: "canary evidence custody pin", target_owner: "test custody stays test custody" },
   "lib/release_certification.mjs": { role: "validator", concern: "release certification checks", target_owner: "validators stay validators" },

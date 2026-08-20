@@ -93,7 +93,16 @@ check("the manifest records the certified runtime code closure", () => {
 
 check("the closure is a real graph walk, not a directory glob or a declared list", () => {
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, "assets", "deployment-profile.json"), "utf8"));
-  assert.deepEqual([...profile.script_entry_points].sort(), [...live.entry_points]);
+  assert.deepEqual([...profile.script_entry_points].sort(), [...live.public_entry_points]);
+  assert.deepEqual([...(profile.script_private_roots ?? [])].sort(), [...live.private_entry_points]);
+  assert.ok(
+    live.entry_points.includes("run_user_flow.mjs"),
+    "the private workbook delegate must remain inside the certified runtime code closure",
+  );
+  assert.ok(
+    live.runtime_manifest_roots.includes("run_filings_pipeline.mjs"),
+    "the installed mandatory filings controller must be a runtime-manifest root",
+  );
   // Every member is reachable: re-walking from the entry points reproduces the
   // set exactly, and every member other than an entry point has an importer.
   const walk = walkCertifiedCodeClosure({

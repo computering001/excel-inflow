@@ -135,12 +135,27 @@ Release begins only after the frozen local cohort is clean. Run, in order:
    render and independent validation smoke;
 9. exact release manifest and closure digest, recorded only when steps 7-8 are
    bound to that digest and pass;
-10. versioned candidate installation without overwriting rollback;
-11. fresh-session installed identity and active-pointer verification, without
-    starting a company run or building a workbook;
-12. explicitly authorised installed behaviour parity and any native Excel
-    review as a separate post-install gate; and
-13. one explicit production promotion.
+10. versioned candidate installation into an immutable INACTIVE slot without
+    changing the current active route or overwriting rollback;
+11. exact installed-member hash readback and full evidence+workbook runtime
+    doctor from that inactive slot, including the frozen real-PDF filing probe;
+12. two fresh candidate-bound staging sessions, followed by IFRS and US-GAAP
+    Company-to-filings canaries and no-broker, unusable-broker and usable-broker
+    delivery canaries; every receipt must bind the inactive candidate identity;
+13. retain and re-verify the previous known-good slot, then atomically update
+    the active pointer only after steps 10-12 pass;
+14. read the active pointer and package identity back from a fresh session;
+15. one post-activation smoke, with rollback on any identity or behaviour
+    mismatch; and
+16. one explicit production promotion.
+
+The installed-capability receipt is deliberately scoped to
+`inactive_candidate_slot_only`. It may establish `candidate_slot_ready` after
+the package and host checks in steps 10-11, but it must always report
+`production_promotion_eligible: false`. Only the independently preserved,
+candidate-bound receipts from steps 12-15 can authorize the separate production
+promotion in step 16. A loader or operator must never infer promotion authority
+from host readiness alone.
 
 ## Development gate selection
 
@@ -148,12 +163,12 @@ Run the smallest scope that covers a local change, plus sentinels:
 
 | Changed layer | Primary scope | Required sentinels |
 |---|---|---|
-| Schema or contracts | `contracts` | `workflow`, one economics case |
-| Intake, coverage or questions | `workflow` | `contracts`, one economics case |
-| Solver or economic graph | `economics` | `contracts`, one workflow case |
-| Row plan or renderer contract | `economics,authority` | `contracts` |
-| Design contract or styling | `authority` | `contracts`, one economics case |
-| Release compiler only | clean-root compiler smoke | Frozen cohort digest unchanged |
+| Schema or contracts | `evidence,graph` | `workflow`, one `economics` case |
+| Intake, coverage or questions | `workflow,evidence` | `graph`, one `economics` case |
+| Solver or economic graph | `economics,graph,forecast` | `workflow`, one `proof` case |
+| Row plan or renderer contract | `economics,proof` | `graph`, one `cohort` case |
+| Design contract or styling | `proof,cohort` | one `economics` case |
+| Release compiler only | `proof,performance` plus clean-root compiler smoke | Frozen cohort digest unchanged |
 
 Heavy native Excel, full renders, goldens and installation are not development
 sentinels. They run at the representative-workbook and release phases.

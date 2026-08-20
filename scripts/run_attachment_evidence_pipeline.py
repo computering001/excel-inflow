@@ -18,13 +18,13 @@ import math
 import os
 import re
 import resource
+import shutil
 import subprocess
 import signal
 import sys
 import tempfile
 import threading
 import time
-import atexit
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,27 @@ ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "attachment-evidence-runtime-members.json"
 USER_BLOCKERS = {"USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
 BROKER_SKIP_PHRASE = "continue without brokers"
+
+
+def resolve_node_executable() -> str:
+    """Resolve one absolute Node executable for every Python-owned JS child.
+
+    The top-level controller supplies EXCEL_INFLOW_NODE=process.execPath after
+    the runtime doctor certifies it. Standalone development invocations resolve
+    PATH once here, then retain that absolute custody; no lane launches a bare
+    `node` that can drift between preflight and execution.
+    """
+    declared = os.environ.get("EXCEL_INFLOW_NODE")
+    candidate = declared if declared else shutil.which("node")
+    if not candidate:
+        raise RuntimeError("No Node executable is under custody for the evidence controller")
+    resolved = Path(candidate)
+    if not resolved.is_absolute() or not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise RuntimeError("The evidence controller's Node executable is not one absolute executable file")
+    return str(resolved)
+
+
+NODE_EXECUTABLE = resolve_node_executable()
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -715,7 +736,7 @@ def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root
     request = resolve(base, declaration.get("request_path"))
     if kind == "filings":
         command = [
-            "node",
+            NODE_EXECUTABLE,
             str(HERE / "run_filings_pipeline.mjs"),
             str(request),
             "--out",
@@ -1035,7 +1056,7 @@ def run_structural_ownership_preflight(
     bundle_path = filings_bundle_path(filings_state)
     receipt_path = output_root / "ownership" / "structural-ownership-preflight.json"
     command = [
-        "node",
+        NODE_EXECUTABLE,
         str(HERE / "run_structural_ownership_preflight.mjs"),
         str(bundle_path),
         str(demand_path),
@@ -1051,7 +1072,7 @@ def run_structural_ownership_preflight(
     verify_path = output_root / "ownership" / "structural-ownership-preflight.verified.json"
     verified = run(
         [
-            "node",
+            NODE_EXECUTABLE,
             str(HERE / "run_structural_ownership_preflight.mjs"),
             str(bundle_path),
             str(demand_path),
@@ -1709,6 +1730,7 @@ def task_frontier(
     *,
     status: str,
     transaction_hash: str,
+    controller_summary: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Project one typed task frontier without leaking internal work as a user ask."""
     lane_progress = {
@@ -1775,6 +1797,49 @@ def task_frontier(
         }
         for task in internal_tasks
     ]
+    if not underlying:
+        # A controller exception can occur before the subordinate lane has had
+        # a chance to mint its ordinary task array. The aggregate must still
+        # name a concrete lane defect; `underlying_defect_count: 0` beside a
+        # terminal internal failure is false evidence and cannot guide repair.
+        for lane, state in sorted(lanes.items()):
+            if state.get("pipeline_status") != "BLOCKED_INTERNAL":
+                continue
+            terminal_reason = (state.get("summary") or {}).get(
+                "terminal_reason", f"{lane}_controller_internal_failure"
+            )
+            defect_sha = sha256_value({
+                "lane": lane,
+                "terminal_reason": terminal_reason,
+                "message": (state.get("summary") or {}).get("message"),
+            })
+            underlying.append({
+                "lane": lane,
+                "task_id": f"{lane}-controller-defect-{defect_sha[:16]}",
+                "task_kind": "controller_terminal_failure",
+                "terminal_reasons": [terminal_reason],
+            })
+    if not underlying and controller_summary:
+        terminal_reason = controller_summary.get(
+            "terminal_reason", "attachment_controller_internal_failure"
+        )
+        controller_signal = controller_summary.get("controller_signal") or {}
+        lane = controller_signal.get("resume_from") or "attachment"
+        defect_sha = sha256_value({
+            "lane": lane,
+            "terminal_reason": terminal_reason,
+            "message": controller_summary.get("message"),
+        })
+        underlying.append({
+            "lane": lane,
+            "task_id": f"{lane}-controller-defect-{defect_sha[:16]}",
+            "task_kind": "controller_terminal_failure",
+            "terminal_reasons": [terminal_reason],
+        })
+    if not underlying:
+        raise RuntimeError(
+            "BLOCKED_INTERNAL has no blocked lane from which to derive a terminal defect"
+        )
     task_input_sha = sha256_value({
         "transaction": transaction_hash,
         "underlying": underlying,
@@ -1859,6 +1924,7 @@ def write_state(
         lanes,
         status=status,
         transaction_hash=transaction_hash,
+        controller_summary=summary,
     )
     # The caller passes lane tasks for compatibility, but typed ownership and
     # aggregation are authoritative here. This prevents an internal lane packet
@@ -1895,7 +1961,9 @@ def write_state(
 
 _TELEMETRY_STARTED_AT = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
 _TELEMETRY_STARTED_MONOTONIC = time.monotonic()
-atexit.register(lambda: _write_process_telemetry("FAIL" if getattr(sys, "last_value", None) else "PASS"))
+_ACTIVE_EXPERIENCE_TRACE: ExperienceTrace | None = None
+_ACTIVE_EXPERIENCE_SPAN: Any = None
+_EXPERIENCE_TRACE_FINISHED = False
 
 def _write_process_telemetry(status: str) -> None:
     directory = os.environ.get("EXCEL_INFLOW_TELEMETRY_DIR")
@@ -1938,7 +2006,25 @@ def _write_process_telemetry(status: str) -> None:
     except Exception:
         pass
 
+
+def _finish_experience_trace(error: BaseException | None) -> None:
+    """Close the root span with the real terminal outcome exactly once."""
+    global _EXPERIENCE_TRACE_FINISHED
+    if _EXPERIENCE_TRACE_FINISHED or _ACTIVE_EXPERIENCE_TRACE is None:
+        return
+    _EXPERIENCE_TRACE_FINISHED = True
+    try:
+        if error is None:
+            _ACTIVE_EXPERIENCE_SPAN.__exit__(None, None, None)
+        else:
+            _ACTIVE_EXPERIENCE_SPAN.__exit__(type(error), error, error.__traceback__)
+    finally:
+        output_root = getattr(_ACTIVE_EXPERIENCE_TRACE, "_output_root", None)
+        if output_root is not None:
+            write_trace(Path(output_root) / "experience-trace.json", _ACTIVE_EXPERIENCE_TRACE.finish())
+
 def main() -> int:
+    global _ACTIVE_EXPERIENCE_TRACE, _ACTIVE_EXPERIENCE_SPAN
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("spec")
     parser.add_argument("--out", required=True)
@@ -1952,12 +2038,9 @@ def main() -> int:
     experience_trace = ExperienceTrace(run_id=str(spec.get("run_id") or output_root.name), scope="attachment_evidence_controller")
     experience_span = experience_trace.span("attachment_evidence_pipeline", "run_attachment_evidence_pipeline", "excel_inflow_active", metadata={"coverage_role": "root"})
     experience_span.__enter__()
-    def _finish_experience_trace() -> None:
-        try:
-            experience_span.__exit__(None, None, None)
-        finally:
-            write_trace(output_root / "experience-trace.json", experience_trace.finish())
-    atexit.register(_finish_experience_trace)
+    experience_trace._output_root = output_root
+    _ACTIVE_EXPERIENCE_TRACE = experience_trace
+    _ACTIVE_EXPERIENCE_SPAN = experience_span
     if spec.get("schema_version") != "attachment-evidence-controller/1.0":
         raise ValueError("Attachment evidence controller spec has the wrong schema version")
     if (
@@ -2466,6 +2549,7 @@ def main() -> int:
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
                     "lane_resource_receipts": lane_resource_receipts,
+                    "broker_intake_state": broker_intake_choice.get("intake_state"),
                     "broker_and_debt_execution": "concurrent_after_filings",
                     "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                 },
@@ -2541,7 +2625,7 @@ def main() -> int:
         compiled_root = output_root / "compiled-evidence"
         semantic_recovery_started = time.monotonic()
         completed = run([
-            "node", str(HERE / "compile_declared_evidence_run.mjs"), str(resolved_path),
+            NODE_EXECUTABLE, str(HERE / "compile_declared_evidence_run.mjs"), str(resolved_path),
             "--declarations", str(declarations_path), "--out", str(compiled_root),
         ])
         semantic_recovery_ms = max(
@@ -2587,6 +2671,7 @@ def main() -> int:
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
                     "lane_resource_receipts": lane_resource_receipts,
+                    "broker_intake_state": broker_intake_choice.get("intake_state"),
                     "broker_and_debt_execution": "concurrent_after_filings",
                     "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                     "filings": (lanes.get("filings", {}).get("summary") or {}).get("performance", {}),
@@ -2606,4 +2691,16 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        _exit_code = main()
+    except BaseException as _error:
+        _finish_experience_trace(_error)
+        _write_process_telemetry("FAIL")
+        raise
+    else:
+        _terminal_error = None if _exit_code == 0 else RuntimeError(
+            f"attachment evidence controller exited {_exit_code}"
+        )
+        _finish_experience_trace(_terminal_error)
+        _write_process_telemetry("PASS" if _exit_code == 0 else "FAIL")
+        raise SystemExit(_exit_code)

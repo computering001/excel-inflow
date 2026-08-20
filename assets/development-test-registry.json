@@ -1898,6 +1898,27 @@
       "test_class": "mutation"
     },
     {
+      "id": "installed-filings-capability",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_filings_capability_tests.mjs",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "timeout_seconds": 1800,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "portable-certification-tier",
       "phase": "proof",
       "runtime": "node",
@@ -2020,6 +2041,15 @@
       "runtime": "node",
       "script": "run_runtime_closure_tests.mjs",
       "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "release-dependency-closure",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_dependency_closure_tests.mjs",
+      "timeout_seconds": 600,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
@@ -2178,7 +2208,7 @@
         {
           "name": "test_out",
           "source": "TEST_OUT",
-          "type": "file"
+          "type": "directory"
         }
       ],
       "requires": [
@@ -2310,7 +2340,7 @@
         {
           "name": "test_out",
           "source": "TEST_OUT",
-          "type": "file"
+          "type": "directory"
         }
       ],
       "requires": [

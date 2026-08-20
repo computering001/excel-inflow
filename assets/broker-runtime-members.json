@@ -3,6 +3,7 @@
   "members": [
     "scripts/run_broker_pipeline.py",
     "scripts/rebind_broker_native_preflight.py",
+    "scripts/broker_numeric.py",
     "scripts/broker_terminal_recovery.py",
     "scripts/pre_broker_demand.py",
     "scripts/broker_period_recovery.py",

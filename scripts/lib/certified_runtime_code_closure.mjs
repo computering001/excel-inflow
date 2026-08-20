@@ -27,7 +27,9 @@
  * NO SELF-REFERENCE ANYWHERE IN THE VERIFICATION PATH:
  *
  *   - The MEMBERSHIP comes from walking the real ES-module import graph from
- *     `assets/deployment-profile.json#/script_entry_points`. It is never read
+ *     the public and private runtime roots declared by the deployment profile
+ *     and every JavaScript root named by a `*-runtime-members.json` manifest.
+ *     It is never read
  *     from the manifest, and never from `script_allowlist` either — the profile
  *     supplies the ROOTS, the graph supplies the closure. (The compiler proves
  *     the same walk agrees with `script_allowlist` in both directions, so the
@@ -58,11 +60,11 @@ import { hasNonLiteralDynamicImport, specifiersOf } from "./release_js_import_sc
 import { runtimeCodeClosureIdentity } from "./identity_vocabulary.mjs";
 
 /** The membership rule this digest is taken over, recorded alongside it. */
-export const CERTIFIED_CODE_CLOSURE_DEFINITION = "certified-runtime-code-closure/1.0";
+export const CERTIFIED_CODE_CLOSURE_DEFINITION = "certified-runtime-code-closure/1.1";
 export const CERTIFIED_CODE_CLOSURE_ROOTS_POINTER =
-  "assets/deployment-profile.json#/script_entry_points";
+  "assets/deployment-profile.json#/(script_entry_points+script_private_roots+*-runtime-members.json JavaScript roots)";
 export const CERTIFIED_CODE_CLOSURE_MEMBERSHIP_RULE =
-  "the transitive ES-module import graph under scripts/, walked from the shipped entry points; assets, references, resources, vendored bytes and Python modules are NOT members";
+  "the transitive ES-module import graph under scripts/, walked from every public, private and runtime-manifest JavaScript root; assets, references, resources, vendored bytes and Python modules are NOT members";
 
 /** The artifact that publishes the digest. It may never be a member. */
 export const CERTIFIED_CODE_CLOSURE_PUBLISHER = "assets/runtime-manifest.json";
@@ -173,7 +175,28 @@ export function assertPublisherOutsideClosure(files) {
  */
 export function computeCertifiedRuntimeCodeClosure(root) {
   const profile = readJson(root, "assets/deployment-profile.json");
-  const entryPoints = [...(profile.script_entry_points ?? [])].sort();
+  const publicEntryPoints = [...(profile.script_entry_points ?? [])].sort();
+  const privateEntryPoints = [...(profile.script_private_roots ?? [])].sort();
+  const runtimeManifestRoots = [];
+  for (const asset of profile.asset_allowlist ?? []) {
+    if (!/-runtime-members\.json$/.test(asset)) continue;
+    const manifest = readJson(root, `assets/${asset}`);
+    for (const member of manifest.members ?? []) {
+      if (
+        typeof member === "string" &&
+        member.startsWith("scripts/") &&
+        member.endsWith(".mjs") &&
+        !member.split("/").includes("..")
+      ) {
+        runtimeManifestRoots.push(member.slice("scripts/".length));
+      }
+    }
+  }
+  const entryPoints = [...new Set([
+    ...publicEntryPoints,
+    ...privateEntryPoints,
+    ...runtimeManifestRoots,
+  ])].sort();
   if (entryPoints.length === 0) {
     throw new Error(
       `${CERTIFIED_CODE_CLOSURE_ROOTS_POINTER} declares no entry points; a closure with no roots is not a closure.`,
@@ -196,6 +219,9 @@ export function computeCertifiedRuntimeCodeClosure(root) {
     roots_pointer: CERTIFIED_CODE_CLOSURE_ROOTS_POINTER,
     membership_rule: CERTIFIED_CODE_CLOSURE_MEMBERSHIP_RULE,
     entry_points: Object.freeze(entryPoints),
+    public_entry_points: Object.freeze(publicEntryPoints),
+    private_entry_points: Object.freeze(privateEntryPoints),
+    runtime_manifest_roots: Object.freeze([...new Set(runtimeManifestRoots)].sort()),
     module_count: walk.modules.length,
     modules: walk.modules,
     files: identity.files,

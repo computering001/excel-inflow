@@ -23,15 +23,16 @@
  * probe directory it creates inside an ALREADY-EXISTING temp root and removes
  * again; that probe is declared in the report rather than performed silently.
  *
- * REPORT-FIRST. Every check here is a cheap capability question (a version
- * print, an import, a stat, a small write). Nothing in this module renders,
- * recalculates, extracts, compiles or solves.
+ * REPORT-FIRST. Every check here is a bounded capability question (a version
+ * print, an import, a stat, a small write, or the frozen two-page filing
+ * extraction probe). It never processes issuer evidence, renders a workbook,
+ * recalculates, compiles a case or solves the model.
  *
  * PORTABILITY. This file contains NO absolute host paths. Interpreter and
  * binary locations come from arguments, the environment, the shipped
  * deployment profile, or PATH resolution performed at run time.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -39,6 +40,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { selectedIngressPythonExecutable } from "./attachment_ingress.mjs";
+import { validateJsonSchema } from "./json_schema.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./process_tree.mjs";
 import { resolveActiveSourceIdentity } from "./source_identity.mjs";
 
@@ -47,6 +49,8 @@ const DEFAULT_SKILL_ROOT = path.resolve(HERE, "..", "..");
 
 export const RUNTIME_DOCTOR_SCHEMA_VERSION = "excel-inflow-runtime-doctor-report/1.0";
 export const RUNTIME_DOCTOR_WORK_PACKAGE = "P6.7";
+export const INSTALLED_CAPABILITY_RECEIPT_SCHEMA_VERSION =
+  "excel-inflow-installed-capability-receipt/1.1";
 
 /**
  * The five result types. Only "satisfied" is a pass. "unknown" exists so a
@@ -86,20 +90,14 @@ export const PACKAGE_LANES = Object.freeze({
   "extract_broker_evidence.py": "evidence",
   "archive_broker_pages.py": "evidence",
   "extract_filing_statements.py": "evidence",
+  "extract_inline_xbrl.py": "evidence",
 });
 
 /**
- * The reason code the refusal carries. The terminal-reason registry
- * (assets/terminal-reason-registry-v1.json) is SEALED and read-only here, and
- * it has no host/environment category: the closest declared code is the
- * internal catch-all, whose recoverability (`resumable_after_repair`),
- * category (`internal`), user_action (`none - engineering owns this`) and
- * terminal state (`INTERNAL_FAILURE`) all match a host-precondition refusal
- * exactly. Only its `owner_layer` (case_compiler_or_graph) is wrong. That
- * mismatch is DECLARED in every refusal via `reason_code_fidelity` and
- * `requested_reason_code` rather than hidden.
+ * Runtime governance owns a failed host precondition directly. It is never
+ * laundered through the compiler/graph owner.
  */
-export const RUNTIME_DOCTOR_REASON_CODE = "INTERNAL.compiler_or_graph_defect";
+export const RUNTIME_DOCTOR_REASON_CODE = "INTERNAL.host_precondition_unsatisfied";
 export const RUNTIME_DOCTOR_REQUESTED_REASON_CODE = "INTERNAL.host_precondition_unsatisfied";
 export const RUNTIME_DOCTOR_TERMINAL_STATE = "INTERNAL_FAILURE";
 export const RUNTIME_DOCTOR_RESPONSIBLE_LAYER = "runtime_host_preflight";
@@ -174,6 +172,16 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
       "single resolved interpreter. This is the documented trap: a host can have " +
       "openpyxl on one interpreter and PyMuPDF on another, and the run would then " +
       "half-work. The doctor names the missing modules before anything is paid for.",
+    exclusion_reason: null,
+  }),
+  filings_extraction_probe: Object.freeze({
+    title: "The installed mandatory filing route opens and extracts the frozen PDF fixture",
+    obligation: "mandatory",
+    lane: "evidence",
+    checked_by:
+      "the one resolved Python opens the frozen two-page PDF with PyMuPDF, runs the " +
+      "shipped extract_filing_statements.py entry point, validates its response schema, " +
+      "and proves labels, values, explicit zero, dash, blank, periods and units",
     exclusion_reason: null,
   }),
   python_optional_module_closure: Object.freeze({
@@ -295,6 +303,96 @@ export const PRECONDITION_IDS = Object.freeze(Object.keys(PRECONDITION_DECLARATI
 
 function sha256Hex(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function canonicalise(value) {
+  if (Array.isArray(value)) return value.map(canonicalise);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, canonicalise(value[key])]),
+    );
+  }
+  return value;
+}
+
+function canonicalJson(value) {
+  return `${JSON.stringify(canonicalise(value))}\n`;
+}
+
+export function serializeRuntimeDoctorReport(report) {
+  return canonicalJson(report);
+}
+
+export function installedCapabilityReceiptDigest(receipt) {
+  const { receipt_sha256: _ignored, ...body } = receipt;
+  return sha256Hex(Buffer.from(canonicalJson(body), "utf8"));
+}
+
+export function serializeInstalledCapabilityReceipt(receipt) {
+  return canonicalJson(receipt);
+}
+
+async function publishContentAddressedFile(target, bytes) {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
+  await fs.writeFile(temporary, bytes, { encoding: "utf8", flag: "wx" });
+  try {
+    await fs.rename(temporary, target);
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    const existing = await fs.readFile(target, "utf8");
+    if (existing !== bytes) {
+      throw new Error(`Content-addressed runtime artifact collision at ${target}.`);
+    }
+    await fs.rm(temporary, { force: true });
+  }
+}
+
+async function publishPointerLast(target, value) {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
+  await fs.writeFile(temporary, canonicalJson(value), { encoding: "utf8", flag: "wx" });
+  await fs.rename(temporary, target);
+}
+
+/**
+ * Publish the doctor report and capability receipt as one content-addressed
+ * generation, then expose that generation through one pointer written last.
+ * Consumers must follow the pointer; caller-named report/receipt files are
+ * compatibility aliases only and are never the custody authority.
+ */
+export async function writeInstalledCapabilityArtifactSet({
+  artifactDirectory,
+  report,
+  pointerName = "host-preflight-current.json",
+  beforePointer = null,
+}) {
+  const directory = path.resolve(String(artifactDirectory));
+  const receipt = compileInstalledCapabilityReceipt(report);
+  const reportBytes = serializeRuntimeDoctorReport(report);
+  const receiptBytes = serializeInstalledCapabilityReceipt(receipt);
+  const reportSha256 = sha256Hex(Buffer.from(reportBytes, "utf8"));
+  const receiptBytesSha256 = sha256Hex(Buffer.from(receiptBytes, "utf8"));
+  const reportPath = path.join(directory, `runtime-doctor-report-${reportSha256}.json`);
+  const receiptPath = path.join(
+    directory,
+    `installed-capability-receipt-${receiptBytesSha256}.json`,
+  );
+  const pointerPath = path.join(directory, pointerName);
+  await publishContentAddressedFile(reportPath, reportBytes);
+  await publishContentAddressedFile(receiptPath, receiptBytes);
+  const pointer = {
+    schema_version: "excel-inflow-host-preflight-pointer/1.1",
+    status: receipt.status === "HOST_READY" ? "HOST_READY" : "HOST_REFUSED",
+    report_file: path.basename(reportPath),
+    report_sha256: reportSha256,
+    receipt_file: path.basename(receiptPath),
+    receipt_sha256: receiptBytesSha256,
+    receipt_self_sha256: receipt.receipt_sha256,
+  };
+  if (beforePointer !== null) await beforePointer({ reportPath, receiptPath, pointerPath, pointer });
+  await publishPointerLast(pointerPath, pointer);
+  return { report, reportBytes, reportPath, receipt, receiptBytes, receiptPath, pointer, pointerPath };
 }
 
 function declarationFor(preconditionId) {
@@ -480,15 +578,10 @@ export function compileRuntimeDoctorReport({
     resumable_checkpoint_path: null,
     preserved_source_hashes: Object.freeze({ ...sourceHashes }),
     downstream_invalidation_scope: "no_work_started",
-    // Declared fidelity: the sealed registry has no host/environment code.
-    reason_code_fidelity: "closest_available",
+    reason_code_fidelity: "exact",
     requested_reason_code: RUNTIME_DOCTOR_REQUESTED_REASON_CODE,
     reason_code_fidelity_note:
-      "assets/terminal-reason-registry-v1.json declares no host/environment reason code. " +
-      `${RUNTIME_DOCTOR_REASON_CODE} is the closest declared match on category, ` +
-      "severity, recoverability, user_action and terminal state; only its owner_layer " +
-      `differs. The needed code is ${RUNTIME_DOCTOR_REQUESTED_REASON_CODE} ` +
-      "(owner_layer runtime_governance). The registry is sealed and was not edited.",
+      "The registered reason code exactly assigns this failure to runtime_governance.",
     terminal_state: RUNTIME_DOCTOR_TERMINAL_STATE,
     refusal_message:
       "This host cannot complete a run: " +
@@ -583,20 +676,26 @@ async function checkNodeInterpreter() {
       detail: { exec_path_absolute: false },
     });
   }
+  let executableSha256;
   try {
-    await fs.access(execPath, fsConstants.X_OK);
+    await fs.access(execPath, fsConstants.X_OK | fsConstants.R_OK);
+    executableSha256 = sha256Hex(await fs.readFile(execPath));
   } catch (error) {
     return typedCheck({
       precondition_id: "node_interpreter",
       result: "unsatisfied",
-      reason: `The Node interpreter is not executable by this process: ${error?.code ?? error?.message}.`,
+      reason: `The Node interpreter is not executable and readable by this process: ${error?.code ?? error?.message}.`,
       detail: { exec_path_absolute: true },
     });
   }
   return typedCheck({
     precondition_id: "node_interpreter",
     result: "satisfied",
-    detail: { exec_path_absolute: true, resolved_executable: execPath },
+    detail: {
+      exec_path_absolute: true,
+      resolved_executable: execPath,
+      executable_sha256: executableSha256,
+    },
   });
 }
 
@@ -695,17 +794,21 @@ export async function resolveDoctorPython({ env = process.env, explicit = null }
 const PYTHON_PROBE = [
   "import importlib, json, sys",
   "modules = {}",
+  "module_versions = {}",
   "for name in sys.argv[1:]:",
   "    try:",
-  "        importlib.import_module(name)",
+  "        imported = importlib.import_module(name)",
   "        modules[name] = True",
+  "        module_versions[name] = str(getattr(imported, '__version__', getattr(imported, 'VersionBind', 'unknown')))",
   "    except Exception:",
   "        modules[name] = False",
+  "        module_versions[name] = None",
   "print(json.dumps({",
   "    'executable': sys.executable,",
   "    'version': list(sys.version_info[:3]),",
   "    'prefix_is_venv': sys.prefix != getattr(sys, 'base_prefix', sys.prefix),",
   "    'modules': modules,",
+  "    'module_versions': module_versions,",
   "}, sort_keys=True))",
 ].join("\n");
 
@@ -719,6 +822,426 @@ async function probePython(resolved, moduleNames, { timeout = 60_000 } = {}) {
     return { ok: true, value: JSON.parse(line) };
   } catch {
     return { ok: false, error: "the interpreter did not print a parsable probe result" };
+  }
+}
+
+export function compileInstalledCapabilityReceipt(report) {
+  const pythonCustody = report.checks.find(
+    (entry) => entry.precondition_id === "python_interpreter_custody",
+  );
+  const pythonVersion = report.checks.find(
+    (entry) => entry.precondition_id === "python_minimum_version",
+  );
+  const pythonClosure = report.checks.find(
+    (entry) => entry.precondition_id === "python_single_interpreter_lane_closure",
+  );
+  const filingsProbe = report.checks.find(
+    (entry) => entry.precondition_id === "filings_extraction_probe",
+  );
+  const sourceIdentity = report.checks.find(
+    (entry) => entry.precondition_id === "active_source_identity",
+  );
+  const coversActivationLanes = ["evidence", "workbook"].every(
+    (lane) => report.requested_lanes.includes(lane),
+  );
+  const attestedActivePackage =
+    sourceIdentity?.detail?.closure_check_status === "match" &&
+    sourceIdentity?.detail?.source_worktree_dirty === false &&
+    ["installed_candidate", "production_promoted"].includes(
+      sourceIdentity?.detail?.deployment_status,
+    ) &&
+    typeof sourceIdentity?.detail?.installation_identity === "string" &&
+    sourceIdentity.detail.installation_identity.trim() !== "" &&
+    typeof sourceIdentity?.detail?.declared_runtime_code_closure_sha256 === "string" &&
+    typeof sourceIdentity?.detail?.complete_package_inventory_sha256 === "string" &&
+    typeof sourceIdentity?.detail?.archive_sha256 === "string" &&
+    typeof sourceIdentity?.detail?.release_package_attestation_sha256 === "string";
+  const hostCapabilityReady =
+    report.verdict === "HOST_READY" && coversActivationLanes &&
+    filingsProbe?.result === "satisfied";
+  const candidateSlotReady = hostCapabilityReady && attestedActivePackage;
+  const body = {
+    schema_version: INSTALLED_CAPABILITY_RECEIPT_SCHEMA_VERSION,
+    status: hostCapabilityReady ? "HOST_READY" : "REFUSED",
+    readiness_scope: "inactive_candidate_slot_only",
+    candidate_slot_ready: candidateSlotReady,
+    candidate_slot_refusal_reason: candidateSlotReady
+      ? null
+      : !hostCapabilityReady
+        ? "The full evidence+workbook host capability did not close."
+        : sourceIdentity?.detail?.source_worktree_dirty === true
+          ? "Host capability may be exercised, but activation requires a clean source snapshot; this package was compiled from a dirty worktree whose HEAD commit/tree do not identify all packaged bytes."
+          : !["installed_candidate", "production_promoted"].includes(
+              sourceIdentity?.detail?.deployment_status,
+            ) || typeof sourceIdentity?.detail?.installation_identity !== "string"
+            ? "Host capability may be exercised, but candidate-slot readiness requires a verified installed-candidate identity in an inactive slot."
+          : "Host capability may be exercised, but candidate-slot readiness requires a verified external package attestation binding the declared closure, complete inventory and deterministic archive.",
+    production_promotion_eligible: false,
+    production_promotion_refusal_reason:
+      "This receipt proves only inactive candidate-slot host readiness. Production promotion additionally requires candidate-bound fresh-session, IFRS, US-GAAP, broker-state, active-pointer read-back and post-activation receipts.",
+    generated_at: report.generated_at,
+    requested_lanes: report.requested_lanes,
+    host: report.host,
+    source_identity: {
+      repository: sourceIdentity?.detail?.repository ?? null,
+      source_commit: sourceIdentity?.detail?.source_commit ?? null,
+      source_tree: sourceIdentity?.detail?.source_tree ?? null,
+      source_worktree_dirty: sourceIdentity?.detail?.source_worktree_dirty ?? null,
+      skill_version: sourceIdentity?.detail?.skill_version ?? null,
+      package_mode: sourceIdentity?.detail?.package_mode ?? null,
+      deployment_status: sourceIdentity?.detail?.deployment_status ?? null,
+      closure_check_status: sourceIdentity?.detail?.closure_check_status ?? null,
+      active_runtime_code_closure_sha256:
+        sourceIdentity?.detail?.active_runtime_code_closure_sha256 ?? null,
+      declared_runtime_code_closure_sha256:
+        sourceIdentity?.detail?.declared_runtime_code_closure_sha256 ?? null,
+      complete_package_inventory_sha256:
+        sourceIdentity?.detail?.complete_package_inventory_sha256 ?? null,
+      archive_sha256: sourceIdentity?.detail?.archive_sha256 ?? null,
+      release_package_attestation_sha256:
+        sourceIdentity?.detail?.release_package_attestation_sha256 ?? null,
+      installation_identity: sourceIdentity?.detail?.installation_identity ?? null,
+    },
+    node: {
+      executable: report.checks.find((entry) => entry.precondition_id === "node_interpreter")
+        ?.detail?.resolved_executable ?? null,
+      executable_sha256: report.checks.find((entry) => entry.precondition_id === "node_interpreter")
+        ?.detail?.executable_sha256 ?? null,
+      version: report.host.node_version,
+    },
+    python: {
+      executable: pythonCustody?.detail?.resolved_executable ?? null,
+      executable_sha256: pythonCustody?.detail?.executable_sha256 ?? null,
+      version: pythonVersion?.detail?.running_version ?? null,
+      required_modules: pythonClosure?.detail?.required ?? [],
+      per_module: pythonClosure?.detail?.per_module ?? {},
+      module_versions: pythonClosure?.detail?.module_versions ?? {},
+    },
+    workbook: {
+      soffice_executable: report.checks.find(
+        (entry) => entry.precondition_id === "soffice_available",
+      )?.detail?.resolved_executable ?? null,
+      soffice_executable_sha256: report.checks.find(
+        (entry) => entry.precondition_id === "soffice_available",
+      )?.detail?.executable_sha256 ?? null,
+      soffice_version: report.checks.find(
+        (entry) => entry.precondition_id === "soffice_available",
+      )?.detail?.version ?? null,
+    },
+    process_spawn: pythonClosure?.result === "satisfied" ? "PASS" : "FAIL",
+    mandatory_filings_probe: filingsProbe?.result === "satisfied" ? filingsProbe.detail : null,
+    filesystem: {
+      work_root: report.checks.find((entry) => entry.precondition_id === "work_root_writable")
+        ?.result ?? "unknown",
+      temp_root: report.checks.find((entry) => entry.precondition_id === "temp_root_writable")
+        ?.result ?? "unknown",
+    },
+    runtime_doctor_sha256: sha256Hex(Buffer.from(serializeRuntimeDoctorReport(report), "utf8")),
+  };
+  const receipt = {
+    ...body,
+    receipt_sha256: "",
+  };
+  receipt.receipt_sha256 = installedCapabilityReceiptDigest(receipt);
+  return Object.freeze(receipt);
+}
+
+async function checkFilingsExtractionProbe({
+  resolvedPython,
+  skillRoot,
+  tempRoot,
+  timeout,
+}) {
+  const precondition_id = "filings_extraction_probe";
+  if (!resolvedPython) {
+    return typedCheck({
+      precondition_id,
+      result: "unknown",
+      reason: "No resolved Python interpreter exists, so the mandatory filings route could not be executed.",
+      detail: null,
+    });
+  }
+  const fixturePath = path.join(
+    skillRoot,
+    "assets",
+    "installed-filings-capability-probe-v1.json",
+  );
+  const responseSchemaPath = path.join(
+    skillRoot,
+    "assets",
+    "filings-extraction-response-v1.schema.json",
+  );
+  const extractorPath = path.join(skillRoot, "scripts", "extract_filing_statements.py");
+  const filingsControllerPath = path.join(skillRoot, "scripts", "run_filings_pipeline.mjs");
+  let probeRoot = null;
+  const started = Date.now();
+  try {
+    const fixtureBytes = await fs.readFile(fixturePath);
+    const fixture = JSON.parse(fixtureBytes.toString("utf8"));
+    const pdfBytes = Buffer.from(String(fixture.pdf_base64 ?? ""), "base64");
+    const pdfSha256 = sha256Hex(pdfBytes);
+    if (fixture.schema_version !== "installed-filings-capability-probe/1.0") {
+      throw new Error("the installed filings fixture has the wrong schema_version");
+    }
+    if (pdfSha256 !== fixture.pdf_sha256) {
+      throw new Error(
+        `the installed filings fixture bytes drifted (${pdfSha256} != ${fixture.pdf_sha256})`,
+      );
+    }
+    const [responseSchema, extractorBytes, filingsControllerBytes] = await Promise.all([
+      readJsonIfPresent(responseSchemaPath),
+      fs.readFile(extractorPath),
+      fs.readFile(filingsControllerPath),
+    ]);
+    if (!responseSchema) throw new Error("the filings extraction response schema is absent");
+    probeRoot = await fs.mkdtemp(path.join(tempRoot, "excel-inflow-filings-capability-"));
+    const pdfPath = path.join(probeRoot, "probe-annual-report.pdf");
+    const requestPath = path.join(probeRoot, "filings-request.json");
+    const outputRoot = path.join(probeRoot, "output");
+    await fs.writeFile(pdfPath, pdfBytes);
+    const request = {
+      schema_version: "filings-extraction-request/1.0",
+      run_id: "installed_filings_capability_probe",
+      documents: [{
+        document_id: "probe-annual",
+        attachment_id: "probe-annual",
+        source_id: "probe_annual",
+        path: pdfPath,
+        media_type: "application/pdf",
+        expected_sha256: pdfSha256,
+      }],
+      filing_facts: {
+        entity_name: "Installed Capability Probe plc",
+        reporting_currency: "GBP",
+        units: "millions",
+        fiscal_calendar_kind: "fixed_date",
+        historical_periods: fixture.expected.periods,
+        forecast_periods: ["2026-12-31", "2027-12-31", "2028-12-31"],
+        reported_gross_debt: 1,
+        reported_cash: 1,
+      },
+    };
+    const requestBytes = Buffer.from(`${JSON.stringify(request, null, 2)}\n`, "utf8");
+    await fs.writeFile(requestPath, requestBytes);
+
+    const openProbeSource = [
+      "import fitz,json,sys",
+      "doc=fitz.open(sys.argv[1])",
+      "print(json.dumps({'page_count':doc.page_count,'text_chars':sum(len(p.get_text()) for p in doc)}))",
+      "doc.close()",
+    ].join("\n");
+    const opened = await runProcessTree(
+      resolvedPython,
+      ["-c", openProbeSource, pdfPath],
+      {
+        cwd: skillRoot,
+        timeout,
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      },
+    );
+    if (!opened.ok) {
+      throw new Error(
+        `PyMuPDF could not open the frozen PDF (${opened.stderr || opened.error_code || `exit ${opened.code}`})`,
+      );
+    }
+    const openedValue = JSON.parse(opened.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
+    if (
+      openedValue.page_count !== fixture.expected.page_count ||
+      !Number.isInteger(openedValue.text_chars) ||
+      openedValue.text_chars <= 0
+    ) {
+      throw new Error("PyMuPDF opened the fixture but did not expose the declared pages and text");
+    }
+
+    const extracted = await runProcessTree(
+      process.execPath,
+      [
+        filingsControllerPath,
+        requestPath,
+        "--out", outputRoot,
+        "--filing-extraction-timeout-ms", String(Math.min(timeout, 480_000)),
+      ],
+      {
+        cwd: skillRoot,
+        timeout,
+        maxBuffer: 16 * 1024 * 1024,
+        env: {
+          ...process.env,
+          EXCEL_INFLOW_NODE: process.execPath,
+          EXCEL_INFLOW_PYTHON: resolvedPython,
+          PYTHON: resolvedPython,
+          PYTHONDONTWRITEBYTECODE: "1",
+        },
+      },
+    );
+    if (!extracted.ok) {
+      throw new Error(
+        `the shipped filings controller failed (${extracted.stderr || extracted.error_code || `exit ${extracted.code}`})`,
+      );
+    }
+    const statePath = path.join(outputRoot, "filings-run-state.json");
+    const stateBytes = await fs.readFile(statePath);
+    const state = JSON.parse(stateBytes.toString("utf8"));
+    if (
+      state.schema_version !== "filings-run-state/1.0" ||
+      state.pipeline_status !== "PASS" || state.user_blocking !== false ||
+      state.blocker_class !== null || (state.tasks ?? []).length !== 0 ||
+      typeof state.runtime_closure_sha256 !== "string"
+    ) {
+      throw new Error(`the filings controller did not close PASS: ${JSON.stringify(state.summary ?? state)}`);
+    }
+    for (const [name, artifactPath] of Object.entries(state.artifacts ?? {})) {
+      const artifactBytes = await fs.readFile(artifactPath);
+      if (sha256Hex(artifactBytes) !== state.artifact_sha256?.[name]) {
+        throw new Error(`the filings controller state did not bind artifact ${name}`);
+      }
+    }
+    const receiptPath = state.artifacts?.native_extraction_receipt;
+    const bundlePath = state.artifacts?.filings_bundle;
+    if (!receiptPath || !bundlePath) {
+      throw new Error("the filings controller omitted its native receipt or evidence bundle");
+    }
+    const responsePath = path.join(path.dirname(receiptPath), "filings-extraction-response.json");
+    const [receiptBytes, responseBytes, bundleBytes] = await Promise.all([
+      fs.readFile(receiptPath),
+      fs.readFile(responsePath),
+      fs.readFile(bundlePath),
+    ]);
+    const receipt = JSON.parse(receiptBytes.toString("utf8"));
+    const response = JSON.parse(responseBytes.toString("utf8"));
+    const bundle = JSON.parse(bundleBytes.toString("utf8"));
+    if (
+      receipt.schema_version !== "filings-native-extraction-receipt/1.0" ||
+      receipt.status !== "PASS" || receipt.findings?.length !== 0 ||
+      receipt.request_sha256 !== sha256Hex(requestBytes) ||
+      receipt.response_sha256 !== sha256Hex(responseBytes) ||
+      receipt.document_count !== 1
+    ) {
+      throw new Error("the extractor receipt did not bind the request, response and one-document result");
+    }
+    const { bundle_sha256: declaredBundleSha256, ...bundleBody } = bundle;
+    if (
+      bundle.schema_version !== "filings-evidence-bundle/1.0" ||
+      bundle.run_id !== request.run_id ||
+      bundle.runtime_closure_sha256 !== state.runtime_closure_sha256 ||
+      declaredBundleSha256 !== sha256Hex(Buffer.from(canonicalJson(bundleBody), "utf8"))
+    ) {
+      throw new Error("the filings evidence bundle did not bind the controller runtime and payload");
+    }
+    const schemaErrors = validateJsonSchema(response, responseSchema);
+    if (schemaErrors.length > 0) {
+      throw new Error(`the extraction response violated its shipped schema: ${schemaErrors.join("; ")}`);
+    }
+    const manifests = response.documents?.[0]?.face_statement_manifests ?? {};
+    if (response.documents?.[0]?.raw_sha256 !== pdfSha256) {
+      throw new Error("the extraction response did not bind the frozen PDF bytes");
+    }
+    const observed = {};
+    for (const section of ["income_statement", "cash_flow"]) {
+      const sectionManifests = manifests[section] ?? [];
+      if (sectionManifests.length !== 1) {
+        throw new Error(`${section} did not produce exactly one selected face-statement manifest`);
+      }
+      const manifest = sectionManifests[0];
+      if (
+        JSON.stringify(manifest.periods) !== JSON.stringify(fixture.expected.periods) ||
+        manifest.units !== fixture.expected.units ||
+        manifest.reporting_currency !== "GBP"
+      ) {
+        throw new Error(`${section} periods, units or reporting currency were not preserved`);
+      }
+      const rows = manifest.rows ?? [];
+      const expectation = fixture.expected[section];
+      if (rows.length < expectation.minimum_row_count) {
+        throw new Error(`${section} retained ${rows.length} rows; expected at least ${expectation.minimum_row_count}`);
+      }
+      observed[section] = {
+        row_count: rows.length,
+        periods: manifest.periods,
+        units: manifest.units,
+        reporting_currency: manifest.reporting_currency,
+        required_rows: {},
+      };
+      for (const [label, expectedRow] of Object.entries(expectation.required_rows)) {
+        const row = rows.find((candidate) => candidate.raw_label === label);
+        if (!row) throw new Error(`${section} omitted required row ${label}`);
+        if (JSON.stringify(row.values) !== JSON.stringify(expectedRow.values)) {
+          throw new Error(`${section}.${label} values were not preserved`);
+        }
+        if (JSON.stringify(row.value_states) !== JSON.stringify(expectedRow.value_states)) {
+          throw new Error(`${section}.${label} zero/dash/blank states were not preserved`);
+        }
+        if (
+          !Array.isArray(row.cells) || row.cells.length !== fixture.expected.periods.length ||
+          row.cells.some((cell, index) =>
+            cell.period !== fixture.expected.periods[index] ||
+            cell.units !== fixture.expected.units ||
+            cell.currency !== "GBP" ||
+            cell.typed_state !== expectedRow.value_states[index] ||
+            cell.normalized_value !== expectedRow.values[index] ||
+            !Number.isInteger(cell.source_page) || cell.source_page < 1 ||
+            cell.source_coordinates?.coordinate_system !== "pdf_points_top_left"
+          )
+        ) {
+          throw new Error(`${section}.${label} cell-local period/unit/state/provenance was not preserved`);
+        }
+        observed[section].required_rows[label] = {
+          values: row.values,
+          value_states: row.value_states,
+          cells: row.cells.map((cell) => ({
+            period: cell.period,
+            units: cell.units,
+            currency: cell.currency,
+            typed_state: cell.typed_state,
+            normalized_value: cell.normalized_value,
+            source_page: cell.source_page,
+            source_coordinates: cell.source_coordinates,
+          })),
+        };
+      }
+    }
+    const detail = {
+      resolved_executable: resolvedPython,
+      duration_ms: Date.now() - started,
+      fixture_sha256: sha256Hex(fixtureBytes),
+      pdf_sha256: pdfSha256,
+      extractor_sha256: sha256Hex(extractorBytes),
+      filings_controller_sha256: sha256Hex(filingsControllerBytes),
+      request_sha256: sha256Hex(requestBytes),
+      response_schema_sha256: sha256Hex(await fs.readFile(responseSchemaPath)),
+      response_sha256: sha256Hex(responseBytes),
+      extractor_receipt_sha256: sha256Hex(receiptBytes),
+      filings_state_sha256: sha256Hex(stateBytes),
+      filings_bundle_sha256: sha256Hex(bundleBytes),
+      runtime_closure_sha256: state.runtime_closure_sha256,
+      semantic_projection_sha256: sha256Hex(Buffer.from(canonicalJson(observed), "utf8")),
+      page_count: openedValue.page_count,
+      text_chars: openedValue.text_chars,
+      periods: fixture.expected.periods,
+      units: fixture.expected.units,
+      observed,
+      scratch_removed: false,
+    };
+    await fs.rm(probeRoot, { recursive: true, force: false });
+    probeRoot = null;
+    detail.scratch_removed = true;
+    return typedCheck({
+      precondition_id,
+      result: "satisfied",
+      detail,
+    });
+  } catch (error) {
+    return typedCheck({
+      precondition_id,
+      result: "unsatisfied",
+      reason: `The installed mandatory filings capability did not close: ${error?.message ?? String(error)}.`,
+      detail: {
+        resolved_executable: resolvedPython,
+        duration_ms: Date.now() - started,
+      },
+    });
+  } finally {
+    if (probeRoot) await fs.rm(probeRoot, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -745,6 +1268,34 @@ function modulesForLanes(declared, requestedLanes, requiredAt) {
   });
 }
 
+async function resolveBinaryExecutable(candidate, env) {
+  const selected = String(candidate ?? "");
+  const extensions = process.platform === "win32"
+    ? (env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";")
+    : [""];
+  const candidates = [];
+  if (path.isAbsolute(selected) || selected.includes(path.sep)) {
+    const base = path.resolve(selected);
+    candidates.push(base, ...extensions.filter(Boolean).map((extension) => `${base}${extension}`));
+  } else {
+    for (const directory of String(env.PATH ?? "").split(path.delimiter).filter(Boolean)) {
+      const base = path.join(directory, selected);
+      candidates.push(base, ...extensions.filter(Boolean).map((extension) => `${base}${extension}`));
+    }
+  }
+  for (const possible of candidates) {
+    try {
+      await fs.access(possible, fsConstants.X_OK | fsConstants.R_OK);
+      const stat = await fs.stat(possible);
+      if (!stat.isFile()) continue;
+      return await fs.realpath(possible);
+    } catch {
+      // Continue through the bounded declared/PATH candidate set.
+    }
+  }
+  throw new Error(`Executable ${JSON.stringify(selected)} did not resolve to a readable regular file.`);
+}
+
 async function checkSoffice({ profile, explicit, env, timeout }) {
   const declaredNames = (profile?.python_runtime?.external_binaries ?? [])
     .filter((entry) => entry?.name)
@@ -758,7 +1309,14 @@ async function checkSoffice({ profile, explicit, env, timeout }) {
   ].filter(Boolean);
   const attempts = [];
   for (const candidate of candidates) {
-    const probe = await runProcessTree(candidate, ["--version"], { timeout, env });
+    let resolved;
+    try {
+      resolved = await resolveBinaryExecutable(candidate, env);
+    } catch (error) {
+      attempts.push({ candidate, error: error.message });
+      continue;
+    }
+    const probe = await runProcessTree(resolved, ["--version"], { timeout, env });
     if (probe.ok) {
       const version = (probe.stdout.trim() || probe.stderr.trim()).split(/\r?\n/)[0] ?? "";
       return typedCheck({
@@ -769,6 +1327,8 @@ async function checkSoffice({ profile, explicit, env, timeout }) {
           candidate_source: candidate === explicit
             ? "argument"
             : candidate === env.SOFFICE_BIN ? "SOFFICE_BIN" : "PATH_resolved_declared_name",
+          resolved_executable: resolved,
+          executable_sha256: sha256Hex(await fs.readFile(resolved)),
           version,
           attempts,
         },
@@ -948,6 +1508,8 @@ async function checkTempRootWritable(tempRoot) {
         detail: { temp_root: tempRoot },
       });
     }
+    await fs.rm(probeDir, { recursive: true, force: false });
+    probeDir = null;
     return typedCheck({
       precondition_id: "temp_root_writable",
       result: "satisfied",
@@ -1025,8 +1587,21 @@ async function checkActiveSourceIdentity(skillRoot) {
           result: "satisfied",
           detail: {
             closure_check_status: check.status,
+            repository: identity.repository ?? null,
+            source_commit: identity.source_commit ?? null,
+            source_tree: identity.source_tree ?? null,
+            source_worktree_dirty: identity.source_worktree_dirty ?? null,
+            skill_version: identity.skill_version ?? null,
             package_mode: identity.package_mode ?? null,
             deployment_status: identity.deployment_status ?? null,
+            active_runtime_code_closure_sha256: check.active_runtime_code_closure_sha256,
+            declared_runtime_code_closure_sha256: check.declared_runtime_code_closure_sha256,
+            complete_package_inventory_sha256:
+              identity.product_identity?.package?.complete_package_inventory?.sha256 ?? null,
+            archive_sha256: identity.product_identity?.package?.archive?.sha256 ?? null,
+            release_package_attestation_sha256:
+              identity.release_package_attestation_sha256 ?? null,
+            installation_identity: identity.installation_identity ?? null,
           },
         }),
         sourceHashes: {
@@ -1046,7 +1621,20 @@ async function checkActiveSourceIdentity(skillRoot) {
           detail: {
             closure_check_status: check.status,
             note: "no declared package identity is pinned, so the live closure is the identity",
+            repository: identity.repository ?? null,
+            source_commit: identity.source_commit ?? null,
+            source_tree: identity.source_tree ?? null,
+            source_worktree_dirty: identity.source_worktree_dirty ?? null,
+            skill_version: identity.skill_version ?? null,
+            package_mode: identity.package_mode ?? null,
+            deployment_status: identity.deployment_status ?? null,
             active_runtime_code_closure_sha256: check.active_runtime_code_closure_sha256,
+            complete_package_inventory_sha256:
+              identity.product_identity?.package?.complete_package_inventory?.sha256 ?? null,
+            archive_sha256: identity.product_identity?.package?.archive?.sha256 ?? null,
+            release_package_attestation_sha256:
+              identity.release_package_attestation_sha256 ?? null,
+            installation_identity: identity.installation_identity ?? null,
           },
         }),
         sourceHashes: {
@@ -1084,8 +1672,9 @@ async function checkActiveSourceIdentity(skillRoot) {
 /**
  * Run every declared precondition check and compile the typed report.
  *
- * Nothing here is expensive: version prints, module imports, hash reads, one
- * stat and one self-cleaning temp probe.
+ * Nothing here performs issuer work: version prints, module imports, hash
+ * reads, one stat, one self-cleaning temp probe and the frozen two-page filing
+ * extraction capability probe.
  */
 export async function runRuntimeDoctor({
   skillRoot = DEFAULT_SKILL_ROOT,
@@ -1111,18 +1700,80 @@ export async function runRuntimeDoctor({
   checks.push(checkNodeMinimumVersion(profile));
   checks.push(await checkVendoredNodeDependencies(profile, skillRoot));
 
+  // Prove the complete active package closure before executing any shipped
+  // child entry point. A drifted extractor must never run and only then be
+  // rejected by a late identity check.
+  const identity = await checkActiveSourceIdentity(skillRoot);
+  checks.push(identity.check);
+  if (identity.check.result !== "satisfied") {
+    const integrityReason =
+      "The active package identity did not close, so no shipped Python entry point was executed.";
+    for (const id of [
+      "python_interpreter_custody",
+      "python_minimum_version",
+      "python_import_time_module_closure",
+      "python_single_interpreter_lane_closure",
+      "python_optional_module_closure",
+    ]) {
+      checks.push(typedCheck({
+        precondition_id: id,
+        result: "unknown",
+        reason: integrityReason,
+        detail: { subordinate_execution_attempted: false },
+      }));
+    }
+    checks.push(typedCheck({
+      precondition_id: "filings_extraction_probe",
+      result: "unknown",
+      reason: integrityReason,
+      detail: { subordinate_execution_attempted: false },
+    }));
+    for (const id of ["soffice_available", "workbook_font_metrics"]) {
+      checks.push(typedCheck({
+        precondition_id: id,
+        result: requestedLanes.includes("workbook") ? "unknown" : "not_applicable",
+        reason: requestedLanes.includes("workbook")
+          ? integrityReason
+          : "The workbook lane was not requested.",
+        detail: { subordinate_execution_attempted: false },
+      }));
+    }
+    checks.push(await checkWorkRootWritable(runRoot));
+    checks.push(await checkTempRootWritable(effectiveTempRoot));
+    checks.push(await checkTempFreeSpace(effectiveTempRoot, floorBytes));
+    for (const [id, declaration] of Object.entries(PRECONDITION_DECLARATIONS)) {
+      if (declaration.obligation !== "excluded_installed_host") continue;
+      checks.push(typedCheck({
+        precondition_id: id,
+        result: "excluded_installed_host",
+        reason: declaration.exclusion_reason,
+        detail: { attempted: false, portable_gate_may_report_as_passed: false },
+      }));
+    }
+    return compileRuntimeDoctorReport({
+      checks,
+      host: await hostFingerprint(),
+      lanes: requestedLanes,
+      skillRoot,
+      runRoot: runRoot === null ? null : path.resolve(runRoot),
+      sourceHashes: identity.sourceHashes,
+    });
+  }
+
   // --- Python custody: resolve ONCE, then answer every python question from
   // that one resolved executable. -----------------------------------------
   let resolvedPython = null;
   try {
     const custody = await resolveDoctorPython({ env, explicit: python });
     resolvedPython = custody.resolved;
+    const executableSha256 = sha256Hex(await fs.readFile(custody.resolved));
     checks.push(typedCheck({
       precondition_id: "python_interpreter_custody",
       result: "satisfied",
       detail: {
         selected: custody.selected,
         resolved_executable: custody.resolved,
+        executable_sha256: executableSha256,
         resolved_absolute: true,
         custody_note:
           "resolved through selectedIngressPythonExecutable + resolvePythonExecutable, " +
@@ -1247,6 +1898,9 @@ export async function runRuntimeDoctor({
         per_module: Object.fromEntries(
           laneClosure.map((entry) => [entry.module, probe.value.modules[entry.module] === true]),
         ),
+        module_versions: Object.fromEntries(
+          laneClosure.map((entry) => [entry.module, probe.value.module_versions?.[entry.module] ?? null]),
+        ),
       },
     }));
 
@@ -1263,6 +1917,22 @@ export async function runRuntimeDoctor({
         declared: optional.map((entry) => entry.module),
         missing: optionalMissing.map((entry) => entry.module),
       },
+    }));
+  }
+
+  if (requestedLanes.includes("evidence")) {
+    checks.push(await checkFilingsExtractionProbe({
+      resolvedPython,
+      skillRoot,
+      tempRoot: effectiveTempRoot,
+      timeout: Math.min(probeTimeoutMs, 60_000),
+    }));
+  } else {
+    checks.push(typedCheck({
+      precondition_id: "filings_extraction_probe",
+      result: "not_applicable",
+      reason: "The evidence lane was not requested, so the filing extractor is not needed.",
+      detail: { requested_lanes: requestedLanes },
     }));
   }
 
@@ -1308,10 +1978,6 @@ export async function runRuntimeDoctor({
   checks.push(await checkTempRootWritable(effectiveTempRoot));
   checks.push(await checkTempFreeSpace(effectiveTempRoot, floorBytes));
 
-  // --- Active source identity -------------------------------------------
-  const identity = await checkActiveSourceIdentity(skillRoot);
-  checks.push(identity.check);
-
   // --- Declared installed-host exclusions --------------------------------
   for (const [id, declaration] of Object.entries(PRECONDITION_DECLARATIONS)) {
     if (declaration.obligation !== "excluded_installed_host") continue;
@@ -1348,4 +2014,5 @@ export default {
   RuntimeDoctorRefusal,
   resolveDoctorPython,
   runRuntimeDoctor,
+  compileInstalledCapabilityReceipt,
 };

@@ -837,6 +837,58 @@ def main() -> int:
     check(attachment_terminal["aggregate_terminal_defect_count"] == 1, "attachment emitted more than one terminal defect")
     checks += 3
 
+    empty_lane_aggregate, _ = attachment.task_frontier(
+        {
+            "filings": {
+                "pipeline_status": "BLOCKED_INTERNAL",
+                "blocker_class": "INTERNAL_WORK",
+                "user_blocking": False,
+                "tasks": [],
+                "summary": {
+                    "terminal_reason": "filings_controller_exception",
+                    "message": "fault-injected post-extraction semantic failure",
+                },
+            },
+        },
+        status="BLOCKED_INTERNAL",
+        transaction_hash="0" * 64,
+    )
+    check(
+        empty_lane_aggregate[0]["progress_measure"]["underlying_defect_count"] == 1
+        and empty_lane_aggregate[0]["underlying_lane_defects"][0]["lane"] == "filings"
+        and empty_lane_aggregate[0]["underlying_lane_defects"][0]["terminal_reasons"]
+        == ["filings_controller_exception"],
+        "a controller exception with no lane task produced an empty terminal aggregate",
+    )
+    checks += 1
+
+    controller_aggregate, _ = attachment.task_frontier(
+        {
+            "filings": {
+                "pipeline_status": "PASS",
+                "blocker_class": None,
+                "user_blocking": False,
+                "tasks": [],
+            },
+        },
+        status="BLOCKED_INTERNAL",
+        transaction_hash="1" * 64,
+        controller_summary={
+            "terminal_reason": "structural_ownership_preflight_blocked",
+            "message": "fault-injected stale receipt",
+            "controller_signal": {"resume_from": "structural_ownership"},
+        },
+    )
+    check(
+        controller_aggregate[0]["progress_measure"]["underlying_defect_count"] == 1
+        and controller_aggregate[0]["underlying_lane_defects"][0]["lane"]
+        == "structural_ownership"
+        and controller_aggregate[0]["underlying_lane_defects"][0]["terminal_reasons"]
+        == ["structural_ownership_preflight_blocked"],
+        "a controller-owned failure without a blocked subordinate lane was not typed",
+    )
+    checks += 1
+
     semantic_attempts = {
         "execution_response_sha256": [],
         "vision_response_sha256": [],

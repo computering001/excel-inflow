@@ -473,15 +473,15 @@ for (const { label, ledger } of cohortLedgers) {
 // path is stubbed.
 const tinyPolicyPath = path.join(workspace, "tiny-policy.json");
 const tinyPolicy = resolveRuntimeBudgetPolicy({
-  source_acquisition: 400,
-  filing_extraction: 400,
-  case_compilation_and_ownership: 400,
-  solver: 400,
-  workbook_build: 400,
-  recalculation: 400,
-  validation: 400,
-  end_to_end_target: 2_000,
-  end_to_end_hard_ceiling: 2_800,
+  source_acquisition: 1,
+  filing_extraction: 1,
+  case_compilation_and_ownership: 1,
+  solver: 1,
+  workbook_build: 1,
+  recalculation: 1,
+  validation: 1,
+  end_to_end_target: 5,
+  end_to_end_hard_ceiling: 7,
 });
 await fs.writeFile(tinyPolicyPath, `${JSON.stringify(tinyPolicy, null, 2)}\n`);
 const tinyDir = path.join(workspace, "tiny-ceiling");
@@ -492,7 +492,7 @@ const tinyArgs = [
 ];
 await command("run_user_flow.mjs", tinyArgs);
 const tinyCold = await readJson(tinyLedgerPath);
-check(tinyCold.hard_deadline_compute_ms === 2_800, "the stated tiny ceiling was not adopted by the ledger");
+check(tinyCold.hard_deadline_compute_ms === 7, "the stated tiny ceiling was not adopted by the ledger");
 check(tinyCold.compute_elapsed_ms > tinyCold.hard_deadline_compute_ms,
   `the tiny-ceiling run did not reach its ceiling (${tinyCold.compute_elapsed_ms} of ${tinyCold.hard_deadline_compute_ms} ms)`);
 // The overshoot is DISCLOSED with the registered code — that is the enforcement

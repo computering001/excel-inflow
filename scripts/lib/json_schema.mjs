@@ -192,6 +192,8 @@ function validateNode(value, schema, rootSchema, path, errors) {
     validateNode(value, schema.if, rootSchema, path, conditionErrors);
     if (conditionErrors.length === 0 && schema.then) {
       validateNode(value, schema.then, rootSchema, path, errors);
+    } else if (conditionErrors.length > 0 && schema.else) {
+      validateNode(value, schema.else, rootSchema, path, errors);
     }
   }
 }

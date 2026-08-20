@@ -484,6 +484,15 @@
       "concern": "run-scoped broker concept elections",
       "target_owner": "Authority selector (Phase 3)"
     },
+    "lib/runtime_doctor.mjs": {
+      "count": 4,
+      "families": {
+        "release_identity": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "installed-host capability report, receipt and pointer state",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
     "lib/semantic_graph.mjs": {
       "count": 3,
       "families": {
