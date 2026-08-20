@@ -45,3 +45,21 @@ agent transcripts are session artifacts; file:line anchors verified at head.
 
 ## Sequencing (from the P3/P4 agent, code-implied)
 P3.6 identity → unblocks P3.1/P3.2/P4.6 · P4.5 AST → P4.4 modules → P4.7 graph-driven solving → P4.8 real solver oracle · P3.5 is the cheapest high-value close (four writers → one module).
+
+## P5.6 — DEFERRED, not attempted (owner decision, 2026-08-20)
+The pack titles P5.6 "Redesign charts around semantic decision questions" and lists charts as
+part of the physical projection. That premise does not hold in this codebase: discovery found
+charts DO NOT EXIST and drawings are actively forbidden by the `no-unintended-drawings`
+invariant. So P5.6 is not "improve the charts" — it is build a charting feature from scratch,
+which requires amending a guarantee that currently holds, and its certification half is
+native-gated and therefore permanently excluded.
+
+Declined on the owner's challenge: this is an Excel MODEL BUILDER, and charts are presentation
+rather than model correctness. Weakening a live guarantee (no undeclared drawings) to add a
+presentation feature is a poor trade in a programme whose purpose is behavioural closure.
+
+If charts are wanted later, the work is well-scoped and the prerequisites now exist: P5.4's
+reconstruction oracle already reads drawing anchors and media digests, and P5.8's
+rendered-geometry scope gives pixel-baseline visual detection. The invariant would become
+"no UNDECLARED drawing" with a plan-declared chart contract binding series to plan row
+identities (not A1 literals — see P3.6a on why address and label bindings drift).
