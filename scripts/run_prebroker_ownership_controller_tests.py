@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -47,30 +48,36 @@ def run_checked(command: list[str], *, timeout: int = 120) -> subprocess.Complet
 def portable_runtime() -> tuple[str, str]:
     dependency_root = Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies"
     python_candidates = [
+        os.environ.get("EXCEL_INFLOW_TEST_PYTHON", ""),
+        os.environ.get("DEBT_OVERLAY_PYTHON", ""),
         str(dependency_root / "python" / "bin" / "python3"),
         sys.executable,
         shutil.which("python3") or "",
     ]
-    def imports_openpyxl(candidate: str) -> bool:
+    def imports_stage4_dependencies(candidate: str) -> bool:
         if not candidate:
             return False
         try:
             return subprocess.run(
-                [candidate, "-c", "import openpyxl"],
+                [candidate, "-c", "import fitz, openpyxl"],
                 capture_output=True,
                 check=False,
             ).returncode == 0
         except OSError:
             return False
 
-    python = next((candidate for candidate in python_candidates if imports_openpyxl(candidate)), None)
+    python = next(
+        (candidate for candidate in python_candidates if imports_stage4_dependencies(candidate)),
+        None,
+    )
     soffice_candidates = [
+        os.environ.get("SOFFICE_BIN", ""),
         shutil.which("soffice") or "",
         str(dependency_root / "bin" / "override" / "soffice"),
         "/Applications/LibreOffice.app/Contents/MacOS/soffice",
     ]
     soffice = next((candidate for candidate in soffice_candidates if candidate and Path(candidate).exists()), None)
-    require(bool(python), "Portable openpyxl runtime is unavailable")
+    require(bool(python), "Portable Stage 4 Python dependencies are unavailable")
     require(bool(soffice), "Portable LibreOffice runtime is unavailable")
     return str(python), str(soffice)
 
