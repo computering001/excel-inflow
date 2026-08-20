@@ -1,4 +1,8 @@
-# Excel Inflow v3.7.5 development — known limitations
+# Excel Inflow v3.7.6 development — known limitations
+
+(Version tracks assets/runtime-manifest.json. The 3.7.7 flip is P8.8 and touches four
+independent tripwires plus this file; the blocker corpus records the 3.7.5->3.7.6 flip going
+red at exact head for missing one of them.)
 
 - This is a development candidate. Its package identity is `development / not_installed`; it is not production-certified or production-promoted.
 - Citrix/Rogo installation and activation have not been performed for these bytes.
@@ -11,3 +15,55 @@
 - Existing v3.7.2, v3.7.3 and v3.7.4 tags, assets and package bytes are immutable and have not been overwritten. v3.7.5 replaces v3.7.4 only as the next development candidate after closing portable ownership and custody gaps.
 - The Rogo installer must verify the actual retained rollback route and identities at installation time. No installed rollback hash is inferred from local package evidence.
 - The broad architecture-shortening programme is intentionally deferred to v3.8 after the installed/native behaviour baseline is frozen; v3.7.5 changes only the bounded remediation surfaces.
+
+
+## Declared limitations carried INTO the v3.7.7 freeze (owner decision, 2026-08-20)
+
+These are limits on what the product can REPRESENT, not incorrect behaviour, and they are
+declared rather than blocking. Each is reproducible and recorded with anchors in
+`programme/gap-reports/DEFECT_REGISTER.md`; the freeze pins them as known, so Phase 9's
+refactor must preserve behaviour WITHOUT being obliged to preserve these gaps as correct.
+
+### Contract vocabulary the case cannot express (D15-D19)
+- No NOL / tax-loss-stock vocabulary: after forecast loss years, the recovery year is taxed in
+  full rather than sheltered.
+- No IAS 23 capitalised-borrowing-cost field: the whole coupon is expensed and capex is
+  understated. The only capitalisation vocabulary is `pik_rate`, which capitalises into
+  principal inside interest expense — a different thing.
+- No period-length, stub-period or changed-year-end vocabulary: both shapes surface only as a
+  per-period fiscal-year mismatch, mapped to no terminal reason code.
+- A genuine reported ZERO tax rate is classified as a tax credit, so a tax holiday is
+  indistinguishable from a credit in the tax ledger.
+- Cross-contract spelling split: the case says `52_53_week`, the envelope says `week_52_53`.
+
+### Support-envelope claims the contract cannot satisfy (D4, D7)
+- The taxonomy declares no direct-method operating roles, yet the envelope classifies
+  `cash_flow_method: direct` as EXPERIMENTAL. Every direct-method operating line is unmapped.
+- `historical_periods = three_or_more` is CERTIFIED but the case contract admits exactly three.
+- A functional currency distinct from the presentation currency is unrepresentable.
+- A per-statement unit scale is unrepresentable (`issuer.units` is one scalar), so a filing
+  printing thousands in one statement and millions in another has no lawful representation.
+
+### Graph and convergence gaps (D29/MG-2, D31/MG-4, D32/MG-5)
+- No debt or lease BALANCE node, so six balance-to-interest edges are undeclared.
+- A `row_type: "header"` row carrying no values is minted into statement values as numeric 0.
+- The opening-debt bridge residual is order-dependent at ~1e-13 relative against a 0.01
+  tolerance — latent, but the residual is not a function of the inputs alone.
+
+### Test-infrastructure defects (D21, D22, D24, D25)
+- The frozen 32-recipe cohort does not merely fail to run in CI, it FAILS: consensus
+  contributors are sealed unsorted against a validator that requires sorting, and C1 then fails
+  forecast ownership. Carried by an EXPIRING quarantine so the nightly fails loudly.
+- The mutation-adequacy compiler can register its own measuring suite as a survivor when that
+  suite is transiently red. Self-correcting on recompile; can manufacture a false survivor.
+- `compileBrokerPreview` throws on the CLEAN fixture and a catch installs the forecast-waterfall
+  fallback. Behaviour is lawful; the throw on clean input is not explained.
+
+### Measurement coverage that is honest rather than complete
+- Mutation adequacy: score 1.0 over what is measured, but measurement coverage is 0.338 — only
+  24 of 69 mutation-class suites report a count, so a suite that stopped mutating would pass.
+  Six of seven P0 invariants have no mutation-class prover.
+- Runtime SLO cohort coverage is LOWER_BOUND_ONLY: end-to-end delivery is not producible at the
+  freeze commit, so p50/p95 are measured on the reachable portion.
+- The custody-cohort equivalence run is a KNOWN RED with pinned totals (55/98/1/0/0); the frozen
+  pre-contract packs need migration adapters, which is the P1.2/P1.3 remainder.
