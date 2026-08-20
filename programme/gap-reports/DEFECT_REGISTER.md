@@ -251,3 +251,30 @@ the artifact under test, D20's gate rewriting what it verifies). A measuring ins
 either exclude itself from its own measurement or declare the self-measurement explicitly.
 Low severity — it is self-correcting on recompile and cannot hide a real survivor — but it can
 manufacture a false one, which is the direction that wastes an owner's time.
+
+### D23 — coordinator's independent determination: this is (a), the emitter is wrong
+Established from the codebase's own declarations while the repair was in flight, so the
+returning verdict can be checked rather than taken:
+
+- The convention is stated at `scripts/build_dynamic_model.mjs:595`:
+  "blue = hardcode, black = same-sheet formula, green = cross-sheet link, white = section
+  title". Blue therefore asserts the number was ENTERED, not computed.
+- P5.3's own comment at `:661` names this exact shape as the lie the package exists to catch:
+  "A derived subtotal shipped as a typed-in number and painted blue satisfies it perfectly —
+  no formula, therefore blue — while asserting to the reader that a computed figure was read
+  off a filed page."
+- P5.3 also proved the certified workbooks are BYTE-IDENTICAL before and after its change.
+  So it did not repaint anything: `ending_cash` was ALREADY shipping as a blue hardcode. The
+  refusal is new; the misrepresentation is old.
+
+Conclusion: the refusal is CORRECT and must not be relaxed. `ending_cash` is a derived row
+whose value is materialised into the sheet as a typed-in number, which tells a reader it was
+read off a source. The underlying defect is in the emitter (or in whatever decided that row
+renders as a cached value rather than a formula), and it predates P5.3 by an unknown margin.
+
+Consequences accepted deliberately: the compiled-case build stays BLOCKED, no workbook is
+produced, the five portable evidence classes stay unproducible and the freeze waits. That is
+the correct trade — the alternative is shipping a workbook that misrepresents where a number
+came from, which is the single thing this programme's constitution refuses most explicitly.
+Unblocking delivery is a separate, properly-scoped repair on the emitter, NOT a relaxation of
+the check that found it.
