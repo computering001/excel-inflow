@@ -1,14 +1,8 @@
 {
-  "schema_version": "excel-inflow-performance-policy/1.1",
-  "trace": {
-    "initial_classification_target": 0.95,
-    "engineering_classification_target": 0.98,
-    "unknown_gap_warning_ms": 30000,
-    "unknown_gap_investigation_ms": 120000,
-    "unknown_internal_gap_certification_block_ms": 300000,
-    "known_external_wait_is_not_unowned_time": true
-  },
-  "runtime_slo": {
+  "schema_version": "excel-inflow-runtime-slo-declaration-receipt/1.0",
+  "policy_ref": "assets/performance-policy-v1.json",
+  "policy_sha256": "6d8d907a142054b9c54373c752f529301bc20db46fc8a2f45d4789ce129f6f8a",
+  "declaration": {
     "schema_version": "excel-inflow-runtime-slo/1.0",
     "declaration_authority": "assets/performance-policy-v1.json#runtime_slo",
     "authority_note": "P6.8: this object is the ONE runtime service-level declaration. Nothing else in the repository may declare an end-to-end runtime objective. The two declarations it replaces are recorded in `supersedes` with the reason each was wrong; scripts/lib/runtime_slo.mjs refuses this asset if either reappears, and refuses it if the numbers below stop agreeing with the constants the runtime actually enforces.",
@@ -44,9 +38,15 @@
       "in_process_preemption_note": "Grants are enforced by construction at every consult and by subprocess timeout at the one spawn boundary. A stage running inside the controller process is charged and typed on overrun (INTERNAL.runtime_budget_overrun) but is not preempted, so overshoot must be DISCLOSED by a receipt rather than assumed impossible."
     },
     "cohort": {
-      "required_cohorts": ["COLD", "WARM"],
+      "required_cohorts": [
+        "COLD",
+        "WARM"
+      ],
       "minimum_samples_per_cohort": 5,
-      "percentiles": [50, 95],
+      "percentiles": [
+        50,
+        95
+      ],
       "percentile_method": "nearest_rank_inclusive",
       "conservative_upper_bound_below_samples": 20,
       "measurement_source": "persisted_run_deadline_ledger",
@@ -65,11 +65,10 @@
       "evidence_half_through_decisions": "Stages inputs, evidence_review and decisions, ending in the lawful PAUSED boundary. A strict subset, so its percentiles bound the end-to-end objective from BELOW and can refute it but never certify it."
     }
   },
-  "release_policy": {
-    "single_external_wait_breach_is_not_automatic_failure": true,
-    "block_on_reproducible_excel_inflow_owned_regression": true,
-    "block_on_trace_classification_below_initial_target": true,
-    "block_on_unexplained_internal_gap_over_ms": 300000,
-    "block_if_native_clean_broker_unnecessarily_invokes_semantic_recovery": true
+  "declaration_errors": [],
+  "enforced_constants": {
+    "scripts/lib/runtime_budget_policy.mjs#DEFAULT_RUNTIME_BUDGETS_MS.end_to_end_target": 900000,
+    "scripts/lib/runtime_budget_policy.mjs#DEFAULT_RUNTIME_BUDGETS_MS.end_to_end_hard_ceiling": 1500000,
+    "scripts/lib/run_deadline.mjs#STAGE_FLOOR_TOTAL_ALLOWANCE_MS": 360000
   }
 }

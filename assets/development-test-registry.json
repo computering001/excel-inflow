@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "runtime-slo",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_slo_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "metamorphic-relations",
       "phase": "cohort",
       "runtime": "node",

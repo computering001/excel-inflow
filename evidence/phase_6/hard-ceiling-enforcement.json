@@ -1,0 +1,214 @@
+{
+  "schema_version": "excel-inflow-hard-ceiling-enforcement-cohort/1.0",
+  "reports": [
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "cohort_run_0",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 1500000,
+        "compute_elapsed_ms": 4675,
+        "overshoot_past_ceiling_ms": 0,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 6,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "5ea6edeadd0a86922aca961307a423881437dd92628cd2bd1d1e0cf31e8727c0"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "cohort_run_1",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 1500000,
+        "compute_elapsed_ms": 4581,
+        "overshoot_past_ceiling_ms": 0,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 6,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "9c4e24a7e51f782e00d18262773a125685fd74d6693f5ce655477e573ebd912a"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "cohort_run_2",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 1500000,
+        "compute_elapsed_ms": 4593,
+        "overshoot_past_ceiling_ms": 0,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 6,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "ecda38b363f49853aa32c3050c56d19515b7dd6ebbe96da32b42707007206931"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "cohort_run_3",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 1500000,
+        "compute_elapsed_ms": 4608,
+        "overshoot_past_ceiling_ms": 0,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 6,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "bbf30d89b66d9ce3404b3faff5ac2804d34ef643035cfcc45f24fc1174aa6d4f"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "cohort_run_4",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 1500000,
+        "compute_elapsed_ms": 4597,
+        "overshoot_past_ceiling_ms": 0,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 6,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "775ead827e75c95fb09acc440cbec75bed78773bfacbfe2c69837089e7a1a50b"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "tiny_ceiling_cold",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 2800,
+        "compute_elapsed_ms": 2886,
+        "overshoot_past_ceiling_ms": 86,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 0,
+        "floor_allowance_remaining_ms": 360000,
+        "grants": 3,
+        "grants_past_ceiling": 0,
+        "typed_overrun_receipts": 0
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "3af1441fd043a087e9cc31e80fe8150a9807a71c81dc24d0221e039d573d9943"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "tiny_ceiling_resumed",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 2800,
+        "compute_elapsed_ms": 4618,
+        "overshoot_past_ceiling_ms": 1818,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 1200,
+        "floor_allowance_remaining_ms": 358800,
+        "grants": 6,
+        "grants_past_ceiling": 3,
+        "typed_overrun_receipts": 3
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "7fb7786b08f80ca399d5b00d4fdcaf80fe6b88f65285e13c78fd641b783eaa51"
+    },
+    {
+      "schema_version": "excel-inflow-hard-ceiling-enforcement/1.0",
+      "label": "tiny_ceiling_exhausted",
+      "run_id": "acquisition_question_evidence_test",
+      "declared_envelope_ms": {
+        "hard_ceiling": 1500000,
+        "bounded_floor_allowance": 360000,
+        "maximum_grantable_compute": 1860000
+      },
+      "observed": {
+        "ledger_ceiling_ms": 2800,
+        "compute_elapsed_ms": 6341,
+        "overshoot_past_ceiling_ms": 3541,
+        "floor_allowance_ms": 360000,
+        "floor_granted_ms": 360000,
+        "floor_allowance_remaining_ms": 0,
+        "grants": 9,
+        "grants_past_ceiling": 6,
+        "typed_overrun_receipts": 6
+      },
+      "in_process_preemption": false,
+      "enforcement_mode": "BOUNDED_ENVELOPE_ON_GRANTS_WITH_TYPED_DISCLOSURE",
+      "violations": [],
+      "status": "ENFORCED",
+      "report_sha256": "b3b3cd1b66535ed60203cb4df887d53a1b45395bf376b16940215319a330affd"
+    }
+  ],
+  "status": "ENFORCED"
+}

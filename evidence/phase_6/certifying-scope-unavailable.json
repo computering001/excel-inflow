@@ -1,0 +1,39 @@
+{
+  "schema_version": "excel-inflow-slo-scope-availability/1.0",
+  "question": "Why does the phase-6 SLO cohort carry scope evidence_half_through_decisions rather than end_to_end_delivery?",
+  "answer": "The certifying scope is NOT PRODUCIBLE at HEAD. A cohort was not narrowed for convenience; the delivered path refuses before a workbook exists, for two independent reasons already on the register.",
+  "probes": [
+    {
+      "probe": "run the real controller through the full path on the acquisition fixture, with a complete Python toolchain and LibreOffice present",
+      "command": "SOFFICE_BIN=<override>/soffice node scripts/run_user_flow.mjs <acquisition-question-evidence-run.json> --out <run> --answers <answers.json> --python <venv>/bin/python --json",
+      "toolchain": {
+        "soffice": "present",
+        "python": "venv built from the codex runtime python3.12 with openpyxl, pymupdf, jsonschema, numpy and Pillow importable"
+      },
+      "observed_status": "BLOCKED",
+      "observed_stage": "build_checks",
+      "observed_outcome": "workbook_build_blocked",
+      "observed_message": "Portable semantic gates N0-N9 did not pass.",
+      "checkpoint_reached": "semantic_gates",
+      "semantic_gates": {
+        "artifact": "/private/tmp/claude-501/-Users-archiepreston-Documents-Codex-excel-inflow-clean-final/14177970-d761-4aab-8ace-dfa418e858d3/scratchpad/slo/e2e1/build-1fa727844137/.stage4/work/semantic_gates/n0-n9-gates.json",
+        "failed": [
+          {
+            "id": "N8",
+            "status": "FAIL"
+          }
+        ],
+        "status": "STOPPED"
+      },
+      "reading": "Stage 4 stops at its FIRST checkpoint. Gate N8 fails on the acquisition test fixture, so no plan, no emit, no recalculation and no validation span is ever measured. test-fixtures/** is out of scope for this package."
+    },
+    {
+      "probe": "the same question asked one layer down, on a compiled production case",
+      "source": "programme/P8.7_issue_card.md",
+      "recorded_finding": "node scripts/build_dynamic_model.mjs <compiled production case> --plan-only REFUSES at build_dynamic_model.mjs:784 with 'Provenance marking contradicts the authority governing the cell', localised by git log -S refuseContradictedProvenance to bd1b973 (P5.3). No workbook can be built at HEAD.",
+      "reading": "Even with a production case the delivered path does not complete at HEAD, so an end_to_end_delivery cohort is unobtainable on this commit for a reason that belongs to another package."
+    }
+  ],
+  "consequence": "The cohort report declares slo_coverage LOWER_BOUND_ONLY. Its percentiles are a strict subset of the end-to-end path, so they can REFUTE the 15/20/25 objective but can never certify it. Recording that in the report is the difference between evidence and a claim.",
+  "owed": "An end_to_end_delivery cohort, re-run with this same harness once the workbook build is producible again. scripts/lib/runtime_slo.mjs already accepts that scope and will flip the report to CERTIFYING without any code change."
+}

@@ -1,0 +1,321 @@
+{
+  "schema_version": "excel-inflow-runtime-slo-cohort/1.0",
+  "captured_at": "2026-08-20T08:02:44.513Z",
+  "declaration_authority": "assets/performance-policy-v1.json#runtime_slo",
+  "policy_ref": "assets/performance-policy-v1.json",
+  "policy_sha256": "6d8d907a142054b9c54373c752f529301bc20db46fc8a2f45d4789ce129f6f8a",
+  "objective_ms": {
+    "p50": 900000,
+    "p95": 1200000,
+    "hard_ceiling": 1500000
+  },
+  "percentile_method": "nearest_rank_inclusive",
+  "measurement_source": "persisted_run_deadline_ledger",
+  "scopes": [
+    "evidence_half_through_decisions"
+  ],
+  "slo_coverage": "LOWER_BOUND_ONLY",
+  "slo_coverage_note": "At least one sample stopped short of delivery, so these percentiles bound the end-to-end objective from BELOW: they can refute it, never certify it.",
+  "environment": {
+    "cpus": 10,
+    "fixture": "acquisition-question evidence run (test-fixtures/cases)",
+    "node": "v22.23.2",
+    "platform": "darwin-arm64"
+  },
+  "cohorts": {
+    "COLD": {
+      "samples": 5,
+      "minimum_samples_required": 5,
+      "p50_ms": 2856,
+      "p95_ms": 2901,
+      "min_ms": 2843,
+      "max_ms": 2901,
+      "p95_estimate": "CONSERVATIVE_UPPER_BOUND",
+      "p95_estimate_note": "Fewer than 20 samples: nearest-rank p95 lands on the slowest observation, so this is an upper bound on the true p95, never an understatement.",
+      "meets_p50": true,
+      "meets_p95": true,
+      "max_run_total_compute_ms": 2901,
+      "inside_hard_ceiling": true,
+      "scopes": [
+        "evidence_half_through_decisions"
+      ]
+    },
+    "WARM": {
+      "samples": 5,
+      "minimum_samples_required": 5,
+      "p50_ms": 1742,
+      "p95_ms": 1774,
+      "min_ms": 1737,
+      "max_ms": 1774,
+      "p95_estimate": "CONSERVATIVE_UPPER_BOUND",
+      "p95_estimate_note": "Fewer than 20 samples: nearest-rank p95 lands on the slowest observation, so this is an upper bound on the true p95, never an understatement.",
+      "meets_p50": true,
+      "meets_p95": true,
+      "max_run_total_compute_ms": 4675,
+      "inside_hard_ceiling": true,
+      "scopes": [
+        "evidence_half_through_decisions"
+      ]
+    }
+  },
+  "cold_to_warm": {
+    "p50_saved_ms": 1114,
+    "p95_saved_ms": 1127,
+    "warm_p95_within_cold_p95": true
+  },
+  "breaches": [],
+  "status": "WITHIN_SLO",
+  "samples": [
+    {
+      "cohort": "COLD",
+      "compute_ms": 2901,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-0/run-deadline.json",
+      "ledger_sha256": "1c43a792ba403de198b257dfdd133f270408c36cba381b69bd31d453d5a30e6f",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": null,
+      "prior_total_compute_ms": 0,
+      "reused_stages": [],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 2901,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "WARM",
+      "compute_ms": 1774,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-0/run-deadline.json",
+      "ledger_sha256": "14459dd8478c20077702e4839b0fad01402c3a6784a14adcb19872bde8115678",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": "1c43a792ba403de198b257dfdd133f270408c36cba381b69bd31d453d5a30e6f",
+      "prior_total_compute_ms": 2901,
+      "reused_stages": [
+        "decisions",
+        "evidence_review",
+        "inputs"
+      ],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 4675,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "COLD",
+      "compute_ms": 2843,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-1/run-deadline.json",
+      "ledger_sha256": "33dd53bcd7b33d44401ff788d27bcd85154ff2a3529615fd1ff2f7ef44f178ee",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": null,
+      "prior_total_compute_ms": 0,
+      "reused_stages": [],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 2843,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "WARM",
+      "compute_ms": 1738,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-1/run-deadline.json",
+      "ledger_sha256": "fe82c604caa9d300190ce3433ac6e3dced0b1f25d7c5d7c8505b4d93e1ef32be",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": "33dd53bcd7b33d44401ff788d27bcd85154ff2a3529615fd1ff2f7ef44f178ee",
+      "prior_total_compute_ms": 2843,
+      "reused_stages": [
+        "decisions",
+        "evidence_review",
+        "inputs"
+      ],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 4581,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "COLD",
+      "compute_ms": 2856,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-2/run-deadline.json",
+      "ledger_sha256": "44b3b2cbfb42459abe55ad1b141682ac78b5f314db3a502e196c6b122f45e6be",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": null,
+      "prior_total_compute_ms": 0,
+      "reused_stages": [],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 2856,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "WARM",
+      "compute_ms": 1737,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-2/run-deadline.json",
+      "ledger_sha256": "0c857771855b6e411f7b7de07fa1d7ee927469b6f156dbfb7ebab4bc1521cb86",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": "44b3b2cbfb42459abe55ad1b141682ac78b5f314db3a502e196c6b122f45e6be",
+      "prior_total_compute_ms": 2856,
+      "reused_stages": [
+        "decisions",
+        "evidence_review",
+        "inputs"
+      ],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 4593,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "COLD",
+      "compute_ms": 2866,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-3/run-deadline.json",
+      "ledger_sha256": "e23c6e3d848725184d1eb01104587fbcf9a8da02905474238b56a02fb3d360e2",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": null,
+      "prior_total_compute_ms": 0,
+      "reused_stages": [],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 2866,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "WARM",
+      "compute_ms": 1742,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-3/run-deadline.json",
+      "ledger_sha256": "7159799e46b5bb119b2bff5b59fbf5ce04ef20238b0aad1f0b31f699903e1c43",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": "e23c6e3d848725184d1eb01104587fbcf9a8da02905474238b56a02fb3d360e2",
+      "prior_total_compute_ms": 2866,
+      "reused_stages": [
+        "decisions",
+        "evidence_review",
+        "inputs"
+      ],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 4608,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "COLD",
+      "compute_ms": 2847,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-4/run-deadline.json",
+      "ledger_sha256": "24f212d6464cb6160a9a545a45f7b44be0d2569fbf9ca1c98161a28f02d3047f",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": null,
+      "prior_total_compute_ms": 0,
+      "reused_stages": [],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 2847,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    },
+    {
+      "cohort": "WARM",
+      "compute_ms": 1750,
+      "floor_granted_ms": 0,
+      "hard_deadline_compute_ms": 1500000,
+      "invocation_segments": [
+        "controller_invocation_overhead",
+        "stage:decisions",
+        "stage:evidence_review",
+        "stage:inputs"
+      ],
+      "ledger_path": "cohort/run-4/run-deadline.json",
+      "ledger_sha256": "0e167843755fa47e34c4649123901dfa1c84bc218a35c78ef1c97604d9e707a2",
+      "measurement_source": "persisted_run_deadline_ledger",
+      "notes": null,
+      "prior_ledger_sha256": "24f212d6464cb6160a9a545a45f7b44be0d2569fbf9ca1c98161a28f02d3047f",
+      "prior_total_compute_ms": 2847,
+      "reused_stages": [
+        "decisions",
+        "evidence_review",
+        "inputs"
+      ],
+      "run_id": "acquisition_question_evidence_test",
+      "run_total_compute_ms": 4597,
+      "scope": "evidence_half_through_decisions",
+      "target_compute_ms": 900000
+    }
+  ],
+  "report_sha256": "b4338e785653ec5fdedc216653a344b4ea262d7339ad7c858894c3653efc575d"
+}

@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "b92eeee2c3e5afa6e7e2a8659fc161bd7b1d04d2",
-  "source_tree": "8483734c1f5d64f19aa73bf34dd39057bd50d4b2",
+  "commit": "1d0177d40b91a74dc928cfc26a6819719c98cf59",
+  "source_tree": "e0747b60f85dfc4e94b2c52dfd475806abb66140",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -40,6 +40,12 @@
       "note": "291bn-point space; found 15 defects incl. D11 in freshly-sealed P4.1 code"
     },
     {
+      "package": "P7.4",
+      "commit": "",
+      "invariant": "a transform that must not change the economics does not, and one that must changes exactly what the graph says",
+      "note": "found five real non-invariances, two high; every escape proved to need its declared missing edge"
+    },
+    {
       "package": "P7.5",
       "commit": "102ada3",
       "invariant": "mutation adequacy is measured, with every survivor registered and the P0 gate composed from a declared set",
@@ -58,7 +64,7 @@
       "note": "found a governance mutation that had gone vacuous, and that the frozen cohort FAILS rather than merely not running"
     }
   ],
-  "sealed_package_count": 8,
+  "sealed_package_count": 9,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",

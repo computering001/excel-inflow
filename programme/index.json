@@ -322,6 +322,21 @@
       "commit": "",
       "invariant": "a change invalidates exactly the work it should, and the reuse a run claims is the reuse it performed",
       "note": "the declared map disagreed with the measured graph on 8 of 12 entries, every one in the unsafe direction"
+    },
+    "P5.5": {
+      "commit": "",
+      "invariant": "authority and capture claims are proven against emitted cells, not receipts the same build produced",
+      "note": "23 cell mutations; capture had none before; addresses derived, never hardcoded"
+    },
+    "P7.4": {
+      "commit": "",
+      "invariant": "a transform that must not change the economics does not, and one that must changes exactly what the graph says",
+      "note": "found five real non-invariances, two high; every escape proved to need its declared missing edge"
+    },
+    "P6.8": {
+      "commit": "",
+      "invariant": "the runtime SLO is one declaration, bound by name, with a measured cohort and an enforceable ceiling",
+      "note": "the two rival declarations were unsatisfiable, not rival; coverage is LOWER_BOUND_ONLY and says so"
     }
   },
   "evidence_baseline": {
