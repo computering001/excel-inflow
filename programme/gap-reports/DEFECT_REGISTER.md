@@ -943,3 +943,39 @@ classified `lawful_counter_or_length`: a retry BUDGET (an unclassified error get
 the guard beside it also requires `classification !== null`) and a failure COUNTER (no prior
 receipt means no prior failures, and `nonNegativeIntegerOrNull` already refuses a malformed
 count). Neither is a financial value and neither can reach a workbook cell.
+
+## D49 — run_gate_side_effect_tests was RED in every gate run, proving nothing (FIXED)
+Corrected attribution: the coordinator dismissed this as a race against concurrent agents. It was
+not. It failed identically in all three full gate runs on a quiet tree.
+
+Cause: the suite computed an independent census with `run_ci_census_tests.mjs --out <temp>`, on
+the stated assumption that "the generator's existing --out redirect IS the lawful verify path: it
+computes the census without touching the tree" — and its own comment said "Prove that claim rather
+than assuming it." The claim is FALSE. `--out` does not redirect output; it REBINDS which file the
+census treats as the committed baseline (`run_ci_census_tests.mjs:248-256`), so an external path
+made it refuse "the committed census is absent" before computing anything.
+
+Repair: `--emit <path>` added to the census — compute and write to an external path with NO
+baseline comparison and no tree write. The gate suite uses it. 276 checks, green.
+
+Then the STALE QUARANTINE trip fired, correctly: `run_ci_census_tests.mjs` was a quarantined
+offender for D20 ("writes ci/test_registry_census.json unconditionally"), anchored to source text
+that D20's own repair removed. The quarantine could not outlive the defect, which is what it was
+built to guarantee. The entry is retired and the script PROMOTED into SUBJECT_GATES, so it is now
+held to the same no-side-effect standard as the other five. The map is left in place and empty:
+it is the mechanism, not the list.
+
+## D50 — run_development_gate.mjs silently drops suites AND exits 0 (SEVERITY: HIGH, OPEN)
+Beyond D45's exit-code masking, the gate does not run its full set. Measured across three runs of
+the same tree: 138 distinct suites, then 123. Fifteen were missing from the third run with no
+error and exit 0 — including mutation-adequacy, canonical-model-modules, graph-driven-solve,
+scale-invariant-convergence, declared-fixed-point-completeness and never-zero-and-order-invariance.
+The second run ended in an unhandled exception inside `runPool` (`run_development_gate.mjs:305`,
+`Array.map` at `:237`) and still reported exit 0.
+
+So the gate can report success having executed 15 fewer suites than the run before it. Every one
+of the 15 was executed individually on the quiet tree and all 15 pass, so this is a defect in the
+HARNESS, not in the product — but a release gate that silently narrows its own coverage is not a
+gate. NOT FIXED: the harness repair is out of scope for the freeze and is recorded for v3.8, with
+the explicit warning that no green from this gate may be trusted without diffing its suite list
+against the registry.

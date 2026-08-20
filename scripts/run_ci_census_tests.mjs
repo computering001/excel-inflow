@@ -232,13 +232,27 @@ const report = {
 // later run byte-for-byte and demanding that would be an unmeetable gate.
 const VOLATILE_CENSUS_FIELDS = ["source_commit", "source_tree", "toolchain"];
 const WRITE_CENSUS = process.argv.includes("--write");
+// --emit <path> computes the census and writes it to an EXTERNAL path WITHOUT
+// treating that path as the committed baseline. `--out` cannot serve this
+// purpose: it rebinds which file counts as committed, so pointing it at a fresh
+// temp file makes the census refuse with "the committed census is absent".
+// run_gate_side_effect_tests.mjs needs exactly this — an independent computed
+// copy to diff the committed one against — and had been red in every gate run
+// because it used --out and got the rebind instead of a redirect.
+const EMIT_PATH = option("emit", null);
 const resolvedOut = path.resolve(ROOT, outPath);
+const resolvedEmit = EMIT_PATH === null ? null : path.resolve(ROOT, EMIT_PATH);
 const substantive = (value) => {
   const copy = { ...value };
   for (const field of VOLATILE_CENSUS_FIELDS) delete copy[field];
   return JSON.stringify(copy, Object.keys(copy).sort());
 };
-if (WRITE_CENSUS) {
+if (resolvedEmit !== null) {
+  // Emit only. The tree is not touched and no baseline comparison is made: the
+  // caller is asking for the computed census as data, not for a verdict on it.
+  await fs.mkdir(path.dirname(resolvedEmit), { recursive: true });
+  await fs.writeFile(resolvedEmit, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+} else if (WRITE_CENSUS) {
   await fs.mkdir(path.dirname(resolvedOut), { recursive: true });
   await fs.writeFile(resolvedOut, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 } else {
@@ -261,5 +275,5 @@ console.log(JSON.stringify({
   checks,
   scripts: rows.length,
   out: outPath,
-  mode: WRITE_CENSUS ? "write" : "verify",
+  mode: resolvedEmit !== null ? "emit" : WRITE_CENSUS ? "write" : "verify",
 }));

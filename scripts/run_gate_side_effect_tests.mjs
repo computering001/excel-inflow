@@ -75,23 +75,22 @@ const SUBJECT_GATES = [
   "run_coercion_ban_tests.mjs",
   "run_architecture_ownership_tests.mjs",
   "run_test_registry_contract_tests.mjs",
+  // Promoted out of QUARANTINED_OFFENDERS: D20 is repaired. run_ci_census_tests
+  // is verify-by-default with an explicit --write, so it is now an ordinary
+  // swept subject and is held to the same no-side-effect standard as the rest.
+  "run_ci_census_tests.mjs",
 ];
 
 // Gates that DO write a tracked artifact on their default path. A quarantine
 // entry is not an exemption: each is re-proven to still be an offender, so the
 // entry cannot outlive the defect.
-const QUARANTINED_OFFENDERS = {
-  "run_ci_census_tests.mjs": {
-    defect: "D20",
-    registry_id: "ci-census",
-    artifact: "ci/test_registry_census.json",
-    // The two source anchors that constitute the offence.
-    default_out_anchor: 'option("out", path.join(ROOT, "ci", "test_registry_census.json"))',
-    unconditional_write_anchor: "await fs.writeFile(path.resolve(ROOT, outPath),",
-    reason:
-      "read-only file for P0.9 — the repair (gate the write behind --write, or stop committing run provenance) belongs to the owner of run_ci_census_tests.mjs",
-  },
-};
+// D20's offender was retired here on 2026-08-20: run_ci_census_tests.mjs no
+// longer defaults an unconditional write into the tracked tree, so its
+// quarantine entry tripped the STALE QUARANTINE check exactly as designed and
+// the script moved into SUBJECT_GATES above. The map is deliberately left in
+// place and empty: it is the mechanism, not the list, and the next offender
+// gets an entry rather than an exemption.
+const QUARANTINED_OFFENDERS = {};
 
 // Fields of the census that are properties of the RUN, not claims about the
 // tree: they are recomputed from git HEAD and the local toolchain on every
@@ -289,7 +288,12 @@ try {
   // computes the census without touching the tree. Prove that claim rather
   // than assuming it.
   const treeBefore = await manifest(ROOT, wholeTreeFiles);
-  const censusRun = await exec(process.execPath, [censusScript, "--out", computedPath], { cwd: ROOT, maxBuffer: 64e6 })
+  // --emit, NOT --out. `--out` rebinds which file the census treats as the
+  // COMMITTED baseline, so an external path made it refuse "the committed
+  // census is absent" — which is why this suite was red in every gate run
+  // rather than proving anything. --emit computes and writes without any
+  // baseline comparison, which is what this check actually needs.
+  const censusRun = await exec(process.execPath, [censusScript, "--emit", computedPath], { cwd: ROOT, maxBuffer: 64e6 })
     .then(() => ({ ok: true }), (error) => ({ ok: false, detail: String(error.stderr || error.message).trim().split("\n")[0] }));
   // The census generator is the only thing that can compute the census, so a
   // refusal here is not something this suite can verify around. Say precisely
