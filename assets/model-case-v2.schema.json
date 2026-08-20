@@ -3391,6 +3391,7 @@
           "minLength": 1
         },
         "class": {
+          "description": "The full debt-class ontology (assets/debt-class-ontology-v1.json), because this field is written by projecting a debt export's instrument_type straight through (attachment_ingress.mjs) and a real debt note does list lease liabilities among borrowings. Admitting the DECLARATION is not a promise to model it on this LANE: the support envelope declares the lane that delivers each class (support-envelope-v377.json dimensions.debt_instruments.declared_matrix_lanes), and lease_liability is delivered by lease_policy as the separately identified lease state family. A register row naming it is therefore a lane disagreement, refused by the compiler with the registered, source-owned SOURCE.lease_declared_on_debt_register - not an internal defect and not a promise of register support (P7.11, defect D12). unclassified is the review sentinel migrateLegacyDebtClasses writes for a source class the ontology cannot resolve; its refusal is SOURCE.instrument_class_unresolved.",
           "enum": [
             "bond_fixed",
             "bond_floating",

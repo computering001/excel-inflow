@@ -45,6 +45,32 @@
       "evidence_preserved": true,
       "allowed_terminal_states": ["SOURCE_REQUIRED"]
     },
+    "SOURCE.lease_declared_on_debt_register": {
+      "owner_layer": "debt_reconciliation",
+      "category": "source",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_new_source",
+      "user_action": "supply the lease disclosure so the obligation is modelled as a lease, or confirm the row is a borrowing and reclassify it in the debt export",
+      "source_action": "report lease liabilities in the lease note rather than as a borrowings register row",
+      "checkpoint_required": true,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["SOURCE_REQUIRED"],
+      "registered_by": "P7.11 (defect D12). A debt note that lists lease liabilities among borrowings projects straight into instruments[].class (attachment_ingress.mjs), and the register cannot carry a lease: the support envelope declares lease_liability on the lease_policy lane, and rolling it forward as an ordinary amortising instrument would count the obligation twice under the wrong interest convention. The refusal was reported as INTERNAL.compiler_or_graph_defect, which told the user engineering had failed when the resolvable fact is that the lease disclosure is the evidence the lease lane needs. Reachable path proven in scripts/run_declared_value_typed_outcome_tests.mjs from a schema-valid, envelope-declared case."
+    },
+    "SOURCE.instrument_class_unresolved": {
+      "owner_layer": "debt_class_ontology",
+      "category": "source",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_new_source",
+      "user_action": "identify the instrument's debt class in the debt export, or supply a filing whose debt note names it",
+      "source_action": "name a debt class the declared ontology resolves (assets/debt-class-ontology-v1.json: a canonical class or a declared legacy alias)",
+      "checkpoint_required": true,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["SOURCE_REQUIRED"],
+      "registered_by": "P7.11 (defect D12 sweep). migrateLegacyDebtClasses maps a source class the ontology cannot resolve to the review sentinel `unclassified`, which model-case-v2.schema.json admits, so the case is schema-valid and reaches the compiler, where an unresolved class has no forecast economics to roll and is refused. That refusal carried INTERNAL.compiler_or_graph_defect: the product told the user its own engineering had failed when what actually happened is that the SOURCE named an instrument the declared vocabulary does not cover. Reachable path proven in scripts/run_declared_value_typed_outcome_tests.mjs: migrateLegacyDebtClasses({instruments:[{class:'mystery facility'}]}) -> unclassified -> validateCaseShape zero errors -> compileInstrumentPeriodState refuses with this code."
+    },
     "SOURCE.opening_debt_unresolved": {
       "owner_layer": "debt_reconciliation",
       "category": "source",

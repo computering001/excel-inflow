@@ -613,10 +613,22 @@ check("D12: the refusal is NOT the untyped fallback the terminal catch invents",
   // throw)" when a throw carries nothing. This throw must not rely on that.
   const outcome = leaseThrow.typed_internal_outcome;
   assert.doesNotMatch(String(outcome.earliest_responsible_layer), /unattributed/);
-  assert.equal(outcome.earliest_responsible_layer, "instrument_period_state");
+  // P7.11 re-owned this refusal. P4.1a could only name the layer that threw,
+  // because the contract still promised the class on the register lane and the
+  // registry was not P4.1a's to extend. The envelope now declares the LANE that
+  // delivers lease_liability (lease_policy), so a register row naming it is a
+  // lane disagreement in the SOURCE's debt table, resolvable by the lease
+  // disclosure — owned by debt_reconciliation, terminal SOURCE_REQUIRED, never
+  // an engineering failure the user is asked to accept as their own.
+  assert.equal(outcome.earliest_responsible_layer, "debt_reconciliation");
+  assert.equal(outcome.reason_code, "SOURCE.lease_declared_on_debt_register");
+  assert.deepEqual(
+    REGISTRY.reason_codes[outcome.reason_code].allowed_terminal_states,
+    ["SOURCE_REQUIRED"],
+  );
 });
 
-check("D12: the same typed refusal covers the `unclassified` review sentinel", () => {
+check("D12: the `unclassified` review sentinel is refused with its OWN registered reason", () => {
   const value = leaseClassCase();
   value.instruments[0].class = "unclassified";
   let thrown = null;
@@ -627,24 +639,55 @@ check("D12: the same typed refusal covers the `unclassified` review sentinel", (
   }
   assert.ok(thrown instanceof Error);
   assert.match(thrown.message, /Unsupported debt class unclassified/);
+  // The CODE names what was refused and is shared; the REASON names who owns
+  // it, and the two refusals do not have the same owner. An unresolved class is
+  // a gap in what the source said, not a lease routed to the wrong lane.
   assert.equal(thrown.code, leaseThrow.code);
   assert.notEqual(thrown.typed_internal_outcome, undefined);
   assert.equal(thrown.typed_internal_outcome.declared_instrument_class, "unclassified");
+  assert.equal(
+    thrown.typed_internal_outcome.reason_code,
+    "SOURCE.instrument_class_unresolved",
+  );
+  assert.notEqual(
+    thrown.typed_internal_outcome.reason_code,
+    leaseThrow.typed_internal_outcome.reason_code,
+  );
+  assert.deepEqual(
+    REGISTRY.reason_codes[thrown.typed_internal_outcome.reason_code].allowed_terminal_states,
+    ["SOURCE_REQUIRED"],
+  );
 });
 
-check("D12: the CONTRACT CLAIM MISMATCH that makes this refusal reachable is pinned", () => {
-  // The class is claimed by BOTH contracts on the debt-instrument register, so
-  // a schema-valid, envelope-declared case reaches a refusal. That over-claim
-  // is a separate defect (reported, not repaired here — both assets are sealed
-  // to other owners in this programme).
+check("D12: the contract now declares the LANE that delivers the refused class", () => {
+  // P4.1a pinned this as a CONTRACT CLAIM MISMATCH: both contracts named the
+  // class on the debt-instrument register and the compiler refused it, so the
+  // product promised a lane it did not have. P7.11 repaired the claim rather
+  // than the promise — leases ARE modelled, on the lease_policy lane — so the
+  // pin is inverted: the class must still be admitted (a real debt note lists
+  // leases among borrowings and attachment_ingress projects the export's
+  // instrument_type straight through), and the envelope must now say WHICH
+  // lane delivers it.
   assert.ok(
     MODEL_CASE_SCHEMA.$defs.instrument.properties.class.enum.includes("lease_liability"),
-    "instruments[].class no longer admits lease_liability — retire this pin and the report line",
+    "instruments[].class must still admit the declaration a real debt export produces",
   );
   assert.ok(
     ENVELOPE.dimensions.debt_instruments.declared_matrix.includes("lease_liability"),
-    "the envelope no longer declares lease_liability — retire this pin and the report line",
+    "the envelope still promises the class",
   );
+  assert.equal(
+    ENVELOPE.dimensions.debt_instruments.declared_matrix_lanes.lease_liability,
+    "lease_policy",
+    "and must name the lane that keeps the promise",
+  );
+  for (const declaredClass of ENVELOPE.dimensions.debt_instruments.declared_matrix) {
+    const lane = ENVELOPE.dimensions.debt_instruments.declared_matrix_lanes[declaredClass];
+    assert.ok(
+      lane && ENVELOPE.dimensions.debt_instruments.declared_lanes[lane],
+      `${declaredClass} names no declared lane`,
+    );
+  }
   // And the mismatch is not that leases are unsupported: they are compiled by
   // their OWN lane, which reserves the very id the register would collide with.
   assert.ok(

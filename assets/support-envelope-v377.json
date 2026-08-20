@@ -107,7 +107,24 @@
         "none_disclosed": "SUPPORTED_DEGRADED"
       },
       "unknown_value_class": "EXPERIMENTAL",
-      "declared_matrix": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "commercial_paper", "securitisation", "rcf", "lease_liability", "overdraft", "other_explicit"]
+      "declared_matrix": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "commercial_paper", "securitisation", "rcf", "lease_liability", "overdraft", "other_explicit"],
+      "declared_matrix_lane_invariant": "P7.11 (D12): a class in the matrix is a PROMISE that the product models that debt shape, and every promise must name the case-contract lane that delivers it. Nothing related the matrix to a lane before, so lease_liability stood in the matrix and in the instrument-register enum while the register had no lease lane, and the compiler answered a schema-valid, envelope-declared case with INTERNAL.compiler_or_graph_defect - engineering blamed for what is a lane disagreement in the source's debt table. The matrix is unchanged because the promise is TRUE: lease liabilities ARE modelled, on the lease_policy lane. What is added is the lane, so the promise is checkable: every class here must name a lane, every lane must be declared below, and the register lane's classes must all be admitted by model-case-v2.schema.json $defs.instrument.properties.class.enum.",
+      "declared_matrix_lanes": {
+        "bond_fixed": "instrument_register",
+        "bond_floating": "instrument_register",
+        "term_loan_fixed": "instrument_register",
+        "term_loan_floating": "instrument_register",
+        "commercial_paper": "instrument_register",
+        "securitisation": "instrument_register",
+        "rcf": "instrument_register",
+        "lease_liability": "lease_policy",
+        "overdraft": "instrument_register",
+        "other_explicit": "instrument_register"
+      },
+      "declared_lanes": {
+        "instrument_register": "model case instruments[] - one register row per instrument, rolled forward by instrument_period_state.instrumentStates",
+        "lease_policy": "model case lease_policy - the separately identified lease state family, rolled forward by instrument_period_state.leaseStates, which reserves the lease_liability instrument identity so one obligation can never be carried twice"
+      }
     },
     "broker_availability": {
       "values": {

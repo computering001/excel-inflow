@@ -707,7 +707,7 @@ const CHECKS = {
     },
   },
   lease_liability_instrument_class_refused: {
-    valid_case_is_refused_typed_but_the_contract_over_claims(context) {
+    lane_disagreement_refused_source_owned(context) {
       const { modelCase, compiled } = context;
       check(compiled.shapeErrors.length === 0, `validateCaseShape accepts the case, got ${JSON.stringify(compiled.shapeErrors)}`);
       check(compiled.ok === false, "yet the case cannot be compiled on the debt register lane");
@@ -715,14 +715,31 @@ const CHECKS = {
       check(/Unsupported debt class lease_liability/.test(compiled.error.message), `the message names the refused class, got ${compiled.error.message}`);
       check(compiled.error.code === "UNSUPPORTED_INSTRUMENT_CLASS",
         `the refusal is typed (P4.1a, defect D12), got ${JSON.stringify(compiled.error.code)}`);
-      check(compiled.error.typed_internal_outcome !== undefined
-        && typeof compiled.error.typed_internal_outcome.reason_code === "string",
-        "the refusal carries a typed_internal_outcome naming a registered reason code");
+      const outcome = compiled.error.typed_internal_outcome;
+      check(outcome !== undefined && outcome.reason_code === "SOURCE.lease_declared_on_debt_register",
+        `the refusal names its registered reason, got ${JSON.stringify(outcome?.reason_code)}`);
+      // P7.11: WHOSE fault. A lease in the borrowings table is a fact in the
+      // user's own debt export, resolvable by the lease disclosure — never an
+      // internal defect, and never a material economic choice.
+      const registered = REGISTRY.reason_codes[outcome.reason_code];
+      check(registered !== undefined, "the reason code is registered");
+      check(registered.category === "source", `the refusal is source-owned, got ${registered.category}`);
+      check(JSON.stringify(registered.allowed_terminal_states) === JSON.stringify(["SOURCE_REQUIRED"]),
+        `the registry allows exactly SOURCE_REQUIRED, got ${JSON.stringify(registered.allowed_terminal_states)}`);
+      check(outcome.earliest_responsible_layer === "debt_reconciliation",
+        `the earliest responsible layer is debt_reconciliation, got ${outcome.earliest_responsible_layer}`);
+      // The class stays DECLARED, because a real debt note produces it. What
+      // the contract now adds is the LANE that keeps the promise.
       const declaredClass = modelCase.instruments[0].class;
+      const matrix = ENVELOPE.contract.dimensions.debt_instruments;
       check(MODEL_CASE_SCHEMA.$defs.instrument.properties.class.enum.includes(declaredClass),
-        "the refused class is in the model-case schema enum");
-      check(ENVELOPE.contract.dimensions.debt_instruments.declared_matrix.includes(declaredClass),
-        "and in the support envelope's declared debt matrix: the contract promises a class the compiler refuses");
+        "the refused class is still admitted by the model-case schema enum");
+      check(matrix.declared_matrix.includes(declaredClass),
+        "and still promised by the support envelope's declared debt matrix");
+      check(matrix.declared_matrix_lanes?.[declaredClass] === "lease_policy",
+        `the envelope declares the lane that delivers it, got ${JSON.stringify(matrix.declared_matrix_lanes?.[declaredClass])}`);
+      check(matrix.declared_matrix.every((item) => matrix.declared_lanes?.[matrix.declared_matrix_lanes?.[item]] !== undefined),
+        "every promised class names a declared lane");
     },
   },
   opening_debt_unreconciled_refusal: {

@@ -485,6 +485,21 @@ function amount(basisAmount, rate) {
   };
 }
 
+/**
+ * The SHAPE of a translated amount, so the artifact validator can enumerate the
+ * amounts a state actually carries instead of trusting a hand-written list.
+ */
+function isTranslatedAmount(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.hasOwn(value, "basis_amount") &&
+      Object.hasOwn(value, "reporting_amount") &&
+      Object.hasOwn(value, "translation_rate"),
+  );
+}
+
 function nonCashComponents(instrument) {
   if (instrument.non_cash_movement_components) {
     if (instrument.other_non_cash_movement !== undefined) {
@@ -597,35 +612,71 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
     // double-count it against that family under the wrong interest convention.
     // `unclassified` is the review sentinel and has no economics to roll.
     //
-    // What was defective is that the refusal was a BARE Error: no code, no
-    // typed_internal_outcome, no registered reason — so a case that
-    // `validateCaseShape` accepts with zero errors (the class is in the
-    // model-case schema enum AND the envelope's declared debt matrix) died on
-    // an untyped throw that could not reach a lawful terminal. Typed here on
-    // the P3.7 pattern; the message is unchanged.
+    // P4.1a typed the throw (it was a bare Error) but had to leave it owned by
+    // ENGINEERING, because the contract still promised the class on this lane
+    // and the registry was not P4.1a's to extend. P7.11 closed both halves, and
+    // the three refusals are not the same fault, so they no longer share one
+    // reason code:
+    //
+    //  * `lease_liability` — SOURCE-owned. The class is genuinely supported;
+    //    the envelope now declares WHICH LANE delivers it
+    //    (`declared_matrix_lanes`: lease_policy), so the promise it makes is
+    //    true and checkable. A register row naming it is what a debt note that
+    //    lists leases among borrowings produces: `attachment_ingress` projects
+    //    the export's `instrument_type` straight into `instruments[].class`.
+    //    That is a lane disagreement in the SOURCE, resolvable by the lease
+    //    disclosure — not an engineering defect, and never an economic choice
+    //    for the user to make. Registered as SOURCE.lease_declared_on_debt_register.
+    //
+    //  * `unclassified` — SOURCE-owned. Schema-valid BY DESIGN:
+    //    `migrateLegacyDebtClasses` writes it for a source class the declared
+    //    ontology cannot resolve, so this refusal is reachable from an honest
+    //    run. The source named an instrument the vocabulary does not cover.
+    //    Registered as SOURCE.instrument_class_unresolved.
+    //
+    //  * a canonical class with NO family — this branch is fail-closed defence
+    //    against an ontology entry added without a family, which nothing in the
+    //    contract can express and only engineering can have caused. It stays
+    //    INTERNAL, and it is the only one of the three that is.
+    //
+    // Reporting the first two as INTERNAL.compiler_or_graph_defect told the user
+    // that engineering had failed when the resolvable fact sat in their own
+    // evidence: the misclassification firewall running in reverse.
+    const refusals = {
+      lease_liability: {
+        reason_code: "SOURCE.lease_declared_on_debt_register",
+        earliest_responsible_layer: "debt_reconciliation",
+        refusal_basis:
+          "the debt-instrument register has no lease lane: the support envelope declares " +
+          "lease_liability on the lease_policy lane, compiled as the separately identified " +
+          "lease state family, and rolling the same obligation forward as an ordinary " +
+          "amortising instrument would count it twice under the wrong interest convention",
+      },
+      unclassified: {
+        reason_code: "SOURCE.instrument_class_unresolved",
+        earliest_responsible_layer: "debt_class_ontology",
+        refusal_basis:
+          "unclassified is the debt-class review sentinel: it names an instrument whose class " +
+          "the declared ontology could not resolve, and an unresolved class has no forecast " +
+          "economics to roll",
+      },
+    };
+    const refusal = refusals[debtClass] ?? {
+      reason_code: "INTERNAL.compiler_or_graph_defect",
+      earliest_responsible_layer: "instrument_period_state",
+      refusal_basis:
+        "the debt-class ontology declares this class canonical but the instrument state " +
+        "compiler has no family for it, which no contract can express",
+    };
     const error = new Error(`Unsupported debt class ${debtClass} for ${instrument.instrument_id}.`);
     error.code = "UNSUPPORTED_INSTRUMENT_CLASS";
     error.declared_instrument_class = debtClass;
     error.instrument_id = instrument.instrument_id ?? null;
-    // The contract claims the class and the compiler cannot deliver it on this
-    // lane, so while that claim stands the disagreement is ENGINEERING's, not
-    // the user's: an internal defect, never SOURCE_REQUIRED or ACTION_REQUIRED.
-    // (The narrower code this deserves — a lane-routing refusal owned by the
-    // case contract — is not in the sealed registry, and the registry is not
-    // this package's to extend.)
     error.typed_internal_outcome = {
-      reason_code: "INTERNAL.compiler_or_graph_defect",
-      earliest_responsible_layer: "instrument_period_state",
+      ...refusal,
       downstream_invalidation_scope: "solve_and_below",
       declared_instrument_class: debtClass,
       instrument_id: instrument.instrument_id ?? null,
-      contract_claim_mismatch:
-        debtClass === "lease_liability"
-          ? "instruments[].class admits lease_liability in the model-case schema enum and the " +
-            "support envelope's declared debt matrix, but the debt register has no lease lane: " +
-            "leases are compiled from lease_policy as the separately identified lease state family"
-          : "unclassified is the debt-class review sentinel: it names an instrument whose class " +
-            "was never resolved, and an unresolved class has no forecast economics to roll",
     };
     throw error;
   }
@@ -893,6 +944,16 @@ export function validateInstrumentPeriodStateArtifact(artifact) {
         if (Math.abs(Number(translation[key]) - 1) > EPSILON) errors.push(`${state.state_id} carrying value has non-unit ${key}.`);
       }
     }
+    // P7.11 (D10's class, found by its sweep) — every amount on a state is a
+    // {basis_amount, reporting_amount, translation_rate} triple, and every
+    // triple must reconcile against the rate its economics earns. `amountRates`
+    // used to be BOTH the rate table and the work list, so a triple absent from
+    // this hand-written map was never checked at all: `interest` was exactly
+    // that, the only produced triple the map never named, and a corrupted
+    // interest translation validated with ZERO errors. The work list is now
+    // driven by the STATE's own triples and the map is only the declared rate,
+    // so an amount the compiler adds later is refused until its rate is
+    // declared here (fail-closed) rather than silently escaping.
     const amountRates = {
       opening: state.translation?.opening_rate,
       issuance: state.translation?.flow_rate,
@@ -905,6 +966,19 @@ export function validateInstrumentPeriodStateArtifact(artifact) {
       ending_post_repayment: state.translation?.closing_rate,
       average_interest_balance: state.translation?.flow_rate,
     };
+    // `interest` is the one COMPOSITE amount the compiler produces: the cash
+    // coupon converts at the flow rate and PIK accretion at the closing rate
+    // (`interestDetails`), so it has no single declared rate and is reconciled
+    // against its own two components instead. It is named here because it is
+    // CHECKED below, never to exempt it.
+    const compositeAmounts = new Set(["interest"]);
+    for (const [field, entry] of Object.entries(state)) {
+      if (!isTranslatedAmount(entry)) continue;
+      if (Object.hasOwn(amountRates, field) || compositeAmounts.has(field)) continue;
+      errors.push(
+        `${state.state_id} ${field} is a translated amount with no declared translation rate.`,
+      );
+    }
     for (const [field, expectedRate] of Object.entries(amountRates)) {
       const entry = state[field] ?? {};
       const basisAmount = Number(entry.basis_amount);
@@ -922,6 +996,41 @@ export function validateInstrumentPeriodStateArtifact(artifact) {
           ? "double FX: "
           : "";
         errors.push(`${state.state_id} ${prefix}${field} translation does not reconcile.`);
+      }
+    }
+    // The composite. `interest.basis_amount` is the cash coupon PLUS the PIK
+    // accretion, and the two legs convert at DIFFERENT rates, so the single-rate
+    // form above cannot express it. Reconstructed from the state's own
+    // `pik_accretion` leg: cash = interest - pik, and
+    // reporting = cash * flow_rate + pik * closing_rate. On a domestic
+    // instrument flow and closing agree and this reduces to the simple form; on
+    // a foreign one it is the only check that can see a mis-translated coupon.
+    if (isTranslatedAmount(state.interest)) {
+      const interestBasis = Number(state.interest.basis_amount);
+      const interestReporting = Number(state.interest.reporting_amount);
+      const interestRate = Number(state.interest.translation_rate);
+      const pikBasis = Number(state.pik_accretion?.basis_amount ?? 0);
+      const flowRate = Number(state.translation?.flow_rate);
+      const closingRate = Number(state.translation?.closing_rate);
+      if (
+        ![interestBasis, interestReporting, interestRate, pikBasis, flowRate, closingRate].every(
+          Number.isFinite,
+        )
+      ) {
+        errors.push(`${state.state_id} interest is not a finite translated amount.`);
+      } else {
+        const cashBasis = interestBasis - pikBasis;
+        const expectedReporting = cashBasis * flowRate + pikBasis * closingRate;
+        const expectedRate =
+          Math.abs(interestBasis) > EPSILON ? expectedReporting / interestBasis : flowRate;
+        if (
+          Math.abs(interestReporting - expectedReporting) > EPSILON ||
+          Math.abs(interestRate - expectedRate) > EPSILON
+        ) {
+          errors.push(
+            `${state.state_id} interest translation does not reconcile against its cash and PIK components.`,
+          );
+        }
       }
     }
     const rollForward =

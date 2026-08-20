@@ -445,13 +445,14 @@
       "archetype_id": "lease_liability_instrument_class_refused",
       "case_path": "test-fixtures/archetypes/economics/lease_liability_instrument_class_refused.json",
       "accounting_shape": "Lease liability declared as an INSTRUMENT in the debt register (class lease_liability) rather than through the lease policy — the shape a filing's debt note produces when leases sit inside the borrowings table.",
-      "why_it_breaks_models": "The lease liability is owned by the lease policy, so a register entry for it would double-count the obligation. The product is right to refuse it — but the refusal must be typed, and here it is not.",
+      "why_it_breaks_models": "The lease liability is owned by the lease policy, so a register entry for it would double-count the obligation. The product is right to refuse it — the question a refusal has to answer is WHOSE fault it is, and this one answered ENGINEERING for a fact sitting in the user's own debt export.",
       "proves_envelope_values": [],
       "shape_expectations": [
         {
-          "expectation_id": "valid_case_is_refused_typed_but_the_contract_over_claims",
-          "kind": "schedule_behaviour",
-          "statement": "The debt-register lane REFUSES this class TYPED (error.code UNSUPPORTED_INSTRUMENT_CLASS plus a typed_internal_outcome naming a registered reason code) — repaired by P4.1a, defect D12. The refusal is correct: leases are compiled by their own lease_policy lane, which reserves the lease_liability id, so rolling one as an ordinary amortising instrument would double-count it under the wrong interest convention. The REMAINING defect is the contract over-claim: the model-case schema instrument class enum and the envelope debt_instruments declared_matrix both admit lease_liability on the register lane, and validateCaseShape does not enforce the routing. This pin retires when those assets are corrected."
+          "expectation_id": "lane_disagreement_refused_source_owned",
+          "kind": "typed_refusal",
+          "expected_terminal_reason": "SOURCE.lease_declared_on_debt_register",
+          "statement": "The debt-register lane REFUSES this class typed and SOURCE-owned: error.code UNSUPPORTED_INSTRUMENT_CLASS with a typed_internal_outcome naming the registered reason SOURCE.lease_declared_on_debt_register, earliest_responsible_layer debt_reconciliation, and the registry allowing exactly the SOURCE_REQUIRED terminal. The refusal is correct: leases are compiled by their own lease_policy lane, which reserves the lease_liability id, so rolling one as an ordinary amortising instrument would double-count it under the wrong interest convention. P4.1a typed the throw but had to leave it owned by ENGINEERING because the contract still promised the class on the register lane; P7.11 repaired the claim rather than the promise. The class stays admitted by the schema enum and by the envelope matrix - a real debt note lists leases among borrowings, and attachment_ingress projects the export instrument_type straight into instruments[].class - and the envelope now declares the LANE that delivers each matrix class (declared_matrix_lanes.lease_liability = lease_policy), so a register row naming it is a lane disagreement in the SOURCE, resolvable by the lease disclosure, and never an internal defect the user is asked to own."
         }
       ],
       "extraction_evidence_still_required": true
