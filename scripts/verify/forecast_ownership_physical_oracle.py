@@ -11,11 +11,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import posixpath
-import re
 import sys
 import zipfile
 from collections import Counter
+from decimal import Decimal
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -31,19 +32,86 @@ def read_json(target: Path) -> dict:
     return value
 
 
+def _ecmascript_number(value: float) -> str:
+    """Serialize one finite IEEE-754 value as JSON.stringify does.
+
+    Python and ECMAScript use the same shortest-round-trip digits but choose
+    different display bands: Python switches to exponent notation below 1e-4,
+    while ECMAScript keeps fixed notation down to 1e-6.  Solver convergence
+    receipts contain values in that gap, so post-processing only the exponent's
+    leading zero is insufficient and makes a valid Node-authored binding look
+    stale to this independent Python oracle.
+    """
+    if not math.isfinite(value):
+        return "null"
+    if value == 0:
+        return "0"
+    magnitude = abs(value)
+    text = repr(value).lower()
+    if 1e-6 <= magnitude < 1e21:
+        if "e" in text:
+            return format(Decimal(text), "f")
+        if text.endswith(".0"):
+            return text[:-2]
+        return text
+    if "e" not in text:
+        text = format(value, ".17e")
+    mantissa, exponent = text.split("e", 1)
+    if mantissa.endswith(".0"):
+        mantissa = mantissa[:-2]
+    exponent_value = int(exponent)
+    exponent_text = f"+{exponent_value}" if exponent_value >= 0 else str(exponent_value)
+    return f"{mantissa}e{exponent_text}"
+
+
+def _ecmascript_canonical_json(value: object, level: int = 0) -> str:
+    """Match canonicalise + JSON.stringify(value, null, 2) from run_store.mjs."""
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return _ecmascript_number(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        child_indent = "  " * (level + 1)
+        close_indent = "  " * level
+        children = [
+            f"{child_indent}{_ecmascript_canonical_json(child, level + 1)}"
+            for child in value
+        ]
+        return "[\n" + ",\n".join(children) + f"\n{close_indent}]"
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        child_indent = "  " * (level + 1)
+        close_indent = "  " * level
+        # Array.prototype.sort compares UTF-16 code units.  All current keys
+        # are ASCII, but retaining that ordering rule keeps the hash contract
+        # correct if a future issuer-owned key contains supplementary Unicode.
+        keys = sorted(
+            value,
+            key=lambda key: str(key).encode("utf-16-be", errors="surrogatepass"),
+        )
+        children = []
+        for key in keys:
+            encoded_key = json.dumps(str(key), ensure_ascii=False, separators=(",", ":"))
+            encoded_value = _ecmascript_canonical_json(value[key], level + 1)
+            children.append(f"{child_indent}{encoded_key}: {encoded_value}")
+        return "{\n" + ",\n".join(children) + f"\n{close_indent}}}"
+    raise TypeError(f"Unsupported canonical JSON value: {type(value).__name__}")
+
+
 def canonical_sha256(value: object) -> str:
     """Match scripts/lib/run_store.mjs hashValue exactly."""
-    payload = json.dumps(
-        value,
-        sort_keys=True,
-        indent=2,
-        ensure_ascii=False,
-        separators=(",", ": "),
-    )
-    # Python pads exponent digits (1e-08); ECMAScript JSON.stringify emits
-    # 1e-8.  The solver contract is authored in Node, so normalise that sole
-    # lexical difference while retaining the same parsed number.
-    payload = re.sub(r"e([+-])0+(\d+)", r"e\1\2", payload)
+    payload = _ecmascript_canonical_json(value)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

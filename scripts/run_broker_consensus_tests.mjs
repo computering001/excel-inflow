@@ -2,6 +2,7 @@
 
 import {
   brokerConsensusFormula,
+  compareDefinitionSignatures,
   compileBrokerConsensusMetric,
   resolveBrokerConsensusSelection,
   sealBrokerConsensusMembership,
@@ -80,6 +81,21 @@ const check = (condition, message) => {
   assert(condition, message);
   assertions += 1;
 };
+
+check(
+  compareDefinitionSignatures(
+    { accounting_basis: "ifrs", fiscal_calendar: "52-53 week", currency: "usd" },
+    { accounting_basis: "IFRS", fiscal_calendar: "52_53_WEEK", currency: "USD" },
+  ).compatible,
+  "equivalent definition enum spelling was treated as an economic mismatch",
+);
+check(
+  !compareDefinitionSignatures(
+    { accounting_basis: "IFRS", currency: "USD" },
+    { accounting_basis: "US_GAAP", currency: "USD" },
+  ).compatible,
+  "genuinely different accounting bases were normalized together",
+);
 
 for (const brokers of [
   { "House A": [100, 110, 120] },

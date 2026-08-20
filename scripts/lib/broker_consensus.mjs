@@ -20,6 +20,22 @@ const PERIOD_STATUS_INCLUDED = "included";
 const finite = (value) =>
   value !== null && value !== undefined && Number.isFinite(Number(value));
 
+// Definition signatures cross several independently typed boundaries: the
+// model-case schema uses values such as `IFRS` and `US_GAAP`, while broker
+// extraction fingerprints intentionally emit canonical lower-case tokens.
+// Those spellings describe the same economics.  Compare their semantic token,
+// not their presentation casing/separator, while retaining the original
+// values in mismatch receipts for review.
+function definitionToken(value) {
+  if (typeof value !== "string") return value;
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 export function brokerMetricDefinitionSignature(modelCase, metricId) {
   const declared =
     modelCase?.broker_pack?.metrics?.[metricId]?.definition_signature ?? {};
@@ -53,7 +69,7 @@ export function compareDefinitionSignatures(left, right) {
       a !== undefined &&
       b !== null &&
       b !== undefined &&
-      a !== b
+      definitionToken(a) !== definitionToken(b)
     ) {
       mismatches.push({ dimension, left: a, right: b });
     }

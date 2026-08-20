@@ -50,6 +50,20 @@ def seal(body: dict) -> dict:
 
 
 def main() -> int:
+    # Cross-language sentinel for the exact numeric bands that differ between
+    # Python's json.dumps and ECMAScript JSON.stringify.  The expected digest
+    # is minted by scripts/lib/run_store.mjs hashValue over this object.
+    numeric_canonicalisation_fixture = {
+        "small_fixed": 0.000028320312500440536,
+        "small_exp": 1e-8,
+        "integer_float": 1.0,
+        "large_fixed": 1e20,
+        "large_exp": 1e21,
+        "negative_zero": -0.0,
+    }
+    assert canonical_sha256(numeric_canonicalisation_fixture) == (
+        "74aad83b8362f82baaa0e518cbb257a60ecb73dfb65f805bb8e43375fa0e6a41"
+    )
     with tempfile.TemporaryDirectory(prefix="ownership-c-physical-") as temporary:
         root = Path(temporary)
         model_case = {
@@ -139,6 +153,7 @@ def main() -> int:
 
         print(json.dumps({
             "status": "PASS",
+            "ecmascript_numeric_canonicalisation_cases": 6,
             "clean_checked_writer_bindings": clean["checked_writer_bindings"],
             "mutations_rejected": 4,
             "mutations": [
