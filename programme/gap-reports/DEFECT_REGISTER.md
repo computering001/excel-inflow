@@ -203,7 +203,20 @@ mutations survive a digest-only sweep.
 Also: an attribution sweep must never run in a SHARED tree. P0.9's auto-restore reverted a
 concurrent agent's in-flight edit once before it moved to a detached worktree.
 
-## D23 — ending_cash ships as a blue hardcode claiming a filed source on a derived row
+## D23 — DELIVERY-BLOCKING REGRESSION: no workbook builds on the compiled-case path
+**ESCALATED from a fixture curiosity to a delivery blocker.** My first assessment scoped this
+to one fixture; it is not. Independently found again by P8.7, then verified by me:
+- `node scripts/run_phase9_broker_e2e_scenarios.mjs` was GREEN earlier this session and now
+  FAILS with this refusal. It compiles real cases and builds workbooks.
+- P8.7 proved the same case bytes PLAN successfully at `73c3401`, the parent of `bd1b973`
+  (P5.3), and `git log -S refuseContradictedProvenance` returns exactly `bd1b973`.
+- Consequence: every one of P8.7's five portable evidence classes is unproducible, so the
+  release dossier cannot be assembled and the freeze cannot proceed.
+Introduced by P5.3, which I committed. Its own gate passed because it exercised the archived
+`reference_parity` fixtures, not a compiled `production_model` case — the refusal fires on the
+latter.
+
+## D23 detail — the contradiction as reported
 Surfaced by P5.3's new emitter refusal, and confirmed as the single OPEN survivor in P7.5's
 mutation-adequacy register (`cash-fx-identity-workbook::suite-failure`, owner release-proof,
 reproduced serially and independently red in a clean worktree).
