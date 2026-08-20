@@ -338,6 +338,41 @@
       "invariant": "a convergence criterion must scale with the magnitudes it judges, and an absolute ceiling must be declared where it binds rather than applied silently",
       "note": "corrected two registered defects rather than only fixing them: MG-3 was overstated and its reproduction contaminated by D33 (a guard testing a convention NAME for its meaning); MG-1 could not land and in proving that, found P3.3's ETR acyclicity conclusion FALSE about the running solver - tax is already iterated today and the graph never said so"
     },
+    "P4.10": {
+      "commit": "",
+      "invariant": "the declared fixed point must contain every node the running solver actually iterates",
+      "note": "the missing edge was net_income->cfo, not the predicted tax_expense->cfo, and the component is 17 nodes not 16; landing 16 would have satisfied the work order and violated the invariant. P3.3's acyclicity conclusion corrected, not weakened: 112 -> 140 checks"
+    },
+    "P5.9": {
+      "commit": "",
+      "invariant": "a cell marked as a filed source must state the figure that source declares",
+      "note": "the exemption tested a filed record's EXISTENCE, not its VALUE; a case declaring 815.593 with a row value of 999.111 built clean"
+    },
+    "P7.9": {
+      "commit": "",
+      "invariant": "a transform must decide what a quantity means from its declared semantics, not a regex over its name",
+      "note": "the guard was DEAD CODE: five schema-admitted conventions, /rate/i matches none. Seven more name-for-meaning defects registered D37-D43"
+    },
+    "P7.10": {
+      "commit": "",
+      "invariant": "a residual is a function of its inputs; two accumulations of the same set must agree",
+      "note": "D32 closed by construction via a total order whose equality class contains only bit-identical doubles. D31 blocked: the typed value model is a shadow core, typed_arithmetic.mjs imported by ZERO production modules, 96 risk sites tabulated"
+    },
+    "P7.11": {
+      "commit": "",
+      "invariant": "every declared enum value must produce a supported outcome or a lawful typed refusal",
+      "note": "generalised D12 from one instrument class to all 82 declared enums / 371 values; an untyped throw is neither outcome nor refusal"
+    },
+    "P8.9": {
+      "commit": "",
+      "invariant": "one version declaration with no second value in the system to compare against",
+      "note": "freeze criteria 9 and 11. Criterion 11 was UNSATISFIABLE as written: the manifest was a member of the closure it published"
+    },
+    "P8.10": {
+      "commit": "",
+      "invariant": "the release smoke test must prove the mode the product ships in, on an input the profile DECLARES",
+      "note": "D44 resolved; the package compiles. Declined the stamped-output shortcut, which would have declared a mode whose entry conditions the case never met"
+    },
     "P6.8": {
       "commit": "",
       "invariant": "the runtime SLO is one declaration, bound by name, with a measured cohort and an enforceable ceiling",

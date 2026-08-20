@@ -1760,6 +1760,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "declared-value-typed-outcome",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_declared_value_typed_outcome_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "declared-fixed-point-completeness",
       "phase": "graph",
       "runtime": "node",

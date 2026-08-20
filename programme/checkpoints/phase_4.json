@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "5fd1b2af6f7d8f1d4a875a4edc7a7ff320b16661",
-  "source_tree": "d5693f70b9957e799a0a066648789697bccaeae1",
+  "commit": "8641134628826fb23645716d0c04a45af82137c1",
+  "source_tree": "cfaec5ee8aa613294e072fe4a7d5db4d590d4567",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -14,6 +14,12 @@
       "commit": "d627849",
       "invariant": "every opening instrument records its candidate universe, selected source and typed not-selected register",
       "note": "bridge citation of candidate ids and coverage-side validation follow on"
+    },
+    {
+      "package": "P4.10",
+      "commit": "",
+      "invariant": "the declared fixed point must contain every node the running solver actually iterates",
+      "note": "the missing edge was net_income->cfo, not the predicted tax_expense->cfo, and the component is 17 nodes not 16; landing 16 would have satisfied the work order and violated the invariant. P3.3's acyclicity conclusion corrected, not weakened: 112 -> 140 checks"
     },
     {
       "package": "P4.2",
@@ -70,7 +76,7 @@
       "note": "corrected two registered defects rather than only fixing them: MG-3 was overstated and its reproduction contaminated by D33 (a guard testing a convention NAME for its meaning); MG-1 could not land and in proving that, found P3.3's ETR acyclicity conclusion FALSE about the running solver - tax is already iterated today and the graph never said so"
     }
   ],
-  "sealed_package_count": 10,
+  "sealed_package_count": 11,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",
