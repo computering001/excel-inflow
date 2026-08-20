@@ -16,7 +16,10 @@ import {
 } from "./forecast_authority.mjs";
 import { verifyForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
-import { solverIterationOptions } from "./economic_solve_policy.mjs";
+import {
+  ECONOMIC_SOLVE_POLICY,
+  solverIterationOptions,
+} from "./economic_solve_policy.mjs";
 import {
   compileInstrumentPeriodState,
   definitionBasisValuesForPeriod,
@@ -167,6 +170,157 @@ export function detectTwoCycle(previousPrevious, previous, current, tolerance) {
   const currentResidual = iterationResidual(previous, current);
   const twoCycleResidual = iterationResidual(previousPrevious, current);
   return currentResidual > tolerance && twoCycleResidual <= tolerance;
+}
+
+/**
+ * P4.9 / defect D30 (MG-3) — THE CONVERGENCE TOLERANCE, MADE RELATIVE TO THE
+ * MAGNITUDES IT JUDGES, BELOW A DECLARED SCALE ENVELOPE.
+ *
+ * The residual this solver publishes is an L-infinity norm over a state vector
+ * of CURRENCY quantities. It was compared against
+ * `ECONOMIC_SOLVE_POLICY.solver.absolute_tolerance` — a fixed 1e-8 in whatever
+ * unit the issuer happens to report in — which makes the convergence criterion
+ * a function of a presentation choice. The direction with real teeth is
+ * DOWNWARD: for a small issuer, or a state vector of magnitude ~1, a constant
+ * 1e-8 is so loose that a sweep-to-sweep movement of 5e-9 — a fifth of the
+ * state's own resolution requirement — is accepted as a fixed point. That is
+ * the failure a bigger constant would make worse, so the criterion is made
+ * proportional to the state instead, and floored by a bound derived from
+ * IEEE754 rather than chosen:
+ *
+ *     tolerance(state) = min( max( rho * S , nu(state) ) , ceiling )
+ *
+ *   S       the L-infinity magnitude of the state vector across the two
+ *           iterates being compared. It scales exactly with the economics, so
+ *           below the ceiling `residual <= tolerance` is scale-free.
+ *
+ *   nu      the float-noise floor. A residual is a difference of two values
+ *           each produced by a chain of sums and products, so below the
+ *           accumulated rounding of that chain "movement" is not movement. This
+ *           is the textbook recursive-summation bound
+ *           `(n-1) * u * SUM|xi| + u * |target|` with u = 2^-53, carrying the
+ *           same safety factor of 4 that P2.10 derived for the footing oracle,
+ *           so this repository's two tolerance homes agree about what doubles
+ *           can resolve. It is proportional to the state, so it is scale-free
+ *           too. On the whole archetype corpus it sits at least ~100x below the
+ *           relative term, so it never binds and never asks the iteration to
+ *           chase rounding — but it is there so the criterion can never be
+ *           tighter than the arithmetic's own resolution at any scale.
+ *
+ *   rho     the relative convergence tolerance, expressed as the absolute
+ *           tolerance restated at the magnitude a currency state vector
+ *           actually carries (10^3 reporting units):
+ *           rho = absolute_tolerance / REFERENCE_STATE_MAGNITUDE.
+ *           At S = 10^3 the criterion reproduces 1e-8 exactly; below that it is
+ *           strictly stricter, which is the repair.
+ *
+ *   ceiling THE DECLARED SCALE ENVELOPE, and the honest limitation of this
+ *           package. Above S = 10^3 the criterion would become LOOSER than
+ *           `absolute_tolerance`, and three readers outside this package's
+ *           mandate refuse that: `run_graph_driven_solve_tests` (P4.7) checks
+ *           every per-SCC and per-sweep residual against the published
+ *           `convergence_tolerance`; `fixed_point_constitution.mjs:187` requires
+ *           the published tolerance to EQUAL `policy.solver.absolute_tolerance`
+ *           and `:191` requires `residual <= absolute_tolerance`; and
+ *           `release_nodes.mjs:48` compares the residual against the published
+ *           field. Removing the ceiling was implemented and measured: it is
+ *           correct, it makes the criterion scale-free in both directions, and
+ *           it turns two of P4.7's 64 checks red and contradicts
+ *           `validateFixedPointSolution` on every case. That is a joint change
+ *           with those three readers, not a solver change, so the ceiling stays
+ *           and SAYS SO on every period it binds
+ *           (`within_declared_envelope: false`). See P4.9's issue card.
+ *
+ * HONEST ABOUT WHAT IS DERIVED AND WHAT IS CALIBRATED: the FORM, and nu, are
+ * derived. REFERENCE_STATE_MAGNITUDE is a calibration — the coarsest power of
+ * ten that reproduces the absolute tolerance at the scale the repository's own
+ * certified fixtures solve at, so that not one emitted number moves on either.
+ * The policy asset already DECLARES `solver.relative_tolerance = 1e-12` (and
+ * cross-checks it against `native_tolerances.relative`) and no caller has ever
+ * read it; that value is 10x stricter again and is the principled destination,
+ * but adopting it moves 25 of 99 solved forecast periods including a certified
+ * fixture and the phase-9 broker receipt, so it is a golden-regeneration
+ * package and not this one.
+ */
+const UNIT_ROUNDOFF = Number.EPSILON / 2;
+const FLOAT_NOISE_SAFETY_FACTOR = 4;
+const REFERENCE_STATE_MAGNITUDE = 1e3;
+const RELATIVE_CONVERGENCE_TOLERANCE =
+  ECONOMIC_SOLVE_POLICY.solver.absolute_tolerance / REFERENCE_STATE_MAGNITUDE;
+
+/** The L-infinity magnitude of the state the residual is measured over. */
+export function convergenceStateScale(previous, current) {
+  let scale = 0;
+  for (const snapshot of [previous, current]) {
+    if (!Array.isArray(snapshot)) continue;
+    for (const value of snapshot) {
+      const magnitude = Math.abs(Number(value));
+      if (Number.isFinite(magnitude) && magnitude > scale) scale = magnitude;
+    }
+  }
+  return scale;
+}
+
+/**
+ * The IEEE754 floor: the residual a state of this magnitude carries from
+ * rounding alone. Recursive-summation bound, same shape and same safety factor
+ * as `source_tolerance.floatNoiseTolerance`. The term sum is taken over BOTH
+ * iterates, the conservative side, since either could be the chain that
+ * accumulated the rounding.
+ */
+export function convergenceFloatNoiseFloor(previous, current) {
+  let terms = 0;
+  let count = 0;
+  for (const snapshot of [previous, current]) {
+    if (!Array.isArray(snapshot)) continue;
+    if (snapshot.length > count) count = snapshot.length;
+    for (const value of snapshot) {
+      const magnitude = Math.abs(Number(value));
+      if (Number.isFinite(magnitude)) terms += magnitude;
+    }
+  }
+  const scale = convergenceStateScale(previous, current);
+  return (
+    FLOAT_NOISE_SAFETY_FACTOR *
+    UNIT_ROUNDOFF *
+    (Math.max(count - 1, 0) * terms + scale)
+  );
+}
+
+/**
+ * The criterion, published rather than left implicit: a reader can recompute
+ * every term, see which one bound, and see whether the declared scale envelope
+ * was the thing that decided.
+ */
+export function convergenceCriterion(previous, current, options = {}) {
+  const relativeTolerance = Number(
+    options.relativeTolerance ?? RELATIVE_CONVERGENCE_TOLERANCE,
+  );
+  const ceiling = Number(
+    options.absoluteTolerance ?? ECONOMIC_SOLVE_POLICY.solver.absolute_tolerance,
+  );
+  const stateScale = convergenceStateScale(previous, current);
+  const relativeTerm = relativeTolerance * stateScale;
+  const floatNoiseFloor = convergenceFloatNoiseFloor(previous, current);
+  const scaleFree = Math.max(relativeTerm, floatNoiseFloor);
+  const withinEnvelope = scaleFree <= ceiling;
+  return {
+    form: "relative_below_declared_reference_magnitude",
+    relative_tolerance: relativeTolerance,
+    reference_state_magnitude: REFERENCE_STATE_MAGNITUDE,
+    state_scale: stateScale,
+    relative_term: relativeTerm,
+    float_noise_floor: floatNoiseFloor,
+    scale_free_tolerance: scaleFree,
+    envelope_ceiling: ceiling,
+    within_declared_envelope: withinEnvelope,
+    applied_tolerance: withinEnvelope ? scaleFree : ceiling,
+    binding_term: !withinEnvelope
+      ? "declared_absolute_ceiling"
+      : relativeTerm >= floatNoiseFloor
+        ? "relative"
+        : "float_noise_floor",
+  };
 }
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
@@ -2539,6 +2693,10 @@ export function solveCase(
     // P4.7 — per-period convergence and binding-constraint observations.
     const convergenceTrace = [];
     let lastSccResiduals = [];
+    // P4.9 — the convergence criterion actually applied, per period.
+    let lastConvergenceCriterion = convergenceCriterion(null, [], {
+      absoluteTolerance: tolerance,
+    });
     let lastBindingConstraint = null;
     let lastCashLoop = null;
     let previousIterationSnapshot = null;
@@ -3006,10 +3164,18 @@ export function solveCase(
         previousIterationSnapshot,
         currentIterationSnapshot,
       );
+      // P4.9 — the fixed-point test is judged against the magnitudes it is
+      // measuring, not against a constant in the issuer's reporting unit.
+      lastConvergenceCriterion = convergenceCriterion(
+        previousIterationSnapshot,
+        currentIterationSnapshot,
+        { absoluteTolerance: tolerance },
+      );
+      const convergenceLimit = lastConvergenceCriterion.applied_tolerance;
       const twoCycleResidual = previousPreviousIterationSnapshot
         ? iterationResidual(previousPreviousIterationSnapshot, currentIterationSnapshot)
         : Number.POSITIVE_INFINITY;
-      const twoCycleDetected = solverDeclaration.required && detectTwoCycle(previousPreviousIterationSnapshot, previousIterationSnapshot, currentIterationSnapshot, tolerance);
+      const twoCycleDetected = solverDeclaration.required && detectTwoCycle(previousPreviousIterationSnapshot, previousIterationSnapshot, currentIterationSnapshot, convergenceLimit);
       if (twoCycleDetected) cycleDetectionCount += 1;
       // P4.7 — the residual, DECOMPOSED per strongly-connected component of
       // the case's own graph. The published scalar is an L-infinity norm over
@@ -3030,6 +3196,8 @@ export function solveCase(
         two_cycle_residual: twoCycleResidual,
         two_cycle_detected: twoCycleDetected,
         damping_index: dampingIndex,
+        applied_tolerance: convergenceLimit,
+        state_scale: lastConvergenceCriterion.state_scale,
         scc_residuals: lastSccResiduals.map((entry) => ({
           component_id: entry.component_id,
           residual: entry.residual,
@@ -3166,7 +3334,7 @@ export function solveCase(
         statement_values: Object.fromEntries(finalStatementValues),
       };
 
-      if (!solverDeclaration.required || residual <= tolerance) {
+      if (!solverDeclaration.required || residual <= convergenceLimit) {
         if (!solverDeclaration.required) residual = 0;
         endingCash = nextEndingCash;
         endingRcf = nextEndingRcf;
@@ -3194,6 +3362,8 @@ export function solveCase(
       error.code = "SOLVER_NON_CONVERGENCE";
       error.iterations = iterationLimit;
       error.residual = residual;
+      // P4.9 — a refusal must say what it judged the residual against.
+      error.convergence_criterion = lastConvergenceCriterion;
       error.two_cycle_detections = cycleDetectionCount;
       // P4.7 — a refusal that says only "did not converge" cannot be told
       // apart from an oscillation or a divergence. The trace travels with it.
@@ -3401,6 +3571,7 @@ export function solveCase(
         convergence_trace: convergenceTrace,
         binding_constraint: lastBindingConstraint,
         cash_loop: lastCashLoop,
+        convergence_criterion: lastConvergenceCriterion,
       },
       typed_states: scheduleTypedStates,
       checks: {
@@ -3495,6 +3666,17 @@ export function solveCase(
       results.every((result) => result.converged === true),
     iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),
     residual: Math.max(0, ...results.map((result) => Number(result.residual ?? Number.POSITIVE_INFINITY))),
+    // P4.9 — this field continues to name the DECLARED policy tolerance, not
+    // the criterion applied. Two validators outside this package's mandate read
+    // it as the policy constant and refuse any other value
+    // (`fixed_point_constitution.mjs` requires exact equality with
+    // `policy.solver.absolute_tolerance`; `release_nodes.mjs` compares the
+    // residual against it), so publishing the applied criterion here would
+    // contradict them rather than inform them. The criterion that actually
+    // decided each period is published in full at
+    // `forecast[].graph_driven_solve.convergence_criterion`. Naming the applied
+    // criterion HERE is a joint change with those two readers — see P4.9's
+    // issue card, "Unresolved".
     convergence_tolerance: tolerance,
     all_checks_pass: results.every((result) =>
       Object.values(result.checks).every(Boolean),

@@ -365,3 +365,56 @@ appears and the trailing one does not.
 Seed 700577: -943.56 vs -943.5600000000002 depending on accumulation order; 26 drifts observed,
 all ~1e-13 relative against a 0.01 tolerance. Latent today, but it means the bridge's residual
 is not a function of the inputs alone.
+
+# Wave 4 — P4.9's corrections. Two defects were WRONG as registered.
+
+## D33 — a metamorphic guard tests a convention's NAME for its MEANING (NEW)
+`scripts/lib/metamorphic_relations.mjs:733` guards the commitment fee with
+`!/rate/i.test(commitment_fee_convention)`. The three conventions that exist in the repo —
+`bps_on_undrawn`, `captured_in_residual`, `none` — contain no "rate", so the guard has NEVER
+fired. The unit-scale transform therefore scales `rcf_policy.commitment_fee_value` from 35 to
+35,000 while the convention is `bps_on_undrawn`: a 350% commitment fee.
+
+## D30/MG-3 — CORRECTED: overstated, and its reproduction was contaminated by D33
+As registered, MG-3 claimed convergence is not scale-invariant and that "an issuer reporting in
+thousands is refused for economics an issuer in millions is served". That reproduction was the
+350% fee, not the tolerance. Held at a faithful rate, the thousands restatement CONVERGES on
+the shipped tree (3.019e-9 < 1e-8, CFO scaling exactly x1000), and a faithful sweep at
+x1e3/1e6/1e9/1e12 across every archetype produced NOT ONE refusal.
+
+The mechanism is real but far milder: the worst faithful x1000 restatement lands at 9.903e-9
+against 1e-8 — a 1% margin. Severity HIGH -> MEDIUM. P4.9 built the relative criterion anyway
+(P2.10's recursive-summation bound, reference magnitude 10^3, reproducing 1e-8 exactly at that
+scale and strictly stricter below) with the absolute ceiling DECLARED rather than silently
+applied: every period it decides carries `binding_term: "declared_absolute_ceiling"` and the
+uncapped scale-free tolerance beside it. Removing the ceiling is a joint change with three
+other readers and is specified, not attempted.
+
+## D28/MG-1 — NOT LANDED, and it exposed a FALSE sealed proof (SEVERITY: HIGH)
+Landing the edge requires FIVE artefacts to move together: the graph edge; the convergence
+contract's SCC and state vector 13 -> 16 with a rehash; solver.mjs's iteration vector;
+canonical_model_modules.mjs (refuses at load: the new edge is owned by cash_rcf and declared by
+nobody); and model_ir_v3.mjs (cannot bind the three new fixed-point nodes to workbook rows).
+Three were outside P4.9's remit, so nothing landed. NO NUMBER MOVES — it is a pure declaration
+gap.
+
+THE SERIOUS PART, and it corrects sealed work: P3.3's ETR acyclicity conclusion is not merely
+unproven on the repaired graph — it is FALSE about the RUNNING SOLVER. `taxCharge` is computed
+inside the period sweep from `preTaxIncome` <- `netInterest` <- the iterated interest, and CFO
+is seeded from `netIncome` <- `taxCharge`. **Tax is already iterated today.** The graph simply
+never declared it. So the declared 13-node fixed point understates the real one, and P3.3's
+proof asserts a sink property the solver does not have.
+
+P3.3 predicted this in its own comment ("a future edit wiring net income into the cash-flow
+bridge would violate [the sink property] ... It must fail loudly here") — and it does fail
+loudly, which is the validator working. What it could not know was that the solver had already
+crossed the line the graph forbade.
+
+P4.7 is UNAFFECTED: re-derived against the repaired graph the solve order still agrees, zero
+violations. Absorbing three nodes into the SCC moves edges from inter- to intra-component, a
+strictly weaker obligation the hand-written order satisfies.
+
+## D34 — policy.solver.relative_tolerance is declared, schema-validated, hash-bound, and read by NOBODY
+The D20/D26 class again. It is the principled reference magnitude, but adopting its 1e-12 moves
+25 of 99 forecast periods including a certified fixture and the phase-9 receipt, so it is a
+golden-regeneration package rather than a free fix.
