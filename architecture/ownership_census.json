@@ -49,9 +49,9 @@
       "families": {
         "terminal_status": 3
       },
-      "classification": "UNCLASSIFIED",
-      "concern": null,
-      "target_owner": null
+      "classification": "canonical_writer",
+      "concern": "P7.2 behavioural golden records + approval ledger (frozen truth; regeneration is human-approved only)",
+      "target_owner": "Release/package compiler (Phase 8)"
     },
     "lib/broker_intake_choice.mjs": {
       "count": 4,
@@ -330,9 +330,9 @@
       "families": {
         "terminal_status": 3
       },
-      "classification": "UNCLASSIFIED",
-      "concern": null,
-      "target_owner": null
+      "classification": "validator",
+      "concern": "P8.1 A/B archive comparison + smallest-difference report (compares, never writes a package)",
+      "target_owner": "Release/package compiler (Phase 8)"
     },
     "lib/performance_receipt.mjs": {
       "count": 1,
@@ -557,10 +557,7 @@
   ],
   "unknown_writer_gate": {
     "rule": "every high-risk mutation must be classified before Phase 1 closes",
-    "unclassified_files": [
-      "lib/behavioural_golden.mjs",
-      "lib/package_ab_comparison.mjs"
-    ]
+    "unclassified_files": []
   },
   "runtime_mutation_receipts_status": "static census only in P0.7; runtime receipts around the named late-repair points land with the Phase 3/5 shadow migration that consumes them - declared, not silent"
 }

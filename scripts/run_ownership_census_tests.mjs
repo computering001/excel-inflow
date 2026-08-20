@@ -109,6 +109,8 @@ const FILE_OWNERSHIP = {
   "lib/economic_ir.mjs": { role: "canonical_writer", concern: "P3.1 canonical Economic IR (shadow; typed values, never gates delivery)", target_owner: "Economic IR (Phase 3)" },
   "lib/opening_instrument_provenance.mjs": { role: "canonical_writer", concern: "P4.1 opening-instrument candidate inventory + not-selected register", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/release_journal.mjs": { role: "canonical_writer", concern: "P8.6a append-only hash-chained release journal + rollback policy validator", target_owner: "Release/package compiler (Phase 8)" },
+  "lib/behavioural_golden.mjs": { role: "canonical_writer", concern: "P7.2 behavioural golden records + approval ledger (frozen truth; regeneration is human-approved only)", target_owner: "Release/package compiler (Phase 8)" },
+  "lib/package_ab_comparison.mjs": { role: "validator", concern: "P8.1 A/B archive comparison + smallest-difference report (compares, never writes a package)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/case_generator.mjs": { role: "canonical_writer", concern: "P7.3 development-only seeded synthetic case generator (writes generated TEST cases and their seed registry; never mutates product state on a real run)", target_owner: "Corpus and generated cohort (Phase 7)" },
 };
 

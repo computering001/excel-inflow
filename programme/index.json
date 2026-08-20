@@ -252,6 +252,16 @@
       "commit": "bd4bcfd",
       "invariant": "the economic layer is edge-bound to the statement layer and no graph can drift from another unseen",
       "note": "coverage gap declared for 7 node families and re-derived by the validator"
+    },
+    "P3.8": {
+      "commit": "73c3401",
+      "invariant": "the authority seal binds all five compiled economic artifacts and localises which one moved",
+      "note": "embedding discovered not tabulated; over-reports rather than under-reports"
+    },
+    "P5.3": {
+      "commit": "bd1b973",
+      "invariant": "provenance colour and comment truth are bound to the authority record and checked independently",
+      "note": "the flaw was a shared ANCHOR, not a shared import; workbooks byte-identical"
     }
   },
   "evidence_baseline": {
