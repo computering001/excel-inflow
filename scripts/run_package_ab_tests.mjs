@@ -570,7 +570,13 @@ try {
   compileRefuses(
     "compile: --portable-certify demands a hash-bound portable evidence dossier, not a development build",
     ["--skill", ROOT, "--out", scratchOut, "--portable-certify", "--smoke-case", path.join(temp, "case.json")],
-    /--portable-certify requires both --certification-evidence/,
+    // Reworded by P8.10, not weakened. --smoke-case is no longer mandatory on
+    // the command line because assets/deployment-profile.json can declare
+    // release_smoke_case, so "requires BOTH" stopped being true. The refusal
+    // itself is unchanged and still fires: --portable-certify without a
+    // certification-evidence dossier is refused. The pin follows the accurate
+    // wording rather than the accurate wording being reverted to suit the pin.
+    /--portable-certify requires --certification-evidence/,
   );
 
   // The real compiler, against a real source tree whose runtime manifest
