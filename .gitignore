@@ -4,4 +4,12 @@ __pycache__/
 **/__pycache__/
 
 audit/v360/
+# External custody must NEVER ship. The top-level path was NOT covered here,
+# so fixtures/external/Codex and fixtures/external/codex-runtimes were tracked
+# as symlinks to absolute paths on one developer's machine
+# (/Users/archiepreston/Documents/Codex). No custody CONTENT was in the repo,
+# but the layout of a private filesystem was, and the links are broken on every
+# other machine. They are the local custody ACCESS mechanism and belong on disk,
+# never in the index.
+fixtures/external/
 scripts/fixtures/external/

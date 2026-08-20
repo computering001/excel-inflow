@@ -979,3 +979,29 @@ HARNESS, not in the product — but a release gate that silently narrows its own
 gate. NOT FIXED: the harness repair is out of scope for the freeze and is recorded for v3.8, with
 the explicit warning that no green from this gate may be trusted without diffing its suite list
 against the registry.
+
+## D51 — external-custody symlinks were TRACKED, leaking a private filesystem layout (FIXED)
+Caught at the push boundary, by diffing what would actually be published rather than trusting the
+working tree to be clean (`git status` was empty; the problem was in history).
+
+`fixtures/external/Codex` and `fixtures/external/codex-runtimes` were tracked as mode-120000
+symlinks to ABSOLUTE paths on one developer's machine:
+
+    fixtures/external/Codex          -> /Users/archiepreston/Documents/Codex
+    fixtures/external/codex-runtimes -> /Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/fixtures/external/codex-runtimes
+
+No custody CONTENT was in the repository — the targets are outside it — so the standing rule that
+external custody must never ship was not breached in substance. But the LAYOUT of a private
+filesystem was tracked, the links are broken on every machine but one, and they sit in the exact
+directory the constitution names as never-ship. This is D48's class (a hard-coded home path in a
+shipped file) in a form `grep` for `/Users/` inside file CONTENT cannot see, because the path is
+the symlink target, not text in a file.
+
+Root cause: `.gitignore` covered `scripts/fixtures/external/` but NOT the top-level
+`fixtures/external/`. Introduced long before this programme, in `e49ad07`.
+
+Repair: both untracked with `git rm --cached` (kept on disk — they are the local custody ACCESS
+mechanism and several suites reach custody through them) and `fixtures/external/` added to
+`.gitignore` with the reason recorded. Verified after: no tracked symlinks remain anywhere, and
+nothing matching `private-test-custody` or `fixtures/external` is tracked. The custody-gated
+suites behave identically (still BLOCKED without a custody root, exactly as before).
