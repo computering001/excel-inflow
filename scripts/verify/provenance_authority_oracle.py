@@ -201,6 +201,69 @@ def row_map_definition(definitions: list, row_id: str) -> dict | None:
     return None
 
 
+def filed_observation(
+    case: dict, definitions: list, row_id: str, period_index: int
+) -> object:
+    """The figure an authority record says was REPORTED for this period, or None.
+
+    D23 fix.  A row's `calculation` — and, on a compiled case, its
+    `historical_authority: "derived_formula"` — states the row's DERIVATION
+    RULE.  Neither is a statement that no figure was reported for the
+    historical periods, and the first version of this table read them as one.
+    The record that says a figure WAS reported is one of these two, both
+    authored by the case or the compiler and never by the emitter's colour
+    rule:
+
+      * `reported_historical_values[period]` on the compiled row — the
+        compiler's explicit "these three are the reported figures";
+      * for `ending_cash` under the LEGACY single-bucket cash policy, the
+        case's own `cash_policy.historical_year_end_cash[period]`.  The
+        emitter states the reason at `build_dynamic_model.mjs:4362`–`:4372`:
+        a legacy historical closing-cash balance "is a filed observation, not
+        an amount the workbook is entitled to replace with a reconstructed
+        cash-flow identity", and it suppresses the historical formula for
+        exactly that row (`sourcedHistoricalEndingCash`).
+
+    Anything else derived stays refused: this is a named exception resting on a
+    compiler field and a declared cash-policy shape, not a heuristic.
+    """
+    definition = row_map_definition(definitions, row_id) or {}
+    reported = definition.get("reported_historical_values")
+    if isinstance(reported, list) and period_index < len(reported):
+        candidate = reported[period_index]
+        if isinstance(candidate, (int, float)) and not isinstance(candidate, bool):
+            return float(candidate)
+    role = definition.get("semantic_role") or (case_rows(case).get(row_id) or {}).get("semantic_role")
+    policy = case.get("cash_policy") or {}
+    if role == "ending_cash" and not policy.get("buckets"):
+        series = policy.get("historical_year_end_cash")
+        if isinstance(series, list) and period_index < len(series):
+            candidate = series[period_index]
+            if isinstance(candidate, (int, float)) and not isinstance(candidate, bool):
+                return float(candidate)
+    return None
+
+
+def declared_historical_value(
+    case: dict, definitions: list, row_id: str, period_index: int
+) -> object:
+    """The reported figure a blue historical cell must be STATING, if the case
+    supplies one at all: the filed observation where one is declared, otherwise
+    the row's own `values` series."""
+    filed = filed_observation(case, definitions, row_id, period_index)
+    if filed is not None:
+        return filed
+    for source in (
+        (case_rows(case).get(row_id) or {}).get("values"),
+        (row_map_definition(definitions, row_id) or {}).get("values"),
+    ):
+        if isinstance(source, list) and period_index < len(source):
+            candidate = source[period_index]
+            if isinstance(candidate, (int, float)) and not isinstance(candidate, bool):
+                return float(candidate)
+    return None
+
+
 def forecast_authority(model_ir: dict, row_id: str, forecast_index: int) -> dict | None:
     for record in ((model_ir.get("planes") or {}).get("authority") or []):
         if record.get("display_id") == row_id and int(record.get("forecast_index", -1)) == int(forecast_index):
@@ -213,7 +276,9 @@ def forecast_authority(model_ir: dict, row_id: str, forecast_index: int) -> dict
 # ---------------------------------------------------------------------------
 
 
-def permitted_markings(kind: str, authority: dict | None, declaration: str) -> tuple:
+def permitted_markings(
+    kind: str, authority: dict | None, declaration: str, filed: object = None
+) -> tuple:
     """The marks a governing authority record permits, and why.
 
     Hand-authored here from what each authority MEANS, not from what the
@@ -222,10 +287,18 @@ def permitted_markings(kind: str, authority: dict | None, declaration: str) -> t
     """
     if kind == "historical":
         if declaration == "derived":
+            if filed is not None:
+                return (
+                    {"hardcode", "same_sheet_formula", "cross_sheet_link"},
+                    "the row is derived, but an authority record declares a FILED "
+                    "OBSERVATION for this period which the workbook is not entitled "
+                    "to replace with a reconstructed identity",
+                )
             return (
                 {"same_sheet_formula", "cross_sheet_link"},
-                "the case declares this row as computed from other rows, so the "
-                "workbook may not claim the number was read off a filed page",
+                "the case declares this row as computed from other rows and declares no "
+                "filed observation for the period, so the workbook may not claim the "
+                "number was read off a filed page",
             )
         if declaration == "not_applicable":
             return (
@@ -328,6 +401,7 @@ def observe(xlsx: Path) -> dict:
                 "formula": formula,
                 "cross_sheet": bool(formula) and bool(CROSS_SHEET.search(formula)),
                 "populated": formula is not None or (value is not None and value != ""),
+                "value": value,
             }
         sheets[sheet["name"]] = {
             "cells": cells,
@@ -496,7 +570,11 @@ def verify(xlsx: Path, case: dict, model_ir: dict, row_map: dict, binding: dict)
             declaration = "forecast"
 
         authority_visited += 1
-        permitted, why = permitted_markings(kind, authority, declaration)
+        filed = (
+            filed_observation(case, definitions, row_id, period_index)
+            if kind == "historical" else None
+        )
+        permitted, why = permitted_markings(kind, authority, declaration, filed)
         if cell["marking"] not in permitted:
             report.add(
                 "PROV_MARK_CONTRADICTS_AUTHORITY", sheet="Operating Model", cell=address,
@@ -512,14 +590,43 @@ def verify(xlsx: Path, case: dict, model_ir: dict, row_map: dict, binding: dict)
             continue
 
         # A blue statement hardcode is the strongest claim in the workbook — it
-        # says a person read this number off a page.  It must therefore say
-        # WHICH page, and the entry it names must exist.
+        # says a person read this number off a page.  Three things must hold, and
+        # the second and third are D23's new teeth: it must CITE a page, an
+        # authority RECORD for that page must exist, and the cell must be
+        # STATING the figure the case reports for that period rather than a
+        # number of its own.
         if kind == "historical" and cell["marking"] == "hardcode":
             if address not in operating["comments"]:
                 report.add(
                     "PROV_HARDCODE_WITHOUT_SOURCE", sheet="Operating Model", cell=address,
                     row_id=row_id, period_index=period_index,
                     message="a blue historical hardcode claims a filed source and cites no page",
+                )
+            elif not (
+                provenance_entry(case, row_id, period_index)
+                or compiler_provenance_entry(row_map, row_id, period_index)
+                or declared_absence_entry(case_row, period_index)
+            ):
+                report.add(
+                    "PROV_HARDCODE_WITHOUT_SOURCE", sheet="Operating Model", cell=address,
+                    row_id=row_id, period_index=period_index,
+                    message="a blue historical hardcode claims a filed source that no "
+                            "authority record declares",
+                )
+            reported = declared_historical_value(case, definitions, row_id, period_index)
+            stated = cell["value"]
+            if (
+                reported is not None
+                and isinstance(stated, (int, float))
+                and not isinstance(stated, bool)
+                and abs(float(stated) - reported) > 1e-6 * max(1.0, abs(reported))
+            ):
+                report.add(
+                    "PROV_HARDCODE_VALUE_NOT_FILED", sheet="Operating Model", cell=address,
+                    row_id=row_id, period_index=period_index,
+                    stated=stated, authority_reports=reported,
+                    message="a blue hardcode cites a filed page but does not state the "
+                            "figure the authority record reports",
                 )
 
     # ------------------------------------------------------------ comment truth

@@ -1652,6 +1652,42 @@
       "test_class": "mutation"
     },
     {
+      "id": "release-dossier",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_dossier_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "gate-side-effect",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_gate_side_effect_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
+      "id": "stage-recipe",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_stage_recipe_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "mutation-adequacy",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_mutation_adequacy_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "ci-gate-tiers",
       "phase": "workflow",
       "runtime": "node",

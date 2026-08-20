@@ -1,0 +1,28 @@
+PORTABLE EVIDENCE PRODUCER BLOCK — workbook build refusal
+captured_at: 2026-08-20T01:53:09Z
+source_commit: 8bc37db3b487e0c0d38d94473fb505179e3aed13
+earliest_responsible_layer: scripts/build_dynamic_model.mjs refuseContradictedProvenance (:784), reached from emitWorkbook (:12545) via synthesisePlan (:12198)
+introduced_by: bd1b973 (P5.3 — provenance colour and comment TRUTH bound to the authority record), localised with: git log -S refuseContradictedProvenance -- scripts/build_dynamic_model.mjs
+
+STEP 1 — compile the production smoke case (SUCCEEDS)
+$ node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-compiled-case <case.json> --production
+exit 0; case bytes sha256: 0df3cd00b7c226a34e6b934574e2409bf3ae3e4e7ca5705d673c332be47bc106
+
+STEP 2 — build the workbook plan from that case (REFUSES)
+$ node scripts/build_dynamic_model.mjs <case.json> --out <model.xlsx> --plan-only
+Error: Provenance marking contradicts the authority governing the cell:
+- Operating Model!G64: ending_cash is a derived row in the case, but the cell ships as a blue hardcode claiming a filed source
+- Operating Model!H64: ending_cash is a derived row in the case, but the cell ships as a blue hardcode claiming a filed source
+- Operating Model!I64: ending_cash is a derived row in the case, but the cell ships as a blue hardcode claiming a filed source
+    at refuseContradictedProvenance (file:///Users/archiepreston/Documents/Codex/excel-inflow-v377/scripts/build_dynamic_model.mjs:784:11)
+    at emitWorkbook (file:///Users/archiepreston/Documents/Codex/excel-inflow-v377/scripts/build_dynamic_model.mjs:12545:3)
+    at synthesisePlan (file:///Users/archiepreston/Documents/Codex/excel-inflow-v377/scripts/build_dynamic_model.mjs:12198:20)
+    at main (file:///Users/archiepreston/Documents/Codex/excel-inflow-v377/scripts/build_dynamic_model.mjs:12718:29)
+exit 1
+
+STEP 3 — the same case bytes at 73c3401, the parent of the introducing commit (SUCCEEDS), so the block is a CURRENT DEFECT and not a permanent condition
+$ git worktree add --detach <tmp> 73c3401 && node scripts/build_dynamic_model.mjs <case.json> --plan-only
+{"status":"PLANNED","plan":"<tmp>/pre53.xlsx.plan.json","case_id":"standard_net_cash","instrument_count":2,"last_row":142,"unresolved_caches":0,"solver_checks_pass":true}
+exit 0
+
+CONSEQUENCE: no workbook can be produced at this commit, so every portable evidence class that needs a built workbook is unproducible here. This transcript is the hash-bound blocking evidence for those typed absences.

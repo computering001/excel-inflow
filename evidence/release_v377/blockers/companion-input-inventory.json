@@ -1,0 +1,39 @@
+{
+  "schema_version": "excel-inflow-portable-dossier-companion-input-probe/1.0",
+  "captured_at": "2026-08-20T01:53:10.000Z",
+  "source_commit": "8bc37db3b487e0c0d38d94473fb505179e3aed13",
+  "earliest_responsible_layer": "the producer's companion INPUT: an artifact the repository does not contain at this commit",
+  "purpose": "A filesystem probe of the companion inputs the portable evidence producers require. It is the hash-bound blocking evidence for the typed absences whose block is a MISSING INPUT rather than a refusing producer or an unsatisfied host.",
+  "probes": {
+    "built_or_committed_workbooks": {
+      "command": "find . -name \"*.xlsx\" -not -path \"./node_modules/*\" | wc -l | tr -d \" \"",
+      "result": "0"
+    },
+    "render_evidence_reports": {
+      "command": "find . -name \"*render-evidence*.json\" -not -path \"./node_modules/*\" | wc -l | tr -d \" \"",
+      "result": "0"
+    },
+    "immutable_render_baseline_directories": {
+      "command": "find . -type d -name \"*baseline*\" -not -path \"./node_modules/*\" | wc -l | tr -d \" \"",
+      "result": "0"
+    },
+    "frozen_cohort_authority_directories": {
+      "command": "find . -type d -name \"*authorit*\" -not -path \"./node_modules/*\" | wc -l | tr -d \" \"",
+      "result": "0"
+    },
+    "source_parity_lineage_ledger_files": {
+      "command": "find . -name \"*lineage*ledger*\" -not -path \"./node_modules/*\" | wc -l | tr -d \" \"",
+      "result": "0"
+    },
+    "evidence_directories_under_audit": {
+      "command": "ls audit | tr \"\\n\" \" \"",
+      "result": "v370 v372-governance v372-phase15 v373-governance v373-phase15 v374-governance v375-governance"
+    }
+  },
+  "findings": [
+    "run_frozen_cohort.mjs requires --authorities <directory> of immutable authority workbooks. No authority corpus and no .xlsx of any kind exists at this commit, so the 32-case frozen cohort cannot be run, let alone compared.",
+    "check_render.py in exact_authority_replay mode compares against IMMUTABLE pixel baselines and refuses to author its own expected output (a missing baseline is BLOCKED, never a warning). No baseline directory exists at this commit.",
+    "release_certification.mjs pins the two immutable V4 authority workbooks by sha256 (02acdc52... maximal, df030788... net_cash). Neither workbook is present at this commit; only their digests are, in assets/standardised-design-runtime.v4.json.",
+    "validate_source_parity.mjs takes <workbook.xlsx> <row-map.json> <ledger.json>. The lineage ledger is derived independently from a source manifest and no ledger artifact exists in the repository at this commit; that independence from the case is the whole point of the check, so the ledger cannot be synthesised from the case without destroying the property being validated."
+  ]
+}

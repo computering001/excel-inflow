@@ -379,6 +379,16 @@
       "concern": "release certification checks",
       "target_owner": "validators stay validators"
     },
+    "lib/release_dossier.mjs": {
+      "count": 3,
+      "families": {
+        "terminal_status": 2,
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "P8.7 portable dossier assembly (typed absences; refuses to mint a manifest naming fewer than five classes)",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
     "lib/release_identity_governance.mjs": {
       "count": 1,
       "families": {

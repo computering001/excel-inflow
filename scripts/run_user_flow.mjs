@@ -19,6 +19,7 @@ import {
 } from "./lib/run_deadline.mjs";
 import {
   DEFAULT_RUNTIME_BUDGETS_MS,
+  RUNTIME_BUDGET_POLICY_SCHEMA,
   resolveRuntimeBudgetPolicy,
   validateRuntimeBudgetPolicy,
 } from "./lib/runtime_budget_policy.mjs";
@@ -49,6 +50,8 @@ import {
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
 import {
+  bindStageRecipes,
+  deriveStageRuntimeClosure,
   persistStage,
   readJsonIfPresent,
   readUsableStage,
@@ -182,104 +185,13 @@ function renderCompletionScreen(stageId) {
   return renderStageStatus({ stageId, status: "complete", summary });
 }
 
-const STAGE_RUNTIME_MEMBERS = Object.freeze({
-  inputs: Object.freeze([
-    "scripts/run_user_flow.mjs",
-    "scripts/lib/evidence_run.mjs",
-    "scripts/lib/case_compiler.mjs",
-    "scripts/lib/face_statement_manifest.mjs",
-    "scripts/lib/forecast_observation.mjs",
-    "scripts/lib/json_schema.mjs",
-    "scripts/lib/flow_runtime.mjs",
-    "scripts/lib/user_flow_controller.mjs",
-    "scripts/lib/run_store.mjs",
-    "scripts/lib/process_tree.mjs",
-    "scripts/lib/runtime_isolation.mjs",
-    "scripts/lib/run_carrier.mjs",
-    "scripts/lib/broker_intake_choice.mjs",
-    "assets/broker-intake-choice-v1.schema.json",
-    "assets/evidence-run-v1.schema.json",
-    "assets/case-source.schema.json",
-    "assets/forecast-observation-ledger-v1.schema.json",
-    "assets/model-case-v2.schema.json",
-  ]),
-  evidence_review: Object.freeze([
-    "scripts/lib/flow.mjs",
-    "scripts/lib/intake.mjs",
-    "scripts/lib/flow_entity.mjs",
-    "scripts/lib/flow_reconcile.mjs",
-    "scripts/lib/coverage.mjs",
-    "scripts/lib/broker_anchor.mjs",
-    "scripts/lib/broker_preview.mjs",
-    "scripts/lib/broker_metric_dictionary.mjs",
-    "scripts/lib/flow_runtime.mjs",
-    "scripts/lib/flow_screens.mjs",
-    "scripts/lib/run_carrier.mjs",
-    "scripts/lib/workflow_state.mjs",
-    "scripts/lib/statement_classifier.mjs",
-    "assets/dcs-export.schema.json",
-    "assets/broker-pack.schema.json",
-    "assets/broker-preview-v1.schema.json",
-    "assets/broker-preview-confirmation-v1.schema.json",
-    "assets/broker-metric-dictionary.json",
-    "assets/workflow-state-contract-v1.json",
-    "assets/statement-semantic-taxonomy.v1.json",
-  ]),
-  decisions: Object.freeze([
-    "scripts/lib/flow_questions.mjs",
-    "scripts/lib/flow_impact.mjs",
-    "scripts/lib/case_compiler.mjs",
-    "scripts/lib/face_statement_manifest.mjs",
-    "scripts/lib/forecast_behavior.mjs",
-    "scripts/lib/forecast_candidate_compiler.mjs",
-    "scripts/lib/forecast_observation.mjs",
-    "scripts/lib/run_constitution_graph.mjs",
-    "assets/forecast-behavior-map-v1.schema.json",
-    "assets/forecast-plan-v2.schema.json",
-    "assets/forecast-observation-ledger-v1.schema.json",
-    "assets/model-demand-graph-v1.schema.json",
-    "assets/selected-authority-contract-v1.schema.json",
-    "assets/run-constitution-graph-v1.schema.json",
-    "assets/product-constitution-v1.json",
-    "assets/product-constitution-v1.schema.json",
-    "assets/case-source.schema.json",
-  ]),
-  delivery: Object.freeze([
-    "scripts/lib/flow_read.mjs",
-    "scripts/lib/flow_screens.mjs",
-    "scripts/lib/live_delivery_attestation.mjs",
-    "scripts/lib/design_contract.mjs",
-    "scripts/lib/flow_runtime.mjs",
-    "scripts/lib/run_store.mjs",
-    "assets/standardised-design-runtime.v2.json",
-    "assets/standardised-design-runtime.v3.json",
-    "assets/standardised-design-runtime.v4.json",
-  ]),
-});
-
-function runtimeSubsetDigest(integrity, members, label) {
-  const selected = {};
-  for (const member of [...new Set(members)].sort()) {
-    const digest = integrity.files?.[member];
-    if (!digest) throw new Error(`Declared runtime member for ${label} is absent: ${member}`);
-    selected[member] = digest;
-  }
-  return hashValue(selected);
-}
-
-function stageRuntimeDigests(integrity) {
-  const controller = runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.inputs, "inputs");
-  const allRuntimeMembers = Object.keys(integrity.files ?? {});
-  const buildMembers = allRuntimeMembers.filter((member) =>
-    !member.startsWith("references/"));
-  return Object.freeze({
-    inputs: controller,
-    evidence_review: runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.evidence_review, "evidence review"),
-    decisions: runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.decisions, "decisions"),
-    build_checks: runtimeSubsetDigest(integrity, buildMembers, "build and checks"),
-    delivery: runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.delivery, "delivery"),
-  });
-}
+// P6.2: the five user stages no longer carry a HAND-MAINTAINED membership list.
+// The list that used to live here was not closed over the real import graph —
+// its `inputs` entry named 13 modules whose own transitive closure is 99 — so a
+// change to a module the stage genuinely executes (solver.mjs, run_deadline.mjs,
+// semantic_graph.mjs, ...) left the stage receipt reusable. Membership is now
+// DERIVED by deriveStageRuntimeClosure() in user_flow_controller.mjs and carried
+// in the receipt's recipe.
 
 function parseArgs(argv) {
   const positional = [];
@@ -306,6 +218,20 @@ async function readJson(target, label) {
     return JSON.parse(await fs.readFile(path.resolve(target), "utf8"));
   } catch (error) {
     throw new Error(`${label} is not readable JSON: ${error.message}`);
+  }
+}
+
+/**
+ * Hash a declared stage input, or a stable sentinel when it is absent. This
+ * exists so a blocked path and the success path of the same stage can share ONE
+ * input shape: a shape that throws on a missing artifact would force the
+ * blocked path back to a narrower, incomparable key.
+ */
+async function hashFileOrAbsent(target) {
+  try {
+    return await hashFile(target);
+  } catch {
+    return hashValue({ absent: path.basename(String(target)) });
   }
 }
 
@@ -693,7 +619,19 @@ async function main() {
     elapsed_at_start_ms: runDeadline.ledger.compute_elapsed_ms,
   };
   const reusedStages = [];
-  const runtimeDigests = stageRuntimeDigests(integrity);
+  // ONE derived executable closure, and ONE recipe binding through which every
+  // stage receipt in this run is written or reused. The closure record is
+  // persisted so the recipe in every receipt can be audited against the members
+  // it was computed over.
+  const runtimeClosure = await deriveStageRuntimeClosure({ skillRoot: ROOT, integrity });
+  bindStageRecipes({
+    closure: runtimeClosure,
+    contractVersions: {
+      runtime_integrity_schema: integrity.schema_version,
+      runtime_budget_policy_schema: RUNTIME_BUDGET_POLICY_SCHEMA,
+    },
+  });
+  await writeJsonAtomic(path.join(runDir, "stage-runtime-closure.json"), runtimeClosure);
   const carrierMigrationInput = (stageId) =>
     runCarrierMigrationStageInput(verifiedCarrier, stageId);
   let brokerIntakeChoicePath = null;
@@ -745,7 +683,7 @@ async function main() {
     ...(brokerIntakeChoicePath
       ? { broker_intake_choice: await hashFile(brokerIntakeChoicePath) }
       : {}),
-    runtime: runtimeDigests.inputs,
+    runtime: runtimeClosure.digest,
     ...carrierMigrationInput("inputs"),
   };
   const stage1Outputs = {
@@ -1134,7 +1072,7 @@ async function main() {
       productionBrokerPreviewRequired && stage2BrokerConfirmation
         ? await hashFile(stage2BrokerConfirmation)
         : hashValue({ pending: productionBrokerPreviewRequired }),
-    runtime: runtimeDigests.evidence_review,
+    runtime: runtimeClosure.digest,
     ...carrierMigrationInput("evidence_review"),
   };
   const stage2Outputs = {
@@ -1166,6 +1104,20 @@ async function main() {
     outputs: stage2Outputs,
   });
   let receipt2;
+  // P6.2: ONE stage-3 input shape. The blocked and action-required paths used to
+  // key on `{ stage2_receipt }` or `{ stage2_receipt, answers }` while the
+  // success path keyed on four components, so a stage-3 miss could never be
+  // explained against the receipt that preceded it — the two keys were not
+  // comparable. Every stage-3 receipt is now keyed identically; only the
+  // `answers` component varies, and it varies over NAMED states.
+  const ANSWERS_NOT_SUPPLIED = hashValue({ answers: "not_supplied" });
+  const ANSWERS_NOT_REQUIRED = hashValue({ answers: "not_required" });
+  const stage3InputsFor = (answers) => ({
+    stage2_receipt: receipt2.receipt_hash,
+    answers,
+    runtime: runtimeClosure.digest,
+    ...carrierMigrationInput("decisions"),
+  });
   const freshIntakeResult = runIntake({
     intake: validation.handoff.intake,
     draftCase: activeModelCase,
@@ -1252,7 +1204,7 @@ async function main() {
         runId,
         stageId: "decisions",
         status: internalDecisionFailure ? "blocked" : "action_required",
-        inputHashes: { stage2_receipt: receipt2.receipt_hash },
+        inputHashes: stage3InputsFor(ANSWERS_NOT_SUPPLIED),
         previousReceiptHash: receipt2.receipt_hash,
         outputs: { decision_result: stage3Result },
         detail: { outcome: intakeResult.outcome },
@@ -1393,7 +1345,7 @@ async function main() {
         runId,
         stageId: "decisions",
         status: "action_required",
-        inputHashes: { stage2_receipt: receipt2.receipt_hash },
+        inputHashes: stage3InputsFor(ANSWERS_NOT_SUPPLIED),
         previousReceiptHash: receipt2.receipt_hash,
         outputs: { question_result: questionResult, question_screen: questionScreen },
         detail: { question_count: intakeResult.plan.questions.length },
@@ -1435,10 +1387,7 @@ async function main() {
         runId,
         stageId: "decisions",
         status: "blocked",
-        inputHashes: {
-          stage2_receipt: receipt2.receipt_hash,
-          answers: await hashFile(path.resolve(options.answers)),
-        },
+        inputHashes: stage3InputsFor(await hashFile(path.resolve(options.answers))),
         previousReceiptHash: receipt2.receipt_hash,
         outputs: { answer_errors: answerFailure },
         detail: { errors: parsed.errors },
@@ -1489,10 +1438,7 @@ async function main() {
         runId,
         stageId: "decisions",
         status: "blocked",
-        inputHashes: {
-          stage2_receipt: receipt2.receipt_hash,
-          answers: await hashFile(path.resolve(options.answers)),
-        },
+        inputHashes: stage3InputsFor(await hashFile(path.resolve(options.answers))),
         previousReceiptHash: receipt2.receipt_hash,
         outputs: {
           case_source: answeredCaseSourcePath,
@@ -1553,10 +1499,7 @@ async function main() {
         runId,
         stageId: "decisions",
         status: "action_required",
-        inputHashes: {
-          stage2_receipt: receipt2.receipt_hash,
-          answers: await hashFile(path.resolve(options.answers)),
-        },
+        inputHashes: stage3InputsFor(await hashFile(path.resolve(options.answers))),
         previousReceiptHash: receipt2.receipt_hash,
         outputs: {
           case_source: answeredCaseSourcePath,
@@ -1613,14 +1556,9 @@ async function main() {
       answeredCompileReportPath,
       activeCaseCompileReport,
     );
-    answerHash = hashValue({ skipped: true });
+    answerHash = ANSWERS_NOT_REQUIRED;
   }
-  const stage3Inputs = {
-    stage2_receipt: receipt2.receipt_hash,
-    answers: answerHash,
-    runtime: runtimeDigests.decisions,
-    ...carrierMigrationInput("decisions"),
-  };
+  const stage3Inputs = stage3InputsFor(answerHash);
   const stage3Outputs = {
     model_case: answeredCasePath,
     forecast_plan: forecastPlanPath,
@@ -1846,6 +1784,21 @@ async function main() {
   await enterFlowStage("build_checks");
   const stage4Dir = path.join(runDir, "stages", "build_checks");
   const caseHash = await hashFile(answeredCasePath);
+  // P6.2: ONE stage-4 input shape, computed BEFORE the first path that can
+  // refuse the stage. The case-mutation refusal used to key on a three-component
+  // subset, so its receipt could never be compared with the success receipt it
+  // was meant to replace. Absent forecast artifacts hash to a sentinel rather
+  // than throwing, which is what lets the refusal path share the full shape.
+  const stage4Inputs = {
+    stage3_receipt: receipt3.receipt_hash,
+    model_case: caseHash,
+    forecast_plan: await hashFileOrAbsent(forecastPlanJsonPath),
+    model_demand_graph: await hashFileOrAbsent(modelDemandGraphPath),
+    selected_authority_contract: await hashFileOrAbsent(selectedAuthorityContractPath),
+    run_constitution_graph: await hashFileOrAbsent(runConstitutionGraphPath),
+    runtime: runtimeClosure.digest,
+    ...carrierMigrationInput("build_checks"),
+  };
 
   // A paused run holds a position; it does not hand the case over for editing.
   // Because the build folder is content-addressed, a case that changed while the
@@ -1887,11 +1840,7 @@ async function main() {
       runId,
       stageId: "build_checks",
       status: "blocked",
-      inputHashes: {
-        stage3_receipt: receipt3.receipt_hash,
-        model_case: caseHash,
-        runtime: runtimeDigests.build_checks,
-      },
+      inputHashes: stage4Inputs,
       previousReceiptHash: receipt3.receipt_hash,
       outputs: { case_mutation: mutationPath },
       detail: {
@@ -1934,16 +1883,6 @@ async function main() {
     validation.handoff.intake.broker_pack,
   );
   await writeJsonAtomic(filingsPath, validation.handoff.intake.filings);
-  const stage4Inputs = {
-    stage3_receipt: receipt3.receipt_hash,
-    model_case: caseHash,
-    forecast_plan: await hashFile(forecastPlanJsonPath),
-    model_demand_graph: await hashFile(modelDemandGraphPath),
-    selected_authority_contract: await hashFile(selectedAuthorityContractPath),
-    run_constitution_graph: await hashFile(runConstitutionGraphPath),
-    runtime: runtimeDigests.build_checks,
-    ...carrierMigrationInput("build_checks"),
-  };
   const stage4Outputs = {
     build_result: buildResultPath,
     workbook,
@@ -2201,7 +2140,7 @@ async function main() {
     stage4_receipt: receipt4.receipt_hash,
     model_case: caseHash,
     live_delivery_attestation: await hashFile(deliveryAttestationPath),
-    runtime: runtimeDigests.delivery,
+    runtime: runtimeClosure.digest,
     ...carrierMigrationInput("delivery"),
   };
   const stage5Outputs = {

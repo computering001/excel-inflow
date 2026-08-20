@@ -1,0 +1,51 @@
+PORTABLE EVIDENCE PRODUCER BLOCK — host toolchain (render lane)
+captured_at: 2026-08-20T01:53:09Z
+source_commit: 8bc37db3b487e0c0d38d94473fb505179e3aed13
+earliest_responsible_layer: runtime_host_preflight (P6.7's runtime doctor), which refuses BEFORE any expensive work starts
+
+$ node scripts/run_runtime_doctor.mjs
+
+RUNTIME DOCTOR — host pre-flight (P6.7)
+  lanes: evidence, workbook
+  host:  darwin/arm64, node v22.23.2
+
+  [OK  ] node_interpreter (mandatory)
+  [??  ] node_minimum_version (optional)
+         assets/deployment-profile.json declares no node_runtime.minimum_version and the repository has no package.json engines field, so there is no floor to compare against. COULD NOT CHECK — declared, not skipped. The running version is reported.
+  [OK  ] node_vendored_dependency_closure (mandatory)
+  [OK  ] python_interpreter_custody (mandatory)
+  [OK  ] python_minimum_version (mandatory)
+  [OK  ] python_import_time_module_closure (mandatory)
+  [FAIL] python_single_interpreter_lane_closure (mandatory)
+         No single interpreter satisfies the declared closure for the requested lanes: /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9 cannot import PIL (Pillow, needed by render), numpy (numpy, needed by render). A run started on this interpreter would half-work and fail deep in the lane that needs the missing module. Install the missing distributions into ONE interpreter and pass it as EXCEL_INFLOW_PYTHON.
+  [FAIL] python_optional_module_closure (optional)
+         Optional modules absent (a corroboration degrades, the run is not blocked): jsonschema, pdfplumber, reportlab.
+  [OK  ] soffice_available (mandatory)
+  [OK  ] workbook_font_metrics (optional)
+  [??  ] work_root_writable (mandatory)
+         No run root was supplied, so the working directory this run would write cannot be checked. Pass --run-root. COULD NOT CHECK — declared, not skipped.
+  [OK  ] temp_root_writable (mandatory)
+  [??  ] temp_free_space (optional)
+         No shipped asset declares a temp free-space floor and none was supplied via --min-free-bytes or EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES, so there is nothing to compare the measurement against. The measurement is reported; a floor is not invented.
+  [OK  ] active_source_identity (mandatory)
+  [excl] installed_package_hash_readback (excluded_installed_host)
+         Requires reading a live Rogo install's versioned install destination. The installed-host tier is PERMANENTLY EXCLUDED by standing directive (see assets/release-rollback-policy-v1.json scope.installed_host_tier); no script in this repository may attempt it, so this precondition is unsatisfiable here by construction rather than merely unfinished. It is never reported as passed.
+  [excl] installed_active_pointer (excluded_installed_host)
+         Requires resolving a live install's active pointer from a fresh session. Same permanently excluded installed-host tier; declared exclusion, never a waiver.
+  [excl] installed_rollback_package_present (excluded_installed_host)
+         The retained rollback target lives in the install destination's retention area on the live host. Portable tier can attest a package; only the installed tier can confirm one is retained THERE. Same permanent exclusion.
+  [excl] installed_host_write_permissions (excluded_installed_host)
+         Probing write access to a live install destination is itself an installed-host mutation risk and is forbidden here. Same permanent exclusion.
+
+  satisfied 9 · unsatisfied 2 · not-applicable 0 · unknown 3 · installed-host-excluded 4
+
+VERDICT: REFUSED — this host cannot complete a run. No expensive work was started.
+  reason_code:                   INTERNAL.compiler_or_graph_defect
+  reason_code_fidelity:          closest_available
+  requested_reason_code:         INTERNAL.host_precondition_unsatisfied
+  terminal_state:                INTERNAL_FAILURE
+  earliest_responsible_layer:    runtime_host_preflight
+  downstream_invalidation_scope: no_work_started
+  unsatisfied mandatory preconditions:
+    - python_single_interpreter_lane_closure (unsatisfied): No single interpreter satisfies the declared closure for the requested lanes: /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9 cannot import PIL (Pillow, needed by render), numpy (numpy, needed by render). A run started on this interpreter would half-work and fail deep in the lane that needs the missing module. Install the missing distributions into ONE interpreter and pass it as EXCEL_INFLOW_PYTHON.
+    - work_root_writable (unknown): No run root was supplied, so the working directory this run would write cannot be checked. Pass --run-root. COULD NOT CHECK — declared, not skipped.

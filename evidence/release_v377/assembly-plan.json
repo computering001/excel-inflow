@@ -1,0 +1,53 @@
+{
+  "schema_version": "excel-inflow-portable-release-dossier-plan/1.0",
+  "declared_by": "P8.7",
+  "declares": "What the portable release certification dossier for v3.7.7 claims, class by class. Every one of the five portable-required classes must appear here as EXACTLY ONE of an `artifact` (a produced evidence report, which the assembler digests from its own bytes) or an `absence` (a typed absence, which the assembler hash-binds to the captured block). Silence about a class is refused by the assembler, because silence is how a gate set quietly shrinks.",
+  "note": "The two native-host classes (native_excel, visual_review) do NOT appear here and cannot: they are PERMANENT DECLARED EXCLUSIONS in release_certification.mjs's register, the assembler refuses them as plan entries, and the dossier carries them from the code-declared register instead.",
+  "classes": {
+    "exact_maximal": {
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_HOST_TOOLCHAIN",
+        "blocked_at_layer": "runtime_host_preflight — scripts/run_runtime_doctor.mjs (P6.7), which refuses before any expensive work starts",
+        "reason": "Exact authority replay for standard-maximal is a render-evidence/2 report from scripts/render/check_render.py, whose render lane needs Pillow and numpy. The runtime doctor REFUSES this host: no single interpreter satisfies the declared closure for the evidence and workbook lanes, because the only interpreter carrying openpyxl and PyMuPDF cannot import PIL or numpy. Two further blocks sit behind that one and are recorded so the absence is not read as a one-line fix: the immutable V4 authority workbook this class must replay (sha256 02acdc52...) is not present in the repository at this commit, and check_render.py refuses to author its own expected output, so with no committed pixel baselines the comparison is BLOCKED rather than PASS.",
+        "revisit_condition": "Pillow and numpy are installed into ONE interpreter which also carries openpyxl and PyMuPDF, the runtime doctor returns a satisfied verdict for the evidence and workbook lanes, the immutable V4 maximal authority workbook and its approved pixel baselines are available as declared custody inputs, and check_render.py runs in comparison-only mode at the certification commit.",
+        "blocking_evidence": "evidence/release_v377/blockers/runtime-doctor-report.txt"
+      }
+    },
+    "exact_net_cash": {
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_HOST_TOOLCHAIN",
+        "blocked_at_layer": "runtime_host_preflight — scripts/run_runtime_doctor.mjs (P6.7), which refuses before any expensive work starts",
+        "reason": "Exact authority replay for standard-net-cash is blocked identically to standard-maximal and by the same host refusal: the render lane needs Pillow and numpy, and the runtime doctor refuses this host because no single interpreter satisfies the declared lane closure. The immutable V4 net-cash authority workbook (sha256 df030788...) is likewise absent from the repository at this commit, and no approved pixel baselines exist for the comparison to run against.",
+        "revisit_condition": "Pillow and numpy are installed into ONE interpreter which also carries openpyxl and PyMuPDF, the runtime doctor returns a satisfied verdict for the evidence and workbook lanes, the immutable V4 net-cash authority workbook and its approved pixel baselines are available as declared custody inputs, and check_render.py runs in comparison-only mode at the certification commit.",
+        "blocking_evidence": "evidence/release_v377/blockers/runtime-doctor-report.txt"
+      }
+    },
+    "frozen_cohort": {
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_ARTIFACT_ABSENT_FROM_REPOSITORY",
+        "blocked_at_layer": "the producer's companion input — scripts/run_frozen_cohort.mjs requires --authorities <directory>, and no authority corpus exists at this commit",
+        "reason": "The clean 32-case frozen-cohort report is produced by scripts/run_frozen_cohort.mjs, which requires an --authorities directory of immutable authority workbooks to compare each of the 32 builds against. A filesystem probe at this commit finds zero .xlsx files of any kind in the repository and zero authority directories, so the cohort has nothing to be frozen against. Behind that input block sits the same workbook-build refusal that stops the other classes, since each of the 32 cases builds a workbook twice.",
+        "revisit_condition": "The 32-case immutable authority corpus is available as a declared custody input, the workbook build refusal at build_dynamic_model.mjs:784 is repaired at its own layer, and run_frozen_cohort.mjs completes 32 of 32 at the certification commit with the report bound to that closure.",
+        "blocking_evidence": "evidence/release_v377/blockers/companion-input-inventory.json"
+      }
+    },
+    "finance_proof_mutations": {
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_UPSTREAM_BUILD_REFUSAL",
+        "blocked_at_layer": "scripts/build_dynamic_model.mjs refuseContradictedProvenance (:784), reached from emitWorkbook (:12545) via synthesisePlan (:12198)",
+        "reason": "The independent finance-proof mutation set needs a real case and a real built workbook: scripts/verify/run_finance_proof_mutations.py corrupts cached values in a built workbook and proves the independent oracle rejects every corruption. The case compiles cleanly at this commit, but the workbook build then REFUSES — Operating Model!G64:I64 ship ending_cash as blue hardcodes claiming a filed source while the case derives that row — so there is no workbook to mutate. The refusal is correct and this dossier records that it fired rather than routing around it; the class is producible on this host the moment a workbook exists, since the only toolchain it needs is openpyxl, which this host has.",
+        "revisit_condition": "The provenance contradiction at build_dynamic_model.mjs:784 is repaired at its own layer so the compiled production case builds a workbook, then run_finance_proof_mutations.py runs against that workbook at the certification commit with every mutation rejected.",
+        "blocking_evidence": "evidence/release_v377/blockers/workbook-build-refusal.txt"
+      }
+    },
+    "source_parity": {
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_ARTIFACT_ABSENT_FROM_REPOSITORY",
+        "blocked_at_layer": "the producer's companion input — scripts/validate_source_parity.mjs takes <workbook.xlsx> <row-map.json> <ledger.json>, and no lineage ledger exists at this commit",
+        "reason": "Source-intent parity reads the lineage ledger derived from the source manifest, deliberately NOT the case's own row classifications, because the compiler must not be able to excuse its own output. A filesystem probe at this commit finds no lineage-ledger artifact anywhere in the repository, and synthesising one from the case would destroy the independence that is the entire point of the check. The workbook and row map the same command needs are additionally unavailable behind the build refusal.",
+        "revisit_condition": "The lineage ledger for the certification case is available as a declared custody input, the workbook build refusal at build_dynamic_model.mjs:784 is repaired so a workbook and row map exist, and validate_source_parity.mjs runs both passes with the ledger pass non-vacuous and zero violations at the certification commit.",
+        "blocking_evidence": "evidence/release_v377/blockers/companion-input-inventory.json"
+      }
+    }
+  }
+}

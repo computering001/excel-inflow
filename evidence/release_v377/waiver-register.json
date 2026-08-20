@@ -1,0 +1,31 @@
+{
+  "schema_version": "excel-inflow-portable-release-waiver-register/1.0",
+  "register_disposition": "DECLARED_UNNECESSARY_ZERO_WAIVERS",
+  "waivers": [],
+  "waiver_count": 0,
+  "admits_waivers": false,
+  "verdict": "A waiver register is UNNECESSARY for the portable certification tier and is deliberately not created as a populated register. It is declared here, empty and closed, so that 'zero waivers' is a recorded assertion rather than an absence a reader has to interpret.",
+  "closed_case_argument": [
+    {
+      "case": "the class is satisfied",
+      "home": "manifest.evidence.<class>, hash-bound to the artifact bytes and accepted by validateReleaseCertificationEvidence at the portable tier",
+      "needs_dispensation": false,
+      "why": "Nothing is being skipped, so there is nothing to dispense from."
+    },
+    {
+      "case": "the class is unsatisfiable on this host by construction",
+      "home": "PERMANENTLY_EXCLUDED_EVIDENCE (release_certification.mjs, P8.0) and manifest.declared_exclusions",
+      "needs_dispensation": false,
+      "why": "A permanent declared exclusion is a statement about host capability, never permission to skip a reachable check. It carries is_waiver: false and revisit_condition: null by contract, and P8.0's validator refuses any dossier that spells it as a waiver or as pending. Registering it as a waiver would be the exact reclassification P8.0 refused: it would convert a permanent, honest, strictly-weaker claim into a temporary, dischargeable one that somebody could later be told to close."
+    },
+    {
+      "case": "the class is producible but was not produced at this commit",
+      "home": "the dossier's TYPED_ABSENCE_DISPOSITIONS record, carrying a reason, the blocking artifact's digest and a revisit condition",
+      "needs_dispensation": false,
+      "why": "A typed absence BLOCKS certification. It does not permit certification to proceed without the evidence, so it is the opposite of a waiver: a waiver's function is to let a gate pass while a check is missing, and nothing in this module can do that. The correct disposition is a refused certification with the blocker named, which is what the assembler produces."
+    }
+  ],
+  "therefore": "The three cases are exhaustive for any member of NATIVE_REQUIRED_EVIDENCE, and none admits a dispensation, so a waiver register would have no legitimate subject. Creating one anyway would only be useful if a permanent exclusion or a blocking absence were filed in it, and both of those filings are refused in code.",
+  "enforcement": "REFUSED_DISPENSATION_SPELLINGS is scanned over every key, at every depth, of every object entering the assembly API and of the assembled dossier itself. A caller cannot introduce a waiver by option, by plan key, by approval field or by hand-editing the receipt and re-validating it.",
+  "freeze_criterion": "v3.7.7 freeze criterion 8 — 'portable dossier PASS, native/visual permanent declared exclusions, zero waivers'."
+}

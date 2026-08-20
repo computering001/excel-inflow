@@ -1,0 +1,275 @@
+{
+  "schema_version": "excel-inflow-portable-release-dossier/1.0",
+  "assembly_status": "ASSEMBLED_NOT_CERTIFIABLE",
+  "certification_tier": "portable_certified",
+  "native_tier_not_claimed": "certified",
+  "assembled_at": "2026-08-20T01:53:32.000Z",
+  "assembler": {
+    "kind": "automation",
+    "identity": "scripts/assemble_release_dossier.mjs",
+    "authority_note": "Automation assembles and records; it never approves. See APPROVAL_EXPIRY_MODEL.automation_may_approve."
+  },
+  "identity": {
+    "repository": "computering001/excel-inflow",
+    "source_commit": "8d94e6c7255a125b7c4f9ccff4c45860f2cb322c",
+    "source_tree": "fe481955fb476f5220c16678e054220cef015b94",
+    "skill_version": "3.7.6",
+    "runtime_code_closure_sha256": "ab72f2afe8eacf7dcdc25355fe597afb1573cf49f36cb2a6739f84ea34169603",
+    "runtime_code_closure_file_count": 332,
+    "runtime_code_closure_identity_source": "resolveActiveSourceIdentity (scripts/lib/source_identity.mjs) over live bytes. NOT the release compiler's deployment-profile closure; the Phase-8 work order records that the two closure definitions have never been proven equal, and P8.2's closure-convergence slice is the package that must close that gap before a dossier closure may be asserted equal to a package closure.",
+    "worktree_clean": false,
+    "worktree_status_sha256": "c1e468e6736e5f37309f277dca4d16515726938a67efb1f2edb75d4505863f86"
+  },
+  "plan": {
+    "schema_version": "excel-inflow-portable-release-dossier-plan/1.0",
+    "sha256": "666f88726cfea281d0bc6b88b45fbf29bb29276e1586bae11b4e2535a6c135ac",
+    "filename": "assembly-plan.json",
+    "file_sha256": "a2123d1e1d4c73559832d2df72c9c8da227054222a80da0b8516e601be8ad0bb"
+  },
+  "required_evidence": [
+    "exact_maximal",
+    "exact_net_cash",
+    "frozen_cohort",
+    "finance_proof_mutations",
+    "source_parity"
+  ],
+  "satisfied_classes": [],
+  "typed_absence_classes": [
+    "exact_maximal",
+    "exact_net_cash",
+    "frozen_cohort",
+    "finance_proof_mutations",
+    "source_parity"
+  ],
+  "classes": {
+    "exact_maximal": {
+      "evidence_class": "exact_maximal",
+      "disposition": "TYPED_ABSENCE",
+      "artifact": null,
+      "certified_runtime_code_closure_sha256": null,
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_HOST_TOOLCHAIN",
+        "absence_disposition_description": "The producer exists and is portable, but this host does not satisfy its declared toolchain closure, so running it would half-work and fail deep in the lane. Detected by the runtime doctor before any expensive work started.",
+        "reason": "Exact authority replay for standard-maximal is a render-evidence/2 report from scripts/render/check_render.py, whose render lane needs Pillow and numpy. The runtime doctor REFUSES this host: no single interpreter satisfies the declared closure for the evidence and workbook lanes, because the only interpreter carrying openpyxl and PyMuPDF cannot import PIL or numpy. Two further blocks sit behind that one and are recorded so the absence is not read as a one-line fix: the immutable V4 authority workbook this class must replay (sha256 02acdc52...) is not present in the repository at this commit, and check_render.py refuses to author its own expected output, so with no committed pixel baselines the comparison is BLOCKED rather than PASS.",
+        "revisit_condition": "Pillow and numpy are installed into ONE interpreter which also carries openpyxl and PyMuPDF, the runtime doctor returns a satisfied verdict for the evidence and workbook lanes, the immutable V4 maximal authority workbook and its approved pixel baselines are available as declared custody inputs, and check_render.py runs in comparison-only mode at the certification commit.",
+        "blocked_at_layer": "runtime_host_preflight — scripts/run_runtime_doctor.mjs (P6.7), which refuses before any expensive work starts",
+        "blocking_evidence": {
+          "path": "blockers/runtime-doctor-report.txt",
+          "sha256": "c56fd7c813db6cd283a5e486d620f41935372e020977d6098b326e87e65b71b6",
+          "byte_length": 4768
+        },
+        "blocks_certification": true,
+        "is_exclusion": false,
+        "is_waiver": false,
+        "is_pending": true
+      }
+    },
+    "exact_net_cash": {
+      "evidence_class": "exact_net_cash",
+      "disposition": "TYPED_ABSENCE",
+      "artifact": null,
+      "certified_runtime_code_closure_sha256": null,
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_HOST_TOOLCHAIN",
+        "absence_disposition_description": "The producer exists and is portable, but this host does not satisfy its declared toolchain closure, so running it would half-work and fail deep in the lane. Detected by the runtime doctor before any expensive work started.",
+        "reason": "Exact authority replay for standard-net-cash is blocked identically to standard-maximal and by the same host refusal: the render lane needs Pillow and numpy, and the runtime doctor refuses this host because no single interpreter satisfies the declared lane closure. The immutable V4 net-cash authority workbook (sha256 df030788...) is likewise absent from the repository at this commit, and no approved pixel baselines exist for the comparison to run against.",
+        "revisit_condition": "Pillow and numpy are installed into ONE interpreter which also carries openpyxl and PyMuPDF, the runtime doctor returns a satisfied verdict for the evidence and workbook lanes, the immutable V4 net-cash authority workbook and its approved pixel baselines are available as declared custody inputs, and check_render.py runs in comparison-only mode at the certification commit.",
+        "blocked_at_layer": "runtime_host_preflight — scripts/run_runtime_doctor.mjs (P6.7), which refuses before any expensive work starts",
+        "blocking_evidence": {
+          "path": "blockers/runtime-doctor-report.txt",
+          "sha256": "c56fd7c813db6cd283a5e486d620f41935372e020977d6098b326e87e65b71b6",
+          "byte_length": 4768
+        },
+        "blocks_certification": true,
+        "is_exclusion": false,
+        "is_waiver": false,
+        "is_pending": true
+      }
+    },
+    "frozen_cohort": {
+      "evidence_class": "frozen_cohort",
+      "disposition": "TYPED_ABSENCE",
+      "artifact": null,
+      "certified_runtime_code_closure_sha256": null,
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_ARTIFACT_ABSENT_FROM_REPOSITORY",
+        "absence_disposition_description": "The producer requires a companion input that this repository does not contain at the certification commit — an immutable baseline, an authority corpus or a lineage ledger. The producer is not at fault and inventing the input would fabricate the evidence.",
+        "reason": "The clean 32-case frozen-cohort report is produced by scripts/run_frozen_cohort.mjs, which requires an --authorities directory of immutable authority workbooks to compare each of the 32 builds against. A filesystem probe at this commit finds zero .xlsx files of any kind in the repository and zero authority directories, so the cohort has nothing to be frozen against. Behind that input block sits the same workbook-build refusal that stops the other classes, since each of the 32 cases builds a workbook twice.",
+        "revisit_condition": "The 32-case immutable authority corpus is available as a declared custody input, the workbook build refusal at build_dynamic_model.mjs:784 is repaired at its own layer, and run_frozen_cohort.mjs completes 32 of 32 at the certification commit with the report bound to that closure.",
+        "blocked_at_layer": "the producer's companion input — scripts/run_frozen_cohort.mjs requires --authorities <directory>, and no authority corpus exists at this commit",
+        "blocking_evidence": {
+          "path": "blockers/companion-input-inventory.json",
+          "sha256": "115a9d34745ce6a313b1a80411b151ecbb6b11ea6498137de7e3abebac2aa26a",
+          "byte_length": 2793
+        },
+        "blocks_certification": true,
+        "is_exclusion": false,
+        "is_waiver": false,
+        "is_pending": true
+      }
+    },
+    "finance_proof_mutations": {
+      "evidence_class": "finance_proof_mutations",
+      "disposition": "TYPED_ABSENCE",
+      "artifact": null,
+      "certified_runtime_code_closure_sha256": null,
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_UPSTREAM_BUILD_REFUSAL",
+        "absence_disposition_description": "The artifact is producible in principle on a portable host, but a committed refusal upstream of the producer stops the pipeline before the artifact exists. The refusal is correct; the dossier records that it fired rather than routing around it.",
+        "reason": "The independent finance-proof mutation set needs a real case and a real built workbook: scripts/verify/run_finance_proof_mutations.py corrupts cached values in a built workbook and proves the independent oracle rejects every corruption. The case compiles cleanly at this commit, but the workbook build then REFUSES — Operating Model!G64:I64 ship ending_cash as blue hardcodes claiming a filed source while the case derives that row — so there is no workbook to mutate. The refusal is correct and this dossier records that it fired rather than routing around it; the class is producible on this host the moment a workbook exists, since the only toolchain it needs is openpyxl, which this host has.",
+        "revisit_condition": "The provenance contradiction at build_dynamic_model.mjs:784 is repaired at its own layer so the compiled production case builds a workbook, then run_finance_proof_mutations.py runs against that workbook at the certification commit with every mutation rejected.",
+        "blocked_at_layer": "scripts/build_dynamic_model.mjs refuseContradictedProvenance (:784), reached from emitWorkbook (:12545) via synthesisePlan (:12198)",
+        "blocking_evidence": {
+          "path": "blockers/workbook-build-refusal.txt",
+          "sha256": "9c1170da1e68f53afffb29ee9410c4c77aed9f3b09e693c3d529f3521dcf0123",
+          "byte_length": 2528
+        },
+        "blocks_certification": true,
+        "is_exclusion": false,
+        "is_waiver": false,
+        "is_pending": true
+      }
+    },
+    "source_parity": {
+      "evidence_class": "source_parity",
+      "disposition": "TYPED_ABSENCE",
+      "artifact": null,
+      "certified_runtime_code_closure_sha256": null,
+      "absence": {
+        "absence_disposition": "ASSEMBLY_BLOCKED_ARTIFACT_ABSENT_FROM_REPOSITORY",
+        "absence_disposition_description": "The producer requires a companion input that this repository does not contain at the certification commit — an immutable baseline, an authority corpus or a lineage ledger. The producer is not at fault and inventing the input would fabricate the evidence.",
+        "reason": "Source-intent parity reads the lineage ledger derived from the source manifest, deliberately NOT the case's own row classifications, because the compiler must not be able to excuse its own output. A filesystem probe at this commit finds no lineage-ledger artifact anywhere in the repository, and synthesising one from the case would destroy the independence that is the entire point of the check. The workbook and row map the same command needs are additionally unavailable behind the build refusal.",
+        "revisit_condition": "The lineage ledger for the certification case is available as a declared custody input, the workbook build refusal at build_dynamic_model.mjs:784 is repaired so a workbook and row map exist, and validate_source_parity.mjs runs both passes with the ledger pass non-vacuous and zero violations at the certification commit.",
+        "blocked_at_layer": "the producer's companion input — scripts/validate_source_parity.mjs takes <workbook.xlsx> <row-map.json> <ledger.json>, and no lineage ledger exists at this commit",
+        "blocking_evidence": {
+          "path": "blockers/companion-input-inventory.json",
+          "sha256": "115a9d34745ce6a313b1a80411b151ecbb6b11ea6498137de7e3abebac2aa26a",
+          "byte_length": 2793
+        },
+        "blocks_certification": true,
+        "is_exclusion": false,
+        "is_waiver": false,
+        "is_pending": true
+      }
+    }
+  },
+  "declared_exclusions": {
+    "native_excel": {
+      "evidence_class": "native_excel",
+      "satisfiability": "EXCLUDED_NATIVE_HOST",
+      "exclusion_disposition": "PERMANENT_DECLARED_EXCLUSION",
+      "excluded_from_portable_gate": true,
+      "is_pending": false,
+      "is_waiver": false,
+      "revisit_condition": null,
+      "required_host_capability": "A licensed native Microsoft Excel installation able to open, recalculate and re-serialise the release workbooks.",
+      "exclusion_reason": "Native-Excel restoration evidence requires opening the candidate workbooks in a licensed native Microsoft Excel installation and reading back its own recalculated bytes. This programme has no such host, by standing directive, and native recalculation cannot be simulated by any portable renderer without the evidence ceasing to be native. The class is therefore unsatisfiable here by construction rather than merely unfinished."
+    },
+    "visual_review": {
+      "evidence_class": "visual_review",
+      "satisfiability": "EXCLUDED_NATIVE_HOST",
+      "exclusion_disposition": "PERMANENT_DECLARED_EXCLUSION",
+      "excluded_from_portable_gate": true,
+      "is_pending": false,
+      "is_waiver": false,
+      "revisit_condition": null,
+      "required_host_capability": "A human reviewer inspecting every visible sheet of every release profile inside native Microsoft Excel.",
+      "exclusion_reason": "Native visual review is a human judgement made in front of a native Microsoft Excel window: openability, layout geometry, formatting consistency, formula visibility, provenance colours, print setup and screenshot legibility as that application renders them. There is no reviewer and no native host in this programme, and an automated portable check of the same properties would be a different assertion wearing the same name."
+    }
+  },
+  "physical_lane_terminal_declaration": {
+    "declaration_kind": "physical_lane_terminal_state",
+    "lane": "manual_physical_verification",
+    "status_token": "PASS_PENDING_MANUAL",
+    "release_gate_token": "PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW",
+    "process_exit_code": 0,
+    "disposition": "PERMANENT_DECLARED_EXCLUSION",
+    "is_pending": false,
+    "is_waiver": false,
+    "revisit_condition": null,
+    "token_wording_is_historical_misnomer": true,
+    "tokens_deliberately_unchanged": true,
+    "tokens_unchanged_reason": "The two token strings and the exit-0 contract are pinned by other suites and by the compiler and orchestrator surfaces P8.0 must not touch. Renaming them is a separate, wider change; declaring their meaning is this package's job.",
+    "excluded_evidence_classes": [
+      "native_excel",
+      "visual_review"
+    ],
+    "reachable_certification_tier": "portable_certified",
+    "reason": "Both remaining classes of the manual physical lane require a licensed native Microsoft Excel installation: native-Excel restoration evidence, and a human visual review of every visible sheet in that application. Neither is available to this programme and neither may be simulated, so the lane has no reachable PASS beyond this state."
+  },
+  "waiver_register": {
+    "schema_version": "excel-inflow-portable-release-waiver-register/1.0",
+    "register_disposition": "DECLARED_UNNECESSARY_ZERO_WAIVERS",
+    "waivers": [],
+    "waiver_count": 0,
+    "admits_waivers": false,
+    "verdict": "A waiver register is UNNECESSARY for the portable certification tier and is deliberately not created as a populated register. It is declared here, empty and closed, so that 'zero waivers' is a recorded assertion rather than an absence a reader has to interpret.",
+    "closed_case_argument": [
+      {
+        "case": "the class is satisfied",
+        "home": "manifest.evidence.<class>, hash-bound to the artifact bytes and accepted by validateReleaseCertificationEvidence at the portable tier",
+        "needs_dispensation": false,
+        "why": "Nothing is being skipped, so there is nothing to dispense from."
+      },
+      {
+        "case": "the class is unsatisfiable on this host by construction",
+        "home": "PERMANENTLY_EXCLUDED_EVIDENCE (release_certification.mjs, P8.0) and manifest.declared_exclusions",
+        "needs_dispensation": false,
+        "why": "A permanent declared exclusion is a statement about host capability, never permission to skip a reachable check. It carries is_waiver: false and revisit_condition: null by contract, and P8.0's validator refuses any dossier that spells it as a waiver or as pending. Registering it as a waiver would be the exact reclassification P8.0 refused: it would convert a permanent, honest, strictly-weaker claim into a temporary, dischargeable one that somebody could later be told to close."
+      },
+      {
+        "case": "the class is producible but was not produced at this commit",
+        "home": "the dossier's TYPED_ABSENCE_DISPOSITIONS record, carrying a reason, the blocking artifact's digest and a revisit condition",
+        "needs_dispensation": false,
+        "why": "A typed absence BLOCKS certification. It does not permit certification to proceed without the evidence, so it is the opposite of a waiver: a waiver's function is to let a gate pass while a check is missing, and nothing in this module can do that. The correct disposition is a refused certification with the blocker named, which is what the assembler produces."
+      }
+    ],
+    "therefore": "The three cases are exhaustive for any member of NATIVE_REQUIRED_EVIDENCE, and none admits a dispensation, so a waiver register would have no legitimate subject. Creating one anyway would only be useful if a permanent exclusion or a blocking absence were filed in it, and both of those filings are refused in code.",
+    "enforcement": "REFUSED_DISPENSATION_SPELLINGS is scanned over every key, at every depth, of every object entering the assembly API and of the assembled dossier itself. A caller cannot introduce a waiver by option, by plan key, by approval field or by hand-editing the receipt and re-validating it.",
+    "freeze_criterion": "v3.7.7 freeze criterion 8 — 'portable dossier PASS, native/visual permanent declared exclusions, zero waivers'."
+  },
+  "approval_expiry_model": {
+    "model": "absolute_clock_expiry_AND_subject_binding",
+    "clock": "UTC",
+    "max_validity_days": 90,
+    "default_validity_days": 30,
+    "minimum_validity_days": 1,
+    "expiry_is_refusal": true,
+    "auto_renewal": false,
+    "renewal": "A lapsed approval is never extended, re-dated or edited in place. A new approval document is written and a new record is appended to the release journal, so the lapse and the re-approval are both permanently visible in the chain.",
+    "invalidated_by": [
+      "expires_at has passed at the moment the dossier is read",
+      "the dossier assembly receipt digest the approval names has changed",
+      "the runtime-code closure the approval names has changed",
+      "the certification tier the approval names has changed"
+    ],
+    "automation_may_approve": false,
+    "automation_may_record": true,
+    "authority": "P8.6a's discipline, unchanged: automation records, humans authorise. An approval is an authorising act, so an approval whose actor.kind is \"automation\" is refused at creation and again at validation.",
+    "journal": "The approvals RECORD is P8.6a's hash-chained append-only release journal (scripts/lib/release_journal.mjs), reused rather than duplicated. Approvals are appended with event_type \"attest\".",
+    "journal_event_type_note": "RELEASE_JOURNAL_EVENT_TYPES has no \"approve\" member and release_journal.mjs is not this package's file to widen, so a dossier approval is journalled as \"attest\" with a detail string that names it a portable-certification-dossier approval and binds the approval document's digest. The event vocabulary should gain a first-class approval member when its owner next opens it; until then the conflation is declared here rather than hidden."
+  },
+  "certification_manifest": {
+    "present": false,
+    "filename": null,
+    "sha256": null,
+    "refusal_reason": "No portable certification manifest was minted: exact_maximal, exact_net_cash, frozen_cohort, finance_proof_mutations, source_parity are a typed absence. A manifest naming fewer than the five portable-required classes would present a portable-required class as pending, which the portable dossier contract refuses by design. The absence is recorded here instead."
+  },
+  "certification_receipt": {
+    "status": "NOT_RUN",
+    "reason": "The certification validator was not run: there is no manifest to submit, because the dossier is incomplete. This is a REFUSAL, not a pass — no portable certification exists for this tree."
+  },
+  "approvals": {
+    "record": "release-journal.jsonl (P8.6a's hash-chained append-only release journal, reused) plus approvals/*.json",
+    "subject_binding": "Each approval names the SHA-256 of this receipt file as written. Re-assembling the dossier changes that digest and every prior approval stops applying — expiry by identity as well as by clock.",
+    "human_approval_required": true,
+    "automation_may_approve": false,
+    "expiry_model": "absolute_clock_expiry_AND_subject_binding",
+    "max_validity_days": 90
+  },
+  "waiver_register_file": {
+    "filename": "waiver-register.json",
+    "sha256": "e4d6888a76e3b974e82d59cde16cc9ab9bbdc677374026c35fdc0d345eb20fd2"
+  },
+  "receipt_body_sha256": "9a140f09cf9f3a5892194e814a28b0e4e79fec399e7ada13ff344324907e8165"
+}

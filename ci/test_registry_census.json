@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 399,
-  "source_commit": "73c3401e1023910dbc102fba672858e4a7d9e393",
-  "source_tree": "1d7e7bc378b5bd531602f47897ff16409c6dbb45",
+  "checks": 409,
+  "source_commit": "4d6c5f6dcf07ab0cf04e45ce4d3ce5f31c3a74de",
+  "source_tree": "56f2917dd6224433963ef45b3f543dc3bd460a19",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 192
+    "test_count": 197
   },
   "scripts": [
     {
@@ -234,6 +234,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_ci_gate_tier_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_ci_governance_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -442,6 +446,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_gate_side_effect_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_generated_cohort_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -527,6 +535,10 @@
     },
     {
       "script": "run_multipage_filing_extraction_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_mutation_adequacy_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -670,6 +682,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_release_dossier_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_release_identity_governance_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -779,6 +795,10 @@
     },
     {
       "script": "run_stage4_checkpoint_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_stage_recipe_tests.mjs",
       "disposition": "REGISTERED"
     },
     {

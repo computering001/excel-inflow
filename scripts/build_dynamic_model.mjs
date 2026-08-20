@@ -732,7 +732,7 @@ function bindProvenanceAuthorities(sheet, rowPlan, modelCase) {
   return bound;
 }
 
-function refuseContradictedProvenance(sheets, modelCase) {
+function refuseContradictedProvenance(sheets, modelCase, rowPlan) {
   const violations = [];
   for (const sheet of sheets) {
     if (!sheet || typeof sheet.cellAddresses !== "function") continue;
@@ -766,6 +766,21 @@ function refuseContradictedProvenance(sheets, modelCase) {
       if (authority.kind !== "historical" || !authority.case_declared) continue;
       const declared = declaredHistoricalAuthority(modelCase, authority.row_id);
       if (declared !== "derived") continue;
+      // D23. A derived row may still have a FILED OBSERVATION for a historical
+      // period, declared by the compiler or by the case's cash policy, which
+      // this file states elsewhere it is "not entitled to replace with a
+      // reconstructed cash-flow identity" (see `sourcedHistoricalEndingCash`).
+      // Where such a record exists the blue mark is TRUE and must stand.
+      if (
+        filedHistoricalObservation(
+          modelCase,
+          rowPlan,
+          authority.row_id,
+          authority.period_index,
+        ) !== null
+      ) {
+        continue;
+      }
       const cell = sheet.cellAt(address);
       if (!cell) continue;
       const populated =
@@ -774,8 +789,9 @@ function refuseContradictedProvenance(sheets, modelCase) {
       if (!populated) continue;
       if (PROVENANCE_MARKINGS.get(cell.font?.color ?? "") === "hardcode") {
         violations.push(
-          `${sheet.name}!${address}: ${authority.row_id} is a derived row in the case, ` +
-            "but the cell ships as a blue hardcode claiming a filed source",
+          `${sheet.name}!${address}: ${authority.row_id} is a derived row with no filed ` +
+            "observation declared for this period, but the cell ships as a blue hardcode " +
+            "claiming a filed source",
         );
       }
     }
@@ -788,6 +804,53 @@ function refuseContradictedProvenance(sheets, modelCase) {
     );
   }
   return violations.length;
+}
+
+/**
+ * D23 — THE FIGURE AN AUTHORITY RECORD SAYS WAS REPORTED, OR `null`.
+ *
+ * A row's `calculation` — and, on a compiled case, its `historical_authority:
+ * "derived_formula"` — states the row's DERIVATION RULE. Neither is a statement
+ * that no figure was REPORTED for the historical periods, and the first version
+ * of this refusal read them as one. Two records say a figure was reported, both
+ * authored by the compiler or the case:
+ *
+ *   `reported_historical_values[period]` on the row plan definition — the
+ *   compiler's explicit "these three are the reported figures"; and
+ *
+ *   for `ending_cash` under the LEGACY single-bucket cash policy, the case's own
+ *   `cash_policy.historical_year_end_cash[period]`. That is the same record
+ *   `sourcedHistoricalEndingCash` consults below, for the reason stated there: a
+ *   legacy historical closing-cash balance is a filed observation, not an amount
+ *   the workbook is entitled to replace with a reconstructed identity.
+ *
+ * A named exception resting on a compiler field and a declared cash-policy
+ * shape. Anything else derived stays refused.
+ */
+function filedHistoricalObservation(modelCase, rowPlan, rowId, periodIndex) {
+  const index = Number(periodIndex);
+  const definition = [
+    ...(rowPlan?.statement_rows?.income_statement ?? []),
+    ...(rowPlan?.statement_rows?.cash_flow ?? []),
+  ].find((entry) => entry.row_id === rowId);
+  const reported = definition?.reported_historical_values;
+  if (Array.isArray(reported) && Number.isFinite(Number(reported[index]))) {
+    return Number(reported[index]);
+  }
+  const role =
+    definition?.semantic_role ??
+    [
+      ...(modelCase.statement_structure?.income_statement ?? []),
+      ...(modelCase.statement_structure?.cash_flow ?? []),
+    ].find((entry) => entry.row_id === rowId)?.semantic_role;
+  const policy = modelCase.cash_policy ?? {};
+  if (role === "ending_cash" && !policy.buckets) {
+    const series = policy.historical_year_end_cash;
+    if (Array.isArray(series) && Number.isFinite(Number(series[index]))) {
+      return Number(series[index]);
+    }
+  }
+  return null;
 }
 
 /**
@@ -12545,6 +12608,7 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   refuseContradictedProvenance(
     (workbook.sheets ?? [operatingModel]).filter(Boolean),
     modelCase,
+    rowPlan,
   );
   workbook.recalculate();
   return {

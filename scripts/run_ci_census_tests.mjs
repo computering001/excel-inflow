@@ -63,7 +63,6 @@ const DISPOSITIONS = {
   // owner/expiry); the pull-request gate's gate-tier-declaration job and
   // every scheduled deep-tier job invoke it as a first-class step whose
   // verdict is asserted, exactly like run_governance_evidence_tests.mjs.
-  "run_ci_gate_tier_tests.mjs": "CI_WORKFLOW_STEP",
   // Harnesses that require caller-supplied artifacts; they cannot run bare
   // and are exercised via their owning registered suites or manually.
   "run_authority_projection_mutations.mjs": "ARGUMENT_REQUIRED_HARNESS",
