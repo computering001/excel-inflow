@@ -1742,6 +1742,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "scale-invariant-convergence",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_scale_invariant_convergence_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "release-dossier",
       "phase": "proof",
       "runtime": "node",

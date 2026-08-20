@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "1d0177d40b91a74dc928cfc26a6819719c98cf59",
-  "source_tree": "e0747b60f85dfc4e94b2c52dfd475806abb66140",
+  "commit": "aa715cadbbd5ac084bf3f26c5b3a9431497d2d6a",
+  "source_tree": "7bde0afeda450ce4c8728993d262974e0df8f5a4",
   "working_tree_clean": false,
   "sealed_packages": [
     {
@@ -62,9 +62,15 @@
       "commit": "b7bbf5a",
       "invariant": "the solver fixed point, RCF sweep from cash need and debt roll-forward are recomputed independently in another language",
       "note": "7,737 quantities across 33 cases, zero disagreement; independently derived P4.4a's identity"
+    },
+    {
+      "package": "P4.9",
+      "commit": "aa715ca",
+      "invariant": "a convergence criterion must scale with the magnitudes it judges, and an absolute ceiling must be declared where it binds rather than applied silently",
+      "note": "corrected two registered defects rather than only fixing them: MG-3 was overstated and its reproduction contaminated by D33 (a guard testing a convention NAME for its meaning); MG-1 could not land and in proving that, found P3.3's ETR acyclicity conclusion FALSE about the running solver - tax is already iterated today and the graph never said so"
     }
   ],
-  "sealed_package_count": 9,
+  "sealed_package_count": 10,
   "defect_register": "programme/gap-reports/DEFECT_REGISTER.md",
   "known_red": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
   "rollback": "tag excel-inflow-v376-evidence-baseline; every package is an atomic commit",

@@ -5,8 +5,8 @@
   "seal_status": "SEALED_PACKAGES_RECORDED",
   "seal_status_note": "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",
   "branch": "agent/excel-inflow-v377-behavioural-closure",
-  "commit": "1d0177d40b91a74dc928cfc26a6819719c98cf59",
-  "source_tree": "e0747b60f85dfc4e94b2c52dfd475806abb66140",
+  "commit": "aa715cadbbd5ac084bf3f26c5b3a9431497d2d6a",
+  "source_tree": "7bde0afeda450ce4c8728993d262974e0df8f5a4",
   "working_tree_clean": false,
   "sealed_packages": [
     {

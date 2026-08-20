@@ -333,6 +333,11 @@
       "invariant": "a transform that must not change the economics does not, and one that must changes exactly what the graph says",
       "note": "found five real non-invariances, two high; every escape proved to need its declared missing edge"
     },
+    "P4.9": {
+      "commit": "aa715ca",
+      "invariant": "a convergence criterion must scale with the magnitudes it judges, and an absolute ceiling must be declared where it binds rather than applied silently",
+      "note": "corrected two registered defects rather than only fixing them: MG-3 was overstated and its reproduction contaminated by D33 (a guard testing a convention NAME for its meaning); MG-1 could not land and in proving that, found P3.3's ETR acyclicity conclusion FALSE about the running solver - tax is already iterated today and the graph never said so"
+    },
     "P6.8": {
       "commit": "",
       "invariant": "the runtime SLO is one declaration, bound by name, with a measured cohort and an enforceable ceiling",
@@ -346,7 +351,8 @@
   },
   "last_green_commit": "4857acb",
   "open_blockers": [
-    "P4.9 in flight: D28/MG-1 (equation graph omits statement.tax_expense -> cash.cfo, which closes a cycle the convergence contract does not declare) and D30/MG-3 (convergence is not scale-invariant, so an issuer reporting in thousands is refused for economics an issuer in millions is served). BOTH must land before P7.8 freezes, or the freeze pins them as reference behaviour.",
+    "P5.9 IN FLIGHT AND NOW THE FREEZE-CRITICAL BLOCKER: D23 leaves the compiled-case build BLOCKED at head. ending_cash is a DERIVED row shipped as a blue hardcode (build_dynamic_model.mjs:784 refuses it, correctly), so NO WORKBOOK IS PRODUCED, the five portable evidence classes are unproducible, and a freeze taken now would pin a product that does not deliver. The refusal is new; the misrepresentation is old and predates P5.3.",
+    "P4.9 LANDED at aa715ca with two CORRECTIONS to the register. D30/MG-3 was OVERSTATED: its reproduction was contaminated by a new defect (D33) whose guard tests a convention NAME for /rate/i, scaling a 35bp fee to 350%. Held at a faithful rate the thousands restatement CONVERGES on the shipped tree; severity high -> medium, and a scale-relative criterion landed anyway at a 1 percent margin. D28/MG-1 NOT landed: it needs five artefacts moving together, three outside P4.9's remit — now P4.10. In proving that, P4.9 found P3.3's ETR acyclicity conclusion is FALSE about the RUNNING solver, not merely unproven: taxCharge is computed inside the period sweep from preTaxIncome <- netInterest <- iterated interest, and CFO is seeded from netIncome <- taxCharge. Tax is ALREADY iterated today; the graph never declared it. A sealed proof asserts a sink property the solver does not have.",
     "P7.8 (behavioural freeze) and P8.8 (immutable tag) not started; they are the gate for Phases 9-10.",
     "Freeze criterion 9 OPEN: skill_version is still 3.7.6 across four independent tripwires plus KNOWN_LIMITATIONS.md. The corpus already records this exact failure mode from the 3.7.5->3.7.6 flip, so the literal must be centralised before the 3.7.7 flip rather than after.",
     "Freeze criterion 11 OPEN: assets/runtime-manifest.json carries no certified_runtime_code_closure_sha256, so post-tag mutation cannot invalidate certification. P8.1 computes and states the value; recording it is P8.8's.",
