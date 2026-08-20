@@ -15,9 +15,9 @@
   ],
   "files": {
     "build_dynamic_model.mjs": {
-      "count": 27,
+      "count": 31,
       "families": {
-        "row_topology": 19,
+        "row_topology": 23,
         "economic_values": 2,
         "workbook_state": 6
       },
@@ -43,6 +43,15 @@
       "classification": "canonical_writer",
       "concern": "attachment evidence",
       "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/behavioural_golden.mjs": {
+      "count": 3,
+      "families": {
+        "terminal_status": 3
+      },
+      "classification": "UNCLASSIFIED",
+      "concern": null,
+      "target_owner": null
     },
     "lib/broker_intake_choice.mjs": {
       "count": 4,
@@ -289,10 +298,10 @@
       "target_owner": "validators stay validators"
     },
     "lib/model_ir_v3.mjs": {
-      "count": 7,
+      "count": 8,
       "families": {
         "capture_ownership": 2,
-        "row_topology": 5
+        "row_topology": 6
       },
       "classification": "canonical_writer",
       "concern": "model IR projection",
@@ -315,6 +324,15 @@
       "classification": "derived_reader",
       "concern": "ownership census view (derived, never a writer)",
       "target_owner": "derived view of the canonical graph (Phase 3)"
+    },
+    "lib/package_ab_comparison.mjs": {
+      "count": 3,
+      "families": {
+        "terminal_status": 3
+      },
+      "classification": "UNCLASSIFIED",
+      "concern": null,
+      "target_owner": null
     },
     "lib/performance_receipt.mjs": {
       "count": 1,
@@ -397,6 +415,15 @@
       "classification": "validator",
       "concern": "package attestation checks",
       "target_owner": "validators stay validators"
+    },
+    "lib/required_role_closure.mjs": {
+      "count": 2,
+      "families": {
+        "row_topology": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "P2.4 required-role closure artifact minted before forecast compilation",
+      "target_owner": "Statement Authority compiler (Phase 2)"
     },
     "lib/row_plan.mjs": {
       "count": 80,
@@ -530,7 +557,10 @@
   ],
   "unknown_writer_gate": {
     "rule": "every high-risk mutation must be classified before Phase 1 closes",
-    "unclassified_files": []
+    "unclassified_files": [
+      "lib/behavioural_golden.mjs",
+      "lib/package_ab_comparison.mjs"
+    ]
   },
   "runtime_mutation_receipts_status": "static census only in P0.7; runtime receipts around the named late-repair points land with the Phase 3/5 shadow migration that consumes them - declared, not silent"
 }

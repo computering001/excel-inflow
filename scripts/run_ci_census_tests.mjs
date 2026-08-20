@@ -38,6 +38,12 @@ function check(condition, message) {
 const DISPOSITIONS = {
   // Product/pipeline entry points — they ARE the system under test.
   "run_attachment_evidence_pipeline.py": "PIPELINE_ENTRYPOINT",
+  // P8.1: the A/B driver needs --out and creates git worktrees; the registered
+  // package-ab suite exercises the comparison logic. Not a gate step.
+  "run_package_ab_proof.mjs": "ARGUMENT_REQUIRED_HARNESS",
+  // P6.7: the doctor CLI is an operator tool reporting host fitness; the
+  // registered runtime-doctor suite covers its logic.
+  "run_runtime_doctor.mjs": "ARGUMENT_REQUIRED_HARNESS",
   "run_broker_intake.mjs": "PIPELINE_ENTRYPOINT",
   "run_broker_pipeline.py": "PIPELINE_ENTRYPOINT",
   "run_dcs_pipeline.py": "PIPELINE_ENTRYPOINT",

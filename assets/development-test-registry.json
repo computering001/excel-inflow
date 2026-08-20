@@ -1634,6 +1634,49 @@
       "test_class": "mutation"
     },
     {
+      "id": "canonical-graph-binding",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_canonical_graph_binding_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "etr-dag-safety",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_etr_dag_safety_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "hard-clock",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_hard_clock_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "provenance-authority",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_provenance_authority_tests.py",
+      "arguments": [
+        {
+          "name": "out",
+          "source": "OUT_DIR",
+          "type": "directory"
+        }
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "economic-authority-seal",
       "phase": "forecast",
       "runtime": "node",

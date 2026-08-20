@@ -650,6 +650,171 @@ function assertFormulaProvenance() {
   return asserted;
 }
 
+// ---------------------------------------------------------------------------
+// P5.3 — THE COLOUR IS A CLAIM ABOUT AN AUTHORITY, SO IT NAMES THE AUTHORITY.
+//
+// `formulaColor()` above decides a colour from the SHAPE OF THE FORMULA the
+// emitter just wrote, and the shipped validators re-derive the same expectation
+// from the same cell's formula with the same rule. That pairing proves the two
+// halves of this build agree with each other; it proves nothing about whether
+// the mark is TRUE. A derived subtotal shipped as a typed-in number and painted
+// blue satisfies it perfectly — no formula, therefore blue — while asserting to
+// the reader that a computed figure was read off a filed page.
+//
+// So every provenance-marked cell in the statement grid now also records WHICH
+// AUTHORITY RECORD governs it: the row and the period, resolvable in the
+// compiled case (historical declaration and `provenance` ledger) and in the
+// model IR's authority plane (per row, per forecast period). The binding is a
+// pointer, never a copy — see `plan_builder.bindProvenanceAuthority`.
+//
+// Two refusals ride with it, and neither repaints anything:
+//
+//   MECHANICAL, over every sheet. Blue with a formula, a cross-sheet formula
+//   not green, or a same-sheet formula neither black nor white (white is the
+//   chrome channel, which `releaseFormulaProvenance` documents) is a build
+//   failure rather than an emitted lie. The shipped validators check this on
+//   the Operating Model's income-statement and cash-flow rows only; the debt
+//   schedule, the Brokers sheet and Forward Curves were never scanned at all.
+//
+//   AUTHORITY-BOUND, over the bound cells. A cell whose governing authority
+//   says the value is DERIVED may not ship as a blue hardcode.
+//
+const PROVENANCE_MARKINGS = new Map([
+  ["FF0000FF", "hardcode"],
+  ["FF000000", "same_sheet_formula"],
+  ["FF008000", "cross_sheet_link"],
+  ["FFFFFFFF", "chrome"],
+]);
+
+function crossSheetFormula(formula) {
+  return /(?:'[^']+'|[A-Za-z_][A-Za-z0-9_.]*)!/.test(String(formula ?? ""));
+}
+
+function bindProvenanceAuthorities(sheet, rowPlan, modelCase) {
+  if (typeof sheet.bindProvenanceAuthority !== "function") return 0;
+  const caseRowsById = new Map(
+    [
+      ...(modelCase.statement_structure?.income_statement ?? []),
+      ...(modelCase.statement_structure?.cash_flow ?? []),
+    ].map((row) => [row.row_id, row]),
+  );
+  let bound = 0;
+  for (const definition of [
+    ...(rowPlan.statement_rows?.income_statement ?? []),
+    ...(rowPlan.statement_rows?.cash_flow ?? []),
+  ]) {
+    if (definition.row_type === "header") continue;
+    if (!Number.isInteger(definition.row)) continue;
+    const declared = caseRowsById.get(definition.row_id) ?? null;
+    for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
+      sheet.bindProvenanceAuthority(`${column}${definition.row}`, {
+        kind: "historical",
+        row_id: definition.row_id,
+        period_index: index,
+        // Whether the case DECLARED this row at all is part of the pointer: a
+        // compiler-minted row has no case declaration to resolve against, and
+        // saying so is better than a reader inferring it from a silence.
+        case_declared: Boolean(declared),
+      });
+      bound += 1;
+    }
+    for (const [index, column] of FORECAST_COLUMNS.entries()) {
+      sheet.bindProvenanceAuthority(`${column}${definition.row}`, {
+        kind: "forecast",
+        row_id: definition.row_id,
+        forecast_index: index,
+        period_index: index + 3,
+        case_declared: Boolean(declared),
+      });
+      bound += 1;
+    }
+  }
+  return bound;
+}
+
+function refuseContradictedProvenance(sheets, modelCase) {
+  const violations = [];
+  for (const sheet of sheets) {
+    if (!sheet || typeof sheet.cellAddresses !== "function") continue;
+    for (const address of sheet.cellAddresses()) {
+      const cell = sheet.cellAt(address);
+      if (!cell) continue;
+      const marking = PROVENANCE_MARKINGS.get(cell.font?.color ?? "");
+      const formula = cell.formula === undefined ? null : cell.formula;
+      const populated =
+        formula !== null ||
+        (cell.value !== undefined && cell.value !== null && cell.value !== "");
+      if (!populated || !marking) continue;
+      if (marking === "hardcode" && formula !== null) {
+        violations.push(
+          `${sheet.name}!${address}: blue says a hand-entered number, but the cell holds =${formula}`,
+        );
+      } else if (formula !== null && crossSheetFormula(formula)) {
+        if (marking !== "cross_sheet_link" && marking !== "chrome") {
+          violations.push(
+            `${sheet.name}!${address}: =${formula} imports from another sheet but is marked ${marking}`,
+          );
+        }
+      } else if (formula !== null && marking === "cross_sheet_link") {
+        violations.push(
+          `${sheet.name}!${address}: green claims a cross-sheet link, but =${formula} is same-sheet`,
+        );
+      }
+    }
+    if (typeof sheet._provenanceAuthority?.entries !== "function") continue;
+    for (const [address, authority] of sheet._provenanceAuthority) {
+      if (authority.kind !== "historical" || !authority.case_declared) continue;
+      const declared = declaredHistoricalAuthority(modelCase, authority.row_id);
+      if (declared !== "derived") continue;
+      const cell = sheet.cellAt(address);
+      if (!cell) continue;
+      const populated =
+        cell.formula !== undefined ||
+        (cell.value !== undefined && cell.value !== null && cell.value !== "");
+      if (!populated) continue;
+      if (PROVENANCE_MARKINGS.get(cell.font?.color ?? "") === "hardcode") {
+        violations.push(
+          `${sheet.name}!${address}: ${authority.row_id} is a derived row in the case, ` +
+            "but the cell ships as a blue hardcode claiming a filed source",
+        );
+      }
+    }
+  }
+  if (violations.length > 0) {
+    throw new Error(
+      "Provenance marking contradicts the authority governing the cell:\n- " +
+        violations.slice(0, 40).join("\n- ") +
+        (violations.length > 40 ? `\n- ...and ${violations.length - 40} more` : ""),
+    );
+  }
+  return violations.length;
+}
+
+/**
+ * What the CASE says produces a row's reported history: `derived` when the row
+ * is computed from other rows, `source` when the number is read off a filed
+ * page. This is the authority the historical provenance mark is a claim about.
+ */
+function declaredHistoricalAuthority(modelCase, rowId) {
+  const row = [
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
+  ].find((entry) => entry.row_id === rowId);
+  if (!row) return "unknown";
+  if (
+    row.historical_authority === "derived_formula" ||
+    row.historical_authority === "reported_total_reconciled"
+  ) {
+    return "derived";
+  }
+  if (row.historical_authority === "source_input") return "source";
+  const refs = row.calculation?.refs ?? [];
+  if (["calculation", "subtotal"].includes(row.row_type) && refs.length > 0) {
+    return "derived";
+  }
+  return "source";
+}
+
 function setFormula(sheet, address, formula) {
   const text = formula.startsWith("=") ? formula : `=${formula}`;
   sheet.getRange(address).formulas = [[text]];
@@ -1312,7 +1477,7 @@ function isStandaloneOnlyForecastRule(rule) {
 // and two sheets in one workbook may legitimately want a comment on `B12`.
 const COMMENTED_CELLS = new WeakMap();
 
-function addCommentOnce(workbook, sheet, address, text) {
+function addCommentOnce(workbook, sheet, address, text, authority = null) {
   let seen = COMMENTED_CELLS.get(sheet);
   if (!seen) {
     seen = new Set();
@@ -1320,8 +1485,45 @@ function addCommentOnce(workbook, sheet, address, text) {
   }
   if (seen.has(address)) return false;
   seen.add(address);
-  workbook.comments.addThread({ cell: sheet.getRange(address) }, text);
+  workbook.comments.addThread({ cell: sheet.getRange(address) }, text, authority);
   return true;
+}
+
+// P5.3 — A SOURCE COMMENT IS AN ASSERTION, SO IT NAMES WHAT IT ASSERTS.
+//
+// Every provenance comment in this file is rendered by `provenanceComment()`
+// from ONE record in `modelCase.provenance` (or from a compiler-minted stand-in
+// for a row the case never declared). Until now the address, the text and the
+// record parted company at the moment of writing: the workbook carried a
+// sentence naming a document and a page, and nothing anywhere recorded WHICH
+// record that sentence was rendered from. A validator could therefore only ask
+// whether a comment was PRESENT — which is what `historical-provenance-comments`
+// asks — and a comment whose claim had drifted from, or outright contradicted,
+// the authority it was rendered from was indistinguishable from a true one.
+//
+// This routes every one of those writes through a single door that records the
+// pointer beside the text: kind, row id and period index. The comment's TRUTH is
+// then checkable — resolve the pointer in the case and re-render — by a reader
+// that shares no code with this file. Nothing about the emitted text changes.
+function addProvenanceComment(
+  workbook,
+  sheet,
+  address,
+  provenance,
+  rowId,
+  periodIndex,
+) {
+  return addCommentOnce(
+    workbook,
+    sheet,
+    address,
+    provenanceComment(provenance),
+    {
+      kind: provenance.declared_absence ? "declared_absence" : "filed_source",
+      row_id: rowId,
+      period_index: Number(periodIndex),
+    },
+  );
 }
 
 function provenanceComment(entry) {
@@ -2646,6 +2848,16 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
           sheet,
           address,
           forecastAuthorityComment(modelCase, definition, index, authority),
+          // P5.3. The forecast-assumption note is rendered either from the
+          // case's provenance record for the forecast period or from the
+          // resolved forecast authority; the pointer says which row and which
+          // forecast period it speaks for, so its claim can be resolved.
+          {
+            kind: "forecast_authority",
+            row_id: definition.row_id,
+            forecast_index: index,
+            period_index: index + 3,
+          },
         );
       }
       sheet.getRange(`${ACTUAL_COLUMN}${row}:${LAST_COLUMN}${row}`).format.numberFormat =
@@ -4190,11 +4402,13 @@ function configureOperatingModel(
           (entry) => Number(entry.period_index) === index,
         );
         if (provenance) {
-          addCommentOnce(
+          addProvenanceComment(
             workbook,
             sheet,
             `${column}${definition.row}`,
-            provenanceComment(provenance),
+            provenance,
+            definition.row_id,
+            index,
           );
         }
       } else if (generic) {
@@ -4206,11 +4420,13 @@ function configureOperatingModel(
           (entry) => Number(entry.period_index) === index,
         );
         if (provenance) {
-          addCommentOnce(
+          addProvenanceComment(
             workbook,
             sheet,
             `${column}${definition.row}`,
-            provenanceComment(provenance),
+            provenance,
+            definition.row_id,
+            index,
           );
         }
       }
@@ -8053,11 +8269,13 @@ function configureOperatingModel(
         filedFinanceExpenseDefinition.row_id
       ] ?? []).find((entry) => Number(entry.period_index) === index);
       if (provenance) {
-        addCommentOnce(
+        addProvenanceComment(
           workbook,
           sheet,
           `${column}${interestRows.interest_reported_total}`,
-          provenanceComment(provenance),
+          provenance,
+          filedFinanceExpenseDefinition.row_id,
+          index,
         );
       }
     } else {
@@ -8140,11 +8358,13 @@ function configureOperatingModel(
         filedInterestIncomeDefinition.row_id
       ] ?? []).find((entry) => Number(entry.period_index) === index);
       if (provenance) {
-        addCommentOnce(
+        addProvenanceComment(
           workbook,
           sheet,
           `${column}${interestRows.interest_income_schedule}`,
-          provenanceComment(provenance),
+          provenance,
+          filedInterestIncomeDefinition.row_id,
+          index,
         );
       }
     }
@@ -8191,11 +8411,13 @@ function configureOperatingModel(
         filedCashInterestPaidDefinition.row_id
       ] ?? []).find((entry) => Number(entry.period_index) === index);
       if (provenance) {
-        addCommentOnce(
+        addProvenanceComment(
           workbook,
           sheet,
           `${column}${interestRows.cash_interest_paid}`,
-          provenanceComment(provenance),
+          provenance,
+          filedCashInterestPaidDefinition.row_id,
+          index,
         );
       }
     } else {
@@ -8217,11 +8439,13 @@ function configureOperatingModel(
         filedCashInterestReceivedDefinition.row_id
       ] ?? []).find((entry) => Number(entry.period_index) === index);
       if (provenance) {
-        addCommentOnce(
+        addProvenanceComment(
           workbook,
           sheet,
           `${column}${interestRows.cash_interest_received}`,
-          provenanceComment(provenance),
+          provenance,
+          filedCashInterestReceivedDefinition.row_id,
+          index,
         );
       }
     } else {
@@ -9936,7 +10160,16 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
       // A cell may already carry a comment from an emission branch; that is the
       // desired end state either way, so this sweep only fills the gaps. It is
       // not a duplicate that gets skipped — a duplicate never gets written.
-      if (addCommentOnce(workbook, sheet, address, provenanceComment(provenance))) {
+      if (
+        addProvenanceComment(
+          workbook,
+          sheet,
+          address,
+          provenance,
+          definition.row_id,
+          periodIndex,
+        )
+      ) {
         attached += 1;
       }
     }
@@ -12010,8 +12243,11 @@ export async function synthesisePlan({
   // terminates the walk; see scripts/lib/plan_values.mjs.
   const evaluated = fillCachedValues(emission.workbook);
 
-  const { plan, uncached_formulas: uncachedFormulas } =
-    emission.workbook.toPlan({
+  const {
+    plan,
+    uncached_formulas: uncachedFormulas,
+    provenance_authority: provenanceAuthority,
+  } = emission.workbook.toPlan({
       caseId: modelCase.case_id,
       // Deterministic on purpose: a wall clock here would make two builds of
       // the same case differ, and the renderer stamps docProps from this field.
@@ -12068,6 +12304,13 @@ export async function synthesisePlan({
     evaluated_cached_cells: evaluated.filled,
     unresolved_caches: [...historical.unresolved, ...evaluated.unresolved],
     uncached_formula_cells: uncachedFormulas,
+    // P5.3 — the provenance/authority binding, carried beside the plan rather
+    // than inside it so the emitted package is unchanged.
+    provenance_authority: {
+      ...provenanceAuthority,
+      case_id: modelCase.case_id,
+      bound_cells: emission.boundProvenanceAuthorities ?? 0,
+    },
   };
 }
 
@@ -12138,8 +12381,19 @@ async function writeModelSidecars(
     standaloneSolution,
     proFormaSolution,
     historicalNormalisationReceipt,
+    provenanceAuthority,
   },
 ) {
+  // P5.3 — which authority record governs each provenance-marked cell. Written
+  // as its own sidecar because `assets/plan.schema.json` closes the plan and
+  // the emitted .xlsx must not move by one byte for carrying a binding.
+  if (provenanceAuthority) {
+    await fs.writeFile(
+      `${outputPath}.provenance-authority.json`,
+      `${JSON.stringify(provenanceAuthority, null, 2)}\n`,
+      "utf8",
+    );
+  }
   await fs.writeFile(
     `${outputPath}.row-map.json`,
     `${JSON.stringify(rowPlan, null, 2)}\n`,
@@ -12279,6 +12533,19 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   // LAST styling act of the build: reclaim the provenance channel on every cell
   // that holds a formula, whatever any earlier pass painted over it.
   const assertedFormulaProvenance = assertFormulaProvenance();
+  // P5.3. AFTER the last styling act, because a binding recorded before it
+  // would name a colour a later pass could still repaint. Nothing here paints:
+  // the pass records which authority record governs each provenance-marked
+  // statement cell, then refuses the build if a marking contradicts it.
+  const boundProvenanceAuthorities = bindProvenanceAuthorities(
+    operatingModel,
+    rowPlan,
+    modelCase,
+  );
+  refuseContradictedProvenance(
+    (workbook.sheets ?? [operatingModel]).filter(Boolean),
+    modelCase,
+  );
   workbook.recalculate();
   return {
     workbook,
@@ -12286,6 +12553,7 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
     brokerRows,
     curveSheet,
     assertedFormulaProvenance,
+    boundProvenanceAuthorities,
   };
 }
 
@@ -12493,6 +12761,7 @@ async function main(packaging = null) {
       standaloneSolution,
       proFormaSolution,
       historicalNormalisationReceipt,
+      provenanceAuthority: synthesis.provenance_authority,
     });
     console.log(
       JSON.stringify({
@@ -12687,6 +12956,7 @@ async function main(packaging = null) {
     standaloneSolution,
     proFormaSolution,
     historicalNormalisationReceipt,
+    provenanceAuthority: synthesis.provenance_authority,
   });
   // DEFECT 0.12, THE GENERAL DEFENCE. Every one of these counts is a scanner's
   // report of how much of the workbook it managed to see. They were all

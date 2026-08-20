@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 343,
-  "source_commit": "3f529eb8901d8602e9c203a6f154e7c06658e8f4",
-  "source_tree": "48868979a15fa1ec348bf6c0799119b1d73327f7",
+  "checks": 399,
+  "source_commit": "73c3401e1023910dbc102fba672858e4a7d9e393",
+  "source_tree": "1d7e7bc378b5bd531602f47897ff16409c6dbb45",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 164
+    "test_count": 192
   },
   "scripts": [
     {
@@ -58,6 +58,14 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_archetype_economics_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_archetype_presentation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_architecture_ownership_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -68,6 +76,10 @@
     {
       "script": "run_authority_projection_mutations.mjs",
       "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_behavioural_golden_tests.mjs",
+      "disposition": "REGISTERED"
     },
     {
       "script": "run_blocker_corpus_tests.mjs",
@@ -190,6 +202,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_canonical_graph_binding_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_carrier_product_identity_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -226,7 +242,15 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_classifier_caption_defect_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_coercion_ban_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_completion_census_scope_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -286,6 +310,14 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_economic_authority_seal_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_economic_ir_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_emitted_candidate_independent_oracle_tests.py",
       "disposition": "REGISTERED"
     },
@@ -298,7 +330,15 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_envelope_terminal_legality_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_equation_graph_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_etr_dag_safety_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -358,6 +398,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_footing_tolerance_defect_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_forecast_authority_ledger_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -386,6 +430,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_formula_ast_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_frozen_cohort.mjs",
       "disposition": "PIPELINE_ENTRYPOINT"
     },
@@ -394,8 +442,16 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_generated_cohort_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_governance_evidence_tests.mjs",
       "disposition": "CI_WORKFLOW_STEP"
+    },
+    {
+      "script": "run_hard_clock_tests.mjs",
+      "disposition": "REGISTERED"
     },
     {
       "script": "run_historical_normalisation_tests.mjs",
@@ -482,6 +538,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_opening_amount_typing_defect_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_opening_debt_bridge_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -490,11 +550,31 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_opening_instrument_provenance_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_ownership_census_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_package_ab_proof.mjs",
+      "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_package_ab_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_performance_receipt_honesty_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_performance_receipt_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_period_scoring_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -514,11 +594,19 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_plan_reconstruction_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_policy_registry_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
       "script": "run_portability_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_portable_certification_tier_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -543,6 +631,10 @@
     },
     {
       "script": "run_progress_heartbeat_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_provenance_authority_tests.py",
       "disposition": "REGISTERED"
     },
     {
@@ -586,11 +678,23 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_release_rollback_policy_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_required_role_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_reviewed_portable_gate.py",
       "disposition": "ORPHANED_LEGACY_GATE"
     },
     {
       "script": "run_reviewed_repair_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_roll_forward_invariant_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -618,6 +722,14 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_runtime_doctor.mjs",
+      "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_runtime_doctor_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_runtime_version_contract_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -627,6 +739,10 @@
     },
     {
       "script": "run_semantic_role_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_solver_fixed_point_oracle_tests.py",
       "disposition": "REGISTERED"
     },
     {
@@ -684,6 +800,10 @@
     {
       "script": "run_structural_ownership_preflight.mjs",
       "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_support_coverage_grid_tests.mjs",
+      "disposition": "REGISTERED"
     },
     {
       "script": "run_support_envelope_tests.mjs",

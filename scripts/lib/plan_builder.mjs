@@ -532,6 +532,21 @@ export class PlanWorksheet {
     this._conditionalFormats = [];
     this._dataValidations = [];
     this._comments = [];
+    // P5.3 — THE AUTHORITY A PROVENANCE MARK IS MAKING A CLAIM ABOUT.
+    //
+    // A font colour and a source comment are both CLAIMS: blue says "a human
+    // typed this number off a filed page", green says "this number was imported
+    // from another sheet", and a `Source: ...` comment names the page. Nothing
+    // recorded here decides a colour or writes a comment — the emitter still
+    // does that — but every provenance-marked cell now also records a POINTER
+    // to the authority record that governs it, so a reader can ask whether the
+    // claim and the authority agree instead of only whether the claim is
+    // well-formed. The pointer is deliberately a pointer and not a copy: an
+    // emitter that copied the authority's contents into its own binding could
+    // make a wrong colour agree with a convenient story, whereas a pointer is
+    // resolved against the case and the model IR by whoever checks it.
+    this._provenanceAuthority = new Map();
+    this._commentAuthority = [];
     this._merges = [];
     // These are the OOXML defaults openpyxl writes even on a sheet with no
     // grouped rows. Keeping them in the plan makes the plan a complete account
@@ -556,6 +571,36 @@ export class PlanWorksheet {
       this._cells.set(address, cell);
     }
     return cell;
+  }
+
+  /**
+   * P5.3 — bind one cell's provenance marking to the authority record that
+   * governs it. `authority` is a POINTER (`{ kind, row_id, period_index, ... }`)
+   * into the compiled case / model IR, never a copy of what those records say.
+   * Last writer wins: the emitter binds once, at the end of the build, after
+   * every styling pass has run.
+   */
+  bindProvenanceAuthority(address, authority) {
+    this._provenanceAuthority.set(String(address), authority);
+  }
+
+  /**
+   * P5.3 — read the cell back as it will ship. The emitter needs this to REFUSE
+   * a workbook whose provenance colour contradicts the bound authority; without
+   * a read-back the only place that contradiction could ever surface is after
+   * the file has been written.
+   */
+  cellShapeOf(address) {
+    const cell = this._cells.get(String(address));
+    if (!cell) return { font_color: null, formula: null, has_content: false };
+    const formula = cell.formula === undefined ? null : cell.formula;
+    return {
+      font_color: cell.font?.color ?? null,
+      formula,
+      has_content:
+        formula !== null ||
+        (cell.value !== undefined && cell.value !== null && cell.value !== ""),
+    };
   }
 
   /** See the note on `PlanFormat.borders` for what a frame is and how two compose. */
@@ -695,15 +740,20 @@ class PlanComments {
    * writer permitted it; a builder that deduplicated them would be making a
    * decision the emitter did not make, and would hide it.
    */
-  addThread(target, text) {
+  addThread(target, text, authority = null) {
     const range = target?.cell;
     if (!range) throw new Error("plan_builder: addThread needs a { cell } range.");
     const sheet = range._sheet;
     const box = range._box;
-    sheet._comments.push({
-      cell: `${columnNameOf(box.firstColumn)}${box.firstRow}`,
-      text: String(text),
-    });
+    const cell = `${columnNameOf(box.firstColumn)}${box.firstRow}`;
+    sheet._comments.push({ cell, text: String(text) });
+    // P5.3. A comment that ASSERTS a source records which authority record it
+    // asserted, so the assertion can be checked for truth rather than for
+    // presence. `authority` is null for the many comments that explain a
+    // control or a convention and assert no source at all.
+    if (authority) {
+      sheet._commentAuthority.push({ cell, authority: { ...authority } });
+    }
   }
 }
 
@@ -855,13 +905,65 @@ export class PlanWorkbook {
     if (options.caseId) plan.case_id = options.caseId;
     if (options.generator) plan.generator = { ...options.generator };
     plan.workbook = workbook;
-    return { plan, uncached_formulas: uncachedFormulas };
+    return {
+      plan,
+      uncached_formulas: uncachedFormulas,
+      // P5.3. Deliberately NOT part of `plan`: the plan is the renderer's
+      // input and `assets/plan.schema.json` closes it, so the binding travels
+      // as its own record and the emitted package is byte-identical with or
+      // without this channel. What ships here is the marking as it will land
+      // (read back off the finished cell, so it is the emitted fact and not a
+      // second opinion) plus the POINTER to the governing authority record.
+      provenance_authority: this._provenanceAuthorityRecord(),
+    };
+  }
+
+  /** P5.3 — see `bindProvenanceAuthority`. */
+  _provenanceAuthorityRecord() {
+    const cells = [];
+    const comments = [];
+    for (const sheet of this.sheets) {
+      const bound = [...sheet._provenanceAuthority.entries()].sort(
+        (left, right) => compareAddresses(left[0], right[0]),
+      );
+      for (const [address, authority] of bound) {
+        const shape = sheet.cellShapeOf(address);
+        cells.push({
+          sheet: sheet.name,
+          cell: address,
+          font_color: shape.font_color,
+          has_formula: shape.formula !== null,
+          cross_sheet_formula:
+            shape.formula !== null && /(?:'[^']+'|[A-Za-z_][A-Za-z0-9_.]*)!/.test(shape.formula),
+          has_content: shape.has_content,
+          authority: { ...authority },
+        });
+      }
+      for (const entry of [...sheet._commentAuthority].sort((left, right) =>
+        compareAddresses(left.cell, right.cell),
+      )) {
+        comments.push({
+          sheet: sheet.name,
+          cell: entry.cell,
+          authority: { ...entry.authority },
+        });
+      }
+    }
+    return { version: "provenance-authority/1", cells, comments };
   }
 }
 
 // ---------------------------------------------------------------------------
 // Serialisation helpers
 // ---------------------------------------------------------------------------
+
+/** Row-major address order, so a recorded binding list is deterministic. */
+function compareAddresses(left, right) {
+  const a = parseAddress(left);
+  const b = parseAddress(right);
+  if (a.firstRow !== b.firstRow) return a.firstRow - b.firstRow;
+  return a.firstColumn - b.firstColumn;
+}
 
 /** Key-order-independent identity for a style record. */
 function stableKey(value) {
