@@ -152,3 +152,14 @@ headline release promise was entirely unsampled — and SUPPORTED_DEGRADED once 
 the budget went to preflight-stopped cases because 5 of 11 entity types are financial
 institutions. P7.3 now declares four strata drawn from the seed, so determinism is preserved.
 Value coverage alone hid this; LANE coverage is what exposed it.
+
+## D20 — a governance test mutates a tracked artifact as a side effect
+`node scripts/run_programme_control_tests.mjs` rewrites `ci/test_registry_census.json`
+while running (found by P7.2's re-verification, which had that file on its forbidden list
+and had to revert it after every run). A validator must not mutate the tree it validates:
+a gate run should be side-effect free, and a census artifact should be regenerated only by
+its own generator. Consequence today: any agent forbidden from `ci/**` sees a spurious dirty
+file, and a CI run could in principle commit a census it regenerated rather than verified.
+Owner surface: scripts/run_programme_control_tests.mjs (the census invocation) and whatever
+it calls in the census generator. Fix: verify without writing, or write only under an
+explicit --write flag as run_ownership_census_tests.mjs and the coercion inventory already do.
