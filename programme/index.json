@@ -262,6 +262,41 @@
       "commit": "bd1b973",
       "invariant": "provenance colour and comment truth are bound to the authority record and checked independently",
       "note": "the flaw was a shared ANCHOR, not a shared import; workbooks byte-identical"
+    },
+    "P7.5": {
+      "commit": "102ada3",
+      "invariant": "mutation adequacy is measured, with every survivor registered and the P0 gate composed from a declared set",
+      "note": "score 1.0 / coverage 0.338; six of seven P0 invariants have no mutation-class prover, published as holes"
+    },
+    "P6.2": {
+      "commit": "102ada3",
+      "invariant": "every stage receipt declares the recipe that produced it, and the stage closure is derived from the import graph",
+      "note": "13 hand-named modules where the real closure is 98; RunStore declared dead, its digest helpers made live"
+    },
+    "P0.9": {
+      "commit": "102ada3",
+      "invariant": "a gate run is side-effect free; regeneration happens only under an explicit flag",
+      "note": "one offender across all 192 registered suites"
+    },
+    "P8.7": {
+      "commit": "102ada3",
+      "invariant": "a portable dossier assembles hash-bound or refuses, with permanent exclusions unmistakable from pending work",
+      "note": "five typed absences; waiver register argued out of existence"
+    },
+    "P7.7": {
+      "commit": "c26463e",
+      "invariant": "the gate is layered, each tier declares what it defers, and a quarantine carries an owner and an expiry",
+      "note": "found a governance mutation that had gone vacuous, and that the frozen cohort FAILS rather than merely not running"
+    },
+    "P4.7": {
+      "commit": "",
+      "invariant": "the solve order is checked against the case's own graph, with per-SCC residuals and a recorded binding constraint",
+      "note": "hand-written order AGREES across 33 cases / 99 periods; edge-wise not rank-wise, since Gauss-Seidel legitimately interleaves"
+    },
+    "P4.4": {
+      "commit": "",
+      "invariant": "the nine declared modules have checked boundaries and a sealed per-module version",
+      "note": "4 of 6 invariants proven, 1 proven-partial with the remainder refused by a live blocker probe, 1 with a declared benign coarsening"
     }
   },
   "evidence_baseline": {

@@ -112,6 +112,8 @@ const FILE_OWNERSHIP = {
   "lib/behavioural_golden.mjs": { role: "canonical_writer", concern: "P7.2 behavioural golden records + approval ledger (frozen truth; regeneration is human-approved only)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/package_ab_comparison.mjs": { role: "validator", concern: "P8.1 A/B archive comparison + smallest-difference report (compares, never writes a package)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/release_dossier.mjs": { role: "canonical_writer", concern: "P8.7 portable dossier assembly (typed absences; refuses to mint a manifest naming fewer than five classes)", target_owner: "Release/package compiler (Phase 8)" },
+  "lib/solve_order.mjs": { role: "validator", concern: "P4.7 Tarjan + topological derivation; checks the hand-written solve order against the case graph, never reorders it", target_owner: "Schedule/solver layer (Phase 4)" },
+  "lib/canonical_model_modules.mjs": { role: "validator", concern: "P4.4 nine-module boundary register + the sealed per-module boundary digest; validates the declared contract against real solver output, never reorders or extracts", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/case_generator.mjs": { role: "canonical_writer", concern: "P7.3 development-only seeded synthetic case generator (writes generated TEST cases and their seed registry; never mutates product state on a real run)", target_owner: "Corpus and generated cohort (Phase 7)" },
 };
 

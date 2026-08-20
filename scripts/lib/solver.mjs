@@ -23,7 +23,18 @@ import {
   instrumentPeriodStateByKey,
   mandatoryRepaymentForPeriod,
 } from "./instrument_period_state.mjs";
-import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+import { EQUATION_GRAPH, compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+// P4.7 — the solve order is OBSERVED and CHECKED against the case's own graph.
+// Recording and checking only: nothing in this module reorders the solve or
+// touches a solved number.
+import {
+  SOLVE_ORDER_SCHEMA_VERSION,
+  checkIterationVectorDerivation,
+  checkSolveOrderAgreement,
+  classifyRevolverBinding,
+  deriveSolveOrder,
+  perComponentResiduals,
+} from "./solve_order.mjs";
 import {
   OPENING_DEBT_BRIDGE_REFUSAL_REASON_CODE,
   compileOpeningDebtBridge,
@@ -74,6 +85,61 @@ export function solverIterationDeclaration(circularity) {
       : [],
   };
 }
+
+/**
+ * P4.7 — the SOLVE-ORDER RECORDER.
+ *
+ * The order in which this file evaluates a period's equations was hand-written
+ * and, until now, unobservable: nothing recorded it and nothing checked it
+ * against the graph the solve is hash-bound to. The recorder is the cheapest
+ * honest instrument for that — each equation-graph node names itself at the
+ * point the hand-written solve makes its value final, so the resulting order is
+ * OBSERVED rather than declared a second time in a literal.
+ *
+ * It records identity only. It reads no value, writes nothing back, and is
+ * sealed after the first sweep of each period so the hot loop pays nothing.
+ */
+function createSolveOrderRecorder() {
+  const order = [];
+  const seen = new Set();
+  let open = true;
+  return {
+    record(nodeId) {
+      if (!open || seen.has(nodeId)) return;
+      seen.add(nodeId);
+      order.push(nodeId);
+    },
+    recordAll(nodeIds) {
+      for (const nodeId of nodeIds) this.record(nodeId);
+    },
+    seal() {
+      open = false;
+    },
+    order() {
+      return [...order];
+    },
+  };
+}
+
+/**
+ * The statement roles this file seeds into `statementOverrides` that ARE
+ * equation-graph nodes. The Map preserves its own construction order, so
+ * walking its keys recovers the hand-written order of those nodes from the
+ * code itself instead of restating it as a list.
+ */
+const STATEMENT_ROLE_EQUATION_NODES = Object.freeze({
+  ebit: "statement.ebit",
+  interest_income: "statement.finance_income",
+  interest_expense: "statement.finance_expense",
+  net_finance_addback: "cash.net_finance_addback",
+  pre_tax_income: "statement.pre_tax_income",
+  effective_tax_rate: "statement.effective_tax_rate",
+  tax_expense: "statement.tax_expense",
+  net_income: "statement.net_income",
+  non_cash_interest_addback: "cash.noncash_interest_addback",
+  cash_interest_paid: "cash.cash_interest_paid",
+  cash_interest_received: "cash.cash_interest_received",
+});
 
 function solverIterationSnapshot(declaration, values) {
   const snapshot = [];
@@ -1616,6 +1682,54 @@ export function solveCase(
       absolute_tolerance: Number(tolerance),
     },
   };
+  // P4.7 — Tarjan runs HERE, on the case's own equation graph, at solve time,
+  // and the 13-entry literal iteration vector is checked against the vector
+  // DERIVED from it. `compileSolverEquationGraphEvidence` already compares the
+  // literal with the convergence contract's declaration; this is the second,
+  // independent witness (an iterative Tarjan written from the algorithm, and a
+  // comparison that reads the graph's own tolerance classes), so contract and
+  // graph must BOTH agree with the literal before economics runs.
+  const derivedSolveOrder = deriveSolveOrder(
+    EQUATION_GRAPH,
+    Number(solverDeclaration.active_circularity_state),
+  );
+  const iterationVectorDerivation = checkIterationVectorDerivation(
+    solverDeclaration,
+    derivedSolveOrder,
+    EQUATION_GRAPH,
+  );
+  if (!derivedSolveOrder.condensation_acyclic) {
+    const error = new Error(
+      `SOLVE_ORDER_UNDERIVABLE: the equation graph's condensation is cyclic ` +
+        `(${derivedSolveOrder.unplaced_components.join(", ")}); no solve order exists.`,
+    );
+    error.code = "SOLVE_ORDER_UNDERIVABLE";
+    error.typed_internal_outcome = {
+      reason_code: "INTERNAL.equation_system_unsolved",
+      earliest_responsible_layer: "solver",
+      downstream_invalidation_scope: "solve_and_below",
+      unplaced_components: derivedSolveOrder.unplaced_components,
+    };
+    throw error;
+  }
+  if (!iterationVectorDerivation.agrees) {
+    const error = new Error(
+      `SOLVER_ITERATION_VECTOR_NOT_DERIVED: the solver's literal iteration vector ` +
+        `does not agree with the vector derived from the equation graph:\n- ` +
+        iterationVectorDerivation.errors.join("\n- "),
+    );
+    error.code = "SOLVER_ITERATION_VECTOR_NOT_DERIVED";
+    error.iteration_vector_derivation = iterationVectorDerivation;
+    error.typed_internal_outcome = {
+      reason_code: "INTERNAL.equation_system_unsolved",
+      earliest_responsible_layer: "solver",
+      downstream_invalidation_scope: "solve_and_below",
+      missing: iterationVectorDerivation.missing,
+      extra: iterationVectorDerivation.extra,
+    };
+    throw error;
+  }
+  const observedSolveOrders = [];
   const dynamicV2 = Number(modelCase.contract_version) === 2;
   const compiledInstrumentPeriodState = instrumentPeriodState ??
     (dynamicV2 ? compileInstrumentPeriodState(modelCase) : null);
@@ -1766,6 +1880,13 @@ export function solveCase(
   for (let forecastIndex = 0; forecastIndex < forecastPeriods.length; forecastIndex += 1) {
     const periodIndex = firstForecastPeriodIndex + forecastIndex;
     const period = modelCase.periods[periodIndex];
+    // P4.7 — one recorder per period: a period whose branches differ (an
+    // acquisition that closes, a cash-interest row that is calculated rather
+    // than supplied) evaluates a different set of nodes, and each one is
+    // checked against the graph on its own terms rather than assumed to match
+    // the first period's.
+    const solveOrder = createSolveOrderRecorder();
+    solveOrder.record("control.circularity");
     const acquisitionBaseValues = resolvedAcquisitionBaseSolution
       ? new Map(
           Object.entries(
@@ -2078,6 +2199,7 @@ export function solveCase(
             Math.max(0, openingNative + issuanceNative + nonPikNonCashNative),
             asSeries3(instrument.scheduled_amortisation, 0)[forecastIndex],
           );
+      solveOrder.record("debt.scheduled_amortisation");
       const timing = dynamicV2 && !compiledState
         ? instrumentTiming(modelCase, periodIndex, instrument, {
             opening: openingNative,
@@ -2118,14 +2240,17 @@ export function solveCase(
                   1,
                 )
           : 0;
+      solveOrder.record("interest.instrument_pik");
       const preMaturityEnding = compiledState
         ? Number(compiledState.ending_pre_repayment.basis_amount)
         : Math.max(0, baseEndingBeforePik + pikInterestNative);
+      solveOrder.record("debt.pik_accretion");
       const maturityRepaymentNative = compiledState
         ? Number(compiledState.maturity_repayment.basis_amount)
         : matures
           ? preMaturityEnding
           : 0;
+      solveOrder.record("debt.maturity_repayment");
       const endingNative = compiledState
         ? Number(compiledState.ending_post_repayment.basis_amount)
         : preMaturityEnding - maturityRepaymentNative;
@@ -2160,6 +2285,7 @@ export function solveCase(
       const issuanceReporting = compiledState
         ? Number(compiledState.issuance.reporting_amount)
         : issuanceNative * flowFx;
+      solveOrder.record("debt.issuance");
       const repaymentReporting = compiledState
         ? Number(compiledState.scheduled_amortisation.reporting_amount) +
           Number(compiledState.maturity_repayment.reporting_amount)
@@ -2203,6 +2329,7 @@ export function solveCase(
         modelCase.controls.circularity === 1
           ? rawCashCouponInterestReporting
           : 0;
+      solveOrder.record("interest.instrument_cash");
       const rawInterestReporting =
         rawCashCouponInterestReporting + pikInterestReporting;
       const interestReporting =
@@ -2286,6 +2413,7 @@ export function solveCase(
 
     const leasePeriod = leaseProjection[forecastIndex];
     const leasePrincipal = leasePeriod.principal_repayment;
+    solveOrder.record("lease.principal");
     const leaseAdditions = leasePeriod.additions;
     const endingLease = leasePeriod.ending_total;
     const rawLeaseInterest = leasePeriod.interest;
@@ -2373,12 +2501,14 @@ export function solveCase(
     // on the pro-forma acquisition interest formula.
     const acquisitionInterest =
       modelCase.controls.circularity === 1 ? rawAcquisitionInterest : 0;
+    solveOrder.record("interest.acquisition");
 
     const rcfCapacity = Number(
       modelCase.rcf_policy?.capacity ??
         rcfInstrument?.facility_capacity ??
         0,
     );
+    solveOrder.record("rcf.capacity");
     const rcfRate = rcfInstrument
       ? allInRate(rcfInstrument, forecastIndex)
       : 0;
@@ -2392,6 +2522,7 @@ export function solveCase(
       ? fxRate(modelCase, rcfInstrument.currency, periodIndex, "period_end")
       : 1;
     const effectiveMinimumCash = minimumCash(modelCase);
+    solveOrder.record("cash.minimum_cash");
     const rawOtherInterest = asSeries3(modelCase.other_interest, 0)[forecastIndex];
     const rawNonCashInterest = asSeries3(
       modelCase.non_cash_interest,
@@ -2405,6 +2536,11 @@ export function solveCase(
     let iteration = 0;
     let residual = Number.POSITIVE_INFINITY;
     let lastComputation = null;
+    // P4.7 — per-period convergence and binding-constraint observations.
+    const convergenceTrace = [];
+    let lastSccResiduals = [];
+    let lastBindingConstraint = null;
+    let lastCashLoop = null;
     let previousIterationSnapshot = null;
     let previousPreviousIterationSnapshot = null;
     let dampingIndex = 0;
@@ -2421,8 +2557,11 @@ export function solveCase(
       // breaker is on. Raw assumptions are untouched in both states.
       const interestEnabled = modelCase.controls.circularity === 1;
       const leaseInterest = interestEnabled ? rawLeaseInterest : 0;
+      solveOrder.record("interest.lease");
       const otherInterest = interestEnabled ? rawOtherInterest : 0;
+      solveOrder.record("interest.other");
       const nonCashInterest = interestEnabled ? rawNonCashInterest : 0;
+      solveOrder.record("interest.noncash");
       const rcfInterest = interestEnabled
         ? foreignRcf
           ? ((openingRcfNative + endingRcfNative) / 2) *
@@ -2430,6 +2569,7 @@ export function solveCase(
             rcfAverageFx
           : ((openingRcf + endingRcf) / 2) * rcfRate
         : 0;
+      solveOrder.record("interest.rcf");
       const averageUndrawnRcf = foreignRcf
         ? Math.max(
             0,
@@ -2443,9 +2583,16 @@ export function solveCase(
       const commitmentFee = interestEnabled
         ? averageUndrawnRcf * commitmentFeeRate
         : 0;
+      solveOrder.record("interest.commitment_fee");
       const interestIncome = interestEnabled
         ? cashBucketSnapshot(endingCash).interest_income
         : 0;
+      // `interest.cash_income` is the cash-balance leg; `interest.income` is
+      // the aggregate the statement consumes. The graph declares the first
+      // feeding the second, and this file computes both from one expression,
+      // so both are recorded here in that declared direction.
+      solveOrder.record("interest.cash_income");
+      solveOrder.record("interest.income");
       const grossInterest = interestEnabled
         ? instrumentInterest +
           rcfInterest +
@@ -2455,7 +2602,9 @@ export function solveCase(
           otherInterest +
           nonCashInterest
         : 0;
+      solveOrder.record("interest.gross_expense");
       const netInterest = grossInterest - interestIncome;
+      solveOrder.record("interest.net_expense");
       const standaloneGrossInterest = Math.max(
         0,
         grossInterest - acquisitionInterest,
@@ -2674,6 +2823,14 @@ export function solveCase(
       ) {
         statementOverrides.set("cash_interest_received", interestIncome);
       }
+      // P4.7 — the statement nodes' hand-written order is recovered from the
+      // override Map's OWN insertion order rather than restated as a list, so
+      // reordering the Map moves this observation with it.
+      solveOrder.recordAll(
+        [...statementOverrides.keys()]
+          .map((role) => STATEMENT_ROLE_EQUATION_NODES[role])
+          .filter(Boolean),
+      );
       const cashFlowGraph = declaredStatementPeriod(
         modelCase,
         periodIndex,
@@ -2688,12 +2845,14 @@ export function solveCase(
       // without encoding an issuer-specific presentation.
       const cashFlowStart =
         cashFlowGraph.resolveRole("cash_flow_net_income") ?? netIncome;
+      solveOrder.record("statement.cash_flow_start");
       const declaredCashFromOperations =
         cashFlowGraph.resolveRole("cash_from_operations");
       const declaredCashFromInvesting =
         cashFlowGraph.resolveRole("cash_from_investing");
       const cashFromOperations =
         declaredCashFromOperations ?? fallbackCashFromOperations;
+      solveOrder.record("cash.cfo");
       const cashFromInvesting =
         (declaredCashFromInvesting ?? fallbackCashFromInvesting) -
         acquisitionCashConsideration;
@@ -2738,6 +2897,7 @@ export function solveCase(
             forecastIndex,
           )
         : nonRcfDebtRepayment + leasePrincipal;
+      solveOrder.record("debt.mandatory_repayment");
       const cashAfterMandatory = cashBeforeMandatory - mandatoryRepayment;
       const preRcfDebtCashFlow =
         nonRcfDebtIssuance + acquisitionDebtProceeds -
@@ -2755,6 +2915,7 @@ export function solveCase(
       const rcfDraw = foreignRcf
         ? rcfDrawNative * rcfAverageFx
         : rcfDrawNative;
+      solveOrder.record("rcf.draw");
       const rcfRepaymentNative =
         rcfDraw > tolerance
           ? 0
@@ -2764,19 +2925,65 @@ export function solveCase(
       const rcfRepayment = foreignRcf
         ? rcfRepaymentNative * rcfAverageFx
         : rcfRepaymentNative;
+      solveOrder.record("rcf.repayment");
       const nextEndingRcfNative =
         openingRcfNative + rcfDrawNative - rcfRepaymentNative;
       const nextEndingRcf = foreignRcf
         ? nextEndingRcfNative * rcfEndingFx
         : nextEndingRcfNative;
+      solveOrder.record("rcf.ending_balance");
       const rcfFxNonCashMovement =
         nextEndingRcf - openingRcf - rcfDraw + rcfRepayment;
       const nextEndingCash = cashAfterMandatory + rcfDraw - rcfRepayment;
+      solveOrder.record("cash.ending_balance");
       const nextCashBucketSnapshot = cashBucketSnapshot(nextEndingCash);
       const liquidityShortfall = Math.max(
         0,
         effectiveMinimumCash - nextEndingCash,
       );
+      solveOrder.record("rcf.liquidity_shortfall");
+      // P4.7 — the sweep is over; the observed order is complete and closed.
+      solveOrder.seal();
+      // P4.7 — WHICH constraint bound the revolver, recorded rather than left
+      // implicit in the two `Math.min` calls above. Both candidate bounds, the
+      // slack between them, and the equation-graph node and edges that carry
+      // each of them travel with the period.
+      lastCashLoop = {
+        minimum_cash: effectiveMinimumCash,
+        cash_after_mandatory: cashAfterMandatory,
+        deficit_native: foreignRcf ? deficit / rcfAverageFx : deficit,
+        surplus_native: foreignRcf ? surplus / rcfAverageFx : surplus,
+        opening_rcf_native: openingRcfNative,
+        capacity_native: rcfCapacity,
+        available_capacity_native: availableCapacityNative,
+        draw_native: rcfDrawNative,
+        repayment_native: rcfRepaymentNative,
+        draw_reporting: rcfDraw,
+        repayment_reporting: rcfRepayment,
+        ending_rcf_native: nextEndingRcfNative,
+        ending_cash: nextEndingCash,
+        liquidity_shortfall: liquidityShortfall,
+        fx_average: rcfAverageFx,
+        fx_ending: rcfEndingFx,
+        tolerance,
+      };
+      lastBindingConstraint = classifyRevolverBinding({
+        minimumCash: effectiveMinimumCash,
+        cashAfterMandatory,
+        openingRcfNative,
+        capacityNative: rcfCapacity,
+        availableCapacityNative,
+        drawNative: rcfDrawNative,
+        repaymentNative: rcfRepaymentNative,
+        drawReporting: rcfDraw,
+        repaymentReporting: rcfRepayment,
+        endingRcfNative: nextEndingRcfNative,
+        endingCash: nextEndingCash,
+        liquidityShortfall,
+        fxAverage: rcfAverageFx,
+        fxEnding: rcfEndingFx,
+        tolerance,
+      });
       const currentIterationSnapshot = solverIterationSnapshot(
         solverDeclaration,
         {
@@ -2804,6 +3011,31 @@ export function solveCase(
         : Number.POSITIVE_INFINITY;
       const twoCycleDetected = solverDeclaration.required && detectTwoCycle(previousPreviousIterationSnapshot, previousIterationSnapshot, currentIterationSnapshot, tolerance);
       if (twoCycleDetected) cycleDetectionCount += 1;
+      // P4.7 — the residual, DECOMPOSED per strongly-connected component of
+      // the case's own graph. The published scalar is an L-infinity norm over
+      // the whole state vector and cannot say which loop is still moving; this
+      // names the component and the worst node inside it.
+      lastSccResiduals = perComponentResiduals(
+        derivedSolveOrder,
+        solverDeclaration.state_vector.map((component) => component.node_id),
+        previousIterationSnapshot,
+        currentIterationSnapshot,
+      );
+      convergenceTrace.push({
+        iteration,
+        // The published residual: with no state vector to move there is
+        // nothing to converge, which is exactly what the break below records.
+        residual: solverDeclaration.required ? residual : 0,
+        raw_residual: residual,
+        two_cycle_residual: twoCycleResidual,
+        two_cycle_detected: twoCycleDetected,
+        damping_index: dampingIndex,
+        scc_residuals: lastSccResiduals.map((entry) => ({
+          component_id: entry.component_id,
+          residual: entry.residual,
+          worst_node: entry.worst_node,
+        })),
+      });
       previousPreviousIterationSnapshot = previousIterationSnapshot;
       previousIterationSnapshot = currentIterationSnapshot;
 
@@ -2963,6 +3195,11 @@ export function solveCase(
       error.iterations = iterationLimit;
       error.residual = residual;
       error.two_cycle_detections = cycleDetectionCount;
+      // P4.7 — a refusal that says only "did not converge" cannot be told
+      // apart from an oscillation or a divergence. The trace travels with it.
+      error.convergence_trace = convergenceTrace.map((entry) => ({ ...entry }));
+      error.scc_residuals = lastSccResiduals;
+      error.observed_solve_order = solveOrder.order();
       error.damping_attempts = dampingIndex;
       // P3.7: maps onto the sealed terminal-reason registry.
       error.typed_internal_outcome = {
@@ -2974,6 +3211,40 @@ export function solveCase(
       };
       throw error;
     }
+
+    // P4.7 — PROVE the hand-written order this period actually used is a valid
+    // solve order of the case's own graph: every dependency edge crossing two
+    // strongly-connected components must point FORWARD in the observed order.
+    // Intra-component back edges are the feedback set a Gauss-Seidel sweep
+    // necessarily carries; they are reported, not silently tolerated. A real
+    // disagreement refuses here rather than being repaired by reordering — the
+    // reorder would move numbers, and which of the two authorities is right is
+    // not this seam's decision to make.
+    const observedOrder = solveOrder.order();
+    const orderAgreement = checkSolveOrderAgreement(observedOrder, derivedSolveOrder);
+    if (!orderAgreement.agrees) {
+      const error = new Error(
+        `SOLVE_ORDER_DISAGREES_WITH_GRAPH: case ${modelCase.case_id} forecast period ` +
+          `${period.date} evaluates ${orderAgreement.violations.length} dependency edge(s) ` +
+          `in an order the equation graph does not admit ` +
+          `(${orderAgreement.violations.map((entry) => entry.edge_id).join(", ")}).`,
+      );
+      error.code = "SOLVE_ORDER_DISAGREES_WITH_GRAPH";
+      error.order_agreement = orderAgreement;
+      error.observed_solve_order = observedOrder;
+      error.typed_internal_outcome = {
+        reason_code: "INTERNAL.equation_system_unsolved",
+        earliest_responsible_layer: "solver",
+        downstream_invalidation_scope: "solve_and_below",
+        violations: orderAgreement.violations,
+      };
+      throw error;
+    }
+    observedSolveOrders.push({
+      period: period.date,
+      order: observedOrder,
+      agreement: orderAgreement,
+    });
 
     const finalCashBucketSnapshot = cashBucketSnapshot(endingCash);
     const eligibleCash = finalCashBucketSnapshot.net_debt_eligible_cash;
@@ -3120,6 +3391,17 @@ export function solveCase(
       iterations: iteration,
       converged,
       residual,
+      // P4.7 — the solve's ORDER and CONVERGENCE, observed rather than assumed.
+      // Additive observation only: no field below is read by the numeric path.
+      graph_driven_solve: {
+        schema_version: SOLVE_ORDER_SCHEMA_VERSION,
+        observed_order: observedOrder,
+        order_agreement: orderAgreement,
+        scc_residuals: lastSccResiduals,
+        convergence_trace: convergenceTrace,
+        binding_constraint: lastBindingConstraint,
+        cash_loop: lastCashLoop,
+      },
       typed_states: scheduleTypedStates,
       checks: {
         rcf_within_bounds:
@@ -3182,6 +3464,26 @@ export function solveCase(
     issuer: modelCase.issuer,
     periods: modelCase.periods,
     equation_graph_evidence: equationGraphEvidence,
+    // P4.7 — Tarjan ran on this case's own graph at solve time; the SCCs, the
+    // condensation's topological order and the derivation of the solver's
+    // literal iteration vector travel with the solution.
+    solve_order_evidence: {
+      schema_version: SOLVE_ORDER_SCHEMA_VERSION,
+      graph_id: derivedSolveOrder.graph_id,
+      circularity: derivedSolveOrder.circularity,
+      condensation_acyclic: derivedSolveOrder.condensation_acyclic,
+      components: derivedSolveOrder.components.map((component) => ({
+        id: component.id,
+        rank: component.rank,
+        cyclic: component.cyclic,
+        nodes: component.nodes,
+      })),
+      cyclic_components: derivedSolveOrder.cyclic_components,
+      topological_component_order: derivedSolveOrder.topological_component_order,
+      topological_node_order: derivedSolveOrder.topological_node_order,
+      iteration_vector_derivation: iterationVectorDerivation,
+      observed_orders: observedSolveOrders,
+    },
     instrument_period_state_schema_version:
       compiledInstrumentPeriodState?.schema_version ?? null,
     definition_basis_graph:

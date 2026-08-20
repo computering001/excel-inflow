@@ -23,6 +23,45 @@
     "acquisition_overlay",
     "outputs_and_ratios"
   ],
+  "module_boundary_register": "scripts/lib/canonical_model_modules.mjs",
+  "module_versions": {
+    "historical_statements": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "0fb2661204ce9e4f70779a00204abd42eb9a34451c0ab3082adc2a6daebc8291"
+    },
+    "operating_forecast": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "00149e8395d598b6dc782ad425b72827e9e69009d2b65175bdded59ab7c3c8c1"
+    },
+    "tax_and_working_capital": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "c8aef3c520ca063186aa1b48d83de9fd71af86de3a2aa6c06bc709b4c363d066"
+    },
+    "debt_instruments": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "c923dd0315019ad26eb327b7af557dd9660c51d1047b25976054b91361781559"
+    },
+    "leases": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "7bd4d4a52cf52cfa62203484486f07d3236b0891c1f75eb9df8cb2dd61bd269c"
+    },
+    "cash_rcf": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "731d22cf4b80c79e77833043fbbeb34943b49e1d05a9ab89e6acad7d8d972af0"
+    },
+    "interest": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "c1de20e54d11885647ac5c6cbf32e765684037ead22ae8385a15d3b016916638"
+    },
+    "acquisition_overlay": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "82b2154921985d3bccdd4c2aefce2f12dfc46ed7811ad38630755856a4f66bba"
+    },
+    "outputs_and_ratios": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "38f69866073e685c055be8b7d99d569b639e9fa8b967875bb7c946c1b2ade2e7"
+    }
+  },
   "economic_equation_graph_view": "assets/equation-graph.v1.json",
   "invariants": [
     "unique_node_ids",

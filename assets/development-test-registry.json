@@ -1652,6 +1652,24 @@
       "test_class": "mutation"
     },
     {
+      "id": "canonical-model-modules",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_canonical_model_module_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "graph-driven-solve",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_graph_driven_solve_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "release-dossier",
       "phase": "proof",
       "runtime": "node",
