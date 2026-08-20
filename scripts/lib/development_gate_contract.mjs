@@ -78,6 +78,48 @@ export function testIdSetSha256(tests) {
   return sha256Text(`${tests.map((test) => test.id).sort().join("\n")}\n`);
 }
 
+/**
+ * Prove that every registry argument names an input the runner can actually
+ * resolve.  This is deliberately performed before the pool starts: a typo in
+ * the final registry row must not masquerade as a nearly-complete gate run.
+ */
+export function validateRegistryInvocationContract(
+  tests,
+  availableSources,
+) {
+  const available = new Set(availableSources ?? []);
+  const errors = [];
+  for (const test of tests ?? []) {
+    for (const requirement of test.requires ?? []) {
+      if (!available.has(requirement)) {
+        errors.push(`${test.id}: unknown required source ${requirement}`);
+      }
+    }
+    for (const [index, argument] of (test.arguments ?? []).entries()) {
+      const structured = argument && typeof argument === "object" && !Array.isArray(argument);
+      if (structured && !["directory", "executable", "file", "literal"].includes(argument.type)) {
+        errors.push(`${test.id}: argument ${index} has unknown type ${String(argument.type)}`);
+        continue;
+      }
+      if (structured && argument.type === "literal" && argument.value === undefined) {
+        errors.push(`${test.id}: literal argument ${index} has no value`);
+        continue;
+      }
+      if (structured && argument.type !== "literal" && !argument.source) {
+        errors.push(`${test.id}: argument ${index} has no source`);
+        continue;
+      }
+      const source = structured
+        ? argument.type === "literal" ? null : argument.source
+        : /^\$([A-Z_]+)$/.exec(String(argument))?.[1] ?? null;
+      if (source && !available.has(source)) {
+        errors.push(`${test.id}: argument ${index} names unknown source ${source}`);
+      }
+    }
+  }
+  return errors;
+}
+
 export function aggregateGateReports({ registry, registrySha256, profile, reports }) {
   const errors = [];
   if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {

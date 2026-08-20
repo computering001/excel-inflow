@@ -1838,8 +1838,13 @@
       "script": "run_provenance_authority_tests.py",
       "arguments": [
         {
+          "name": "out_flag",
+          "type": "literal",
+          "value": "--out"
+        },
+        {
           "name": "out",
-          "source": "OUT_DIR",
+          "source": "TEST_OUT",
           "type": "directory"
         }
       ],

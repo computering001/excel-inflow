@@ -10,6 +10,7 @@ import {
   selectRegistryTests,
   testIdSetSha256,
   testProfile,
+  validateRegistryInvocationContract,
 } from "./lib/development_gate_contract.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const registryPath = path.join(root, "assets", "development-test-registry.json");
@@ -44,6 +45,42 @@ const portable = selectRegistryTests(registry, { profile: "portable" });
 const custody = selectRegistryTests(registry, { profile: "custody" });
 assert.equal(portable.length + custody.length, registry.tests.length);
 assert.deepEqual(portable.filter((test) => custody.some((row) => row.id === test.id)), []);
+const availableSources = [
+  "BROKER_CORPUS",
+  "BROKER_REAL_PACK_MANIFEST",
+  "CASES",
+  "DEGRADED_DELIVERY_REPORT",
+  "FIXED_POINT_CASES_MANIFEST",
+  "INSTALLED_HOST_BROKER_RECEIPT",
+  "PYTHON",
+  "RAW_CANARY_EVIDENCE",
+  "REAL_FILING_CORPUS_MANIFEST",
+  "REAL_FILINGS_EXPECTATIONS",
+  "REAL_FILINGS_REQUEST",
+  "REPRESENTATIVE",
+  "SOFFICE",
+  "TEST_OUT",
+  "USABLE_BROKER_WORKBOOK",
+];
+assert.deepEqual(
+  validateRegistryInvocationContract(registry.tests, availableSources),
+  [],
+  "The registry names an argument source the development gate cannot resolve.",
+);
+const unknownSourceMutation = structuredClone(registry.tests);
+unknownSourceMutation.at(-1).arguments = ["$OUT_DIR"];
+assert.deepEqual(
+  validateRegistryInvocationContract(unknownSourceMutation, availableSources),
+  [`${unknownSourceMutation.at(-1).id}: argument 0 names unknown source OUT_DIR`],
+  "An uncallable registry/CLI argument contract escaped preflight.",
+);
+const missingSourceMutation = structuredClone(registry.tests);
+missingSourceMutation.at(-1).arguments = [{ type: "file" }];
+assert.deepEqual(
+  validateRegistryInvocationContract(missingSourceMutation, availableSources),
+  [`${missingSourceMutation.at(-1).id}: argument 0 has no source`],
+  "A typed registry argument without a source escaped preflight.",
+);
 
 const report = (profile, tests, sourceCommit = "a".repeat(40)) => ({
   schema_version: "development-gate-report/2.0",

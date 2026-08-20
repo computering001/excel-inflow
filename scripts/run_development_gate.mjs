@@ -23,6 +23,7 @@ import {
   effectiveTestMetadata,
   selectRegistryTests,
   testIdSetSha256,
+  validateRegistryInvocationContract,
 } from "./lib/development_gate_contract.mjs";
 
 const exec = promisify(execFile);
@@ -326,6 +327,15 @@ if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {
 }
 const selectedTests = selectRegistryTests(registry, { profile, phases: selectedPhases });
 const inputs = substitutions(options);
+const invocationErrors = validateRegistryInvocationContract(
+  selectedTests,
+  [...Object.keys(inputs), "TEST_OUT"],
+);
+if (invocationErrors.length > 0) {
+  throw new Error(
+    `Development-test registry invocation contract is invalid:\n${invocationErrors.join("\n")}`,
+  );
+}
 const out = options.out
   ? path.resolve(options.out)
   : await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-development-gate-"));

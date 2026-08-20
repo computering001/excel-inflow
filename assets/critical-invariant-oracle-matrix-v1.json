@@ -4,7 +4,7 @@
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
     "oracle_sha256": "372ddcee0f3eea4f111b658578211d2622bad6e25f063f666903c0a73de6645d",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "311ca878b1e2d8e27cd66a6df3c76a8bfb0caf719da00fbd704b29de3185b843"
+    "registry_sha256": "d58c99e1b11acc29c9749c93673e70b91e88f41342d6fafc89ee0cac5607a3e1"
   },
   "artifact_oracle": {
     "test_id": "emitted-candidate-independent-oracle",
