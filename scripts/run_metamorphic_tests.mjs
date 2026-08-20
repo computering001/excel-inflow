@@ -201,8 +201,27 @@ check("the locality authority is the graph's own activation-filtered edge set", 
   const off = activeEquationEdges(EQUATION_GRAPH, 0).length;
   assert.ok(off < on, "circularity_on edges must drop out at circularity 0");
   const etrOn = declaredLocality("statement.effective_tax_rate", 1);
-  assert.deepEqual(etrOn.may_move_observable, ["statement.net_income", "statement.tax_expense"]);
-  assert.equal(etrOn.must_not_move_observable.length, Object.keys(NODE_OBSERVABLE).length - 2);
+  // P4.10 landed edge.net_income_to_cash_flow_start / edge.net_income_to_cfo and
+  // enlarged the declared fixed point 13 -> 17. The effective tax rate's
+  // forward-reachable observable set is therefore 14 nodes, not 2. This is the
+  // set the graph now declares; it is not hand-maintained economics.
+  assert.deepEqual(etrOn.may_move_observable, [
+    "cash.cfo",
+    "cash.ending_balance",
+    "interest.commitment_fee",
+    "interest.gross_expense",
+    "interest.income",
+    "interest.net_expense",
+    "interest.rcf",
+    "rcf.draw",
+    "rcf.ending_balance",
+    "rcf.liquidity_shortfall",
+    "rcf.repayment",
+    "statement.net_income",
+    "statement.pre_tax_income",
+    "statement.tax_expense",
+  ]);
+  assert.equal(etrOn.must_not_move_observable.length, Object.keys(NODE_OBSERVABLE).length - 14);
   const minOn = declaredLocality("cash.minimum_cash", 1);
   const minOff = declaredLocality("cash.minimum_cash", 0);
   assert.ok(
@@ -663,7 +682,9 @@ check("every declared missing edge names two real graph nodes", () => {
 
 check("the graph-gap defects still reproduce — the register cannot rot", () => {
   const graphGaps = RELATIONS.known_defects.filter((defect) => defect.class === "graph_dependency_gap");
-  assert.ok(graphGaps.length >= 2, "expected the graph-gap defects to be registered");
+  // MG-1 retired by P4.10 (the edge landed). MG-2 remains OPEN and unrepaired:
+  // the graph still has no debt or lease balance node.
+  assert.ok(graphGaps.length >= 1, "expected the graph-gap defects to be registered");
   for (const defect of graphGaps) {
     assert.equal(defect.status, "OPEN", `${defect.id} is registered but not OPEN`);
     const reproduced = defectReproductions.get(defect.id);
@@ -674,7 +695,13 @@ check("the graph-gap defects still reproduce — the register cannot rot", () =>
   }
 });
 
-check("MG-1 reproduces exactly as the register states it", () => {
+check("MG-1 IS RETIRED: the tax-rate perturbation no longer escapes the declared graph", () => {
+  // Was: "MG-1 reproduces exactly as the register states it", asserting that
+  // cash.cfo ESCAPED the declared graph and was attributable to MG-1. P4.10
+  // landed edge.net_income_to_cash_flow_start and edge.net_income_to_cfo, so
+  // the escape is closed. INVERTED rather than deleted: the numbers below are
+  // unchanged (P4.10 proved no emitted number moved), so this check still
+  // pins the real behaviour and now additionally proves the escape is gone.
   const before = solveCase(readArchetype("deferred_revenue_ratable.json"));
   const after = solveCase(applyTransform("perturb_effective_tax_rate", readArchetype("deferred_revenue_ratable.json")));
   assert.equal(before.forecast[0].tax, 0);
@@ -684,23 +711,37 @@ check("MG-1 reproduces exactly as the register states it", () => {
   const verdict = localityVerdict({
     node: "statement.effective_tax_rate", circularity: 1, before, after,
   });
-  assert.ok(verdict.escaped.includes("cash.cfo"), "the tax charge must be seen reaching operating cash flow");
   assert.deepEqual(verdict.unexplained_escape, []);
-  assert.deepEqual(Object.keys(verdict.attributed_to_known_defects), ["MG-1"]);
+  assert.deepEqual(
+    Object.keys(verdict.attributed_to_known_defects),
+    [],
+    "MG-1 is retired; nothing may still be attributed to it",
+  );
 });
 
-check("MG-1's second-order consequence holds: the declared active SCC omits nodes that move", () => {
+check("P4.10's landing holds: the declared active SCC CONTAINS the nodes that move", () => {
+  // Was: "the declared active SCC omits nodes that move" — MG-1's second-order
+  // consequence. The omission was the defect; it is now repaired, so the
+  // assertions are inverted. This is the obligation that would have caught the
+  // defect on the day the solver first seeded cash flow from net income.
   const contract = JSON.parse(fs.readFileSync(path.join(ROOT, "assets", "convergence-contract.v1.json"), "utf8"));
   const declared = new Set(contract.scc_contract.active_by_circularity["1"].flatMap((component) => component.nodes));
-  assert.equal(declared.has("statement.pre_tax_income"), false);
-  assert.equal(declared.has("statement.tax_expense"), false);
+  assert.equal(declared.has("statement.pre_tax_income"), true);
+  assert.equal(declared.has("statement.tax_expense"), true);
+  assert.equal(declared.has("statement.net_income"), true);
   const before = solveCase(readArchetype("deferred_revenue_ratable.json"));
   const after = solveCase(applyTransform("perturb_effective_tax_rate", readArchetype("deferred_revenue_ratable.json")));
   const changed = changedObservableNodes(before, after);
   assert.ok(
     changed.has("statement.pre_tax_income"),
-    "pre-tax income must be observed moving under a tax-rate change for the SCC understatement to be proven",
+    "pre-tax income must still be observed moving under a tax-rate change",
   );
+  for (const node of changed) {
+    assert.ok(
+      declared.has(node) || !node.startsWith("statement."),
+      `${node} moves but the contract does not declare it — the MG-1 class has reopened`,
+    );
+  }
 });
 
 check("every declared missing edge is NECESSARY — the register cannot be padded", () => {
@@ -1132,7 +1173,12 @@ check("MUTATION: a locality claim widened to the whole graph is caught as vacuou
   const widened = new Set(everything);
   const declared = new Set(declaredLocality("statement.effective_tax_rate", 1).may_move);
   assert.ok(widened.size > declared.size, "the declared locality must be a strict subset of the graph");
-  assert.equal(declared.size, 3, "the tax-rate locality must stay at three nodes, not widen");
+  // Was 3. P4.10 landed the net-income edges and enlarged the declared fixed
+  // point 13 -> 17, so the tax rate's declared locality is now 21 of the
+  // graph's 39 nodes. The exact pin is the anti-vacuity guard and is kept as
+  // an exact pin deliberately: a locality that silently grows toward 39 is the
+  // failure this check exists to catch, and >= would not catch it.
+  assert.equal(declared.size, 21, "the tax-rate locality must stay at 21 nodes, not widen toward the whole graph");
 });
 
 check("MUTATION: a defect entry whose edges do nothing is reported as unnecessary", () => {
@@ -1143,13 +1189,56 @@ check("MUTATION: a defect entry whose edges do nothing is reported as unnecessar
   assert.deepEqual([...withPad].sort(), [...withoutPad].sort(), "the padding edge changes nothing, so the necessity check must reject it");
 });
 
-check("MUTATION: dropping the tax->cfo edge from the register leaves MG-1 unexplained", () => {
+check("MUTATION: dropping P4.10's landed edges makes the MG-1 escape visible again", () => {
+  // Was: "dropping the tax->cfo edge from the register leaves MG-1 unexplained",
+  // which relied on the edge being ABSENT and so became vacuous the moment
+  // P4.10 landed it. Rewritten as a genuine necessity mutation: withdraw the
+  // two landed edges and the escape MUST reappear. Note the edge is the
+  // net-income pair, not the tax->cfo edge MG-1 predicted — P4.10 measured
+  // that CFO tracks net income exactly and the tax charge not at all.
   const before = solveCase(readArchetype("deferred_revenue_ratable.json"));
   const after = solveCase(applyTransform("perturb_effective_tax_rate", readArchetype("deferred_revenue_ratable.json")));
   const changed = changedObservableNodes(before, after);
-  const mayMove = new Set(["statement.effective_tax_rate", ...forwardReachable("statement.effective_tax_rate", 1, [])]);
-  const escaped = [...changed].filter((id) => !mayMove.has(id));
-  assert.ok(escaped.includes("cash.cfo"), "without the declared edge, the escape must be visible");
+
+  const withEdges = new Set([
+    "statement.effective_tax_rate",
+    ...forwardReachable("statement.effective_tax_rate", 1, []),
+  ]);
+  assert.deepEqual(
+    [...changed].filter((id) => !withEdges.has(id)),
+    [],
+    "with the landed edges the graph must explain every moving node",
+  );
+
+  // forwardReachable's third parameter ADDS edges, so the withdrawal is done
+  // here explicitly over the graph's own activation-filtered edge set.
+  const LANDED = new Set(["edge.net_income_to_cash_flow_start", "edge.net_income_to_cfo"]);
+  const active = activeEquationEdges(EQUATION_GRAPH, 1);
+  const remaining = active.filter((edge) => !LANDED.has(edge.id));
+  assert.equal(
+    active.length - remaining.length,
+    LANDED.size,
+    "both landed edges must be present to be withdrawn, or this mutation is vacuous",
+  );
+  const adjacency = new Map();
+  for (const edge of remaining) {
+    if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+    adjacency.get(edge.from).push(edge.to);
+  }
+  const withoutEdges = new Set(["statement.effective_tax_rate"]);
+  const stack = ["statement.effective_tax_rate"];
+  while (stack.length > 0) {
+    for (const next of adjacency.get(stack.pop()) ?? []) {
+      if (!withoutEdges.has(next)) {
+        withoutEdges.add(next);
+        stack.push(next);
+      }
+    }
+  }
+  assert.ok(
+    [...changed].filter((id) => !withoutEdges.has(id)).includes("cash.cfo"),
+    "withdrawing the landed edges must make the escape visible, or the edges are not load-bearing",
+  );
 });
 
 // ---------------------------------------------------------------------------

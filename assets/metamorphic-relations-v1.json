@@ -612,39 +612,6 @@
   },
   "known_defects": [
     {
-      "id": "MG-1",
-      "title": "The canonical equation graph omits the cash-tax edge statement.tax_expense -> cash.cfo",
-      "severity": "high",
-      "status": "OPEN",
-      "class": "graph_dependency_gap",
-      "declared_elsewhere": false,
-      "missing_edges": [
-        {
-          "from": "statement.tax_expense",
-          "to": "cash.cfo"
-        }
-      ],
-      "found_by": "perturb_effective_tax_rate",
-      "reproducing_case": "test-fixtures/archetypes/economics/deferred_revenue_ratable.json",
-      "reproducing_seed": null,
-      "reproduction": "Append an income-statement row {semantic_role: effective_tax_rate, values: [0.25,0.25,0.25,0.28,0.28,0.28]} and solve. tax moves 0 -> 42.27117623444384 and cash_from_operations moves 282.18090452260935 -> 239.69731031714127, so the operating cash flow depends on the tax charge. The graph gives statement.tax_expense exactly one outgoing edge, to statement.net_income, and anchors the cash flow at statement.ebit, so no path exists.",
-      "escaping_nodes_observed": [
-        "cash.cfo",
-        "cash.ending_balance",
-        "interest.income",
-        "interest.net_expense",
-        "interest.gross_expense",
-        "interest.rcf",
-        "rcf.ending_balance",
-        "rcf.repayment",
-        "rcf.liquidity_shortfall",
-        "statement.pre_tax_income"
-      ],
-      "second_order_consequence": "The missing edge closes a cycle the repository does not declare: tax -> cfo -> ending_cash -> interest.cash_income -> interest.income -> statement.finance_income -> statement.pre_tax_income -> statement.tax_expense. assets/convergence-contract.v1.json declares ONE active SCC of 13 nodes for circularity 1 and it contains neither statement.pre_tax_income nor statement.tax_expense, yet both move under this perturbation. The declared fixed point therefore understates the solver's real fixed point.",
-      "repair_owner": "assets/equation-graph.v1.json + assets/convergence-contract.v1.json \u2014 both FORBIDDEN to this package. Recorded, not repaired.",
-      "retirement_condition": "When the edge lands, this suite fails at the reproduction assertion and this entry must be deleted."
-    },
-    {
       "id": "MG-2",
       "title": "The equation graph has no debt or lease BALANCE node, so every balance movement -> accrued interest dependency is absent",
       "severity": "medium",
@@ -893,64 +860,64 @@
     ],
     "keyed_quantities": [
       {
-            "container": "cash_policy.buckets[]",
-            "schema_authority": {
-                  "file": "assets/model-case-v2.schema.json",
-                  "pointer": "/$defs/cashBucket/properties",
-                  "closed": true,
-                  "note": "$defs/cashBucket declares additionalProperties:false, so this key set is exhaustive."
-            },
-            "found_by": "P7.9's sweep for D33's siblings. The retired guard was `key !== \"eligible_percentage\"`, a denylist of ONE key that is not a property of cashBucket at all \u2014 the real keys are net_debt_eligible_percentage, interest_eligible_percentage and cash_yield. The guard was therefore always true, and the transform multiplied two rates the schema bounds to [0,1] and a yield series by the unit factor, producing a case that violates its own schema. No case in the corpus carries buckets today, so it never fired in anger; it is dead code guarding a live branch, which is the same shape as D33.",
-            "by_key": {
-                  "bucket_id": {
-                        "dimension": "non_numeric",
-                        "reason": "An identifier matching ^[a-z0-9][a-z0-9_-]*$. It carries no magnitude."
-                  },
-                  "label": {
-                        "dimension": "non_numeric",
-                        "reason": "The bucket's presentation caption. It carries no magnitude."
-                  },
-                  "historical_year_end": {
-                        "dimension": "monetary",
-                        "reason": "A three-series of cash balances at each historical year end, in the reporting unit. A magnitude, so it restates with the unit."
-                  },
-                  "forecast_treatment": {
-                        "dimension": "non_numeric",
-                        "reason": "The declared enum balancing / hardcode / flat / linked_debt_addback. It carries no magnitude."
-                  },
-                  "included_in_cash_flow_cash": {
-                        "dimension": "non_numeric",
-                        "reason": "A boolean saying whether the bucket forms part of the cash-flow statement's cash. It carries no magnitude."
-                  },
-                  "linked_instrument_ids": {
-                        "dimension": "non_numeric",
-                        "reason": "An array of instrument identifiers. It carries no magnitude."
-                  },
-                  "forecast_values": {
-                        "dimension": "monetary",
-                        "reason": "A three-series of forecast cash balances, or null. A magnitude, so it restates with the unit."
-                  },
-                  "available_for_liquidity": {
-                        "dimension": "non_numeric",
-                        "reason": "A boolean saying whether the bucket is usable liquidity. It carries no magnitude."
-                  },
-                  "net_debt_eligible_percentage": {
-                        "dimension": "rate",
-                        "reason": "The fraction of the bucket that counts against net debt, bounded by the schema to [0, 1]. Dimensionless: scaling it by the unit factor produces a case that violates its own schema maximum. This is one of the three the retired guard scaled."
-                  },
-                  "interest_eligible_percentage": {
-                        "dimension": "rate",
-                        "reason": "The fraction of the bucket that earns interest, bounded by the schema to [0, 1]. Dimensionless, for the same reason, and also scaled by the retired guard."
-                  },
-                  "cash_yield": {
-                        "dimension": "rate",
-                        "reason": "A three-series of yields applied to the bucket balance. A rate series, not a magnitude, and also scaled by the retired guard."
-                  },
-                  "source_line_ids": {
-                        "dimension": "non_numeric",
-                        "reason": "An array of source-line identifiers. It carries no magnitude."
-                  }
-            }
+        "container": "cash_policy.buckets[]",
+        "schema_authority": {
+          "file": "assets/model-case-v2.schema.json",
+          "pointer": "/$defs/cashBucket/properties",
+          "closed": true,
+          "note": "$defs/cashBucket declares additionalProperties:false, so this key set is exhaustive."
+        },
+        "found_by": "P7.9's sweep for D33's siblings. The retired guard was `key !== \"eligible_percentage\"`, a denylist of ONE key that is not a property of cashBucket at all \u2014 the real keys are net_debt_eligible_percentage, interest_eligible_percentage and cash_yield. The guard was therefore always true, and the transform multiplied two rates the schema bounds to [0,1] and a yield series by the unit factor, producing a case that violates its own schema. No case in the corpus carries buckets today, so it never fired in anger; it is dead code guarding a live branch, which is the same shape as D33.",
+        "by_key": {
+          "bucket_id": {
+            "dimension": "non_numeric",
+            "reason": "An identifier matching ^[a-z0-9][a-z0-9_-]*$. It carries no magnitude."
+          },
+          "label": {
+            "dimension": "non_numeric",
+            "reason": "The bucket's presentation caption. It carries no magnitude."
+          },
+          "historical_year_end": {
+            "dimension": "monetary",
+            "reason": "A three-series of cash balances at each historical year end, in the reporting unit. A magnitude, so it restates with the unit."
+          },
+          "forecast_treatment": {
+            "dimension": "non_numeric",
+            "reason": "The declared enum balancing / hardcode / flat / linked_debt_addback. It carries no magnitude."
+          },
+          "included_in_cash_flow_cash": {
+            "dimension": "non_numeric",
+            "reason": "A boolean saying whether the bucket forms part of the cash-flow statement's cash. It carries no magnitude."
+          },
+          "linked_instrument_ids": {
+            "dimension": "non_numeric",
+            "reason": "An array of instrument identifiers. It carries no magnitude."
+          },
+          "forecast_values": {
+            "dimension": "monetary",
+            "reason": "A three-series of forecast cash balances, or null. A magnitude, so it restates with the unit."
+          },
+          "available_for_liquidity": {
+            "dimension": "non_numeric",
+            "reason": "A boolean saying whether the bucket is usable liquidity. It carries no magnitude."
+          },
+          "net_debt_eligible_percentage": {
+            "dimension": "rate",
+            "reason": "The fraction of the bucket that counts against net debt, bounded by the schema to [0, 1]. Dimensionless: scaling it by the unit factor produces a case that violates its own schema maximum. This is one of the three the retired guard scaled."
+          },
+          "interest_eligible_percentage": {
+            "dimension": "rate",
+            "reason": "The fraction of the bucket that earns interest, bounded by the schema to [0, 1]. Dimensionless, for the same reason, and also scaled by the retired guard."
+          },
+          "cash_yield": {
+            "dimension": "rate",
+            "reason": "A three-series of yields applied to the bucket balance. A rate series, not a magnitude, and also scaled by the retired guard."
+          },
+          "source_line_ids": {
+            "dimension": "non_numeric",
+            "reason": "An array of source-line identifiers. It carries no magnitude."
+          }
+        }
       },
       {
         "container": "debt_reconciliation",

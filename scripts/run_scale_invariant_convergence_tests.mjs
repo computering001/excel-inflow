@@ -657,14 +657,41 @@ const economicSignature = (solution) =>
   createHash("sha256").update(JSON.stringify(economicsOnly(solution))).digest("hex");
 
 /**
- * Measured on the tree immediately BEFORE this package's edit, and unchanged
- * after it. Every forecast field, every instrument result, every statement
- * value, plus `residual`, `iterations`, `converged` and
- * `convergence_tolerance`.
+ * Every forecast field, every instrument result, every statement value, plus
+ * `residual`, `iterations`, `converged` and `convergence_tolerance`.
+ *
+ * RE-PINNED 2026-08-20 by the coordinator. P4.10 correctly REFUSED to re-pin
+ * this, because re-basing a pin to whatever the tree now produces is exactly
+ * what the pin exists to prevent. The movement was therefore bisected and
+ * measured before anything was rewritten here, and BOTH causes are named:
+ *
+ *  1. P7.10 (`e3ace99`, canonical summation in `opening_debt_bridge.mjs`).
+ *     Green at `5fd1b2a`, red at `e3ace99`. Exactly three fields moved on
+ *     standard-maximal-v2, all TOWARD exactness — which is canonical
+ *     summation's whole purpose:
+ *         identified_instrument_total  9121.864999999998 -> 9121.865
+ *         explained_total              9335.505999999998 -> 9335.506
+ *         unexplained_residual         1.8189894035458565e-12 -> 0
+ *     residual, iterations, converged and convergence_tolerance are all
+ *     BIT-IDENTICAL across that commit, so the solve itself did not move.
+ *     Note the direction: P7.10 reverted its own `instrument_period_state.mjs`
+ *     repair because it moved this same figure 9335.506 -> 9335.505999999998.
+ *     The bridge repair moves it back to exactly 9335.506, which is what the
+ *     maintained fixture at run_opening_instrument_provenance_tests.mjs:563
+ *     asserts; that suite and the D36 lock are both green at the new value.
+ *     P7.10's report that no certified fixture moved was WRONG — it checked
+ *     the bridge residual (-943.56), not this signature.
+ *
+ *  2. P4.10 (`d93a9cd`), which redefines `residual` as L-inf over 17
+ *     components instead of 13. P4.10 proved independently that the only
+ *     differing leaf field name across the whole corpus is `residual` itself.
+ *
+ * Neither cause is a number the product got wrong, and neither was laundered:
+ * each was reproduced, bisected to a commit, and diffed field-by-field first.
  */
 const CERTIFIED_ECONOMIC_SIGNATURES = Object.freeze({
   "standard-maximal-v2":
-    "e5a5b35338643623bc4371e88e5ce161b92ca23e105d35d3cfa3ae296b5f3b8c",
+    "d7394aef80d1b392e20fe395907aec7aedbbca9498c51fef51722c6112c2bde4",
   "standard-net-cash-v2":
     "0d89110a30f37f491bbd0747433b5e2f24a93937b0a10fd57c7c38d847555693",
 });
