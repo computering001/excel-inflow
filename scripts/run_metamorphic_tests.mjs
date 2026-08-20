@@ -52,9 +52,11 @@ import {
   compareRefusalVerdicts,
   declaredLocality,
   declaredMissingEdges,
+  discriminatedUnitDimension,
   economicSignature,
   economicSignatureSha256,
   forwardReachable,
+  keyedUnitDimension,
   localityFamilyIds,
   localityVerdict,
   preservingFamilyIds,
@@ -63,6 +65,7 @@ import {
   statementBindingFor,
   transformFamily,
   validateNodeObservableTotality,
+  validateUnitRestatementDimensionTotality,
 } from "./lib/metamorphic_relations.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -464,38 +467,44 @@ check("economics-preserving transforms do not change a lawful refusal", () => {
   assert.deepEqual(violations, [], `a presentation transform changed a refusal:\n- ${violations.slice(0, 6).join("\n- ")}`);
 });
 
-check("MG-5 reproduces: permuting the register moves the reported opening-debt residual", () => {
+// MG-5 RETIRED (P7.10 closed D32; P7.9 lands the retirement, both files being
+// forbidden to P7.10). This check used to read "MG-5 reproduces: permuting the
+// register moves the reported opening-debt residual" and to REQUIRE a drift.
+// The opening-debt bridge now accumulates through canonical_sum.mjs, so the
+// residual is a function of its inputs alone and the assertion inverts: any
+// drift at all is a REGRESSION. Inverted rather than deleted — a retired defect
+// that leaves no standing assertion behind can silently come back.
+check("MG-5 RETIRED: a register permutation moves no reported magnitude at all", () => {
   const drifting = driftObservations.filter((item) => item.drift > 0);
-  assert.ok(
-    drifting.length > 0,
-    "MG-5 no longer reproduces — if the bridge now sums in a canonical order, DELETE the MG-5 entry.",
-  );
-  const foreign = drifting.filter((item) => item.family !== "row_reorder_instruments");
   assert.deepEqual(
-    foreign.map((item) => `${item.family}/${item.seed}`),
+    drifting.map((item) => `${item.family}/${item.seed}: ${item.drift}`),
     [],
-    "only a register permutation may move a reported magnitude; a label transform doing so is a NEW defect",
+    "a register permutation moved a reported magnitude — MG-5 has REGRESSED. The opening-debt " +
+      "bridge is meant to sum through canonical_sum.mjs, whose order depends only on the values.",
   );
-  const registered = RELATIONS.known_defects.find((defect) => defect.id === "MG-5");
-  const worst = Math.max(...drifting.map((item) => item.drift));
-  assert.ok(
-    worst <= registered.observed_relative_drift_bound,
-    `the registered drift bound is ${registered.observed_relative_drift_bound} and ${worst} was observed — the dependence has WIDENED`,
-  );
-  assert.ok(worst < 1e-9, `observed relative drift ${worst} is no longer negligible against the bridge tolerance`);
-  assert.ok(
-    drifting.some((item) => item.seed === registered.reproducing_seed),
-    `the registered reproducing seed ${registered.reproducing_seed} no longer drifts`,
+  assert.equal(
+    RELATIONS.known_defects.some((defect) => defect.id === "MG-5"),
+    false,
+    "MG-5 is closed; its register entry must be gone, not merely unasserted",
   );
 });
 
-check("the refusal comparison still catches a genuinely different refusal", () => {
+check("the refusal comparison is EXACT, and the mode is declared not assumed", () => {
   const base = "OPENING_DEBT_UNRESOLVED: case x opening-debt bridge leaves -943.56 USD unexplained (tolerance 0.01).";
-  assert.equal(compareRefusalVerdicts(base, base.replace("-943.56", "-943.5600000000002")).equal, true);
+  // This line used to assert `.equal === true`, because the 1e-9 epsilon
+  // absorbed exactly this drift. With D32 closed there is nothing to absorb:
+  // the last place of a printed residual moving IS a violation.
+  assert.equal(compareRefusalVerdicts(base, base.replace("-943.56", "-943.5600000000002")).equal, false);
+  assert.equal(compareRefusalVerdicts(base, base).equal, true, "an identical refusal must still compare equal");
   assert.equal(compareRefusalVerdicts(base, base.replace("OPENING_DEBT_UNRESOLVED", "SOLVER_NON_CONVERGENCE")).equal, false);
   assert.equal(compareRefusalVerdicts(base, base.replace("case x", "case y")).equal, false);
   assert.equal(compareRefusalVerdicts(base, base.replace("-943.56", "-950.0")).equal, false);
   assert.equal(compareRefusalVerdicts(base, `${base} extra`).equal, false);
+
+  const plane = RELATIONS.observation_planes.find((item) => item.id === "refusal_verdict");
+  assert.equal(plane.comparison.numeric_comparison, "exact");
+  assert.equal(plane.comparison.relative_epsilon, undefined, "the retired epsilon must not still be live");
+  assert.equal(plane.comparison.retired_relative_epsilon, 1e-9, "and it must be recorded as retired, not erased");
 });
 
 // ---------------------------------------------------------------------------
@@ -805,6 +814,8 @@ const scaleRegisteredCase = path.basename(scaleRegistered.reproducing_case);
 let scaleApplied = 0;
 let scaleExact = 0;
 const scaleRefused = [];
+/** The restated period that came closest to being refused. MG-3's live margin. */
+let scaleTightest = null;
 
 check("unit_scale_restatement scales currency exactly and leaves ratios invariant (archetypes)", () => {
   const violations = [];
@@ -818,6 +829,22 @@ check("unit_scale_restatement scales currency exactly and leaves ratios invarian
     } catch (error) {
       scaleRefused.push({ id: item.id, message: String(error?.message ?? error).split("\n")[0] });
       continue;
+    }
+    for (const [index, period] of after.forecast.entries()) {
+      const criterion = period?.graph_driven_solve?.convergence_criterion;
+      if (!criterion) continue;
+      const margin = Number(period.residual) / criterion.applied_tolerance;
+      if (!scaleTightest || margin > scaleTightest.margin) {
+        scaleTightest = {
+          id: item.id,
+          period: index,
+          margin,
+          residual: Number(period.residual),
+          applied_tolerance: criterion.applied_tolerance,
+          binding_term: criterion.binding_term,
+          within_declared_envelope: criterion.within_declared_envelope,
+        };
+      }
     }
     const problems = scaleViolations(item.solution, after);
     if (problems.length > 0) violations.push(`${item.id}: ${problems.slice(0, 3).join(" | ")}`);
@@ -835,31 +862,83 @@ check("unit_scale_restatement scales currency exactly and leaves ratios invarian
   };
 });
 
-check("MG-3 reproduces: the only case the restatement refuses is the registered one", () => {
-  assert.ok(scaleRefused.length > 0, `MG-3 no longer reproduces — the solver tolerance may now be relative. If so, DELETE the MG-3 entry.`);
-  const unregistered = scaleRefused.filter((item) => !item.id.endsWith(scaleRegisteredCase));
+// MG-3, CORRECTED by P4.9 and P7.9. This pin used to read "MG-3 reproduces:
+// the only case the restatement refuses is the registered one". It reproduced
+// a 350% commitment fee, not a tolerance: D33's name-test guard scaled a 35bp
+// rate to 35,000bp, the solve then genuinely oscillated, and the refusal was
+// attributed to the solver. Held faithful, NOTHING is refused. The pin is
+// therefore inverted — a refusal reappearing here is a finding either way, and
+// the message says which two things it could be.
+check("MG-3 CORRECTED: a FAITHFUL restatement refuses nothing at all", () => {
   assert.deepEqual(
-    unregistered.map((item) => `${item.id}: ${item.message}`),
+    scaleRefused.map((item) => `${item.id}: ${item.message}`),
     [],
-    "a NEW scale-dependent refusal appeared that the register does not cover",
+    "a faithful unit restatement was refused. Either a real scale dependence has appeared in the " +
+      "solver, or a transform guard has started corrupting an economic term the way D33 did — " +
+      "check what the transform did to the case before blaming the tolerance",
   );
-  for (const item of scaleRefused) {
-    assert.match(item.message, /SOLVER_NON_CONVERGENCE/, `${item.id}: unexpected refusal ${item.message}`);
-  }
+  assert.equal(scaleExact, scaleApplied, "every applied restatement must also scale exactly");
 });
 
-check("MG-3's cause is an absolute tolerance, proven from the base solve", () => {
-  const before = solveCase(readArchetype(scaleRegisteredCase));
-  assert.equal(before.convergence_tolerance, 1e-8);
-  assert.ok(before.residual < before.convergence_tolerance, "the case converges as filed");
-  assert.ok(
-    before.residual * SCALE > before.convergence_tolerance,
-    `scaling by ${SCALE} must push the residual (${before.residual}) past a tolerance that does not scale`,
+check("MG-3's registered reproduction WAS D33: the fee, not the tolerance", () => {
+  // Kept as a live proof rather than prose, because the register's old
+  // reproduction is what a future reader will find first.
+  const base = readArchetype(scaleRegisteredCase);
+  assert.equal(base.rcf_policy.commitment_fee_convention, "bps_on_undrawn");
+  const transformed = applyTransform("unit_scale_restatement", base);
+  assert.equal(
+    transformed.rcf_policy.commitment_fee_value,
+    base.rcf_policy.commitment_fee_value,
+    "a basis-point rate is dimensionless and must survive a unit restatement untouched",
   );
+  const faithful = solveCase(structuredClone(transformed));
+  assert.equal(faithful.converged, true, "faithfully restated, the registered case CONVERGES");
+  const expected = solveCase(structuredClone(base)).forecast[0].cash_from_operations * SCALE;
+  assert.ok(
+    Math.abs(faithful.forecast[0].cash_from_operations - expected) <= Math.abs(expected) * 1e-12,
+    `and its economics scale exactly: ${faithful.forecast[0].cash_from_operations} vs ${expected}`,
+  );
+  // Re-inject exactly the contamination the old guard produced, and the
+  // registered refusal returns — which is what proves the attribution.
+  const contaminated = structuredClone(transformed);
+  contaminated.rcf_policy.commitment_fee_value = base.rcf_policy.commitment_fee_value * SCALE;
+  assert.equal(contaminated.rcf_policy.commitment_fee_value / 100, 350, "the D33 fee is 350%");
+  assert.throws(
+    () => solveCase(contaminated),
+    /SOLVER_NON_CONVERGENCE/,
+    "a 350% commitment fee must still refuse — the old reproduction was this, correctly refused",
+  );
+});
+
+check("MG-3's mechanism is REAL and MEDIUM: the restated corpus sits ~1% under the ceiling", () => {
+  // What survives of MG-3 after the correction. Above the declared reference
+  // magnitude P4.9's criterion is capped by the declared absolute ceiling, so
+  // scale-freeness stops there — and the worst restated period lands just
+  // under it. Pinned as a measured margin so the register's "MEDIUM, ~1%"
+  // cannot drift into prose: if this widens the defect is being repaired, and
+  // if it closes the defect is about to become a refusal.
+  assert.ok(scaleTightest, "no restated period was measured");
+  assert.ok(
+    scaleTightest.margin < 1,
+    `${scaleTightest.id} period ${scaleTightest.period} exceeded its own criterion: ${scaleTightest.margin}`,
+  );
+  assert.ok(
+    scaleTightest.margin > 0.9,
+    `MG-3's margin has widened to ${scaleTightest.margin} — the mechanism may have been repaired; ` +
+      "re-measure it and update the register rather than loosening this pin",
+  );
+  assert.equal(
+    scaleTightest.binding_term,
+    "declared_absolute_ceiling",
+    "the near-miss must be the DECLARED ceiling binding, not the scale-free term",
+  );
+  assert.equal(scaleTightest.within_declared_envelope, false);
+  preservingReport.mg3_tightest_restated_period = scaleTightest;
 });
 
 check("unit_scale_restatement scales exactly across the generated cohort", () => {
   const violations = [];
+  const refusals = [];
   let applied = 0;
   let refused = 0;
   for (const item of cohort.solvable) {
@@ -871,11 +950,7 @@ check("unit_scale_restatement scales exactly across the generated cohort", () =>
       after = solveCase(transformed);
     } catch (error) {
       refused += 1;
-      assert.match(
-        String(error?.message ?? error),
-        /SOLVER_NON_CONVERGENCE/,
-        `seed ${item.seed}: restatement caused a refusal that is not the registered scale dependence — ${String(error?.message ?? error).split("\n")[0]}`,
-      );
+      refusals.push(`seed ${item.seed}: ${String(error?.message ?? error).split("\n")[0]}`);
       continue;
     }
     const problems = scaleViolations(item.solution, after);
@@ -891,7 +966,19 @@ check("unit_scale_restatement scales exactly across the generated cohort", () =>
     generated: applied,
     generated_refused: refused,
   };
-  assert.ok(refused >= 1, "the registered scale dependence should also appear in the generated cohort");
+  // MG-3 CORRECTED. This used to read `assert.ok(refused >= 1, "the registered
+  // scale dependence should also appear in the generated cohort")`. The one
+  // generated refusal (seed 700413) was the same D33 shape as the archetype
+  // reproduction — the same bps_on_undrawn fee restated 35 -> 35000 — and it
+  // converges once the rate is held. Faithfully restated, the cohort refuses
+  // nothing.
+  assert.deepEqual(
+    refusals,
+    [],
+    "a faithful unit restatement was refused across the generated cohort. Before attributing it to " +
+      "the solver's tolerance, check what the transform did to the case: D33 was exactly this shape",
+  );
+  assert.equal(refused, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -1066,6 +1153,312 @@ check("MUTATION: dropping the tax->cfo edge from the register leaves MG-1 unexpl
 });
 
 // ---------------------------------------------------------------------------
+// H2. P7.9 / D33 — SELF-MUTATION: no guard in this layer may be satisfied by
+//     RENAMING a field. A dimension is declared, or the transform refuses.
+//
+// This is the class the programme has now found six times: an expectation taken
+// from a name, a label, or the artifact under test, rather than from the thing
+// itself. The mutations below are the ones the retired guards would have PASSED
+// — each renames something without touching a single number, and each must now
+// produce a loud, named refusal rather than a silently different economics.
+// ---------------------------------------------------------------------------
+
+/** Renames that inject or remove the words the retired regexes matched on. */
+const SPELLING_MUTATIONS = Object.freeze([
+  (value) => `${value}_rate`,
+  (value) => `${value}_RATE`,
+  (value) => `rate_${value}`,
+  (value) => `${value}_percentage`,
+  (value) => `${value}_ratio`,
+  (value) => `${value}_amount`,
+  (value) => value.replace(/_/g, ""),
+  (value) => value.toUpperCase(),
+]);
+
+check("SELF-MUTATION: no SPELLING of a convention can buy it a dimension", () => {
+  // The retired guard classified by regex, so `bps_on_undrawn_rate` would have
+  // been held fixed and `bps_on_undrawn` scaled — the SAME quantity, two
+  // treatments, decided by eight characters of spelling. Every rename must now
+  // be an unclassified convention, and unclassified must mean refused.
+  const base = readArchetype(scaleRegisteredCase);
+  const declared = base.rcf_policy.commitment_fee_convention;
+  assert.equal(discriminatedUnitDimension("rcf_policy.commitment_fee_value", declared), "rate");
+  for (const rename of SPELLING_MUTATIONS) {
+    const renamed = rename(declared);
+    if (renamed === declared) continue;
+    const mutant = structuredClone(base);
+    mutant.rcf_policy.commitment_fee_convention = renamed;
+    assert.throws(
+      () => applyTransform("unit_scale_restatement", mutant),
+      /UNIT_DIMENSION_UNCLASSIFIED_CONVENTION/,
+      `renaming the convention to "${renamed}" was accepted — a guard in this layer is still reading spelling`,
+    );
+  }
+  // And the absent case, which a `?? ""` default used to swallow whole.
+  const absent = structuredClone(base);
+  delete absent.rcf_policy.commitment_fee_convention;
+  assert.throws(
+    () => applyTransform("unit_scale_restatement", absent),
+    /UNIT_DIMENSION_UNCLASSIFIED_CONVENTION/,
+    "a fee value with no declared convention has no declared dimension and must refuse, not default",
+  );
+});
+
+check("SELF-MUTATION: no SPELLING of a container key can buy it a dimension", () => {
+  // D33's sibling at the old `NON_MONETARY_RECONCILIATION_KEY` guard. Renaming
+  // a monetary balance to end in `_percentage` would have silently stopped it
+  // being restated; renaming a tolerance away from `percentage` would have
+  // silently scaled a ratio by 1000. Neither rename touches what the field
+  // means, so neither may change what the transform does to it.
+  const withReconciliation = archetypeCases.find((item) => item.model_case?.debt_reconciliation);
+  assert.ok(withReconciliation, "no archetype carries a debt_reconciliation to mutate");
+  assert.equal(keyedUnitDimension("debt_reconciliation", "reported_opening_gross_debt"), "monetary");
+  assert.equal(keyedUnitDimension("debt_reconciliation", "maximum_residual_percentage"), "rate");
+  for (const key of ["reported_opening_gross_debt", "maximum_residual_percentage"]) {
+    for (const rename of SPELLING_MUTATIONS) {
+      const renamed = rename(key);
+      if (renamed === key) continue;
+      const mutant = structuredClone(withReconciliation.model_case);
+      if (!(key in mutant.debt_reconciliation)) continue;
+      mutant.debt_reconciliation[renamed] = mutant.debt_reconciliation[key];
+      delete mutant.debt_reconciliation[key];
+      assert.throws(
+        () => applyTransform("unit_scale_restatement", mutant),
+        /UNIT_DIMENSION_UNCLASSIFIED_KEY/,
+        `renaming debt_reconciliation.${key} to ${renamed} was accepted — the key guard still reads spelling`,
+      );
+    }
+  }
+});
+
+check("SELF-MUTATION: the cash-bucket guard was a denylist of a key that does not exist", () => {
+  // D33's second sibling, found by P7.9's sweep. The retired guard was
+  // `key !== "eligible_percentage"`, and `eligible_percentage` is not a
+  // property of $defs/cashBucket at all — the schema closes the object and
+  // names three rate-shaped keys, none of them that one. So the guard was
+  // unconditionally true and the transform scaled two [0,1]-bounded rates and a
+  // yield series by the unit factor.
+  const schema = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "assets", "model-case-v2.schema.json"), "utf8"),
+  );
+  const declared = Object.keys(schema.$defs.cashBucket.properties);
+  assert.equal(schema.$defs.cashBucket.additionalProperties, false, "the container must be closed");
+  assert.ok(
+    !declared.includes("eligible_percentage"),
+    "the retired guard named a key the schema does not declare — that is why it never fired",
+  );
+  for (const key of declared) {
+    assert.notEqual(key !== "eligible_percentage", false, `${key} would have passed the retired guard`);
+  }
+
+  // No archetype carries buckets, so the branch is exercised here directly.
+  const withBuckets = structuredClone(archetypeCases[0].model_case);
+  withBuckets.cash_policy.buckets = [{
+    bucket_id: "operating",
+    label: "Operating cash",
+    historical_year_end: [100, 110, 120],
+    forecast_treatment: "flat",
+    available_for_liquidity: true,
+    net_debt_eligible_percentage: 1,
+    interest_eligible_percentage: 0.25,
+    cash_yield: [0.03, 0.03, 0.03],
+  }];
+  const factor = transformFamily("unit_scale_restatement").expected_effect.scale_factor;
+  const scaled = applyTransform("unit_scale_restatement", withBuckets);
+  const bucket = scaled.cash_policy.buckets[0];
+  assert.deepEqual(bucket.historical_year_end, [100 * factor, 110 * factor, 120 * factor], "a balance restates");
+  assert.equal(bucket.net_debt_eligible_percentage, 1, "a [0,1] fraction must not restate");
+  assert.equal(bucket.interest_eligible_percentage, 0.25, "a [0,1] fraction must not restate");
+  assert.deepEqual(bucket.cash_yield, [0.03, 0.03, 0.03], "a yield series must not restate");
+
+  // And a key the schema does not declare refuses rather than being scaled.
+  const undeclared = structuredClone(withBuckets);
+  undeclared.cash_policy.buckets[0].invented_balance = 5;
+  assert.throws(
+    () => applyTransform("unit_scale_restatement", undeclared),
+    /UNIT_DIMENSION_UNCLASSIFIED_KEY/,
+  );
+});
+
+check("SELF-MUTATION: the ratio-role set is DERIVED, and it was missing one", () => {
+  // D33's third sibling. `RATIO_SEMANTIC_ROLES` was a hand-written
+  // `new Set(["effective_tax_rate"])`. The statement taxonomy declares the set
+  // it was standing in for, and it has two members.
+  const taxonomy = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "assets", "statement-semantic-taxonomy.v1.json"), "utf8"),
+  );
+  const declaredRatioRoles = taxonomy.roles
+    .filter((role) => (role.numeric_types ?? []).includes("percentage"))
+    .map((role) => role.id)
+    .sort();
+  assert.deepEqual(declaredRatioRoles, ["effective_tax_rate", "margin"]);
+  assert.ok(
+    declaredRatioRoles.length > 1,
+    "the retired hand-written set had exactly one member; the authority has more",
+  );
+
+  // Behavioural proof, on the role the hand-written set omitted.
+  const withMargin = structuredClone(archetypeCases[0].model_case);
+  withMargin.statement_structure.income_statement.push({
+    row_id: "gross_margin_pct",
+    label: "Gross margin",
+    row_type: "input",
+    forecast_treatment: "hardcode",
+    semantic_role: "margin",
+    values: [0.42, 0.42, 0.42, 0.43, 0.43, 0.43],
+  });
+  const scaled = applyTransform("unit_scale_restatement", withMargin);
+  const row = scaled.statement_structure.income_statement.find((item) => item.row_id === "gross_margin_pct");
+  assert.deepEqual(row.values, [0.42, 0.42, 0.42, 0.43, 0.43, 0.43], "a declared percentage role must not restate");
+  // MG-7's residual, asserted rather than assumed: an UNTYPED role is still
+  // scaled, because the taxonomy does not type it and semantic_role is open.
+  const untyped = structuredClone(withMargin);
+  untyped.statement_structure.income_statement.at(-1).semantic_role = "gross_margin";
+  const untypedScaled = applyTransform("unit_scale_restatement", untyped);
+  const untypedRow = untypedScaled.statement_structure.income_statement.find(
+    (item) => item.row_id === "gross_margin_pct",
+  );
+  assert.equal(untypedRow.values[0], 0.42 * 1000, "MG-7: an untyped role is scaled by omission, as registered");
+  assert.ok(RELATIONS.known_defects.some((defect) => defect.id === "MG-7"));
+});
+
+check("SELF-MUTATION: the retired regexes would have PASSED these renames", () => {
+  // Without this the mutations above prove only that the new guard is strict,
+  // not that the old one was wrong. Replay both retired predicates over the
+  // same renames and show they disagree with the declared dimension.
+  const RETIRED_CONVENTION_GUARD = (value) => !/rate/i.test(String(value ?? ""));
+  const RETIRED_KEY_GUARD = /percentage|_rate|ratio|tolerance_bps/;
+
+  // The convention guard scaled EVERY convention the repository admits.
+  const declaredConventions = Object.keys(
+    RELATIONS.unit_restatement_dimensions.discriminated_quantities[0].by_value,
+  );
+  const wronglyScaled = declaredConventions.filter(
+    (value) =>
+      RETIRED_CONVENTION_GUARD(value) &&
+      discriminatedUnitDimension("rcf_policy.commitment_fee_value", value) !== "monetary",
+  );
+  assert.deepEqual(
+    wronglyScaled.sort(),
+    ["bps_on_committed", "bps_on_undrawn", "captured_in_residual", "none", "percent_of_margin"],
+    "the retired guard scaled every declared convention, including two rates and two placeholders",
+  );
+
+  // And a rename alone flipped its verdict, on the same quantity.
+  assert.equal(RETIRED_CONVENTION_GUARD("bps_on_undrawn"), true, "scaled");
+  assert.equal(RETIRED_CONVENTION_GUARD("bps_on_undrawn_rate"), false, "held — same fee, different spelling");
+
+  // The key guard is the same shape: spelling alone flips the treatment.
+  assert.equal(RETIRED_KEY_GUARD.test("reported_opening_gross_debt"), false, "scaled");
+  assert.equal(RETIRED_KEY_GUARD.test("reported_opening_gross_debt_ratio"), true, "held — same balance");
+  assert.equal(RETIRED_KEY_GUARD.test("maximum_residual_percentage"), true, "held");
+  assert.equal(RETIRED_KEY_GUARD.test("maximum_residual_share"), false, "scaled — same tolerance");
+});
+
+check("SELF-MUTATION: a newly admitted convention cannot fall into a class by default", () => {
+  // The property that makes the repair durable rather than a one-off fix. Add a
+  // convention to the governing schema enum and the register stops being total,
+  // which throws at IMPORT — the whole metamorphic layer refuses to load until
+  // a human classifies it. Simulated here on a copy of the register, because
+  // the real failure is an import-time throw this process cannot survive.
+  const register = structuredClone(RELATIONS.unit_restatement_dimensions);
+  const quantity = register.discriminated_quantities[0];
+  assert.deepEqual(validateUnitRestatementDimensionTotality(register), []);
+
+  // (a) a schema value nobody classified
+  const unclassified = structuredClone(register);
+  delete unclassified.discriminated_quantities[0].by_value.bps_on_undrawn;
+  assert.ok(
+    validateUnitRestatementDimensionTotality(unclassified).some((line) =>
+      line.startsWith("UNIT_DIMENSION_UNCLASSIFIED_VALUE"),
+    ),
+    "a convention the schema admits and the register omits must be reported",
+  );
+
+  // (b) a classification for a value no schema admits — the other direction, so
+  //     the register cannot be padded to launder a future value
+  const orphan = structuredClone(register);
+  orphan.discriminated_quantities[0].by_value.invented_convention = {
+    dimension: "monetary",
+    reason: "x".repeat(40),
+  };
+  assert.ok(
+    validateUnitRestatementDimensionTotality(orphan).some((line) =>
+      line.startsWith("UNIT_DIMENSION_CLASSIFICATION_ORPHAN"),
+    ),
+    "a classification no schema admits must be reported",
+  );
+
+  // (c) a dimension outside the declared vocabulary
+  const badDimension = structuredClone(register);
+  badDimension.discriminated_quantities[0].by_value.bps_on_undrawn.dimension = "probably_a_rate";
+  assert.ok(
+    validateUnitRestatementDimensionTotality(badDimension).some((line) =>
+      line.startsWith("UNIT_DIMENSION_UNDECLARED_DIMENSION"),
+    ),
+  );
+
+  // (d) a classification with no stated reason
+  const unreasoned = structuredClone(register);
+  unreasoned.discriminated_quantities[0].by_value.bps_on_undrawn.reason = "rate";
+  assert.ok(
+    validateUnitRestatementDimensionTotality(unreasoned).some((line) =>
+      line.startsWith("UNIT_DIMENSION_UNREASONED_CLASSIFICATION"),
+    ),
+  );
+
+  // (e) a key set the schema does not close cannot be claimed total
+  const openContainer = structuredClone(register);
+  openContainer.keyed_quantities[0].schema_authority = {
+    file: "assets/model-case-v2.schema.json",
+    pointer: "/properties/rcf_policy/properties",
+  };
+  assert.ok(
+    validateUnitRestatementDimensionTotality(openContainer).some((line) =>
+      line.startsWith("UNIT_DIMENSION_AUTHORITY_IS_NOT_CLOSED") ||
+      line.startsWith("UNIT_DIMENSION_UNCLASSIFIED_VALUE"),
+    ),
+  );
+
+  // (f) an authority that does not resolve is not silently skipped
+  const brokenAuthority = structuredClone(register);
+  brokenAuthority.discriminated_quantities[0].enum_authority.pointer = "/properties/not_a_thing";
+  assert.ok(
+    validateUnitRestatementDimensionTotality(brokenAuthority).some((line) =>
+      line.startsWith("UNIT_DIMENSION_UNRESOLVABLE_AUTHORITY"),
+    ),
+  );
+
+  assert.equal(quantity.discriminator, "rcf_policy.commitment_fee_convention");
+});
+
+check("the dimension register is TOTAL over the schemas as they stand", () => {
+  assert.deepEqual(validateUnitRestatementDimensionTotality(), []);
+  const quantity = RELATIONS.unit_restatement_dimensions.discriminated_quantities[0];
+  // Read the enum back out of the governing schema rather than restating it,
+  // so this check cannot drift from the authority it claims to follow.
+  const schema = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "assets", "model-case-v2.schema.json"), "utf8"),
+  );
+  const admitted = schema.properties.rcf_policy.properties.commitment_fee_convention.enum;
+  for (const value of admitted) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(quantity.by_value, value),
+      `${value} is admitted by the model-case schema and classified nowhere`,
+    );
+  }
+  // Not one admitted convention is monetary, which is exactly why the retired
+  // guard's "scale everything" behaviour was wrong in every single case.
+  for (const value of admitted) {
+    assert.notEqual(
+      discriminatedUnitDimension("rcf_policy.commitment_fee_value", value),
+      "monetary",
+      `${value}: a commitment fee is never a magnitude in the reporting unit`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 
 const localityFamilies = localityFamilyIds();
 console.log(JSON.stringify({
@@ -1088,5 +1481,11 @@ console.log(JSON.stringify({
   refusal_magnitude_drift_observations: driftObservations.length,
   locality_applications: localityReport,
   known_defects_open: RELATIONS.known_defects.length,
-  known_defects_reproduced: [...new Set([...defectReproductions.keys(), scaleRegistered.id, "MG-4", "MG-5"])].sort(),
+  // MG-3 is deliberately NOT in this list. P7.9 proved its registered
+  // reproduction was D33's 350% fee rather than the tolerance; what survives is
+  // a measured margin, reported beside it rather than as a reproduction.
+  // MG-5 is gone too: P7.10 closed D32 by construction and P7.9 retired the
+  // entry and the epsilon it justified.
+  known_defects_reproduced: [...new Set([...defectReproductions.keys(), "MG-4"])].sort(),
+  known_defects_corrected_not_reproduced: [scaleRegistered.id],
 }));

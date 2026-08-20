@@ -468,19 +468,52 @@ export function comparePreservingSignatures(familyId, before, after) {
 
 const NUMERIC_LITERAL = /-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?/g;
 
+/** The comparison modes the refusal plane may declare. No default. */
+const REFUSAL_NUMERIC_COMPARISONS = Object.freeze({
+  exact: () => 0,
+  relative_epsilon: (comparison) => {
+    if (typeof comparison.relative_epsilon !== "number" || !(comparison.relative_epsilon > 0)) {
+      throw new Error(
+        "REFUSAL_COMPARISON_EPSILON_MISSING: the refusal plane declares relative_epsilon " +
+          "comparison without a positive epsilon.",
+      );
+    }
+    return comparison.relative_epsilon;
+  },
+});
+
 /**
  * Compare two refusal verdicts.
  *
  * The literal text is compared EXACTLY: a different reason, case id or word is a
- * violation, full stop. The embedded magnitudes are compared at the plane's
- * declared relative epsilon, because a reported residual is a floating-point sum
- * whose order the instrument register determines — the drift that exposes is
- * registered as MG-5 with a bounded magnitude, and the bound is RETURNED here so
- * the caller can assert it rather than take it on trust.
+ * violation, full stop.
+ *
+ * The magnitudes WERE compared at a declared relative epsilon of 1e-9, because
+ * the opening-debt bridge summed its register in array order and a reported
+ * residual therefore depended on the order of its addends — registered as MG-5.
+ * P7.10 closed that by construction (`scripts/lib/canonical_sum.mjs`), so the
+ * epsilon's only justification is gone and the comparison is now EXACT. P7.9
+ * verified before removing it that it had no other dependant: across the whole
+ * refusal plane — 1,658 comparisons, 8 economics-preserving families over 208
+ * refused cases — there is not one comparison that passes only because of the
+ * epsilon, and not one non-zero drift. A repaired defect must not leave a
+ * loosened comparison standing behind it.
+ *
+ * The MODE is declared on the plane rather than being a constant here, so
+ * re-loosening it is a visible change to the register and not an edit to a
+ * literal — and an undeclared mode throws instead of falling back to a default.
  */
 export function compareRefusalVerdicts(before, after) {
   const plane = RELATIONS.observation_planes.find((item) => item.id === "refusal_verdict");
-  const epsilon = plane.comparison.relative_epsilon;
+  const mode = plane.comparison.numeric_comparison;
+  const resolve = REFUSAL_NUMERIC_COMPARISONS[mode];
+  if (resolve === undefined) {
+    throw new Error(
+      `REFUSAL_COMPARISON_MODE_UNDECLARED: the refusal plane declares numeric_comparison ` +
+        `${JSON.stringify(mode)}; declared modes are ${Object.keys(REFUSAL_NUMERIC_COMPARISONS).join(", ")}.`,
+    );
+  }
+  const epsilon = resolve(plane.comparison);
   const skeleton = (text) => String(text).replace(NUMERIC_LITERAL, " ");
   const magnitudes = (text) => (String(text).match(NUMERIC_LITERAL) ?? []).map(Number);
   if (skeleton(before) !== skeleton(after)) {
@@ -554,8 +587,252 @@ const SCALED_LEASE_SERIES = new Set([
   "principal_repayment", "additions", "other_movements", "historical_liabilities",
   "forecast_liabilities", "historical_interest_bearing_liabilities", "forecast_interest_bearing_liabilities",
 ]);
-const RATIO_SEMANTIC_ROLES = new Set(["effective_tax_rate"]);
-const NON_MONETARY_RECONCILIATION_KEY = /percentage|_rate|ratio|tolerance_bps/;
+/**
+ * D33's third sibling. This was a hand-written `new Set(["effective_tax_rate"])`
+ * — a list of names standing in for the set of roles that are ratios. The
+ * statement taxonomy already declares that set: a role carrying
+ * `numeric_types: ["percentage"]` is a ratio, and there are TWO of them, not
+ * one. `margin` was missing, so a sourced margin row would have been multiplied
+ * by the unit factor. Derived here so the set cannot drift from its authority.
+ *
+ * This one CANNOT be made total the way the commitment fee and the cash buckets
+ * were: `statementRow.semantic_role` is an open `{"type":"string"}` in the
+ * model-case schema, and 13 of the 32 roles the corpus uses carry no
+ * `numeric_types` at all (4 are absent from the taxonomy entirely). So an
+ * untyped role is still treated as a magnitude by omission. That residual is
+ * registered as MG-7 rather than hidden behind a default that looks decided.
+ */
+const STATEMENT_TAXONOMY = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "assets", "statement-semantic-taxonomy.v1.json"), "utf8"),
+);
+const RATIO_SEMANTIC_ROLES = new Set(
+  STATEMENT_TAXONOMY.roles
+    .filter((role) => (role.numeric_types ?? []).includes("percentage"))
+    .map((role) => role.id),
+);
+if (RATIO_SEMANTIC_ROLES.size === 0) {
+  throw new Error(
+    "assets/statement-semantic-taxonomy.v1.json declares no percentage-typed role; " +
+      "unit_scale_restatement would scale every ratio row.",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// P7.9 / D33 — a quantity's DIMENSION is declared, never spelled
+// ---------------------------------------------------------------------------
+
+/**
+ * D33. Two guards in `unit_scale_restatement` used to decide whether a number
+ * was a magnitude or a rate by pattern-matching a NAME:
+ *
+ *   !/rate/i.test(String(rcfPolicy.commitment_fee_convention ?? ""))   // :733
+ *   NON_MONETARY_RECONCILIATION_KEY = /percentage|_rate|ratio|.../     // :558
+ *
+ * The first never fired: no convention this repository admits — `none`,
+ * `bps_on_undrawn`, `captured_in_residual` in the model-case schemas,
+ * `percent_of_margin` and `bps_on_committed` in the legacy and case-source
+ * schemas — contains the letters r-a-t-e. So the transform scaled a 35bp
+ * commitment fee to 35,000bp (350%) while claiming, in its own
+ * `non_monetary_paths_held_fixed`, to hold it. The solve then genuinely
+ * oscillated and the refusal was registered as MG-3, a scale-invariance defect
+ * of the SOLVER. It was a defect of the transform.
+ *
+ * The second is the same shape and is correct only by coincidence of spelling:
+ * rename `maximum_residual_percentage` and the transform starts scaling a
+ * tolerance; rename `reported_opening_gross_debt` to end in `_ratio` and it
+ * stops scaling a balance. Neither rename would touch what the field MEANS.
+ *
+ * Both now dispatch on `unit_restatement_dimensions` in the relation register,
+ * which is checked TOTAL against the governing JSON Schema at import. A
+ * convention or key the register does not classify is a THROW, never a default:
+ * that is the property that makes it impossible for a newly admitted value to
+ * fall silently into the wrong class.
+ */
+const MODEL_CASE_SCHEMA_PATH = path.join(ROOT, "assets", "model-case-v2.schema.json");
+const LEGACY_MODEL_CASE_SCHEMA_PATH = path.join(ROOT, "assets", "model-case.schema.json");
+const CASE_SOURCE_SCHEMA_PATH = path.join(ROOT, "assets", "case-source.schema.json");
+
+const SCHEMA_BY_FILE = Object.freeze({
+  "assets/model-case-v2.schema.json": JSON.parse(fs.readFileSync(MODEL_CASE_SCHEMA_PATH, "utf8")),
+  "assets/model-case.schema.json": JSON.parse(fs.readFileSync(LEGACY_MODEL_CASE_SCHEMA_PATH, "utf8")),
+  "assets/case-source.schema.json": JSON.parse(fs.readFileSync(CASE_SOURCE_SCHEMA_PATH, "utf8")),
+});
+
+/** Resolve a JSON-Pointer inside one of the declared schemas. Throws if absent. */
+function schemaPointer(file, pointer) {
+  const document = SCHEMA_BY_FILE[file];
+  if (document === undefined) {
+    throw new Error(`unit_restatement_dimensions names an unreadable schema authority: ${file}`);
+  }
+  let node = document;
+  for (const raw of pointer.split("/").slice(1)) {
+    const token = raw.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (node === null || typeof node !== "object" || !(token in node)) {
+      throw new Error(`unit_restatement_dimensions names a pointer that does not resolve: ${file}#${pointer}`);
+    }
+    node = node[token];
+  }
+  return node;
+}
+
+/**
+ * TOTALITY, at import, on the same channel as `validateNodeObservableTotality`.
+ *
+ * A declaration is total when (a) every value the governing schemas admit is
+ * classified, (b) no classification is an orphan no schema admits, (c) every
+ * dimension named is one of the declared dimensions, and (d) every entry
+ * carries a stated reason. (a) is what makes a NEW convention fail loudly: add
+ * `sofr_spread_on_undrawn` to the schema enum and this returns
+ * `UNIT_DIMENSION_UNCLASSIFIED_VALUE`, which throws below, and every importer of
+ * this module — the whole metamorphic suite — refuses to load until the new
+ * convention has been given a dimension by hand.
+ */
+export function validateUnitRestatementDimensionTotality(
+  register = RELATIONS.unit_restatement_dimensions,
+) {
+  const errors = [];
+  if (!register || typeof register !== "object") {
+    return ["UNIT_DIMENSION_REGISTER_ABSENT"];
+  }
+  const dimensions = new Set(Object.keys(register.dimension_semantics ?? {}));
+  if (dimensions.size === 0) errors.push("UNIT_DIMENSION_VOCABULARY_ABSENT");
+  for (const [name, meaning] of Object.entries(register.dimension_semantics ?? {})) {
+    if (typeof meaning !== "string" || meaning.length < 40) {
+      errors.push(`UNIT_DIMENSION_UNEXPLAINED_DIMENSION: ${name}`);
+    }
+  }
+
+  const classify = (owner, entries, admitted) => {
+    for (const [value, entry] of Object.entries(entries ?? {})) {
+      if (!dimensions.has(entry?.dimension)) {
+        errors.push(`UNIT_DIMENSION_UNDECLARED_DIMENSION: ${owner} ${value} -> ${entry?.dimension}`);
+      }
+      if (typeof entry?.reason !== "string" || entry.reason.length < 20) {
+        errors.push(`UNIT_DIMENSION_UNREASONED_CLASSIFICATION: ${owner} ${value}`);
+      }
+      if (!admitted.has(value)) {
+        errors.push(`UNIT_DIMENSION_CLASSIFICATION_ORPHAN: ${owner} ${value}`);
+      }
+    }
+    for (const value of admitted) {
+      if (!Object.prototype.hasOwnProperty.call(entries ?? {}, value)) {
+        errors.push(`UNIT_DIMENSION_UNCLASSIFIED_VALUE: ${owner} ${value}`);
+      }
+    }
+  };
+
+  for (const quantity of register.discriminated_quantities ?? []) {
+    const admitted = new Set();
+    const authorities = [
+      quantity.enum_authority,
+      ...(quantity.additional_enum_authorities ?? []),
+    ];
+    for (const authority of authorities) {
+      let values;
+      try {
+        values = schemaPointer(authority?.file, authority?.pointer);
+      } catch (error) {
+        errors.push(`UNIT_DIMENSION_UNRESOLVABLE_AUTHORITY: ${quantity.path} ${String(error.message)}`);
+        continue;
+      }
+      if (!Array.isArray(values) || values.length === 0) {
+        errors.push(`UNIT_DIMENSION_AUTHORITY_IS_NOT_AN_ENUM: ${quantity.path} ${authority.file}#${authority.pointer}`);
+        continue;
+      }
+      for (const value of values) admitted.add(value);
+    }
+    classify(quantity.path, quantity.by_value, admitted);
+  }
+
+  for (const container of register.keyed_quantities ?? []) {
+    const authority = container.schema_authority;
+    let properties;
+    try {
+      properties = schemaPointer(authority?.file, authority?.pointer);
+    } catch (error) {
+      errors.push(`UNIT_DIMENSION_UNRESOLVABLE_AUTHORITY: ${container.container} ${String(error.message)}`);
+      continue;
+    }
+    if (properties === null || typeof properties !== "object" || Array.isArray(properties)) {
+      errors.push(`UNIT_DIMENSION_AUTHORITY_IS_NOT_A_PROPERTY_MAP: ${container.container}`);
+      continue;
+    }
+    // A key set can only be claimed EXHAUSTIVE when the schema closes it.
+    const closedPointer = authority.pointer.replace(/\/properties$/, "/additionalProperties");
+    let closed = false;
+    try {
+      closed = schemaPointer(authority.file, closedPointer) === false;
+    } catch {
+      closed = false;
+    }
+    if (!closed) {
+      errors.push(`UNIT_DIMENSION_AUTHORITY_IS_NOT_CLOSED: ${container.container} — an open key set cannot be classified totally`);
+    }
+    classify(container.container, container.by_key, new Set(Object.keys(properties)));
+  }
+  return errors;
+}
+
+const UNIT_DIMENSION_ERRORS = validateUnitRestatementDimensionTotality();
+if (UNIT_DIMENSION_ERRORS.length > 0) {
+  throw new Error(
+    `assets/metamorphic-relations-v1.json does not classify every declared unit dimension:\n- ${UNIT_DIMENSION_ERRORS.join("\n- ")}`,
+  );
+}
+
+const UNIT_DIMENSIONS = RELATIONS.unit_restatement_dimensions;
+
+/**
+ * The declared dimension of a discriminated quantity, given the value of its
+ * discriminator. THROWS on anything unclassified — the absence of a default is
+ * the whole point of the repair.
+ */
+export function discriminatedUnitDimension(quantityPath, discriminatorValue) {
+  const quantity = (UNIT_DIMENSIONS.discriminated_quantities ?? []).find(
+    (item) => item.path === quantityPath,
+  );
+  if (!quantity) {
+    throw new Error(`UNIT_DIMENSION_UNDECLARED_QUANTITY: ${quantityPath}`);
+  }
+  const entry = quantity.by_value[discriminatorValue];
+  if (entry === undefined) {
+    throw new Error(
+      `UNIT_DIMENSION_UNCLASSIFIED_CONVENTION: ${quantity.discriminator} = ${JSON.stringify(discriminatorValue)} ` +
+        `is not classified in assets/metamorphic-relations-v1.json :: unit_restatement_dimensions. ` +
+        `Classify it there (declared: ${Object.keys(quantity.by_value).join(", ")}) — a transform must not ` +
+        `guess a dimension from a convention's spelling.`,
+    );
+  }
+  return entry.dimension;
+}
+
+/**
+ * The declared dimension of one key of a closed container. THROWS on an
+ * unclassified key for the same reason.
+ */
+export function keyedUnitDimension(containerName, key) {
+  const container = (UNIT_DIMENSIONS.keyed_quantities ?? []).find(
+    (item) => item.container === containerName,
+  );
+  if (!container) {
+    throw new Error(`UNIT_DIMENSION_UNDECLARED_CONTAINER: ${containerName}`);
+  }
+  const entry = container.by_key[key];
+  if (entry === undefined) {
+    throw new Error(
+      `UNIT_DIMENSION_UNCLASSIFIED_KEY: ${containerName}.${key} is not classified in ` +
+        `assets/metamorphic-relations-v1.json :: unit_restatement_dimensions. ` +
+        `Classify it there (declared: ${Object.keys(container.by_key).join(", ")}) — a transform must not ` +
+        `guess a dimension from a key's spelling.`,
+    );
+  }
+  return entry.dimension;
+}
+
+/** True only for the one dimension a unit restatement is allowed to move. */
+function isScaleCovariant(dimension) {
+  return dimension === "monetary";
+}
 
 /**
  * Every transform takes a case and returns a NEW case, or null when the family
@@ -716,10 +993,17 @@ export const TRANSFORMS = Object.freeze({
       if (Array.isArray(cashPolicy.historical_year_end_cash)) {
         cashPolicy.historical_year_end_cash = scaleSeries(cashPolicy.historical_year_end_cash, factor);
       }
+      // D33's second sibling, found by P7.9's sweep. The retired guard was
+      // `key !== "eligible_percentage"` — a denylist of ONE key that is not a
+      // property of `cashBucket` at all. The real keys are
+      // net_debt_eligible_percentage, interest_eligible_percentage and
+      // cash_yield, so the guard was always true and the transform multiplied
+      // two schema-bounded [0,1] rates and a yield series by the unit factor.
       for (const bucket of cashPolicy.buckets ?? []) {
         for (const [key, value] of Object.entries(bucket)) {
-          if (typeof value === "number" && key !== "eligible_percentage") bucket[key] = value * factor;
-          else if (Array.isArray(value) && key !== "eligible_percentage") bucket[key] = scaleSeries(value, factor);
+          if (!isScaleCovariant(keyedUnitDimension("cash_policy.buckets[]", key))) continue;
+          if (typeof value === "number") bucket[key] = value * factor;
+          else if (Array.isArray(value)) bucket[key] = scaleSeries(value, factor);
         }
       }
     }
@@ -728,11 +1012,16 @@ export const TRANSFORMS = Object.freeze({
       for (const key of ["capacity", "opening_draw"]) {
         if (typeof rcfPolicy[key] === "number") rcfPolicy[key] *= factor;
       }
-      if (
-        typeof rcfPolicy.commitment_fee_value === "number" &&
-        !/rate/i.test(String(rcfPolicy.commitment_fee_convention ?? ""))
-      ) {
-        rcfPolicy.commitment_fee_value *= factor;
+      // D33. The dimension comes from the DECLARED convention, not from its
+      // spelling. `bps_on_undrawn` is a rate and must not move; only a
+      // convention declared `monetary` restates with the unit. An unclassified
+      // convention throws rather than being scaled by default.
+      if (typeof rcfPolicy.commitment_fee_value === "number") {
+        const dimension = discriminatedUnitDimension(
+          "rcf_policy.commitment_fee_value",
+          rcfPolicy.commitment_fee_convention,
+        );
+        if (isScaleCovariant(dimension)) rcfPolicy.commitment_fee_value *= factor;
       }
     }
     const leasePolicy = next.lease_policy;
@@ -745,8 +1034,12 @@ export const TRANSFORMS = Object.freeze({
     if (Array.isArray(next.other_interest)) next.other_interest = scaleSeries(next.other_interest, factor);
     const reconciliation = next.debt_reconciliation;
     if (reconciliation) {
+      // D33's sibling. The old guard was `/percentage|_rate|ratio|tolerance_bps/`
+      // over the KEY: correct today only because the two keys happen to be
+      // spelled conveniently. The schema closes this container, so the
+      // classification is total and a new key throws.
       for (const [key, value] of Object.entries(reconciliation)) {
-        if (NON_MONETARY_RECONCILIATION_KEY.test(key)) continue;
+        if (!isScaleCovariant(keyedUnitDimension("debt_reconciliation", key))) continue;
         if (Array.isArray(value)) reconciliation[key] = scaleSeries(value, factor);
         else if (typeof value === "number") reconciliation[key] = value * factor;
       }

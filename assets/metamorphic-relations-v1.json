@@ -29,9 +29,10 @@
       "primitive_note": "A case the pipeline lawfully refuses has no economics to preserve, but its REFUSAL must still be label-independent. This plane carries the economics-preserving families over the refused population.",
       "comparison": {
         "literal_text": "compared EXACTLY \u2014 a different reason, a different case id or a different word is a violation",
-        "numeric_magnitudes": "compared at a declared relative epsilon of 1e-9, because a reported residual is a floating-point sum whose ORDER the register determines; every observed drift is bounded and recorded as MG-5",
-        "relative_epsilon": 1e-09,
-        "why_not_exact": "Comparing the message byte-for-byte would conflate two different claims: that the refusal IDENTITY is label-independent (it is, and that is asserted exactly) and that a printed residual is bit-reproducible under a register permutation (it is not, and that is registered as MG-5 with a bounded magnitude rather than hidden by a looser comparison)."
+        "numeric_comparison": "exact",
+        "numeric_magnitudes": "compared EXACTLY \u2014 a printed magnitude that moves at all is a violation",
+        "why_exact": "This comparison WAS made at a declared relative epsilon of 1e-9, on the stated ground that a reported residual is a floating-point sum whose ORDER the instrument register determines. P7.10 closed that order dependence by construction (scripts/lib/canonical_sum.mjs sums a multiset in an order derived only from the values), so the justification no longer exists and the epsilon was removed rather than left standing behind a repaired defect. P7.9 verified the removal was safe before making it: across the whole refusal plane \u2014 1,658 comparisons, 8 economics-preserving families over 208 refused cases \u2014 there is not one comparison that passes only because of the epsilon and not one non-zero drift, so exact comparison is strictly stronger and costs nothing. The mode is declared here rather than as a constant in the comparator so that re-loosening it is a visible change to this register; an undeclared mode throws.",
+        "retired_relative_epsilon": 1e-09
       }
     }
   ],
@@ -475,7 +476,7 @@
         "cash_policy.buckets[].eligible_percentage",
         "fx.*.average_rates",
         "fx.*.period_end_rates",
-        "rcf_policy.commitment_fee_value when commitment_fee_convention is a rate",
+        "rcf_policy.commitment_fee_value when commitment_fee_convention is a rate \u2014 the dimension is READ from unit_restatement_dimensions.discriminated_quantities, never inferred from the convention's spelling (D33)",
         "statement rows whose semantic_role is effective_tax_rate",
         "debt_reconciliation keys matching percentage / _rate / ratio / tolerance_bps"
       ],
@@ -689,18 +690,18 @@
     },
     {
       "id": "MG-3",
-      "title": "Solver convergence is not scale-invariant: the fixed-point tolerance is absolute, so the same economics restated in thousands is refused",
-      "severity": "high",
+      "title": "Solver convergence stops being scale-free above the declared reference magnitude, where a declared absolute ceiling binds instead \u2014 CORRECTED: the registered reproduction was D33's 350% commitment fee, not the tolerance",
+      "severity": "medium",
       "status": "OPEN",
       "class": "scale_dependence",
       "declared_elsewhere": false,
       "found_by": "unit_scale_restatement",
       "reproducing_case": "test-fixtures/archetypes/economics/revolver_undrawn_commitment_fee_only.json",
       "reproducing_seed": null,
-      "reproduction": "Solve as filed: converges in 6 iterations with residual 6.0370997090331e-10 against convergence_tolerance 1e-8. Apply unit_scale_restatement (issuer.units millions -> thousands, every declared monetary path x1000) and the same economics throws SOLVER_NON_CONVERGENCE in forecast period 2027-12-31, because the residual scales with the magnitudes while SOLVER_ITERATION_POLICY.tolerance (scripts/lib/solver.mjs:1662) does not.",
-      "consequence": "An issuer that reports in thousands rather than millions can be refused for economics an issuer reporting in millions is served. The refusal is a function of the declared unit, not of the case.",
-      "repair_owner": "scripts/lib/solver.mjs / the solver iteration policy \u2014 FORBIDDEN to this package (scripts/lib/** except metamorphic_relations.mjs). Recorded, not repaired.",
-      "retirement_condition": "When the tolerance becomes relative, this suite fails at the reproduction assertion and this entry must be deleted."
+      "reproduction": "CORRECTED by P4.9 and P7.9. AS REGISTERED this entry claimed the transform's refusal proved a scale-dependent tolerance. It did not. D33 \u2014 a guard that tested the commitment-fee CONVENTION'S NAME against /rate/i, which no convention this repository admits matches \u2014 let unit_scale_restatement scale a 35bp fee to 35,000bp. The registered case then genuinely oscillates under a 350% commitment fee (residual pinned at ~7.07e4 through all 200 sweeps) and is CORRECTLY refused. The one generated reproduction, seed 700413, is the same shape. Held at a faithful rate the thousands restatement CONVERGES (residual 3.019e-9 against 1e-8, cash_from_operations exactly 1000x), and a faithful sweep at x1e3/1e6/1e9/1e12 across every archetype refuses NOT ONE case. WHAT SURVIVES, and what this entry now records: P4.9's criterion is scale-free only BELOW the declared reference magnitude of 10^3; above it the declared absolute ceiling of 1e-8 binds, and the worst faithfully restated period \u2014 lease_only_no_funded_debt.json period 0, restated x1000 \u2014 lands at residual 9.9035e-9 against that ceiling, a margin of 0.97%, reporting binding_term \"declared_absolute_ceiling\" and within_declared_envelope false. scripts/run_metamorphic_tests.mjs pins that margin as a measured number rather than as prose.",
+      "consequence": "No issuer is refused for its reporting unit today: a faithful restatement is accepted at every scale tested, x1e3 through x1e12. What remains is that ABOVE the declared reference magnitude the verdict is decided by a constant rather than by the magnitudes it judges, so a large-magnitude issuer is judged more leniently in relative terms than a small one, and the worst case in the corpus already sits within 1% of that constant. A modest deterioration anywhere in that neighbourhood becomes a refusal whose cause is a presentation choice. HIGH -> MEDIUM: the mechanism is real and structurally live; the registered consequence was not.",
+      "repair_owner": "PARTIALLY REPAIRED. P4.9 landed the scale-relative criterion in scripts/lib/solver.mjs (convergenceCriterion, 176-320) with the absolute ceiling DECLARED rather than silently applied. Removing the ceiling means raising the reference magnitude to policy.solver.relative_tolerance (D34) and is a joint change with three other readers plus a golden regeneration \u2014 specified, not attempted. The contaminating guard (D33) was repaired by P7.9 in scripts/lib/metamorphic_relations.mjs, which is where the false reproduction came from.",
+      "retirement_condition": "Retire when the declared absolute ceiling stops binding \u2014 that is, when every period of every faithfully restated archetype reports within_declared_envelope true, which requires the reference magnitude to rise to the declared relative tolerance (D34). Until then the check \"MG-3's mechanism is REAL and MEDIUM\" in scripts/run_metamorphic_tests.mjs pins the measured margin and fails if it either WIDENS (the mechanism was repaired without retiring this entry) or CLOSES (it became a refusal). Do NOT retire it because nothing is refused: nothing being refused is the corrected finding, not the repair."
     },
     {
       "id": "MG-4",
@@ -718,20 +719,34 @@
       "retirement_condition": "When header rows stop entering statement_values, the pinned delta becomes empty, this suite fails at the MG-4 reproduction assertion and this entry must be deleted."
     },
     {
-      "id": "MG-5",
-      "title": "The opening-debt bridge residual is order-dependent: permuting the instrument register changes the reported residual",
-      "severity": "low_today_latent",
+      "id": "MG-6",
+      "title": "unit_scale_restatement assumes every operating metric is a magnitude, over a key space the schema leaves OPEN",
+      "severity": "low",
       "status": "OPEN",
-      "class": "float_associativity",
+      "class": "unclassified_dimension_over_open_key_space",
       "declared_elsewhere": false,
-      "found_by": "row_reorder_instruments",
-      "reproducing_case": "generated cohort, restricted sub-space",
-      "reproducing_seed": 700577,
-      "reproduction": "Generate seed 700577 in the declared sub-space, complete it, and solve: it refuses with OPENING_DEBT_UNRESOLVED reporting -943.56 USD unexplained. Reverse the instruments array \u2014 every instrument keeps its own display_order, so nothing about the case changes but the traversal order \u2014 and the same refusal reports -943.5600000000002 USD. The bridge sums the register without a canonical order, so the residual is a non-associative floating-point sum.",
-      "observed_relative_drift_bound": 1e-09,
-      "consequence": "Today every observed drift is ~1e-13 relative against a bridge tolerance of 0.01, so no VERDICT flips and this is latent rather than live. It is registered because a residual sitting within ~1e-12 of the tolerance would flip on register order alone, and because the reported number is evidence a reviewer reads.",
-      "repair_owner": "scripts/lib/opening_debt_bridge.mjs / the bridge's summation order \u2014 FORBIDDEN to this package. Recorded, not repaired.",
-      "retirement_condition": "When the bridge sums in a canonical order the drift becomes exactly zero, this suite fails at the MG-5 reproduction assertion and this entry must be deleted."
+      "found_by": "P7.9's sweep for D33's siblings",
+      "reproducing_case": "assets/model-case-v2.schema.json#/properties/operating_metrics",
+      "reproducing_seed": null,
+      "reproduction": "`operating_metrics` is declared `additionalProperties: {$ref: metricSeries}` \u2014 an OPEN key space with six REQUIRED keys (revenue, adjusted_ebitda, depreciation_and_amortisation, change_in_working_capital, capex, tax). The transform scales `metric.values` for EVERY key with no dimension test of any kind. All eleven keys the corpus carries today are magnitudes, so nothing misfires; but a margin, a yield, a headcount, a store count or a per-unit price added under this open key space would be multiplied by the unit factor with no guard and no error. Add `operating_metrics.gross_margin = {values: [0.42, ...]}` to any archetype and the restatement returns 420 for a 42% margin.",
+      "consequence": "Latent. The same failure mode as D33 \u2014 a magnitude assumption applied to something that is not a magnitude \u2014 but reached by having NO test rather than a wrong one. It cannot be repaired the way D33 was: a total classification requires a closed key set, and this one is open by declaration. Either the schema closes `operating_metrics` (owned by the model-case schema, not by this layer) or each metric declares its own dimension.",
+      "repair_owner": "assets/model-case-v2.schema.json \u2014 FORBIDDEN to P7.9 (a schema change with compiler, solver and golden readers). Recorded, not repaired. The transform is left scaling every metric rather than being narrowed, because narrowing it silently would make the relation vacuous on any metric it stopped touching.",
+      "retirement_condition": "When operating_metrics declares a per-metric dimension, or the schema closes the key set and this register classifies it the way it classifies cash_policy.buckets[] \u2014 at which point the transform reads the declaration and this entry is deleted."
+    },
+    {
+      "id": "MG-7",
+      "title": "A statement row's dimension is decided by a role the model-case schema leaves as an open string, and 13 of the 32 roles the corpus uses are untyped",
+      "severity": "low",
+      "status": "OPEN",
+      "class": "unclassified_dimension_over_open_key_space",
+      "declared_elsewhere": false,
+      "found_by": "P7.9's sweep for D33's siblings",
+      "reproducing_case": "assets/model-case-v2.schema.json#/$defs/statementRow/properties/semantic_role",
+      "reproducing_seed": null,
+      "reproduction": "unit_scale_restatement holds a row fixed when its semantic_role is a ratio and scales it otherwise. P7.9 replaced the hand-written one-element set with the set the statement taxonomy declares \u2014 roles carrying numeric_types ['percentage'], which is {margin, effective_tax_rate} \u2014 closing the `margin` gap. The RESIDUAL is that statementRow.semantic_role is declared {\"type\": \"string\"}, an open key space, and assets/statement-semantic-taxonomy.v1.json types only some of its roles: of the 32 distinct roles the corpus uses, 13 carry no numeric_types and 4 (cash_flow_da, discontinued_operation, rcf_draw, rcf_repayment) are absent from the taxonomy entirely. Every one of those is scaled by omission. All 32 happen to be magnitudes today, so nothing misfires; add a row with semantic_role 'gross_margin' and values [0.42, ...] and the restatement returns 420.",
+      "consequence": "Latent, and the same class as MG-6: a magnitude assumption reached by having no declaration to consult rather than by consulting the wrong one. It cannot be closed inside this layer \u2014 a total classification needs either a closed role enum or a numeric_types entry on every role, and both live in assets the metamorphic layer only reads.",
+      "repair_owner": "assets/statement-semantic-taxonomy.v1.json (give every declared role a numeric_types) and/or assets/model-case-v2.schema.json (close semantic_role to the taxonomy's ids) \u2014 both FORBIDDEN to P7.9 and both carrying compiler and classifier readers. Recorded, not repaired.",
+      "retirement_condition": "When every role the corpus uses carries a declared numeric_types, at which point unit_scale_restatement can throw on an untyped role the way it throws on an unclassified commitment-fee convention, and this entry is deleted."
     }
   ],
   "unit_scale_classes": {
@@ -822,5 +837,144 @@
     "currency": "scales by exactly the declared scale_factor under unit_scale_restatement",
     "invariant": "unchanged under unit_scale_restatement \u2014 a ratio or a rate, never a magnitude",
     "structured_not_scale_checked": "a nested structure rather than a scalar; named here so its exclusion is declared, not silent"
+  },
+  "unit_restatement_dimensions": {
+    "why": "D33. `unit_scale_restatement` decided whether rcf_policy.commitment_fee_value was a magnitude or a rate by testing the SPELLING of commitment_fee_convention against /rate/i. No convention this repository admits contains the letters r-a-t-e, so the guard never fired and a 35bp fee was restated as 35,000bp \u2014 a 350% fee \u2014 whose non-convergence was then reported as a scale-invariance defect of the solver. A transform must take a quantity's dimension from a DECLARATION, never from a name. This register is that declaration, and it is checked TOTAL against the governing schema at import, so a newly admitted convention or key cannot fall into a class by default: it fails loudly until it is classified here.",
+    "dimension_semantics": {
+      "monetary": "a magnitude denominated in the issuer's reporting unit. SCALE-COVARIANT: a unit restatement multiplies it by the declared scale_factor.",
+      "rate": "a rate, ratio, price-per-unit or multiple, denominated in its own dimensionless unit (basis points, a percentage, a fraction). SCALE-INVARIANT: a unit restatement must leave it exactly alone, because the unit it is expressed in is not the unit being restated.",
+      "declared_zero_placeholder": "the schema requires the field but the governing convention forces it to an explicit zero and no reader consumes it as a magnitude. It has no dimension, so it is held fixed rather than scaled; scaling it would be a no-op today and a silent misclassification the day it stopped being zero.",
+      "non_numeric": "free text or a structural value that carries no magnitude at all, so no scaling relation applies to it."
+    },
+    "discriminated_quantities": [
+      {
+        "path": "rcf_policy.commitment_fee_value",
+        "discriminator": "rcf_policy.commitment_fee_convention",
+        "enum_authority": {
+          "file": "assets/model-case-v2.schema.json",
+          "pointer": "/properties/rcf_policy/properties/commitment_fee_convention/enum",
+          "note": "The governing schema for every case this transform sees. Every value it admits MUST be classified below."
+        },
+        "additional_enum_authorities": [
+          {
+            "file": "assets/model-case.schema.json",
+            "pointer": "/properties/rcf_policy/properties/commitment_fee_convention/enum",
+            "note": "The legacy model-case schema. It admits percent_of_margin, which model-case-v2 does not; classified here so a case arriving through the legacy path cannot be misclassified by omission."
+          },
+          {
+            "file": "assets/case-source.schema.json",
+            "pointer": "/properties/policies/properties/rcf/properties/commitment_fee_convention/enum",
+            "note": "The case-source schema the compiler reads. It admits bps_on_committed, which neither model-case schema does; classified here for the same reason."
+          }
+        ],
+        "by_value": {
+          "none": {
+            "dimension": "declared_zero_placeholder",
+            "reason": "No fee is charged. coverage.mjs requires an explicit zero for this convention (scripts/lib/coverage.mjs:1605), and solver.mjs forces the applied rate to 0 (scripts/lib/solver.mjs:2737). The field carries no magnitude."
+          },
+          "bps_on_undrawn": {
+            "dimension": "rate",
+            "reason": "Basis points applied to the average undrawn commitment: solver.mjs divides the value by 10000 and multiplies it by a currency balance (scripts/lib/solver.mjs:2737-2741). Basis points are dimensionless, so a restatement of the reporting unit must not move it. This is the value D33 scaled."
+          },
+          "captured_in_residual": {
+            "dimension": "declared_zero_placeholder",
+            "reason": "The fee is already inside the reported unallocated-interest residual, so the field is stamped to an explicit 0 at ingress (scripts/lib/attachment_ingress.mjs:2192) and is admitted only for an explicitly unpriced facility (scripts/lib/coverage.mjs:1623). No reader consumes it as a magnitude."
+          },
+          "percent_of_margin": {
+            "dimension": "rate",
+            "reason": "A percentage of the drawn margin: a fraction of a rate, therefore itself dimensionless. Admitted by the legacy model-case schema only; no case in the tree carries it, and it is classified here so that the day one does, it is not scaled."
+          },
+          "bps_on_committed": {
+            "dimension": "rate",
+            "reason": "Basis points applied to the committed capacity rather than the undrawn portion. Same dimension as bps_on_undrawn; only the balance it is applied to differs. Admitted by the case-source schema only."
+          }
+        }
+      }
+    ],
+    "keyed_quantities": [
+      {
+            "container": "cash_policy.buckets[]",
+            "schema_authority": {
+                  "file": "assets/model-case-v2.schema.json",
+                  "pointer": "/$defs/cashBucket/properties",
+                  "closed": true,
+                  "note": "$defs/cashBucket declares additionalProperties:false, so this key set is exhaustive."
+            },
+            "found_by": "P7.9's sweep for D33's siblings. The retired guard was `key !== \"eligible_percentage\"`, a denylist of ONE key that is not a property of cashBucket at all \u2014 the real keys are net_debt_eligible_percentage, interest_eligible_percentage and cash_yield. The guard was therefore always true, and the transform multiplied two rates the schema bounds to [0,1] and a yield series by the unit factor, producing a case that violates its own schema. No case in the corpus carries buckets today, so it never fired in anger; it is dead code guarding a live branch, which is the same shape as D33.",
+            "by_key": {
+                  "bucket_id": {
+                        "dimension": "non_numeric",
+                        "reason": "An identifier matching ^[a-z0-9][a-z0-9_-]*$. It carries no magnitude."
+                  },
+                  "label": {
+                        "dimension": "non_numeric",
+                        "reason": "The bucket's presentation caption. It carries no magnitude."
+                  },
+                  "historical_year_end": {
+                        "dimension": "monetary",
+                        "reason": "A three-series of cash balances at each historical year end, in the reporting unit. A magnitude, so it restates with the unit."
+                  },
+                  "forecast_treatment": {
+                        "dimension": "non_numeric",
+                        "reason": "The declared enum balancing / hardcode / flat / linked_debt_addback. It carries no magnitude."
+                  },
+                  "included_in_cash_flow_cash": {
+                        "dimension": "non_numeric",
+                        "reason": "A boolean saying whether the bucket forms part of the cash-flow statement's cash. It carries no magnitude."
+                  },
+                  "linked_instrument_ids": {
+                        "dimension": "non_numeric",
+                        "reason": "An array of instrument identifiers. It carries no magnitude."
+                  },
+                  "forecast_values": {
+                        "dimension": "monetary",
+                        "reason": "A three-series of forecast cash balances, or null. A magnitude, so it restates with the unit."
+                  },
+                  "available_for_liquidity": {
+                        "dimension": "non_numeric",
+                        "reason": "A boolean saying whether the bucket is usable liquidity. It carries no magnitude."
+                  },
+                  "net_debt_eligible_percentage": {
+                        "dimension": "rate",
+                        "reason": "The fraction of the bucket that counts against net debt, bounded by the schema to [0, 1]. Dimensionless: scaling it by the unit factor produces a case that violates its own schema maximum. This is one of the three the retired guard scaled."
+                  },
+                  "interest_eligible_percentage": {
+                        "dimension": "rate",
+                        "reason": "The fraction of the bucket that earns interest, bounded by the schema to [0, 1]. Dimensionless, for the same reason, and also scaled by the retired guard."
+                  },
+                  "cash_yield": {
+                        "dimension": "rate",
+                        "reason": "A three-series of yields applied to the bucket balance. A rate series, not a magnitude, and also scaled by the retired guard."
+                  },
+                  "source_line_ids": {
+                        "dimension": "non_numeric",
+                        "reason": "An array of source-line identifiers. It carries no magnitude."
+                  }
+            }
+      },
+      {
+        "container": "debt_reconciliation",
+        "schema_authority": {
+          "file": "assets/model-case-v2.schema.json",
+          "pointer": "/properties/debt_reconciliation/properties",
+          "closed": true,
+          "note": "The schema declares additionalProperties:false, so this key set is exhaustive and the classification below can be TOTAL over it."
+        },
+        "by_key": {
+          "reported_opening_gross_debt": {
+            "dimension": "monetary",
+            "reason": "Reported gross debt in the reporting currency, as a scalar or as a three-series. A magnitude, so it restates with the unit."
+          },
+          "maximum_residual_percentage": {
+            "dimension": "rate",
+            "reason": "A tolerance expressed as a fraction of the reported balance (schema bounds it to [0, 0.05]). Dimensionless, so a unit restatement must not move it."
+          },
+          "note": {
+            "dimension": "non_numeric",
+            "reason": "Free text recording how the reconciliation was struck. It carries no magnitude."
+          }
+        }
+      }
+    ]
   }
 }

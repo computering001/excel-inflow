@@ -632,3 +632,212 @@ different canonical order because it reproduces 9335.506 would be fitting the ca
 to the golden. The drift set is LOCKED by
 `scripts/run_never_zero_and_order_invariance_tests.mjs` and fails if it changes in either
 direction. The decision belongs to the fixture's owner.
+
+# Wave 7 — P7.9. D33 repaired at source, MG-5's retirement landed, and the class swept.
+
+## D32 / MG-5 — RETIREMENT LANDED (P7.9), and the epsilon it justified is GONE
+P7.10 closed D32 by construction but could edit neither `assets/metamorphic-relations-v1.json`
+nor `scripts/run_metamorphic_tests.mjs`, so it verified a retirement patch and handed it over.
+P7.9 owns both files and has applied it: the MG-5 entry is deleted from `known_defects`, the
+suite's `known_defects_reproduced` no longer names it, and the reproduction assertion is
+INVERTED rather than removed — "MG-5 RETIRED: a register permutation moves no reported magnitude
+at all", so a regression is caught by a standing assertion instead of by an absence.
+
+**The part that mattered, and it was checked rather than applied.** The refusal plane compared
+embedded magnitudes at a RELATIVE EPSILON of 1e-9, and its own `why_not_exact` field named MG-5
+as the sole justification. Leaving it would have left a permanently loosened comparison behind
+a repaired defect — the "never weaken a validator" failure arriving by the back door. Two things
+were established before removing it:
+
+1. **It has no other reader.** `comparison.relative_epsilon` is read at exactly one place,
+   `compareRefusalVerdicts` (`metamorphic_relations.mjs:483`). Nothing else in the repository
+   references the field or `observation_planes`.
+2. **Nothing depends on it behaviourally.** Measured across the WHOLE refusal plane with
+   P7.10's repair present — 8 economics-preserving families over 208 refused cases, **1,658
+   comparisons** — there is **not one** comparison that passes only because of the epsilon, and
+   **not one** non-zero drift. Exact comparison is strictly stronger and costs nothing.
+
+The comparison is now `"numeric_comparison": "exact"`. The epsilon is not merely deleted: it is
+recorded as `retired_relative_epsilon` so the history is legible, and the MODE is declared on
+the plane rather than living as a constant in the comparator, so re-loosening it is a visible
+change to the register and an undeclared mode THROWS rather than defaulting. That is the same
+declared-semantics discipline this package landed for D33, applied to the tolerance.
+
+ONE dependant that P7.10's patch list did not name was found and inverted:
+`run_metamorphic_tests.mjs`'s mutation check asserted `compareRefusalVerdicts(base,
+base.replace("-943.56", "-943.5600000000002")).equal === true` — a test asserting the LOOSENING.
+It now asserts `false`, plus an explicit equal-compares-equal case so the comparator is not
+trivially strict.
+
+## D36 — noted, not touched
+P7.10's `reporting_total` order dependence (`instrument_period_state.mjs:469-473`) is locked by
+`scripts/run_never_zero_and_order_invariance_tests.mjs`, which fails if the drift moves in
+either direction. P7.9 asserts nothing about `reporting_total` and its relations do not
+contradict that lock: the metamorphic refusal plane now demands EXACT equality of reported
+magnitudes under a register permutation, which is the direction D36's repair would move toward,
+never away. The refusal plane observes the opening-debt bridge residual, which P7.10 canonicalised;
+`reporting_total` reaches no refusal message the plane compares, which is why the plane is green
+at exact comparison while D36 is still open.
+
+## D37..D43 — the sweep for D33's class OUTSIDE the metamorphic layer
+D33 is the sixth time this programme has found an expectation taken from a NAME rather than from
+the thing named, so P7.9 swept the repository for the class rather than stopping at the instance.
+The rule applied: a guard counts when it decides a SEMANTIC class — monetary vs rate, additive
+vs not, source-fault vs engineering-fault, one declared role vs another — by pattern-matching a
+name, key, label, caption or convention VALUE, while a declared authority (a schema enum, a
+`semantic_role`, a `numeric_types`, a `tolerance_class`, a declared `error_class`) exists that
+could answer instead. Regexes whose subject IS a name and whose purpose IS naming — slugs, legal
+suffixes, tickers, filename globs — do not count, nor does parsing numbers out of free text, nor
+a schema `pattern` constraint.
+
+Every guard below was read at the cited line and every count below was RECOMPUTED against the
+declared authority — `assets/statement-semantic-taxonomy.v1.json`, the schemas, or the corpus.
+NONE is repaired here: all live in files P7.9 is forbidden to touch. They are recorded with
+reproductions so the next owner starts from evidence rather than from a hunch.
+
+### D37 — a fixed classifier guard is bypassed on the production path by an unfixed copy (HIGH)
+`scripts/lib/statement_classifier.mjs:190` carries the word-bounded
+`/\b(?:margins?|rates?|percent(?:age)?s?)\b/i`, fixed under a prior defect (unanchored `rate`
+matching inside "gene-RATE-d") and regression-tested by
+`scripts/run_classifier_caption_defect_tests.mjs:118-145`. But `scripts/lib/case_compiler.mjs:765`
+computes `numeric_type` with the OLD unanchored `/(?:margin|rate|percent|percentage)/i` and
+passes it in as a declared field, short-circuiting the fixed guard. The published fix is
+unreachable from production.
+
+RECOMPUTED: the unanchored regex labels **9 aliases across 5 roles declared
+`numeric_types: ["currency"]`** as percentages — all four `fx_effect_on_cash` aliases, "cash
+generated by operating activities", "cash generated from operations", two `cash_from_investing`
+aliases, "cash generated by financing activities". The wrong `numeric_type` is sealed into the
+artifact as the `source_coverage[]` entry and raises the BLOCK
+`source_coverage.classification_unresolved` (`case_compiler.mjs:800`). The declared authority is
+`roles[].numeric_types` plus the row's own `number_format`.
+
+Two aggravations. **`scripts/run_case_compiler_equivalence.mjs:841` — the independent
+equivalence oracle — replicates the identical unanchored regex**, so producer and checker share
+the defect and the repository's own cross-check can never detect the divergence. And the
+word-bounded form is not sufficient either: **all four `fx_effect_on_cash` aliases contain the
+standalone word "rate"**, so `statement_classifier.mjs:190` still misclassifies a declared
+currency role. Boundaries narrowed the defect; only reading `numeric_types` closes it.
+
+### D38 — source-fault vs engineering-fault ownership decided by regexing a finding ID (HIGH)
+`scripts/lib/evidence_resolution_v2.mjs:581`:
+`const sourceFault = /(?:source|hash|entity|period|opening_debt|reconciliation)/i.test(finding.id ?? "")`
+→ `owner: sourceFault ? "FATAL_SOURCE" : "INTERNAL_WORK"`, consumed at
+`scripts/run_excel_inflow_vnext.mjs:351,935-937` to choose between a terminal `BLOCKED` with
+`user_blocking: true` and `NEEDS_INTERNAL_WORK`.
+
+Wrong in BOTH directions. `evidence.seal.manifest_digest_mismatch`,
+`evidence.seal.manifest_missing`, `evidence.seal.manifest_unreferenced`,
+`statement_map.face_additivity`, `statement_map.unmapped_filed_line` and
+`instruments.balance_basis_defaulted` are unambiguous source faults and none matches, so a
+tampered or mismatched source seal is filed as an engineering bug and the user is never told
+their evidence is bad. Conversely `source_coverage.classification_resolution_ledger` is an
+internal ledger-integrity fault blamed on the user purely because its id begins `source_`. The
+declared authority is `assets/evidence-resolution-v2.schema.json`'s four-value `owner` enum with
+`scripts/lib/error_classification.mjs`'s `ERROR_CLASSES`, each carrying a `reason_code`
+(`SOURCE.*` / `INTERNAL.*` / `USER.*`) and a `terminal_state`.
+
+### D39 — a declared D&A role forecast as a one-off because its LABEL says "impairment" (HIGH)
+`scripts/lib/forecast_behavior.mjs:281-285` classifies a row `lumpy_discretionary_flow` when a
+descriptor built from its LABEL contains "impairment", guarded only by `DRIVER_ROLES.has(role)`
+at `:95`. `DRIVER_ROLES` holds `depreciation_and_amortisation`, `depreciation` and
+`amortisation` but NOT the declared role `depreciation_amortisation_and_impairment`, which the
+taxonomy declares first-class for `["income_statement","cash_flow"]`. Identical row, identical
+label, only the declared role differing: the combined role goes `lumpy_discretionary_flow`
+(0.90), the plain one `driver_linked_flow` (0.96). `ALLOWED_METHODS_BY_BEHAVIOR` then forbids
+`driver_formula`, `historical_trend`, `carry_forward` and `roll_forward` for the first, so a
+recurring D&A add-back loses its driver forecast. The comment at `:231-233` names this exact
+outcome as the thing the code exists to prevent.
+
+### D40 — 4 of 4 declared aliases of the combined D&A role dropped from the EBITDA bridge (HIGH)
+`scripts/lib/case_compiler.mjs:1306-1308` selects the cash-flow D&A row with
+`/depreciat|amortis|amortiz/i.test(row.label) && !/impair/i.test(row.label) && !/grant/i`.
+RECOMPUTED: **every one of the four declared aliases of
+`depreciation_amortisation_and_impairment` is dropped** by the `impair` exclusion. The declared
+escape hatch does not cover it either — `:1315` looks for row ids `cash_flow_da` /
+`cash_flow_depreciation_amortisation`, while `case_source_proposer.mjs:325` emits the combined
+line as `cash_flow_da_and_impairment`, a row id `case_compiler.mjs` never references. Result:
+`cfDa === null`, no EBITDA bridge, for any issuer printing the combined line the taxonomy
+explicitly supports.
+
+### D41 — the CFO starting basis (PBT vs PAT) chosen by a label regex over a declared role (HIGH)
+`scripts/lib/case_compiler.mjs:920`: `/before tax/i.test(row.label)` decides whether the
+indirect-method reconciliation starts from profit before tax or after tax — which determines
+whether a tax add-back is required. The taxonomy declares `cash_flow_profit_before_tax` as a
+distinct `high_impact` role for exactly this, read at `row_plan.mjs:1102`,
+`case_compiler.mjs:2297/2411` and `case_source_proposer.mjs:92/491` — everywhere except here.
+RECOMPUTED: **4 of the 7 declared `pre_tax_income` aliases lack the substring "before tax"** —
+"income before income taxes", "income before provision for income taxes", "income before income
+tax expense and income from equity method investments", "pre tax profit" — so a standard US
+filer silently links CFO to `net_income` and starts the reconciliation from PAT.
+
+### D42 — attribution roles matched in one spelling; two declared roles conflated (MEDIUM)
+`scripts/lib/case_compiler.mjs:1208` and `:1213`:
+`/equity holders|owners of the parent|non-controlling/i`. The classifier's own `normalise()`
+strips hyphens precisely so both spellings resolve; this regex reinstates the distinction. 3 of
+5 declared `non_controlling_interests` aliases and 1 of 5 `owners_of_parent` aliases miss.
+Separately `:1213`'s bare `/non-controlling/i` matches a hyphenated REDEEMABLE caption,
+conflating `redeemable_non_controlling_interests` with `non_controlling_interests` — two roles
+the taxonomy deliberately separates. Adjacent, same file, `:3227`: the net-finance add-back is
+matched by `/finance costs \(net\)|net finance costs/i`, which misses 5 of the 7 declared
+aliases of `net_finance_addback` and whose first alternative is not a declared alias at all —
+and it then ASSIGNS `semantic_role = "net_finance_addback"`, writing the declared role it failed
+to read.
+
+### D43 — three incompatible dimension vocabularies compared as one string (MEDIUM, latent)
+`scripts/verify/source_topology_oracle.py:47,54,57` and its duplicate at
+`scripts/extract_filing_statements.py:1268,1273` take the first of `unit_class`, `numeric_type`,
+`number_format` and test it against `{"percentage","percent","rate","ratio","count"}` to decide
+whether a row family is non-additive. The three fields carry three different vocabularies:
+`unit_class` (broker metric dictionary) declares `per_share` and `multiple`, both non-additive
+and both ABSENT from the guard; `numeric_type` declares only `currency/percentage/text`; and
+`number_format` is an Excel format string whose in-tree values are `"0.00%"`,
+`"0.0x;(0.0x);…"`, `"#,##0;(#,##0);…"`, `"General"` — **none of which ever equals "percentage"**,
+so a row whose only declared dimension is a percent or multiple format is treated as additive
+currency. Conversely `len(unit_classes) > 1` rejects a family mixing `unit_class: "currency"`
+with a `number_format` as dimensionally incompatible.
+
+### Wave 7, LATENT — correct today, fragile by construction, recorded not repaired
+- `scripts/lib/ownership_census.mjs:155` — `cell_class: row_id.includes("_to_") ? "ratio" :
+  "schedule_amount"`, re-deriving a declared 6-value enum from a row-id substring. The eight ids
+  are hardcoded three lines above so it is right today; renaming one to `leverage_ratio`
+  silently reclassifies a ratio as a monetary amount.
+- `scripts/lib/evidence_resolution_v2.mjs:348` — `period_basis: field.includes("date") ?
+  "contractual" : "instant"` over a declared 7-value enum. Against `assets/dcs-export.schema.json`
+  this assigns `instant` to `maturity_source_value`, `maturity_timing_convention` and
+  `amortisation_schedule`, and to pure string metadata for which the enum declares
+  `non_periodic`; only `maturity_date` and `next_call_date` land correctly. The adjacent
+  `units: String(dcs.units ?? …)` takes a document-level default while the export schema declares
+  a per-column `{field, currency, units}` binding that is never consulted.
+- `scripts/lib/support_coverage_grid.mjs:490` — the direct-method detector NEVER fires: the grid
+  scans only `test-fixtures/cases` (2 files, neither direct-method) while the direct-method
+  fixture lives under `test-fixtures/archetypes/presentation/`, and the pattern omits four roles
+  that ARE in the declared `RECURRING_DIRECT_CASH_ROLES` set. `cash_flow_method: direct` is a
+  permanent coverage gap. Its sibling at `:482` requires `semantic_role ===
+  "cash_flow_net_income"`, so a case starting from the declared `cash_flow_profit_before_tax` is
+  not recognised as indirect either.
+- `scripts/lib/case_source_proposer.mjs:370` — the same margin/rate/percent regex, end-anchored,
+  so clean against every declared alias today.
+- `scripts/lib/forecast_behavior.mjs:213` — `schedule_owned` decided from a substring of the
+  SECTION name.
+- `scripts/run_filings_pipeline.mjs:445` — blocker ownership from an error MESSAGE string two
+  lines after the same block correctly reads the structured `error.code`; HTTP 402/405/409/429
+  and any wrapped message fall through to `INTERNAL_WORK`.
+- `scripts/broker_terminal_recovery.py:394` — `measurement_basis` from
+  `metric_id.startswith("adjusted_")`. Right today (one such id), but a broker's "Adjusted EPS"
+  mapped to `eps` is stamped `reported`. The sibling at
+  `scripts/verify/broker_consensus_membership_oracle.py:60` shows the correct shape: prefer
+  `declared.adjustment_basis`, fall back only after.
+- `scripts/lib/mutation_adequacy.mjs:75` — count-vs-rate by field-name SUFFIX. The schema
+  explicitly declares the pattern approach and carries an observed-name inventory, so this is
+  declared rather than assumed; `_executed$` is the one trap.
+
+### Wave 7, EXAMINED AND CLEARED — named so the sweep's boundary is auditable
+- `scripts/lib/row_plan.mjs:1065` — a row-id prefix test, but LAST in a waterfall that consults
+  `semantic_role`, `economic_class` and `movement_type` first. Not a defect.
+- `scripts/lib/error_classification.mjs:212-222` — message-text recognisers, but a closed,
+  documented fallback BEHIND an explicit `error_class` marker, and an error matching nothing is
+  refused rather than guessed. Not a defect.
+- `scripts/extract_filing_statements.py:1493-1512` — caption regex for subtotal recognition,
+  documented as secondary to geometry and explicitly not classifying economic role, at a stage
+  where no declared alternative exists. Not a defect.
