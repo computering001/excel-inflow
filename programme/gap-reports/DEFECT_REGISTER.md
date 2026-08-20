@@ -163,3 +163,18 @@ file, and a CI run could in principle commit a census it regenerated rather than
 Owner surface: scripts/run_programme_control_tests.mjs (the census invocation) and whatever
 it calls in the census generator. Fix: verify without writing, or write only under an
 explicit --write flag as run_ownership_census_tests.mjs and the coercion inventory already do.
+
+## D21 — the frozen 32-recipe cohort does not merely fail to run in CI, it FAILS
+Found by P7.7 while un-darkening it. Its manifest existed nowhere in the tree; once derived,
+`scripts/compile_synthetic_cohort.mjs:1041` seals broker consensus contributors in the fixed
+order `[Northstar, Harbour Lane, Moorland]` while `scripts/lib/broker_consensus.mjs:85-92`
+REQUIRES them sorted. Seed-independent (two seed schemes tried). So the cohort the programme
+treats as its frozen behavioural baseline has never passed.
+
+## D22 — C1 of the frozen cohort has mixed aggregate forecast ownership
+Exposed once D21 is patched (P7.7 patched it in a throwaway probe, since both files were
+forbidden to it): C1 fails `forecast_authority` with "change_in_working_capital has mixed
+aggregate forecast ownership… parent broker_consensus coexists with live children
+wc_*:explicit_zero". Both D21 and D22 are carried by the `nightly-frozen-cohort` quarantine
+entry (owner workbook-oracle, expires 2026-09-17) so the nightly tier fails loudly rather
+than silently skipping — but the quarantine EXPIRES, so they cannot sit unfixed.

@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "ci-gate-tiers",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_gate_tier_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "hard-clock",
       "phase": "performance",
       "runtime": "node",
