@@ -841,3 +841,52 @@ with a `number_format` as dimensionally incompatible.
 - `scripts/extract_filing_statements.py:1493-1512` — caption regex for subtotal recognition,
   documented as secondary to geometry and explicitly not classifying economic role, at a stage
   where no declared alternative exists. Not a defect.
+
+# Wave 7 — coordinator, during release-package integration.
+
+## D44 — `production_model` is declared, gated, and UNREACHABLE by any case in the repository
+Found while trying to build a release package for the push. The release smoke test refuses:
+
+    Invalid v2 case:
+    - production_model requires source_coverage.classification_contract_version=evidence_v1
+    - production_model requires statement_authority_contract_version=authority_v1
+    - production_model requires forecast_authority_contract_version=waterfall_v1
+
+Reproduced OUTSIDE the smoke harness, so it is not a harness artefact:
+    node scripts/build_dynamic_model.mjs test-fixtures/cases/standard-maximal-v2.json \
+         --out <tmp>/model.xlsx --plan-only
+
+Measured facts, each from the declared source rather than inspection:
+- BOTH certified fixtures declare `execution_profile: "production_model"` and carry NONE of the
+  three contract versions it requires. They declare a profile they cannot satisfy.
+- `waterfall_v1` appears in exactly ONE file in the whole repository —
+  `assets/model-case-v2.schema.json`, the schema that DEFINES it. No case anywhere carries it.
+- 23 suites set `execution_profile = "reference_parity"` before building (e.g.
+  `run_cash_fx_identity_workbook_tests.mjs:41`). Every green workbook proof in this programme is
+  a reference_parity proof. The strict production profile is exercised by no end-to-end build.
+- `case_compiler.mjs:3813` DOES set `classification_contract_version = "evidence_v1"`, so the
+  contracts are minted by the COMPILER. The fixtures in `test-fixtures/cases/` are pre-compiler
+  artefacts; feeding one to the builder skips the stage that would make it conformant.
+
+This is the D20/D26/D34 class once more — a declaration that is schema-validated, gated and
+satisfied by nothing — but with a sharper consequence: it is a RELEASE BLOCKER. The
+`--development` package cannot be compiled with either certified fixture as its smoke case, so no
+package can be produced from an in-repo case today.
+
+Also recorded: **the release build's smoke input is undeclared.** `assets/deployment-profile.json`
+names 29 Python entry points and their smoke commands, but nothing names which case
+`compile_skill_release.mjs --smoke-case` is supposed to receive. The one input that decides
+whether a release can be built is passed ad hoc on a command line and written down nowhere.
+
+NOT YET RESOLVED. Two candidate dispositions, and the choice must be made deliberately:
+(a) the smoke case should be a COMPILED case produced by the real pipeline
+    (`run_raw_input_black_box_canary.mjs:636` builds under production_model, so the pipeline can
+    almost certainly mint a conformant case) — in which case the profile must DECLARE it; or
+(b) `production_model` genuinely has no conformant case and the profile is over-claiming, exactly
+    as D12 asks of `lease_liability`.
+Do NOT resolve it by downgrading the smoke case to `reference_parity`: that would make the release
+smoke test prove a weaker thing than the mode the fixtures declare, which is how a gate stops
+meaning anything.
+
+Deferred to a quiet tree deliberately: the raw canary must not be run while agents hold the
+worktree (the ops rule is never to edit the tree mid-run), and two packages were in flight.
