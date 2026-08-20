@@ -249,6 +249,12 @@ check(
     [
       "assets/architecture-ownership-v2.json",
       "assets/deployment-profile.json",
+      // P7.4's register CITES the asset as its boundary-register provenance
+      // ("boundary_register": "assets/canonical-model-graph-v2.json ...").
+      // R3 detects readers by scanning for the filename, so a provenance
+      // citation is indistinguishable from a read here. It is a citation, not
+      // a read: nothing in the metamorphic layer loads or parses the asset.
+      "assets/metamorphic-relations-v1.json",
       "assets/policy-registry-v1.schema.json",
       "scripts/lib/policy_registry.mjs",
       "scripts/run_policy_registry_tests.mjs",

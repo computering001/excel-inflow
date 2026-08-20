@@ -196,7 +196,51 @@ const portableCertifyNow = options["portable-certify"] === true;
 const attestNow = certifyNow || developmentNow || portableCertifyNow;
 const skipSmoke = options["skip-smoke"] === true;
 const certificationEvidencePath = options["certification-evidence"] ?? null;
-const smokeCasePath = options["smoke-case"] ?? null;
+
+// P8.10 (D44): the release smoke input is DECLARED by the deployment profile,
+// on the same surface that names the Python entry points and their smoke
+// commands. It used to be passed ad hoc on a command line and written down
+// nowhere, so the one input that decides whether a release can be built was
+// whatever the operator happened to type -- and what they typed
+// (test-fixtures/cases/*-v2.json) could not enter the builder at all, because
+// those are pre-compiler artefacts that declare production_model while carrying
+// none of the three contract versions it requires.
+//
+// An explicit --smoke-case still wins, so a one-off case can be tried, but it
+// is now an override of a declared default rather than a mandatory argument.
+const explicitSmokeCasePath = options["smoke-case"] ?? null;
+const declaredSmokeCase = skillDir
+  ? JSON.parse(
+      await fs.readFile(path.join(skillDir, "assets", "deployment-profile.json"), "utf8"),
+    ).release_smoke_case ?? null
+  : null;
+const usingDeclaredSmokeCase = !explicitSmokeCasePath && Boolean(declaredSmokeCase?.path);
+const smokeCasePath = explicitSmokeCasePath
+  ?? (usingDeclaredSmokeCase ? path.join(skillDir, declaredSmokeCase.path) : null);
+
+// The declared case is hash-pinned. A stale or foreign case is refused rather
+// than silently built: the gate is only worth something if the thing it builds
+// is the thing the profile says it builds.
+if (usingDeclaredSmokeCase && !skipSmoke) {
+  const declaredBytes = await fs.readFile(smokeCasePath).catch(() => null);
+  if (!declaredBytes) {
+    throw new Error(
+      `deployment-profile.json declares release_smoke_case.path ${declaredSmokeCase.path}, but it is missing from the skill tree.`,
+    );
+  }
+  const actualSha256 = crypto.createHash("sha256").update(declaredBytes).digest("hex");
+  if (actualSha256 !== declaredSmokeCase.sha256) {
+    throw new Error(
+      [
+        `The declared release smoke case is stale or foreign: ${declaredSmokeCase.path}`,
+        `  supplied ${actualSha256}`,
+        `  declared ${declaredSmokeCase.sha256}`,
+        "Regenerate it as test-fixtures/release-smoke/README.md describes and update",
+        "assets/deployment-profile.json#/release_smoke_case/sha256, or pass --smoke-case explicitly.",
+      ].join("\n"),
+    );
+  }
+}
 
 if (certifyNow && skipSmoke) {
   throw new Error("--certify cannot be combined with --skip-smoke.");
@@ -214,21 +258,24 @@ if ([certifyNow, developmentNow, portableCertifyNow].filter(Boolean).length > 1)
 }
 if (certifyNow && (!certificationEvidencePath || !smokeCasePath)) {
   throw new Error(
-    "--certify requires both --certification-evidence <manifest.json> and --smoke-case <case.json>.",
+    "--certify requires --certification-evidence <manifest.json>, and a smoke case: either --smoke-case <case.json> or a release_smoke_case declaration in assets/deployment-profile.json.",
   );
 }
 if (portableCertifyNow && (!certificationEvidencePath || !smokeCasePath)) {
   throw new Error(
-    "--portable-certify requires both --certification-evidence <manifest.json> and --smoke-case <case.json>. The portable tier is a certification, not a development build: it is gated by the five portable evidence classes with the two native classes declared as permanent exclusions.",
+    "--portable-certify requires --certification-evidence <manifest.json>, and a smoke case: either --smoke-case <case.json> or a release_smoke_case declaration in assets/deployment-profile.json. The portable tier is a certification, not a development build: it is gated by the five portable evidence classes with the two native classes declared as permanent exclusions.",
   );
 }
 if (developmentNow && !smokeCasePath) {
-  throw new Error("--development requires --smoke-case <case.json>.");
+  throw new Error(
+    "--development requires a smoke case, and assets/deployment-profile.json declares no release_smoke_case. Pass --smoke-case <case.json> or restore the declaration.",
+  );
 }
 
 if (!skillDir || !outputDir) {
   console.error(
-    "Usage: compile_skill_release.mjs --skill <skill-folder> --out <release-folder> [--certify --certification-evidence <manifest.json> --smoke-case <case.json>] [--portable-certify --certification-evidence <manifest.json> --smoke-case <case.json>] [--development --smoke-case <case.json>] [--skip-smoke]",
+    "Usage: compile_skill_release.mjs --skill <skill-folder> --out <release-folder> [--certify --certification-evidence <manifest.json>] [--portable-certify --certification-evidence <manifest.json>] [--development] [--smoke-case <case.json>] [--skip-smoke]\n" +
+    "  The smoke case defaults to assets/deployment-profile.json#/release_smoke_case and is hash-pinned; --smoke-case overrides it.",
   );
   process.exit(2);
 }

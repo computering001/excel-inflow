@@ -633,6 +633,13 @@ const declarations = {
     fiscal_year_end:
       (filingFacts.historical_periods ?? []).at(-1)?.slice(5) ?? "12-31",
     presentation_profile: "crh_dynamic",
+    // P8.10: the synthetic annual report prints IFRS vocabulary throughout
+    // ("Finance costs", "Profit before taxation", "Depreciation and
+    // amortisation"), so the framework is DECLARED rather than left silent.
+    // P2.11 made the support envelope's accounting-framework stop fire on a
+    // SILENT framework as well as an unsupported one -- correctly -- and an
+    // undeclared canary was refused UNSUPPORTED_PROFILE before it could build.
+    accounting_framework: "ifrs",
     execution_profile: "production_model",
   },
   policies: {

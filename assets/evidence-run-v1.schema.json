@@ -476,7 +476,143 @@
         "material": { "type": "boolean" },
         "parent_label": { "type": "string" },
         "neighbouring_labels": { "type": "array", "items": { "type": "string" } },
-        "table_context": { "type": "string" }
+        "table_context": { "type": "string" },
+        "xbrl": { "$ref": "#/$defs/xbrlRowReconciliation" }
+      }
+    },
+    "xbrlUnreconciledReason": {
+      "description": "The ten typed reasons a face row carries no reconciled inline-XBRL fact (P2.2). A row without XBRL coverage is recorded with one of these, never silently omitted.",
+      "enum": [
+        "row_label_not_classified",
+        "concept_not_in_crosswalk",
+        "declared_units_not_scalable",
+        "row_value_not_reported",
+        "request_document_missing",
+        "raw_filing_unreadable",
+        "document_not_inline_xbrl",
+        "no_matching_fact_for_period",
+        "fact_dimension_qualified_only",
+        "fact_unit_currency_mismatch"
+      ]
+    },
+    "xbrlPeriodReconciliation": {
+      "description": "Per-period fact provenance for one face row, as emitted by scripts/extract_inline_xbrl.py.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "status"],
+      "properties": {
+        "period": { "type": "string", "format": "date" },
+        "status": {
+          "enum": ["reconciled", "material_mismatch", "value_mismatch", "unreconciled", "not_reported"]
+        },
+        "reason": { "$ref": "#/$defs/xbrlUnreconciledReason" },
+        "concept": { "type": "string", "minLength": 1 },
+        "context_ref": { "type": "string", "minLength": 1 },
+        "unit_ref": { "type": "string" },
+        "decimals": { "type": ["string", "null"] },
+        "xbrl_value": { "type": "number" },
+        "printed_value": { "type": "number" },
+        "expected_raw_value": { "type": "number" },
+        "tolerance": { "type": "number", "minimum": 0 },
+        "sign_alignment": { "enum": ["direct", "inverted"] }
+      }
+    },
+    "xbrlRowReconciliation": {
+      "description": "The inline-XBRL reconciliation verdict attached to a filed statement line by scripts/run_filings_pipeline.mjs. Absent periods mean the row was never matched to a document section.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["reconciled", "material_mismatch", "value_mismatch", "unreconciled"]
+        },
+        "semantic_role": { "type": "string", "minLength": 1 },
+        "reason": { "$ref": "#/$defs/xbrlUnreconciledReason" },
+        "periods": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/xbrlPeriodReconciliation" }
+        }
+      }
+    },
+    "outOfScopeRow": {
+      "description": "A face-statement row the extractor deliberately dropped from model scope, recorded typed (P2.1). Ported from assets/filings-extraction-response-v1.schema.json, which is the declaring authority.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "source_line_id", "raw_label", "reason_code", "page_or_note"],
+      "properties": {
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "reason_code": {
+          "enum": [
+            "notes_column_caption",
+            "oci_section_heading",
+            "oci_row",
+            "profit_attribution_heading",
+            "comprehensive_income_attribution",
+            "beyond_operating_statement_row",
+            "per_share_supplement_row",
+            "dividend_declaration_row",
+            "continuing_operations_note"
+          ]
+        },
+        "page_or_note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "unitLabelReconciliation": {
+      "description": "Printed unit label reconciled against the declared units, fail-closed (P2.1). Ported from assets/filings-extraction-response-v1.schema.json, which is the declaring authority.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_label", "printed_units", "declared_units", "status"],
+      "properties": {
+        "raw_label": { "type": "string", "minLength": 1 },
+        "printed_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "declared_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "status": { "enum": ["match", "mismatch", "no_declared_units", "unparsed"] }
+      }
+    },
+    "xbrlReconciliationSummary": {
+      "description": "Run-level inline-XBRL reconciliation verdict written onto filings by scripts/run_filings_pipeline.mjs. FAIL means at least one material printed-vs-fact disagreement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "crosswalk_sha256", "summary", "documents"],
+      "properties": {
+        "status": { "enum": ["PASS", "FAIL"] },
+        "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inline_xbrl_document_count",
+            "fact_count_total",
+            "reconciled_row_count",
+            "unreconciled_row_count",
+            "material_mismatch_row_count",
+            "informational_mismatch_row_count"
+          ],
+          "properties": {
+            "inline_xbrl_document_count": { "type": "integer", "minimum": 0 },
+            "fact_count_total": { "type": "integer", "minimum": 0 },
+            "reconciled_row_count": { "type": "integer", "minimum": 0 },
+            "unreconciled_row_count": { "type": "integer", "minimum": 0 },
+            "material_mismatch_row_count": { "type": "integer", "minimum": 0 },
+            "informational_mismatch_row_count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["document_id", "inline_xbrl"],
+            "properties": {
+              "document_id": { "type": "string", "minLength": 1 },
+              "inline_xbrl": { "type": "boolean" },
+              "reason": { "$ref": "#/$defs/xbrlUnreconciledReason" },
+              "fact_count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
       }
     },
     "faceStatementCell": {
@@ -619,6 +755,14 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/faceStatementRow" }
+        },
+        "out_of_scope_inventory": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/outOfScopeRow" }
+        },
+        "unit_label_reconciliation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unitLabelReconciliation" }
         }
       },
       "allOf": [
@@ -757,7 +901,8 @@
         "source_registry_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "face_statement_manifests": { "$ref": "#/$defs/faceStatementManifests" },
         "income_statement": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } },
-        "cash_flow": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } }
+        "cash_flow": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } },
+        "xbrl_reconciliation": { "$ref": "#/$defs/xbrlReconciliationSummary" }
       }
     },
     "filingPeriodAuthorityList": {

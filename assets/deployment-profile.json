@@ -509,6 +509,20 @@
     "verify/broker_consensus_membership_oracle.py": "Independent stdlib-only library/diagnostic invoked by the registered broker-consensus mutation harness. It ships as a separately smoke-tested verifier, not as an ordinary company-run command.",
     "verify/forecast_ownership_physical_oracle.py": "Invoked only by the controlled Stage-4 release orchestrator after portable emission and before recalculation or publication; independently binds the solver and expected C contract to raw workbook OOXML."
   },
+  "_release_smoke_case_note": "P8.10 (D44). The one input that decides whether a release can be built used to be passed ad hoc on a command line and written down nowhere: this profile named 29 Python entry points and their smoke commands, but never named the case compile_skill_release.mjs --smoke-case is supposed to receive. It is declared here, on the same surface and by the same rule as those smoke commands, and hash-pinned so a stale or foreign case is refused rather than silently built.",
+  "release_smoke_case": {
+    "path": "test-fixtures/release-smoke/production-model-smoke-case-v2.json",
+    "sha256": "926ca509944f5d7886680b3b1deca6d095ab3f5e81e05bf7ae7846efa9c68f3d",
+    "execution_profile": "production_model",
+    "required_contract_versions": {
+      "statement_authority_contract_version": "authority_v1",
+      "forecast_authority_contract_version": "waterfall_v1",
+      "source_coverage.classification_contract_version": "evidence_v1"
+    },
+    "provenance": "Compiled by scripts/lib/case_compiler.mjs from the evidence run that scripts/run_raw_input_black_box_canary.mjs produces from raw filing bytes. execution_profile is DECLARED at the case-source and propagated by the compiler, never stamped onto a finished case. Neither fixture in test-fixtures/cases/ can serve: both declare production_model and carry none of the three contract versions it requires, because they are pre-compiler artefacts and the contracts are minted by the compiler.",
+    "regenerate": "See test-fixtures/release-smoke/README.md. Update this sha256 whenever the case is regenerated.",
+    "not_certification_evidence": "This is a build gate, not a corpus. One issuer, IFRS, USD, two instruments, broker lane explicit_skip. It proves the copied package compiles a contract-complete production case without reaching back into the source tree; it proves nothing about coverage."
+  },
   "python_entry_point_smoke": {
     "migrate_broker_run_state.py": {
       "argv": [

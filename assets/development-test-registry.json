@@ -1751,6 +1751,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "never-zero-and-order-invariance",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_never_zero_and_order_invariance_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "declared-fixed-point-completeness",
       "phase": "graph",
       "runtime": "node",
