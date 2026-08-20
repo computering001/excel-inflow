@@ -1,0 +1,26 @@
+{
+  "schema_version": "installed-filings-capability-probe/1.0",
+  "license": "CC0-1.0",
+  "description": "Frozen synthetic two-page filing used only to prove the installed mandatory PDF extraction route. It contains three annual columns, units, ordinary values, a printed zero, a dash and a blank.",
+  "pdf_sha256": "d0ca40ae2e7a449d30ee18179521b875977624a6a93b0a0d5a9e99a4c0b4281b",
+  "pdf_base64": "JVBERi0xLjQKJXByb2JlCjEgMCBvYmoKPDwgL1R5cGUgL0NhdGFsb2cgL1BhZ2VzIDIgMCBSID4+CmVuZG9iagoyIDAgb2JqCjw8IC9UeXBlIC9QYWdlcyAvS2lkcyBbMyAwIFIgNSAwIFJdIC9Db3VudCAyID4+CmVuZG9iagozIDAgb2JqCjw8IC9UeXBlIC9QYWdlIC9QYXJlbnQgMiAwIFIgL01lZGlhQm94IFswIDAgNTk1IDg0Ml0gL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNyAwIFIgPj4gPj4gL0NvbnRlbnRzIDQgMCBSID4+CmVuZG9iago0IDAgb2JqCjw8IC9MZW5ndGggOTM1ID4+CnN0cmVhbQpCVAovRjEgMTIgVGYKNDAgODAyIFRkCihDb25zb2xpZGF0ZWQgSW5jb21lIFN0YXRlbWVudCkgVGoKMCAtMTYgVGQKL0YxIDggVGYKKEdCUCBtaWxsaW9ucykgVGoKMzQwIDAgVGQKKDIwMjMpIFRqCjY1IDAgVGQKKDIwMjQpIFRqCjY1IDAgVGQKKDIwMjUpIFRqCi00NzAgLTIwIFRkCihSZXZlbnVlKSBUagozNDAgMCBUZAooMTAwKSBUago2NSAwIFRkCigxMTApIFRqCjY1IDAgVGQKKDEyMCkgVGoKLTQ3MCAtMTggVGQKKENvc3Qgb2Ygc2FsZXMpIFRqCjM0MCAwIFRkCihcKDYwXCkpIFRqCjY1IDAgVGQKKFwoNjZcKSkgVGoKNjUgMCBUZAooXCg3MlwpKSBUagotNDcwIC0xOCBUZAooR3Jvc3MgcHJvZml0KSBUagozNDAgMCBUZAooNDApIFRqCjY1IDAgVGQKKDQ0KSBUago2NSAwIFRkCig0OCkgVGoKLTQ3MCAtMTggVGQKKE9wZXJhdGluZyBleHBlbnNlcykgVGoKMzQwIDAgVGQKKFwoMjBcKSkgVGoKNjUgMCBUZAooXCgyMlwpKSBUago2NSAwIFRkCihcKDI0XCkpIFRqCi00NzAgLTE4IFRkCihPcGVyYXRpbmcgcHJvZml0KSBUagozNDAgMCBUZAooMjApIFRqCjY1IDAgVGQKKDIyKSBUago2NSAwIFRkCigyNCkgVGoKLTQ3MCAtMTggVGQKKEZpbmFuY2UgY29zdHMpIFRqCjM0MCAwIFRkCihcKDJcKSkgVGoKNjUgMCBUZAooXCgyXCkpIFRqCjY1IDAgVGQKKFwoMlwpKSBUagotNDcwIC0xOCBUZAooUHJvZml0IGJlZm9yZSB0YXgpIFRqCjM0MCAwIFRkCigxOCkgVGoKNjUgMCBUZAooMjApIFRqCjY1IDAgVGQKKDIyKSBUagotNDcwIC0xOCBUZAooVGF4YXRpb24pIFRqCjM0MCAwIFRkCihcKDRcKSkgVGoKNjUgMCBUZAooXCg0XCkpIFRqCjY1IDAgVGQKKFwoNVwpKSBUagotNDcwIC0xOCBUZAooUHJvZml0IGZvciB0aGUgeWVhcikgVGoKMzQwIDAgVGQKKDE0KSBUago2NSAwIFRkCigxNikgVGoKNjUgMCBUZAooMTcpIFRqCi00NzAgLTE4IFRkCkVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDU5NSA4NDJdIC9SZXNvdXJjZXMgPDwgL0ZvbnQgPDwgL0YxIDcgMCBSID4+ID4+IC9Db250ZW50cyA2IDAgUiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDgwMCA+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjQwIDgwMiBUZAooQ29uc29saWRhdGVkIENhc2ggRmxvdyBTdGF0ZW1lbnQpIFRqCjAgLTE2IFRkCi9GMSA4IFRmCihHQlAgbWlsbGlvbnMpIFRqCjM0MCAwIFRkCigyMDIzKSBUago2NSAwIFRkCigyMDI0KSBUago2NSAwIFRkCigyMDI1KSBUagotNDcwIC0yMCBUZAooUHJvZml0IGZvciB0aGUgeWVhcikgVGoKMzQwIDAgVGQKKDE0KSBUago2NSAwIFRkCigxNikgVGoKNjUgMCBUZAooMTcpIFRqCi00NzAgLTE4IFRkCihEZXByZWNpYXRpb24gYW5kIGFtb3J0aXNhdGlvbikgVGoKMzQwIDAgVGQKKDUpIFRqCjY1IDAgVGQKKDYpIFRqCjY1IDAgVGQKKDcpIFRqCi00NzAgLTE4IFRkCihDaGFuZ2UgaW4gd29ya2luZyBjYXBpdGFsKSBUagozNDAgMCBUZAooMCkgVGoKNjUgMCBUZAooLSkgVGoKNjUgMCBUZAooKSBUagotNDcwIC0xOCBUZAooQ2FzaCBnZW5lcmF0ZWQgZnJvbSBvcGVyYXRpb25zKSBUagozNDAgMCBUZAooMTkpIFRqCjY1IDAgVGQKKDIyKSBUago2NSAwIFRkCigyNCkgVGoKLTQ3MCAtMTggVGQKKENhcGl0YWwgZXhwZW5kaXR1cmUpIFRqCjM0MCAwIFRkCihcKDhcKSkgVGoKNjUgMCBUZAooXCg5XCkpIFRqCjY1IDAgVGQKKFwoMTBcKSkgVGoKLTQ3MCAtMTggVGQKKERpdmlkZW5kcyBwYWlkKSBUagozNDAgMCBUZAooXCgzXCkpIFRqCjY1IDAgVGQKKFwoNFwpKSBUago2NSAwIFRkCihcKDRcKSkgVGoKLTQ3MCAtMTggVGQKKE5ldCBjaGFuZ2UgaW4gY2FzaCkgVGoKMzQwIDAgVGQKKDgpIFRqCjY1IDAgVGQKKDkpIFRqCjY1IDAgVGQKKDEwKSBUagotNDcwIC0xOCBUZApFVAplbmRzdHJlYW0KZW5kb2JqCjcgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iagp4cmVmCjAgOAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMTYgMDAwMDAgbiAKMDAwMDAwMDA2NSAwMDAwMCBuIAowMDAwMDAwMTI4IDAwMDAwIG4gCjAwMDAwMDAyNTQgMDAwMDAgbiAKMDAwMDAwMTIzOSAwMDAwMCBuIAowMDAwMDAxMzY1IDAwMDAwIG4gCjAwMDAwMDIyMTUgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA4IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoyMjg1CiUlRU9GCg==",
+  "expected": {
+    "page_count": 2,
+    "periods": ["2023-12-31", "2024-12-31", "2025-12-31"],
+    "units": "millions",
+    "income_statement": {
+      "minimum_row_count": 9,
+      "required_rows": {
+        "Revenue": { "values": [100, 110, 120], "value_states": ["reported_number", "reported_number", "reported_number"] },
+        "Profit for the year": { "values": [14, 16, 17], "value_states": ["reported_number", "reported_number", "reported_number"] }
+      }
+    },
+    "cash_flow": {
+      "minimum_row_count": 7,
+      "required_rows": {
+        "Change in working capital": { "values": [0, null, null], "value_states": ["reported_zero", "reported_dash", "reported_blank"] },
+        "Net change in cash": { "values": [8, 9, 10], "value_states": ["reported_number", "reported_number", "reported_number"] }
+      }
+    }
+  }
+}

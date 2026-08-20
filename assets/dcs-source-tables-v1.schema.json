@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-source-tables-v1.schema.json",
+  "title": "Lossless DCS source-table census",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "extractor_version", "source", "sheets", "counts"],
+  "properties": {
+    "schema_version": {"const": "dcs-source-tables/1.0"},
+    "extractor_version": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["filename", "media_type", "sha256", "byte_size"],
+      "properties": {
+        "filename": {"type": "string", "minLength": 1},
+        "media_type": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "byte_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sheets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sheet"}},
+    "counts": {"$ref": "#/$defs/counts"}
+  },
+  "$defs": {
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sheets", "rows", "nonblank_cells"],
+      "properties": {
+        "sheets": {"type": "integer", "minimum": 1},
+        "rows": {"type": "integer", "minimum": 1},
+        "nonblank_cells": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sheet": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sheet_id", "name", "index", "max_row", "max_column", "rows", "sheet_sha256"],
+      "properties": {
+        "sheet_id": {"type": "string", "pattern": "^s[0-9]{3}$"},
+        "name": {"type": "string"},
+        "index": {"type": "integer", "minimum": 1},
+        "max_row": {"type": "integer", "minimum": 0},
+        "max_column": {"type": "integer", "minimum": 0},
+        "rows": {"type": "array", "items": {"$ref": "#/$defs/row"}},
+        "sheet_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "row": {
+      "type": "object", "additionalProperties": false,
+      "required": ["row_id", "row", "cells", "row_sha256"],
+      "properties": {
+        "row_id": {"type": "string", "minLength": 1},
+        "row": {"type": "integer", "minimum": 1},
+        "cells": {"type": "array", "items": {"$ref": "#/$defs/cell"}},
+        "row_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "cell": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cell_id", "address", "row", "column", "raw_value", "display_value", "value_type", "formula", "cell_sha256"],
+      "properties": {
+        "cell_id": {"type": "string", "minLength": 1},
+        "address": {"type": "string", "pattern": "^[A-Z]+[1-9][0-9]*$"},
+        "row": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1},
+        "raw_value": {}, "display_value": {},
+        "value_type": {"enum": ["text", "number", "date", "boolean", "null", "formula", "error"]},
+        "formula": {"type": ["string", "null"]},
+        "style_index": {"type": ["integer", "null"], "minimum": 0},
+        "number_format": {"type": ["string", "null"]},
+        "date_system": {"enum": ["1900", "1904", null]},
+        "cell_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

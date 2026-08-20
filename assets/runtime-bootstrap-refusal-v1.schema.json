@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/runtime-bootstrap-refusal-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "verdict",
+    "terminal_state",
+    "owner",
+    "reason_code",
+    "earliest_responsible_layer",
+    "downstream_invalidation_scope",
+    "resumable_checkpoint_path",
+    "preserved_source_hashes",
+    "subordinate_execution_attempted",
+    "package_root",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-runtime-bootstrap-refusal/1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "verdict": { "const": "REFUSED" },
+    "terminal_state": { "const": "INTERNAL_FAILURE" },
+    "owner": { "const": "BLOCK" },
+    "reason_code": { "const": "INTERNAL.host_precondition_unsatisfied" },
+    "earliest_responsible_layer": { "const": "runtime_governance" },
+    "downstream_invalidation_scope": { "const": "all_runtime_lanes" },
+    "resumable_checkpoint_path": { "type": ["string", "null"] },
+    "preserved_source_hashes": { "type": "object" },
+    "subordinate_execution_attempted": { "const": false },
+    "package_root": { "type": "string", "minLength": 1 },
+    "findings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "issue"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "issue": { "type": "string", "minLength": 1 },
+          "expected_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "observed_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

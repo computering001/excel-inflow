@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "required-role-closure/1.0",
+  "description": "The required-role closure artifact. Compiled and sealed BEFORE forecast compilation begins: it enumerates every semantic role the declared taxonomy carries, promotes the roles assets/production-contract-v2.json requires, records for each whether it is present / aliased / compiler-supplied / waived / absent with row-level provenance, and carries the typed refusals. Uniqueness is enforced over the full required set (every required and one_of role), honouring role_aliases and the canonical alias table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "taxonomy_version",
+    "contract_version",
+    "status",
+    "declared_role_count",
+    "required_role_count",
+    "uniqueness_role_count",
+    "uniqueness_roles",
+    "roles",
+    "groups",
+    "duplicates",
+    "refusals",
+    "vocabulary_notes",
+    "violations"
+  ],
+  "properties": {
+    "schema_version": { "const": "required-role-closure/1.0" },
+    "case_id": { "type": ["string", "null"] },
+    "taxonomy_version": { "type": "string", "minLength": 1 },
+    "contract_version": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["PASS", "REFUSED"] },
+    "declared_role_count": { "type": "integer", "minimum": 1 },
+    "required_role_count": { "type": "integer", "minimum": 1 },
+    "uniqueness_role_count": { "type": "integer", "minimum": 1 },
+    "uniqueness_roles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/role" }
+    },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/group" }
+    },
+    "duplicates": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/duplicate" }
+    },
+    "refusals": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/refusal" }
+    },
+    "vocabulary_notes": {
+      "type": "array",
+      "description": "Declared-vocabulary observations that are NOT case refusals: a role the production contract requires but the taxonomy does not declare is a contract defect to fix, never a reason to refuse a case.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "role", "section", "severity", "message"],
+        "properties": {
+          "code": { "enum": ["REQUIRED_ROLE_NOT_IN_TAXONOMY"] },
+          "role": { "type": "string", "minLength": 1 },
+          "section": { "enum": ["income_statement", "cash_flow"] },
+          "severity": { "enum": ["WARN"] },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "closure_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "definitions": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "label", "row_type", "claim_kind", "declared_as", "source_line_ids"],
+      "properties": {
+        "row_id": { "type": ["string", "null"] },
+        "label": { "type": ["string", "null"] },
+        "row_type": { "type": ["string", "null"] },
+        "claim_kind": {
+          "enum": ["semantic_role", "role_alias", "canonical_alias", "compiled_projection"],
+          "description": "WHY this row claims the role: its own declared semantic_role, a declared role_alias, the canonical alias table in scripts/lib/semantic_roles.mjs, or the compiler's own row projection."
+        },
+        "declared_as": { "type": ["string", "null"] },
+        "source_line_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "section",
+        "requirement",
+        "group",
+        "taxonomy_declared",
+        "high_impact",
+        "presence",
+        "status",
+        "authority_row_id",
+        "claim_count",
+        "claims",
+        "waiver"
+      ],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "requirement": { "enum": ["required", "one_of", "optional"] },
+        "group": { "type": ["string", "null"] },
+        "taxonomy_declared": { "type": "boolean" },
+        "high_impact": { "type": "boolean" },
+        "presence": { "enum": ["present", "aliased", "compiler_supplied", "absent"] },
+        "status": {
+          "enum": [
+            "PASS",
+            "WAIVED",
+            "BLOCK",
+            "NOT_REQUIRED",
+            "GROUP_PENDING",
+            "GROUP_SATISFIED_ELSEWHERE"
+          ]
+        },
+        "authority_row_id": { "type": ["string", "null"] },
+        "claim_count": { "type": "integer", "minimum": 0 },
+        "claims": { "type": "array", "items": { "$ref": "#/definitions/claim" } },
+        "waiver": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["policy", "value", "reason"],
+          "properties": {
+            "policy": { "type": "string", "minLength": 1 },
+            "value": {},
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "section", "alternatives", "satisfied", "satisfied_by"],
+      "properties": {
+        "group": { "type": "string", "minLength": 1 },
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "alternatives": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "satisfied": { "type": "boolean" },
+        "satisfied_by": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "presence", "authority_row_id"],
+            "properties": {
+              "role": { "type": "string" },
+              "presence": { "enum": ["present", "aliased", "compiler_supplied", "absent"] },
+              "authority_row_id": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "section", "row_ids", "claims"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "row_ids": { "type": "array", "minItems": 2, "items": { "type": ["string", "null"] } },
+        "claims": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["row_id", "claim_kind", "declared_as"],
+            "properties": {
+              "row_id": { "type": ["string", "null"] },
+              "claim_kind": {
+                "enum": ["semantic_role", "role_alias", "canonical_alias", "compiled_projection"]
+              },
+              "declared_as": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "refusal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "role", "section", "group", "row_ids", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "REQUIRED_ROLE_ABSENT",
+            "REQUIRED_ROLE_GROUP_UNSATISFIED",
+            "REQUIRED_ROLE_DUPLICATE_AUTHORITY"
+          ]
+        },
+        "role": { "type": ["string", "null"] },
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "group": { "type": ["string", "null"] },
+        "row_ids": { "type": "array", "items": { "type": ["string", "null"] } },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

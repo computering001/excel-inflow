@@ -1,0 +1,55 @@
+{
+  "schema_version": "controller-terminal-exit-inventory/1.0",
+  "frozen_at_phase": "phase-0",
+  "public_controller": "scripts/run_excel_inflow_vnext.mjs",
+  "internal_delegate": "scripts/run_user_flow.mjs",
+  "constitution": "assets/delivery-constitution-v1.json",
+  "source_exit_counts": {
+    "scripts/run_excel_inflow_vnext.mjs": 12,
+    "scripts/run_user_flow.mjs": 20
+  },
+  "source_exit_kinds": {
+    "scripts/run_excel_inflow_vnext.mjs": { "model_finish": 9, "presentation": 2, "outer_internal_failure": 1 },
+    "scripts/run_user_flow.mjs": { "model_finish": 18, "presentation": 1, "outer_internal_failure": 1 }
+  },
+  "phase_0_source_exit_counts": {
+    "scripts/run_excel_inflow_vnext.mjs": 6,
+    "scripts/run_user_flow.mjs": 18
+  },
+  "exits": [
+    { "id": "vnext.company_screen", "controller": "vnext", "signature": "const controllerHandoff = `${randomUUID()}${randomUUID()}`", "owner": "LOG", "broker_safe": true },
+    { "id": "vnext.presentation_screen", "controller": "vnext", "signature": "Unable to render ${options.screen} screen.", "owner": "LOG", "broker_safe": true },
+    { "id": "vnext.outer_internal_failure", "controller": "vnext", "signature": "INTERNAL_FAILURE ${reasonCode}: ${summaryLine}", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.raw_evidence_not_closed", "controller": "vnext", "signature": "A fatal raw-source boundary remains.", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.support_envelope_unsupported", "controller": "vnext", "signature": "The case is outside the versioned support envelope: ", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.delegate_failed_before_result", "controller": "vnext", "signature": "The model decision delegate failed before writing a sealed result", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.user_decision", "controller": "vnext", "signature": "One consolidated set of genuine model decisions remains.", "owner": "ASK", "broker_safe": true },
+    { "id": "vnext.delegate_boundary_not_reached", "controller": "vnext", "signature": "The existing model controller did not reach the build boundary.", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.demand_binding_failed", "controller": "vnext", "signature": "The filings-derived demand graph did not survive intact", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.build_delegate_failed_before_fresh_result", "controller": "vnext", "signature": "The build delegate failed before writing a fresh sealed delivery result", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.build_or_delivery_not_closed", "controller": "vnext", "signature": "Workbook build or delivery validation did not close.", "owner": "BLOCK", "broker_safe": true },
+    { "id": "vnext.delivered", "controller": "vnext", "signature": "The model was built and independently validated", "owner": "DELIVER", "broker_safe": true },
+
+    { "id": "delegate.presentation_screen", "controller": "delegate", "signature": "return normaliseUserFlowResult({ status: \"SCREEN\", stage })", "owner": "LOG", "broker_safe": true },
+    { "id": "delegate.outer_internal_failure", "controller": "delegate", "signature": "process.stderr.write(`${error.stack ?? String(error)}\\n`)", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.resume_mutation", "controller": "delegate", "signature": "run_case_mutated_during_pause", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.bad_evidence", "controller": "delegate", "signature": "bad_evidence", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.pause_inputs", "controller": "delegate", "signature": "nextStageId(\"inputs\")", "owner": "LOG", "broker_safe": true },
+    { "id": "delegate.intake_stopped", "controller": "delegate", "signature": "const result = {", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.intake_decision", "controller": "delegate", "signature": "status: \"ACTION_REQUIRED\",\n          stage: \"decisions\",\n          outcome: intakeResult.outcome", "owner": "ASK", "broker_safe": true },
+    { "id": "delegate.intake_evidence_block", "controller": "delegate", "signature": "status: \"BLOCKED\",\n        stage: \"evidence_review\"", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.pause_evidence", "controller": "delegate", "signature": "nextStageId(\"evidence_review\")", "owner": "LOG", "broker_safe": true },
+    { "id": "delegate.questions", "controller": "delegate", "signature": "question_count: intakeResult.plan.questions.length", "owner": "ASK", "broker_safe": true },
+    { "id": "delegate.answers_incomplete", "controller": "delegate", "signature": "answers_incomplete", "owner": "ASK", "broker_safe": true },
+    { "id": "delegate.case_recompile", "controller": "delegate", "signature": "case_recompile_blocked", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.more_questions", "controller": "delegate", "signature": "remaining_question_count: replayedIntake.plan.remaining_question_count", "owner": "ASK", "broker_safe": true },
+    { "id": "delegate.forecast_unresolved", "controller": "delegate", "signature": "forecast_authority_unresolved", "owner": "ASK", "broker_safe": true },
+    { "id": "delegate.pause_decisions", "controller": "delegate", "signature": "nextStageId(\"decisions\")", "owner": "LOG", "broker_safe": true },
+    { "id": "delegate.build_resume_mutation", "controller": "delegate", "signature": "pause_time_model_case", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.workbook_build", "controller": "delegate", "signature": "workbook_build_blocked", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.pause_build", "controller": "delegate", "signature": "nextStageId(\"build_checks\")", "owner": "LOG", "broker_safe": true },
+    { "id": "delegate.delivery_attestation", "controller": "delegate", "signature": "delivery_attestation_blocked", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.delivered", "controller": "delegate", "signature": "manual_gate: \"native_excel_restoration_and_visual_review\"", "owner": "DELIVER", "broker_safe": true }
+  ],
+  "broker_invariant": "No exit may assign BLOCK or ASK solely because optional broker capture, OCR, reconciliation, semantics, preview or optional-close failed."
+}

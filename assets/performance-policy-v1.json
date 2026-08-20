@@ -1,0 +1,75 @@
+{
+  "schema_version": "excel-inflow-performance-policy/1.1",
+  "trace": {
+    "initial_classification_target": 0.95,
+    "engineering_classification_target": 0.98,
+    "unknown_gap_warning_ms": 30000,
+    "unknown_gap_investigation_ms": 120000,
+    "unknown_internal_gap_certification_block_ms": 300000,
+    "known_external_wait_is_not_unowned_time": true
+  },
+  "runtime_slo": {
+    "schema_version": "excel-inflow-runtime-slo/1.0",
+    "declaration_authority": "assets/performance-policy-v1.json#runtime_slo",
+    "authority_note": "P6.8: this object is the ONE runtime service-level declaration. Nothing else in the repository may declare an end-to-end runtime objective. The two declarations it replaces are recorded in `supersedes` with the reason each was wrong; scripts/lib/runtime_slo.mjs refuses this asset if either reappears, and refuses it if the numbers below stop agreeing with the constants the runtime actually enforces.",
+    "supersedes": [
+      {
+        "declaration": "assets/performance-policy-v1.json#service_objectives_minutes.standard_p50 = 35 minutes, standard_p95 = 45 minutes",
+        "why_wrong": "UNSATISFIABLE, not merely different. 35 minutes (2100000 ms) and 45 minutes (2700000 ms) both exceed the enforced end_to_end_hard_ceiling of 1500000 ms, so a run that met this 'objective' would already have exhausted the only clock it has. It had zero code consumers until P6.6 read the trace bands beside it, and assets/deployment-profile.json still describes this file as the canonical v3.6 timing policy: it is stale v3.6 text, not a live objective."
+      },
+      {
+        "declaration": "assets/performance-policy-v1.json#service_objectives_minutes.no_broker_p95 = 25 minutes",
+        "why_wrong": "It restates the hard ceiling as an objective. A ceiling is the line at which a run is refused more budget; declaring it as the p95 of a SUBSET path asserts that 5% of the cheapest path may run to the absolute maximum, and makes a subset path slower than the whole-run p95. The no-broker path is governed by the single end_to_end objective below."
+      }
+    ],
+    "end_to_end_ms": {
+      "p50": 900000,
+      "p95": 1200000,
+      "hard_ceiling": 1500000,
+      "p50_note": "Equal to DEFAULT_RUNTIME_BUDGETS_MS.end_to_end_target, which the instruction surfaces state as 'the ordinary end-to-end target is fifteen minutes'. An ordinary run is the median run, so the enforced target IS the p50; the budget policy has no percentile vocabulary of its own.",
+      "p95_note": "Twenty minutes. This is the only band the enforcement layer never had: it sits strictly between the target and the ceiling, so a tail run may exceed the ordinary target without being at the point of refusal.",
+      "hard_ceiling_note": "Equal to DEFAULT_RUNTIME_BUDGETS_MS.end_to_end_hard_ceiling and to the instruction surfaces' twenty-five-minute hard ceiling."
+    },
+    "bound_runtime_budget_keys": {
+      "p50": "end_to_end_target",
+      "hard_ceiling": "end_to_end_hard_ceiling"
+    },
+    "enforced_envelope": {
+      "hard_ceiling_ms": 1500000,
+      "bounded_floor_allowance_ms": 360000,
+      "maximum_grantable_compute_ms": 1860000,
+      "floor_allowance_source": "scripts/lib/run_deadline.mjs#STAGE_FLOOR_TOTAL_ALLOWANCE_MS",
+      "note": "P6.1 bounded the stage floor instead of removing it, so the ceiling is enforced as an ENVELOPE: a run may be granted at most the ceiling plus a finite, ledger-recorded floor allowance, after which every further grant collapses to 1 ms. Declaring the envelope here keeps it from becoming a fourth, hidden declaration.",
+      "in_process_preemption": false,
+      "in_process_preemption_note": "Grants are enforced by construction at every consult and by subprocess timeout at the one spawn boundary. A stage running inside the controller process is charged and typed on overrun (INTERNAL.runtime_budget_overrun) but is not preempted, so overshoot must be DISCLOSED by a receipt rather than assumed impossible."
+    },
+    "cohort": {
+      "required_cohorts": ["COLD", "WARM"],
+      "minimum_samples_per_cohort": 5,
+      "percentiles": [50, 95],
+      "percentile_method": "nearest_rank_inclusive",
+      "conservative_upper_bound_below_samples": 20,
+      "measurement_source": "persisted_run_deadline_ledger",
+      "measurement_source_note": "A sample is admissible only if it carries the run's own persisted run-deadline.json reading: the run id, the ledger digest, and a compute_elapsed_ms that reconciles against the ledger's labelled segments. A hand-supplied duration is not a measurement.",
+      "warm_p95_may_not_exceed_cold_p95": true,
+      "warm_p95_note": "P6.3/P6.4 made reuse real and enacted. Reuse that makes a run slower is a defect, so the warm cohort's p95 is compared against the cold cohort's."
+    },
+    "component_objectives_ms": {
+      "broker_native_processing_p95": 300000,
+      "broker_native_plus_semantic_recovery_p95": 720000,
+      "build_recalc_validation_p95": 480000,
+      "note": "Sub-path objectives, each of which must be no greater than the end-to-end p95 and no greater than the sum of the stage budgets that bound it."
+    },
+    "scopes": {
+      "end_to_end_delivery": "Every user stage from inputs through delivery, ending in a delivered workbook. The only scope that can CERTIFY the end-to-end objective.",
+      "evidence_half_through_decisions": "Stages inputs, evidence_review and decisions, ending in the lawful PAUSED boundary. A strict subset, so its percentiles bound the end-to-end objective from BELOW and can refute it but never certify it."
+    }
+  },
+  "release_policy": {
+    "single_external_wait_breach_is_not_automatic_failure": true,
+    "block_on_reproducible_excel_inflow_owned_regression": true,
+    "block_on_trace_classification_below_initial_target": true,
+    "block_on_unexplained_internal_gap_over_ms": 300000,
+    "block_if_native_clean_broker_unnecessarily_invokes_semantic_recovery": true
+  }
+}

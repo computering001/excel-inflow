@@ -1,0 +1,43 @@
+{
+  "schema_version": "economic-ontology/2.0",
+  "language_policy": "open_language_controlled_economic_ontology",
+  "canonical_source_assets": [
+    "assets/broker-metric-dictionary.json",
+    "assets/statement-semantic-taxonomy.v1.json"
+  ],
+  "standard_broker_demand": [
+    "revenue",
+    "ebit",
+    "adjusted_ebitda",
+    "depreciation_and_amortisation",
+    "effective_tax_rate",
+    "capex",
+    "change_in_working_capital",
+    "dividends",
+    "share_buybacks"
+  ],
+  "profit_concepts": {
+    "statutory_operating_profit": { "basis": "reported", "level": "operating_profit" },
+    "reported_ebit": { "basis": "reported", "level": "ebit" },
+    "adjusted_ebit": { "basis": "company_adjusted", "level": "ebit" },
+    "reported_ebitda": { "basis": "reported", "level": "ebitda" },
+    "adjusted_ebitda": { "basis": "company_adjusted", "level": "ebitda" }
+  },
+  "profit_bridge_components": {
+    "depreciation": { "pure_ebitda_addback": true },
+    "amortisation": { "pure_ebitda_addback": true },
+    "impairment_loss": { "pure_ebitda_addback": false, "adjusted_measure_only": true },
+    "depreciation_amortisation_and_impairment": { "pure_ebitda_addback": false, "requires_decomposition": true }
+  },
+  "structured_event_roles": [
+    "acquisitions_net_of_cash",
+    "disposal",
+    "litigation",
+    "legal_settlement",
+    "restructuring",
+    "impairment_loss",
+    "exceptional_item",
+    "discontinued_operation"
+  ],
+  "extension_policy": "run_scoped_defined_non_overlapping_concepts_only"
+}

@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/filings-extraction-response-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "documents", "filing_facts"],
+  "properties": {
+    "schema_version": { "const": "filings-extraction-response/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_id", "attachment_id", "source_id", "raw_sha256", "disposition", "review_reason", "face_statement_manifests"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "attachment_id": { "type": "string", "minLength": 1 },
+          "source_id": { "type": "string", "minLength": 1 },
+          "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "disposition": { "enum": ["selected_face_statement_authority", "selected_period_authority_support", "reviewed_supplemental"] },
+          "review_reason": { "type": "string", "minLength": 1 },
+          "out_of_scope_statements": { "type": "array", "items": { "$ref": "#/$defs/outOfScopeStatement" } },
+          "face_statement_manifests": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["income_statement", "cash_flow"],
+            "properties": {
+              "income_statement": { "type": "array", "items": { "$ref": "#/$defs/faceStatementManifest" } },
+              "cash_flow": { "type": "array", "items": { "$ref": "#/$defs/faceStatementManifest" } }
+            }
+          }
+        }
+      }
+    },
+    "filing_facts": { "$ref": "#/$defs/filingFacts" }
+  },
+  "$defs": {
+    "faceStatementCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_text", "source_page", "source_coordinates", "confidence", "typed_state", "currency", "units", "period", "normalized_value"],
+      "properties": {
+        "raw_text": { "type": "string" },
+        "source_page": { "type": "integer", "minimum": 1 },
+        "source_coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coordinate_system", "x0", "y0", "x1", "y1", "inferred_blank_position"],
+          "properties": {
+            "coordinate_system": { "const": "pdf_points_top_left" },
+            "x0": { "type": "number" },
+            "y0": { "type": "number" },
+            "x1": { "type": "number" },
+            "y1": { "type": "number" },
+            "inferred_blank_position": { "type": "boolean" }
+          }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "typed_state": { "enum": ["reported_number", "reported_zero", "reported_dash", "reported_blank", "not_applicable", "unresolved", "period_support_required", "prior_filing_support"] },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "period": { "type": "string", "format": "date" },
+        "normalized_value": { "type": ["number", "null"] }
+      }
+    },
+    "faceStatementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_line_id", "ordinal", "raw_label", "values", "page_or_note", "material"],
+      "properties": {
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "values": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": ["number", "null"] } },
+        "value_states": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "enum": ["reported_number", "reported_zero", "reported_dash", "reported_blank", "not_applicable", "unresolved", "period_support_required", "prior_filing_support"] } },
+        "period_support_provenance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["prior_document_sha256", "prior_source_line_id", "prior_period_index"],
+            "properties": {
+              "prior_document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "prior_source_line_id": { "type": "string" },
+              "prior_period_index": { "type": "integer" }
+            }
+          }
+        },
+        "value_precisions": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 } },
+        "cells": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/faceStatementCell" } },
+        "structural_role": { "enum": ["body", "header"] },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "material": { "type": "boolean" },
+        "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "hierarchy_level": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "is_subtotal": { "type": "boolean" },
+        "xbrl_provenance": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/xbrlFactProvenance" }
+        }
+      }
+    },
+    "faceStatementManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "statement", "statement_order", "source_id", "document_sha256", "page_or_note", "periods", "complete_face_statement", "row_count", "rows_sha256", "rows"],
+      "properties": {
+        "schema_version": { "enum": ["face-statement-manifest/1.0", "face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] },
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "statement_order": { "type": "integer", "minimum": 1 },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "periods": { "$ref": "#/$defs/periods3" },
+        "complete_face_statement": { "const": true },
+        "source_pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "source_unit_labels": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "unit_label_reconciliation": { "type": "array", "items": { "$ref": "#/$defs/unitLabelReconciliation" } },
+        "out_of_scope_inventory": { "type": "array", "items": { "$ref": "#/$defs/outOfScopeRow" } },
+        "period_support_required": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "uniqueItems": true
+        },
+        "period_support_stitches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schema_version", "prior_document_sha256", "periods"],
+            "properties": {
+              "schema_version": { "const": "filings-period-support-stitch/1.0" },
+              "prior_document_sha256": { "type": "string" },
+              "document_id": { "type": "string" },
+              "section": { "type": "string" },
+              "periods": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["period", "filled_row_count", "unmatched_row_ordinals", "refusal"],
+                  "properties": {
+                    "period": { "type": "string" },
+                    "filled_row_count": { "type": "integer", "minimum": 0 },
+                    "unmatched_row_ordinals": { "type": "array", "items": { "type": "integer" } },
+                    "refusal": { "type": ["string", "null"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "row_count": { "type": "integer", "minimum": 1 },
+        "rows_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "rows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/faceStatementRow" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": {
+            "required": ["source_pages", "reporting_currency", "units", "source_unit_labels"],
+            "properties": { "rows": { "items": { "required": ["value_states", "structural_role", "hierarchy_level", "is_subtotal"] } } }
+          }
+        },
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": { "properties": { "rows": { "items": { "required": ["value_precisions"] } } } }
+        },
+        {
+          "if": { "properties": { "schema_version": { "const": "face-statement-manifest/1.3" } } },
+          "then": { "properties": { "rows": { "items": { "required": ["cells"] } } } }
+        }
+      ]
+    },
+    "filingFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_name", "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods", "forecast_periods", "reported_gross_debt", "reported_cash"],
+      "properties": {
+        "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
+        "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "type": "string", "minLength": 1 },
+        "fiscal_calendar_kind": { "enum": ["fixed_date", "52_53_week"] },
+        "historical_periods": { "$ref": "#/$defs/periods3" },
+        "forecast_periods": { "$ref": "#/$defs/periods3" },
+        "reported_gross_debt": { "type": "number", "minimum": 0 },
+        "historical_gross_debt": { "$ref": "#/$defs/series3" },
+        "reported_cash": { "type": "number", "minimum": 0 },
+        "reported_gross_interest": { "type": ["number", "null"] },
+        "reported_lease_liability": { "type": ["number", "null"], "minimum": 0 },
+        "fiscal_label": { "type": ["string", "null"] },
+        "maximum_residual_percentage": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "restricted_cash": { "type": ["object", "null"] },
+        "leverage_basis": { "enum": ["includes_leases", "excludes_leases", null] },
+        "minimum_operating_cash": { "type": ["number", "null"], "minimum": 0 },
+        "announced_acquisition": { "type": ["object", "null"] }
+      }
+    },
+    "outOfScopeRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "source_line_id", "raw_label", "reason_code", "page_or_note"],
+      "properties": {
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "reason_code": { "enum": ["notes_column_caption", "oci_section_heading", "oci_row", "profit_attribution_heading", "comprehensive_income_attribution", "beyond_operating_statement_row", "per_share_supplement_row", "dividend_declaration_row", "continuing_operations_note"] },
+        "page_or_note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outOfScopeStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement_kind", "raw_label", "reason_code", "pages"],
+      "properties": {
+        "statement_kind": { "enum": ["balance_sheet", "statement_of_changes_in_equity"] },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "reason_code": { "const": "statement_out_of_model_scope" },
+        "pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true }
+      }
+    },
+    "xbrlFactProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept", "context_ref", "unit_ref", "decimals"],
+      "properties": {
+        "concept": { "type": "string", "minLength": 1 },
+        "context_ref": { "type": "string", "minLength": 1 },
+        "unit_ref": { "type": "string" },
+        "decimals": { "type": ["string", "null"] },
+        "xbrl_value": { "type": "number" },
+        "sign_alignment": { "enum": ["direct", "inverted"] },
+        "status": { "enum": ["reconciled", "material_mismatch", "value_mismatch"] }
+      }
+    },
+    "unitLabelReconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_label", "printed_units", "declared_units", "status"],
+      "properties": {
+        "raw_label": { "type": "string", "minLength": 1 },
+        "printed_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "declared_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "status": { "enum": ["match", "mismatch", "no_declared_units", "unparsed"] }
+      }
+    },
+    "entityIdentifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lei": { "type": ["string", "null"] },
+        "isin": { "type": ["string", "null"] },
+        "cusip": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] },
+        "factset_entity_id": { "type": ["string", "null"] },
+        "company_number": { "type": ["string", "null"] }
+      }
+    },
+    "periods3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "series3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number", "minimum": 0 }
+    }
+  }
+}
