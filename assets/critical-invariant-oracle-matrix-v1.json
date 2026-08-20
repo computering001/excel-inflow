@@ -4,7 +4,7 @@
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
     "oracle_sha256": "372ddcee0f3eea4f111b658578211d2622bad6e25f063f666903c0a73de6645d",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "331e8ad4cdb09581e8764e0bbdaf8723aa052319dd35969242e9b627400b6ebd"
+    "registry_sha256": "d0c1328b53547f4c6c1792bc1c5cc6137204e4505afff506a440e9169fe48301"
   },
   "artifact_oracle": {
     "test_id": "emitted-candidate-independent-oracle",
@@ -17,7 +17,7 @@
     "reader_path": "scripts/verify/plan_reconstruction_oracle.py",
     "mutation_scope": "emitted_workbook_cell",
     "reader_origin": "P5.4 -- the physical oracle judges, it does not read; no second reader was introduced",
-    "registry_status": "PENDING_REGISTRATION",
+    "registry_status": "REGISTERED",
     "why_pending": "assets/development-test-registry.json is outside P5.5's allowed files. The suite is bound here by PATH and driven by this matrix's oracle on every run; registration is the tracked follow-on. This field must be corrected the moment the suite is registered -- validate_matrix refuses a PENDING_REGISTRATION claim once the registry names the script."
   },
   "domains": [

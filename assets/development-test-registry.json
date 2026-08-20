@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "physical-authority-mutation",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_physical_authority_mutation_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "differential-invalidation",
       "phase": "workflow",
       "runtime": "node",
