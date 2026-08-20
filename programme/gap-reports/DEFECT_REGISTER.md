@@ -890,3 +890,56 @@ meaning anything.
 
 Deferred to a quiet tree deliberately: the raw canary must not be run while agents hold the
 worktree (the ops rule is never to edit the tree mid-run), and two packages were in flight.
+
+# Wave 9 — the full portable gate. THE GATE ITSELF WAS MASKING ITS FAILURES.
+
+## D45 — run_development_gate.mjs EXITS 0 WITH FAILING SUITES (SEVERITY: HIGH)
+The first full portable gate run of the 3.7.7 tree reported `exit code 0` while its own log
+carried `FAIL coercion-ban`, `FAIL public-state-ownership` and `FAIL portability-contract`.
+94 PASS / 3 FAIL / 10 BLOCKED, exit 0.
+
+This is exit-code masking in the gate that decides whether a release is fit to ship, and this
+programme has already recorded the pattern once: EQUIVALENCE_COHORT_BASELINE.md notes that
+"earlier receipts citing 'equivalence 0 diffs' for FULL cohort runs were exit-code-masked
+(`... | tail -N` returns tail's exit)". A gate whose exit code does not reflect its own verdicts
+cannot be used in CI, and anything that trusted its exit code has proved nothing.
+
+All three failures PRE-EXIST this wave: red at `8e1a29f` and red at head, so the wave introduced
+no regression. They were invisible because nothing ever read the log.
+
+## D46 — an ACTION_REQUIRED result was emitted with NO blocker class (SEVERITY: HIGH, FIXED)
+Found by ENFORCING the public-state contract rather than scanning for it. Two sites in
+`run_user_flow.mjs` (the question path at the decisions stage, and its replay twin) emitted
+`status: "ACTION_REQUIRED"` with no `blocker_class` at all. The user was told to act while
+nothing declared who owned the ask or why.
+
+Fixed: both carry `blocker_class: "USER_DECISION"`, which is what they are — the flow is asking
+the user to settle displayed questions.
+
+## D47 — the public-state check was a TEXT-PROXIMITY SCAN, and it read the repair as the defect
+`run_public_state_ownership_tests.mjs` scanned three controllers for `ACTION_REQUIRED` within 220
+characters of `INTERNAL_WORK`. `run_user_flow.mjs:1312` trips it — with the CORRECT ternary, the
+one that routes an internal decision-graph failure to BLOCKED/INTERNAL_WORK and only a genuine
+user question to ACTION_REQUIRED. A regex cannot see a branch.
+
+This is the name-standing-for-meaning class again (D33, D37, D38, and the `eligible_percentage`
+denylist). The answer was NOT to loosen the regex or exempt the file. `run_user_flow.mjs` did not
+call `assertPublicStateOwnership` ANYWHERE — the proxy was its only protection. The property is
+now ENFORCED at `finish()`, the single boundary all 19 of its result sites exit through, and the
+suite requires enforcement-or-absence with a floor of at least one enforcing controller, so the
+enforcement cannot be deleted to make the scan pass again. Enforcing it is what found D46.
+
+## D48 — a hard-coded developer home path shipped in scripts/ (FIXED)
+`run_bounded_parallelism_tests.mjs:55` fell back to
+`/Users/archiepreston/Documents/Codex/excel-inflow-venv/bin/python`. It named ONE developer's
+venv, so the suite could only ever run on that machine. Resolved the way
+`run_filings_pipeline.mjs` already does it: `EXCEL_INFLOW_PYTHON ?? PYTHON ?? "python3"`.
+
+## Coercion inventory — two entries reviewed rather than left `unreviewed`
+`error_classification.mjs:482` (`retry_count ?? 0`) and
+`optional_broker_circuit_breaker.mjs:89` (`failure_count ?? 0`) were new to the inventory and
+landed as `unreviewed`, which the legend says to treat as suspect. Both read in context and
+classified `lawful_counter_or_length`: a retry BUDGET (an unclassified error gets no retries, and
+the guard beside it also requires `classification !== null`) and a failure COUNTER (no prior
+receipt means no prior failures, and `nonNegativeIntegerOrNull` already refuses a malformed
+count). Neither is a financial value and neither can reach a workbook cell.

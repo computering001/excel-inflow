@@ -36,6 +36,7 @@ import {
   nextStageId,
 } from "./lib/flow_runtime.mjs";
 import {
+  assertPublicStateOwnership,
   assertWorkflowTransition,
   normaliseUserFlowResult,
 } from "./lib/workflow_state.mjs";
@@ -422,6 +423,21 @@ async function chargeInvocationToRunDeadline() {
 }
 
 async function finish({ runDir, result, screen = null, machine = false }) {
+  // PUBLIC-STATE OWNERSHIP, enforced rather than scanned for. Every one of this
+  // controller's 19 result sites exits through finish(), so asserting here binds
+  // them all: ACTION_REQUIRED may only be owned by USER_DECISION, USER_EVIDENCE
+  // or FATAL_SOURCE, and INTERNAL_WORK may never be user-blocking.
+  //
+  // Until now the only protection for this file was a TEXT-PROXIMITY SCAN in
+  // run_public_state_ownership_tests.mjs, which fails whenever the two tokens
+  // appear within 220 characters of each other. It was firing on the correct
+  // ternary at the decisions stage -- the one that routes an internal
+  // decision-graph failure to BLOCKED/INTERNAL_WORK and only a genuine user
+  // question to ACTION_REQUIRED. A proximity regex cannot see a branch, so it
+  // read the repair as the defect. That is the same name-standing-for-meaning
+  // class the programme has found repeatedly; the answer is to assert the
+  // property, not to loosen the regex.
+  assertPublicStateOwnership(result);
   // Attribute this invocation's remaining compute (everything outside the
   // separately measured stage and stage-4 spans) so no interval stays
   // unattributed and no interval is counted twice.
@@ -1535,6 +1551,10 @@ async function main() {
           run_id: runId,
           status: "ACTION_REQUIRED",
           stage: "decisions",
+          // The flow is asking the user to settle displayed questions, so the
+          // question path is USER_DECISION. The class was simply absent, which
+          // told the user to act while declaring no owner for the ask.
+          blocker_class: "USER_DECISION",
           question_count: intakeResult.plan.questions.length,
           carrier: carrier.path,
           evidence_run: stage1Evidence,
@@ -1719,6 +1739,8 @@ async function main() {
           run_id: runId,
           status: "ACTION_REQUIRED",
           stage: "decisions",
+          // As above: the replay path is still asking the user to decide.
+          blocker_class: "USER_DECISION",
           question_count: replayedIntake.plan.questions.length,
           remaining_question_count: replayedIntake.plan.remaining_question_count ?? 0,
           carrier: carrier.path,

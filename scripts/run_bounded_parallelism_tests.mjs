@@ -51,8 +51,13 @@ import { RUN_DEADLINE_ENV, STAGE_FLOOR_MS, openRunDeadline } from "./lib/run_dea
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
-const PYTHON = process.env.EXCEL_INFLOW_PYTHON
-  ?? "/Users/archiepreston/Documents/Codex/excel-inflow-venv/bin/python";
+// A hard-coded absolute home path shipped in the tree: it names ONE developer's
+// venv, so this suite could only ever run on that machine, and the portability
+// contract refuses any /Users/... or /home/... string under scripts/. Resolved
+// the way run_filings_pipeline.mjs already does it -- declared env first, then
+// the generic interpreter -- so the suite is machine-independent and the
+// interpreter stays a declared input rather than a local assumption.
+const PYTHON = process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3";
 const PIPELINE = path.join(HERE, "run_attachment_evidence_pipeline.py");
 
 let checks = 0;

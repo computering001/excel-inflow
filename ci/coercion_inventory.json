@@ -3,11 +3,11 @@
   "invariant": "blank/nil/missing/parse-failure never become zero",
   "generated_by": "node scripts/run_coercion_ban_tests.mjs --write",
   "classification_legend": {
-    "lawful_counter_or_length": "counter, length, index, layout geometry, duration, id, or boolean-flag default — safe",
-    "suspect_value_coercion": "financial/value context — migration candidate",
+    "lawful_counter_or_length": "counter, length, index, layout geometry, duration, id, or boolean-flag default \u2014 safe",
+    "suspect_value_coercion": "financial/value context \u2014 migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 402,
+  "entry_count": 474,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -278,6 +278,16 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "bound_cells: emission.boundProvenanceAuthorities ?? 0,",
+      "fingerprint": "146b1887a4a5aad7a045",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -1340,6 +1350,86 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "(state) => Number(actualCensus[state] ?? 0) < Number(expectedCensus[state] ?? 0),",
+      "fingerprint": "153d9ff7074587ea7c58",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "(state) => Number(actualCensus[state] ?? 0) > Number(expectedCensus[state] ?? 0),",
+      "fingerprint": "feaa920fd0e073d371df",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "ALL_TYPED_STATES.map((state) => [state, ir.coverage.by_state[state] ?? 0]),",
+      "fingerprint": "94976e2162a7b4b03918",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "const naFell = Number(after.not_applicable_slots ?? 0) < Number(before.not_applicable_slots ?? 0);",
+      "fingerprint": "6695f09277e0353d37d9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "if (Number(expectedShape.bare_number_slots ?? 0) === 0 && Number(actualShape.bare_number_slots ?? 0) > 0) {",
+      "fingerprint": "eccb092965424ce78e4b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "Number(after.value_bearing_slots ?? 0) > Number(before.value_bearing_slots ?? 0);",
+      "fingerprint": "4119e24520cfde997da3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "Number(before.bare_number_slots ?? 0) === 0 && Number(after.bare_number_slots ?? 0) > 0;",
+      "fingerprint": "07be9473e2f1232a4da7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/behavioural_golden.mjs",
+      "content": "return states.reduce((total, state) => total + Number(census?.[state] ?? 0), 0);",
+      "fingerprint": "72cefaa37b7b70e50a0a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/broker_anchor.mjs",
       "content": ".reduce((total, part) => total - part, parts[0] ?? 0);",
       "fingerprint": "5fdfd2883c5ecca91ec1",
@@ -1390,6 +1480,36 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/canonical_model_modules.mjs",
+      "content": "(rows ?? []).reduce((total, row) => total + Number(row?.[name] ?? 0), 0);",
+      "fingerprint": "b799186a3b310bded273",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/canonical_model_modules.mjs",
+      "content": "(total, ref) => total + Number(period.statement_values?.[ref] ?? 0),",
+      "fingerprint": "d9e5241c4c9c291e947e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/canonical_model_modules.mjs",
+      "content": "if (Number(modelCase.acquisition?.enabled ?? 0) === 1) return [];",
+      "fingerprint": "21d45a8841b6d3552da8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/case_compiler.mjs",
       "content": "child.indent = Math.max(1, Number(child.indent ?? 0));",
       "fingerprint": "f5b0dba927be294d1b97",
@@ -1420,6 +1540,56 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/case_generator.mjs",
+      "content": "benchmark_rate: Array(forecastCount).fill(instrument.benchmark_rate?.[0] ?? 0),",
+      "fingerprint": "f6854fd7bc5150ba31d3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/case_generator.mjs",
+      "content": "const certified = declared.certified_target_share ?? 0;",
+      "fingerprint": "101a34b41fbe99b68871",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/case_generator.mjs",
+      "content": "const degraded = declared.degraded_target_share ?? 0;",
+      "fingerprint": "c0e2ca1cd7180d51f2fc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/case_generator.mjs",
+      "content": "const inEnvelope = declared.in_envelope_share ?? 0;",
+      "fingerprint": "68d5680a8d8137ecbf5e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/case_generator.mjs",
+      "content": "const minimumLaneShare = context.space.contract.distribution_report.minimum_lane_share ?? 0;",
+      "fingerprint": "8e8e5e52c60404544987",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/case_source_proposer.mjs",
       "content": "opening_liability: Number(filings.reported_lease_liability ?? 0),",
       "fingerprint": "bcb12ea84c34435cae11",
@@ -1438,6 +1608,16 @@
       ],
       "occurrences": 1,
       "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/ci_gate_tiers.mjs",
+      "content": "check(Number(timeout?.[1] ?? 0) <= tier.wall_clock_budget_minutes,",
+      "fingerprint": "3671aed25e0f5c13e163",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/coverage.mjs",
@@ -1508,6 +1688,37 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/economic_authority_seal.mjs",
+      "content": "acquisition_enabled: Number(modelCase?.acquisition?.enabled ?? 0) === 1,",
+      "fingerprint": "4d1f7305aae307486447",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/error_classification.mjs",
+      "content": "const budget = classification?.retry_count ?? 0;",
+      "fingerprint": "123f110b918933e1f696",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length",
+      "review_note": "A retry BUDGET, not a value. An unclassified error has no declared budget, so it gets no retries; the guard beside it also requires classification !== null, so the 0 cannot alone authorise a retry. Never reaches a workbook cell."
+    },
+    {
+      "file": "scripts/lib/evidence_work_graph.mjs",
+      "content": "bucket.executed_ms += Number(record.duration_ms ?? 0);",
+      "fingerprint": "14eb1697ff48ab81add9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/fixed_point_constitution.mjs",
@@ -2020,6 +2231,36 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/forecast_authority.mjs",
+      "content": "if (Number(winner?.[dimension] ?? 0) !== Number(rejected?.[dimension] ?? 0)) {",
+      "fingerprint": "ee92e1da2b4e7f4313cf",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/forecast_authority.mjs",
+      "content": "Number(left?.[dimension] ?? 0) - Number(right?.[dimension] ?? 0);",
+      "fingerprint": "b6ba17d47297a249e222",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/forecast_authority.mjs",
+      "content": "vectors.map((vector) => Number(vector[dimension] ?? 0)).reduce(reducer);",
+      "fingerprint": "ee3dba577fa956174b62",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/forecast_behavior.mjs",
       "content": "const secondScore = ranked[1]?.[1] ?? 0;",
       "fingerprint": "82866b032efeb4347ebb",
@@ -2060,6 +2301,16 @@
       "classification": "suspect_value_coercion"
     },
     {
+      "file": "scripts/lib/forecast_completion_constitution.mjs",
+      "content": "Math.max(0, (row?.values?.length ?? 0) - scope.count);",
+      "fingerprint": "7484ece8aa55b28f745d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/forecast_ownership_resolver.mjs",
       "content": "(rowId) => (formulaParentsByChild.get(rowId)?.size ?? 0) > 1,",
       "fingerprint": "633d8de9f89ae654edfb",
@@ -2068,6 +2319,16 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/forecast_ownership_resolver.mjs",
+      "content": "`${familyAggregate?.aggregated_member_count ?? 0} children wins on ${decidingDimension}.`,",
+      "fingerprint": "0ccad50dc3aaa528b105",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/formula_dsl.mjs",
@@ -2148,6 +2409,16 @@
       ],
       "occurrences": 1,
       "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "const pikBasis = Number(state.pik_accretion?.basis_amount ?? 0);",
+      "fingerprint": "41d4e69cc9aaf83b2c63",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/instrument_period_state.mjs",
@@ -2270,6 +2541,16 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/lane_resource_policy.mjs",
+      "content": "const edges = Number(authorityEdgeCount) || 0;",
+      "fingerprint": "72e6c00827ea613d1999",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/layered_graph_constitution.mjs",
       "content": "{ section, row_id: row.row_id, reference, matches: resolved.matches ?? 0 },",
       "fingerprint": "1fb6cd4013676c6724d9",
@@ -2340,6 +2621,16 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/metamorphic_relations.mjs",
+      "content": "next.cash_policy.minimum_cash_override = Number(next.cash_policy.minimum_cash_override ?? 0) + 25;",
+      "fingerprint": "f9c91163b0348c2ad86c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/model_ir_v3.mjs",
       "content": ": Number(rowPlan.section_headers?.debt_schedule ?? 0) - 2,",
       "fingerprint": "af2505f9b80845b50910",
@@ -2370,24 +2661,25 @@
       "classification": "lawful_counter_or_length"
     },
     {
-      "file": "scripts/lib/performance_receipt.mjs",
-      "content": "[\"validation\", [\"verify_dynamic\", \"verify_style\", \"verify_cache\", \"verify_finance\", \"verify_semantic\", \"verify_aggregate\", \"render\"].reduce((sum, key) => sum + Number(timings[key] ?? 0), 0), \"stage4_validation\"],",
-      "fingerprint": "e1f86c0e271e92b1f1b8",
+      "file": "scripts/lib/optional_broker_circuit_breaker.mjs",
+      "content": "const carriedFailures = nonNegativeIntegerOrNull(priorReceipt?.failure_count) ?? 0;",
+      "fingerprint": "1d9e83637454198a4a85",
       "patterns": [
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "lawful_counter_or_length"
+      "classification": "lawful_counter_or_length",
+      "review_note": "A failure COUNTER. No prior receipt means no prior failures, which is the arithmetic truth, not a substitute for an absent measurement. nonNegativeIntegerOrNull already refuses a malformed count. Never reaches a workbook cell."
     },
     {
       "file": "scripts/lib/performance_receipt.mjs",
-      "content": "[\"workbook_build\", Number(timings.emit ?? 0) + Number(timings.terminal_patch ?? 0), \"stage4_emit_and_patch\"],",
-      "fingerprint": "8f5131f26d59eaa32644",
+      "content": "const unmappedMs = unmapped.reduce((sum, id) => sum + (nonNegative(timings[id]) ?? 0), 0);",
+      "fingerprint": "8d1a5b9f6542000747ab",
       "patterns": [
         "js_nullish_zero"
       ],
-      "occurrences": 2,
-      "classification": "lawful_counter_or_length"
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/plan_builder.mjs",
@@ -2748,6 +3040,136 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/runtime_budget_policy.mjs",
+      "content": "return MANDATORY_SEQUENTIAL_BUDGET_KEYS.reduce((total, key) => total + Number(budgets?.[key] ?? 0), 0);",
+      "fingerprint": "59311db91ccba0085508",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_doctor.mjs",
+      "content": "const left = running[index] ?? 0;",
+      "fingerprint": "a662d9f75bfc9e68989f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_doctor.mjs",
+      "content": "const right = floor[index] ?? 0;",
+      "fingerprint": "1c95df921c07f1c242b3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_doctor.mjs",
+      "content": "const satisfied = declared.every((part, index) => (running[index] ?? 0) >= part)",
+      "fingerprint": "fc38e90f0e956df59678",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const allowance = Number(ledger?.floor_allowance_ms ?? 0);",
+      "fingerprint": "6439deb9ce22384ba6ed",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const appendedSum = appended.reduce((sum, entry) => sum + Number(entry?.duration_ms ?? 0), 0);",
+      "fingerprint": "1814cfd7b1626a2a590a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const elapsed = Number(ledger?.compute_elapsed_ms ?? 0);",
+      "fingerprint": "07a8c8f39d87ba7b7c6d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const grant = Number(record?.granted_ms ?? 0);",
+      "fingerprint": "54994950d50c7d6edc79",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const granted = Number(ledger?.floor_granted_ms ?? 0);",
+      "fingerprint": "6418d1d473e40f5f74f0",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const pastCeilingGrants = allowances.filter((record) => Number(record?.remaining_ms_at_consult ?? 0) <= 0);",
+      "fingerprint": "7d8add84fcaa3c822193",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const priorTotal = Number(priorLedger?.compute_elapsed_ms ?? 0);",
+      "fingerprint": "bacd3881699621ffa3d1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "const remaining = Number(record?.remaining_ms_at_consult ?? 0);",
+      "fingerprint": "574f6eaca21c6abccc3d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_slo.mjs",
+      "content": "floor_granted_ms: Number(ledger.floor_granted_ms ?? 0),",
+      "fingerprint": "4f3bca68c4619fc16abc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/semantic_graph.mjs",
@@ -3360,6 +3782,16 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/source_tolerance.mjs",
+      "content": "target: comparison.target ?? 0,",
+      "fingerprint": "909e45ba468f8f468a00",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/lib/statement_classifier.mjs",
       "content": "margin: best ? Number((best.score - (next?.score ?? 0)).toFixed(2)) : 0,",
       "fingerprint": "4f667b7c80974404e69d",
@@ -3398,6 +3830,36 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/support_coverage_grid.mjs",
+      "content": "(document.media_metrics?.median_native_text_characters_per_page ?? 0) >= 1_000,",
+      "fingerprint": "6dbb6f9f78328a860b3a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/support_coverage_grid.mjs",
+      "content": "test: (document) => (document.media_metrics?.full_page_raster_fraction_ppm ?? 0) >= 900_000,",
+      "fingerprint": "d3d851c8172c0dda04ac",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/support_coverage_grid.mjs",
+      "content": "test: (document) => (document.media_metrics?.inline_xbrl_markers ?? 0) > 0,",
+      "fingerprint": "06744b1631f67a851d46",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/tax_rate_policy.mjs",
@@ -3491,6 +3953,16 @@
     },
     {
       "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.fair_value_movement_native ?? 0) +",
+      "fingerprint": "06d8962c50bab30252be",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
       "content": "Number(instrument.issuance_native ?? 0) +",
       "fingerprint": "f750026c93a3e6fd6cf4",
       "patterns": [
@@ -3521,13 +3993,23 @@
     },
     {
       "file": "scripts/lib/validation_invariants.mjs",
-      "content": "Number(instrument.other_non_cash_movement_native ?? 0) -",
-      "fingerprint": "4c1f403648b32fde16ef",
+      "content": "Number(instrument.other_non_cash_movement_native ?? 0) +",
+      "fingerprint": "a54dd1cfec49ba9dda7c",
       "patterns": [
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "suspect_value_coercion"
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.pik_interest_native ?? 0) -",
+      "fingerprint": "cdb7d06d1a3327353a2f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/lib/validation_invariants.mjs",
@@ -3710,6 +4192,76 @@
       "classification": "suspect_value_coercion"
     },
     {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "\"budget_headroom_ms\": int(grant[\"granted_ms\"]) - int(observation.get(\"wall_ms\") or 0),",
+      "fingerprint": "cdd3c804255a653b01e7",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "\"consumed_wall_ms\": int(observation.get(\"wall_ms\") or 0),",
+      "fingerprint": "3e5c1ae21a4786ad0a01",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "\"worker_slot\": int(observation.get(\"worker_slot\") or 0),",
+      "fingerprint": "e44df60f0db826e79411",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "and int(lane_summary.get(\"cell_count\") or 0) > 0",
+      "fingerprint": "b8497e7e4822e448d39a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "elapsed = int(ledger.get(\"compute_elapsed_ms\") or 0)",
+      "fingerprint": "fa74fbeddc1fb5e649e4",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "memory_mib = int(total_memory_mib or 0) or int(policy[\"assumed_total_memory_mib\"])",
+      "fingerprint": "66d4ddc7cb4940b987bb",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_attachment_evidence_pipeline.py",
+      "content": "raw = int(getattr(usage, \"ru_maxrss\", 0) or 0)",
+      "fingerprint": "68c254924af2df9b9adf",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/run_broker_pipeline.py",
       "content": "if limit and int(fixed.get(\"unchanged_retry_count\") or 0) + 1 >= limit:",
       "fingerprint": "6e58e6fe745bceaa4d41",
@@ -3850,6 +4402,26 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/run_solver_fixed_point_oracle_tests.py",
+      "content": "has_rcf = float(period.get(\"rcf_capacity_native\") or 0.0) > 0.0",
+      "fingerprint": "409346581e648d1ea44e",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_solver_fixed_point_oracle_tests.py",
+      "content": "shadow[\"value\"] = float(shadow.get(\"value\") or 0.0) + 9.0",
+      "fingerprint": "ba415cdb08a3a2965bfb",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
       "file": "scripts/run_user_flow.mjs",
       "content": "remaining_question_count: replayedIntake.plan.remaining_question_count ?? 0,",
       "fingerprint": "8f20dca1c6430fbca083",
@@ -3858,6 +4430,16 @@
       ],
       "occurrences": 2,
       "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_visual_mutation_pairing_tests.py",
+      "content": "\"changed_pixels_total\": sum(int(page.get(\"changed_pixels\") or 0) for page in pages),",
+      "fingerprint": "e6261fc36a88c52c567e",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/verify_broker_semantics.py",
@@ -3928,6 +4510,146 @@
       ],
       "occurrences": 1,
       "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"indent\": int(align.get(\"indent\") or 0),",
+      "fingerprint": "9a19592bd473b6230c4a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"outline_level_col\": int(outline.get(\"outline_level_col\") or 0),",
+      "fingerprint": "3409e4d230fa8ca8a532",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"outline_level_row\": int(outline.get(\"outline_level_row\") or 0),",
+      "fingerprint": "ddc98c3b09da38432dc0",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"x_split\": int(float(pane.get(\"xSplit\") or 0)),",
+      "fingerprint": "fa8abfbecdf55debc6b6",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"x_split\": int(freeze.get(\"x_split\") or 0),",
+      "fingerprint": "65a2c261d9fe6fd10b03",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"y_split\": int(float(pane.get(\"ySplit\") or 0)),",
+      "fingerprint": "93b9286d0abeca12aba6",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "\"y_split\": int(freeze.get(\"y_split\") or 0),",
+      "fingerprint": "25be5af477bac0d5dbe9",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "border_id = int(node.get(\"borderId\") or 0)",
+      "fingerprint": "2f8a4a26f4a91cc81db1",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "file_rules = sorted(file_map[key], key=lambda rule: (rule.get(\"priority\") or 0))",
+      "fingerprint": "be58a2b7cf93afa741f3",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "fill_id = int(node.get(\"fillId\") or 0)",
+      "fingerprint": "d9cc1ea0e8b9dd5b7f44",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "font_id = int(node.get(\"fontId\") or 0)",
+      "fingerprint": "0c290e3fa8a7e8c53f00",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "index = int(cell.get(\"s\") or 0)",
+      "fingerprint": "bca82e5f5ad3825c117d",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "numfmt_id = int(node.get(\"numFmtId\") or 0)",
+      "fingerprint": "99f7c7740c6d3860392b",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/plan_reconstruction_oracle.py",
+      "content": "plan_rules = sorted(plan_map[key], key=lambda rule: (rule.get(\"priority\") or 0))",
+      "fingerprint": "966d872d0394d4083259",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
     },
     {
       "file": "scripts/verify/run_finance_proof_mutations.py",
