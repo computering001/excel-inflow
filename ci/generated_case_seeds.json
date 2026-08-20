@@ -6,9 +6,9 @@
   "generated_by": "scripts/generate_case_cohort.mjs --update-seed-registry (excel-inflow-generated-case-generator/1.0.0)",
   "generator_version": "excel-inflow-generated-case-generator/1.0.0",
   "dimension_space_version": "1.0.0",
-  "dimension_space_sha256": "01ce65c1f89b9684908b63375c09d7f2c3113bcf842416be3ce7bb32ea7ce1e3",
+  "dimension_space_sha256": "2b40cddf8ca2e88101957d9327b0dffca0acc594f4c799f27ed03bbb852ec9a1",
   "envelope_version": "3.7.7",
-  "envelope_sha256": "dd13150f8d986187137932542b0d8046e2c58ee2a3d15835a47e3a5da0e78569",
+  "envelope_sha256": "80bb64a2f8e6ae7673517561fb093d5b1a16298ed6c451f368f7e62ef3f6f251",
   "declared_space_size": "291962880000",
   "tiers": {
     "ci_default": 300,
@@ -191,6 +191,36 @@
   "reason_terminal_closure": [
     {
       "reason_code": "SOURCE.issuer_or_reporting_period_unresolved",
+      "category": "source",
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ],
+      "legal_in_classes": [
+        "CERTIFIED",
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
+      ],
+      "unlawful_in_classes": [
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "reason_code": "SOURCE.lease_declared_on_debt_register",
+      "category": "source",
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ],
+      "legal_in_classes": [
+        "CERTIFIED",
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
+      ],
+      "unlawful_in_classes": [
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "reason_code": "SOURCE.instrument_class_unresolved",
       "category": "source",
       "allowed_terminal_states": [
         "SOURCE_REQUIRED"

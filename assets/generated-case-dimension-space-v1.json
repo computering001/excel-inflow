@@ -7,7 +7,7 @@
   "derived_from": {
     "envelope_path": "assets/support-envelope-v377.json",
     "envelope_version": "3.7.7",
-    "envelope_sha256": "dd13150f8d986187137932542b0d8046e2c58ee2a3d15835a47e3a5da0e78569",
+    "envelope_sha256": "80bb64a2f8e6ae7673517561fb093d5b1a16298ed6c451f368f7e62ef3f6f251",
     "envelope_declared_value_count": 40,
     "derivation_rule": "Every envelope dimension is sampled over its declared values PLUS the __unknown value that exercises its unknown_value_class. No value is added to, removed from or renamed within an envelope dimension. loadDimensionSpace() re-derives this mirror at load time and returns typed DRIFT if it disagrees; the suite refuses on any drift."
   },
