@@ -814,23 +814,48 @@ function refuseContradictedProvenance(sheets, modelCase, rowPlan) {
       // this file states elsewhere it is "not entitled to replace with a
       // reconstructed cash-flow identity" (see `sourcedHistoricalEndingCash`).
       // Where such a record exists the blue mark is TRUE and must stand.
-      if (
-        filedHistoricalObservation(
-          modelCase,
-          rowPlan,
-          authority.row_id,
-          authority.period_index,
-        ) !== null
-      ) {
-        continue;
-      }
+      const filed = filedHistoricalObservation(
+        modelCase,
+        rowPlan,
+        authority.row_id,
+        authority.period_index,
+      );
       const cell = sheet.cellAt(address);
       if (!cell) continue;
       const populated =
         cell.formula !== undefined ||
         (cell.value !== undefined && cell.value !== null && cell.value !== "");
       if (!populated) continue;
-      if (PROVENANCE_MARKINGS.get(cell.font?.color ?? "") === "hardcode") {
+      const hardcoded = PROVENANCE_MARKINGS.get(cell.font?.color ?? "") === "hardcode";
+      if (filed !== null) {
+        // P5.9. THE EXEMPTION IS THE FILED FIGURE, NOT THE FILED RECORD.
+        //
+        // The exemption above was granted on the EXISTENCE of a filed
+        // observation and never asked whether the cell STATES it. That is one
+        // step short: a blue cell holding a number the filed record contradicts
+        // is the same misrepresentation D23 exists to refuse — it tells the
+        // reader this figure was read off a filed page while the page says
+        // something else. `provenance_authority_oracle.py` already refuses this
+        // shape (`PROV_HARDCODE_VALUE_NOT_FILED`), so an emitter that let it
+        // through was shipping a package a shipped oracle would block.
+        //
+        // Compared only where the cell actually holds a finite number. A blank,
+        // a nil, a text cell or an unparseable value is NOT silently treated as
+        // zero and is NOT read as agreement — there is no stated figure to
+        // compare, so this refusal says nothing about it.
+        if (!hardcoded) continue;
+        const stated = Number(cell.value);
+        if (cell.value === null || cell.value === "" || !Number.isFinite(stated)) continue;
+        const tolerance = 1e-6 * Math.max(1, Math.abs(filed));
+        if (Math.abs(stated - filed) > tolerance) {
+          violations.push(
+            `${sheet.name}!${address}: ${authority.row_id} ships as a blue hardcode stating ` +
+              `${stated}, but the filed observation the blue mark rests on reports ${filed}`,
+          );
+        }
+        continue;
+      }
+      if (hardcoded) {
         violations.push(
           `${sheet.name}!${address}: ${authority.row_id} is a derived row with no filed ` +
             "observation declared for this period, but the cell ships as a blue hardcode " +

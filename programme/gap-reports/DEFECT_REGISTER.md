@@ -203,7 +203,7 @@ mutations survive a digest-only sweep.
 Also: an attribution sweep must never run in a SHARED tree. P0.9's auto-restore reverted a
 concurrent agent's in-flight edit once before it moved to a detached worktree.
 
-## D23 — DELIVERY-BLOCKING REGRESSION: no workbook builds on the compiled-case path
+## D23 — RESOLVED at 102ada3 (heading kept for history; see the P5.9 correction in Wave 5)
 **ESCALATED from a fixture curiosity to a delivery blocker.** My first assessment scoped this
 to one fixture; it is not. Independently found again by P8.7, then verified by me:
 - `node scripts/run_phase9_broker_e2e_scenarios.mjs` was GREEN earlier this session and now
@@ -418,3 +418,64 @@ strictly weaker obligation the hand-written order satisfies.
 The D20/D26 class again. It is the principled reference magnitude, but adopting its 1e-12 moves
 25 of 99 forecast periods including a certified fixture and the phase-9 receipt, so it is a
 golden-regeneration package rather than a free fix.
+
+# Wave 5 — P5.9. The register was STALE, and the stale entry produced a wrong brief.
+
+## D23 — RESOLVED, and the coordinator's "delivery is blocked" claim was WRONG
+The repair landed in commit `102ada3` ("P5.3 D23 repair ... the build is unblocked"), an
+ancestor of HEAD. `git log -S filedHistoricalObservation` returns exactly that commit, and
+`node scripts/run_cash_fx_identity_workbook_tests.mjs` is GREEN at HEAD. Nothing was relaxed to
+reach green; it was green on arrival.
+
+The coordinator asserted to the owner that the compiled-case build was blocked and that no
+workbook was produced. That was FALSE. It was read from P8.1's and P8.7's issue cards, which
+said so truthfully WHEN WRITTEN and were never revised after 102ada3 landed. **A sealed card is
+a statement about its own moment, not a live status.** Anything read from a card must be
+re-verified against the running tree before it is acted on — this cost a full package's brief.
+
+## The doctrine the brief got wrong (recorded so it is not "repaired" again later)
+`ending_cash` renders as a cached value by DESIGN, at `build_dynamic_model.mjs:4649`
+(`sourcedHistoricalEndingCash`). Under the legacy single-bucket cash policy the historical
+closing-cash balance is a FILED OBSERVATION the workbook "is not entitled to replace with a
+reconstructed cash-flow identity" — reported cash-flow components differ from the filed balance
+by presentation, translation and source rounding.
+
+So the correct shape is historical = filed value (blue), forecast = formula (black), verified in
+a built workbook:
+    G64 815.593 FF0000FF      J64 =SUM(J63,J62,J61) FF000000
+    H64 528.104 FF0000FF      K64 =SUM(K63,K62,K61) FF000000
+    I64 585.671 FF0000FF      L64 =SUM(L63,L62,L61) FF000000
+(rows 61/62/63 = fx_effect_on_cash / net_change_in_cash / opening_cash — a genuine footing
+chain.) Forcing a formula onto G64/H64/I64, which the P5.9 brief instructed, would have made the
+workbook state a RECONSTRUCTED number in place of the filed one. The agent refused the brief and
+was right to.
+
+Class scope, measured rather than assumed: 51 blue+derived+case-declared historical cells across
+5 cases and 12 workbook-producing suites — ALL ending_cash, all legitimately exempt, zero
+unexempted. The exemption is exactly one semantic role, not a general escape hatch.
+
+## D35 — the provenance exemption tested for a filed record's EXISTENCE, not its VALUE (FIXED)
+The exemption landed at `refuseContradictedProvenance` (`build_dynamic_model.mjs:812`) admits a
+blue derived cell where `reported_historical_values[period]` or
+`cash_policy.historical_year_end_cash[period]` declares a filed figure. It never asked whether
+the cell STATES that figure.
+
+Proven exploitable: a case declaring `historical_year_end_cash = [815.593, ...]` with row values
+`[999.111, ...]` BUILT CLEAN, shipping `G64 = 999.111` in blue — asserting a filed source that
+says something else. This is the same misrepresentation D23 exists to refuse, displaced one
+level up into the exemption itself.
+
+The shipped Python oracle already caught it (`PROV_HARDCODE_VALUE_NOT_FILED`, `999.111 vs
+815.593`), so the emitter was shipping packages a shipped oracle would block — two validators
+disagreeing about the same artifact, the D5 pattern again.
+
+Repair: the refusal now compares the stated figure to the filed one within
+`1e-6 * max(1, |filed|)`. Refusal-only — nothing repainted, no exemption widened, no formula
+given a colour it has not earned. Blank/nil/non-finite is SKIPPED, never coerced to zero.
+Certified fixtures byte-identical (model.xlsx, .plan.json, .provenance-authority.json,
+.row-map.json, .model-ir-v3.json all hash-identical). A real workbook builds end to end
+(JS plan -> emit/__main__.py -> .xlsx), opens in openpyxl, 3 sheets, foots per the independent
+finance proof.
+
+Not closed: the value-equality check covers the HISTORICAL HARDCODE channel only. The
+forecast-authority channel remains oracle-only.
