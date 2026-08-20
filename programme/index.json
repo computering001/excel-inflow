@@ -303,6 +303,16 @@
       "invariant": "expensive evidence-half work is a declared graph whose every cache decision records a typed reason",
       "note": "declares and measures but deliberately does not skip; a dishonest key is recorded, not served"
     },
+    "P2.10": {
+      "commit": "",
+      "invariant": "one footing tolerance, IEEE754-derived, neither looser nor stricter than the arithmetic deserves",
+      "note": "sealed late: complete and proven since its card was written, but never given an index entry"
+    },
+    "P7.3a": {
+      "commit": "",
+      "invariant": "the generated cohort is a declared dimension space, not a bag of seeds",
+      "note": "sealed late: complete, awaiting only the programme seal"
+    },
     "P5.2": {
       "commit": "cf2e2f8",
       "invariant": "every emitted formula is an expression in the closed typed vocabulary, and the adjustment gate is applied and recognised structurally",
@@ -365,8 +375,8 @@
     },
     "P8.9": {
       "commit": "",
-      "invariant": "one version declaration with no second value in the system to compare against",
-      "note": "freeze criteria 9 and 11. Criterion 11 was UNSATISFIABLE as written: the manifest was a member of the closure it published"
+      "invariant": "the skill version is declared once and derived everywhere; the certified runtime code closure is recorded on an artifact that can never be a member of it",
+      "note": "freeze criteria 9 and 11 closed; the flip is proven one-field green in scratch and the tree stays at 3.7.6 for P8.8 to bump; the recorded closure digest must be renewed on the frozen tree"
     },
     "P8.10": {
       "commit": "",
@@ -377,11 +387,6 @@
       "commit": "",
       "invariant": "the runtime SLO is one declaration, bound by name, with a measured cohort and an enforceable ceiling",
       "note": "the two rival declarations were unsatisfiable, not rival; coverage is LOWER_BOUND_ONLY and says so"
-    },
-    "P8.9": {
-      "commit": "",
-      "invariant": "the skill version is declared once and derived everywhere; the certified runtime code closure is recorded on an artifact that can never be a member of it",
-      "note": "freeze criteria 9 and 11 closed; the flip is proven one-field green in scratch and the tree stays at 3.7.6 for P8.8 to bump; the recorded closure digest must be renewed on the frozen tree"
     }
   },
   "evidence_baseline": {
@@ -391,17 +396,16 @@
   },
   "last_green_commit": "4857acb",
   "open_blockers": [
-    "P5.9 IN FLIGHT AND NOW THE FREEZE-CRITICAL BLOCKER: D23 leaves the compiled-case build BLOCKED at head. ending_cash is a DERIVED row shipped as a blue hardcode (build_dynamic_model.mjs:784 refuses it, correctly), so NO WORKBOOK IS PRODUCED, the five portable evidence classes are unproducible, and a freeze taken now would pin a product that does not deliver. The refusal is new; the misrepresentation is old and predates P5.3.",
-    "P4.9 LANDED at aa715ca with two CORRECTIONS to the register. D30/MG-3 was OVERSTATED: its reproduction was contaminated by a new defect (D33) whose guard tests a convention NAME for /rate/i, scaling a 35bp fee to 350%. Held at a faithful rate the thousands restatement CONVERGES on the shipped tree; severity high -> medium, and a scale-relative criterion landed anyway at a 1 percent margin. D28/MG-1 NOT landed: it needs five artefacts moving together, three outside P4.9's remit — now P4.10. In proving that, P4.9 found P3.3's ETR acyclicity conclusion is FALSE about the RUNNING solver, not merely unproven: taxCharge is computed inside the period sweep from preTaxIncome <- netInterest <- iterated interest, and CFO is seeded from netIncome <- taxCharge. Tax is ALREADY iterated today; the graph never declared it. A sealed proof asserts a sink property the solver does not have.",
-    "P7.8 (behavioural freeze) and P8.8 (immutable tag) not started; they are the gate for Phases 9-10.",
-    "Freeze criterion 9 CLOSED by P8.9: the version is declared once at assets/runtime-manifest.json#/skill_version and derived everywhere through scripts/lib/skill_version_declaration.mjs; the registered skill-version-declaration suite enumerates 618 files from the deployment profile, the test registry and the scripts tree and refuses any new literal. The 3.7.6->3.7.7 flip was performed end to end in a scratch state as a ONE-FIELD edit with 15 suites green. The tree deliberately still declares 3.7.6: the bump is integration step 3 in programme/SCOPE_DECISION_2026-08-20.md, owed to P8.8 on the frozen tree.",
-    "Freeze criterion 11 CLOSED by P8.9: assets/runtime-manifest.json records certified_runtime_code_closure_sha256 over certified-runtime-code-closure/1.0 (the 150-module import graph walked from the 39 shipped entry points), verified by the registered certified-runtime-code-closure suite. The package-closure reading was PROVEN unsatisfiable (the manifest is in asset_allowlist, so it is a member of the closure it would publish). CARRIED FORWARD: the recorded digest is bound to the tree state at recording time and must be renewed by P8.8 with `node scripts/run_certified_code_closure_tests.mjs --record` on the frozen tree.",
-    "assets/deployment-profile.json script_allowlist disagrees with the real import closure in BOTH directions at head, so compile_skill_release.mjs refuses: lib/canonical_sum.mjs is reachable but undeclared, lib/lane_resource_policy.mjs is declared but unreachable from any entry point. Neither is P8.9's file; both block the package build.",
-    "ci/test_registry_census.json cannot be regenerated or verified at head: run_ci_census_tests.mjs refuses with `unclassified run_* scripts: run_never_zero_and_order_invariance_tests.mjs`, an untracked concurrent suite that is neither registered nor given a disposition.",
-    "12 defects remain open in programme/gap-reports/DEFECT_REGISTER.md, mostly contract-vocabulary absences (no NOL stock, no IAS 23 capitalised borrowing cost, no stub-period vocabulary, no direct-method roles) plus the frozen cohort's two failures. A decision is owed on whether any block the freeze or are declared as known limitations within it.",
-    "Rogo-dependent items excluded by user directive (P5.7, P8.3, P8.4, P8.5, installed half of P8.6, Phase 10 rollout rings). P5.6 deferred on the owner's challenge: the pack says 'redesign charts' but charts do not exist and drawings are forbidden."
+    "P7.8 BEHAVIOURAL FREEZE \u2014 NOT CUT. The mechanism is built and verified and the tree is in PRE_FREEZE (no approval ledger). The genesis freeze is deliberately a HUMAN act: `node scripts/regenerate_behavioural_goldens.mjs freeze --actor <id> --role <role> --reason \"<why>\"`. The coordinator declined to run it: it authored most of this tree's changes, and automation that can freeze can pin its own defects as correct. That is the self-reference class this programme has now found six times.",
+    "P8.8 IMMUTABLE TAG \u2014 NOT CUT; it follows the freeze. Note from P8.9: certified_runtime_code_closure_sha256 is bound to tree state, so it must be re-recorded on the FROZEN tree immediately before tagging (`node scripts/run_certified_code_closure_tests.mjs --record`). It is currently recorded at ccca2efb over 150 modules for HEAD.",
+    "P1.2 / P1.3 REMAIN GENUINELY INCOMPLETE, not bookkeeping. Both cores are sealed in shadow; the PRODUCER and CALL-SITE migrations are outstanding. P7.10 measured the consequence from the other side: typed_arithmetic.mjs is imported by ZERO production modules and none of solver/row_plan/case_compiler/canonical_model_modules/forecast_authority/attachment_ingress imports any typed module. That untyped spine is why the never-zero class keeps reopening (D6, D11, D31) and it carries 96 tabulated risk sites. The migration lands in the same four files Phase 9 decomposes, so it belongs WITH Phase 9 in v3.8 rather than before it.",
+    "P2.11 and P4.1a: repairs complete and proven, sealing blocked on follow-ups outside each package's allowed files.",
+    "D50 OPEN \u2014 run_development_gate.mjs silently drops suites and still exits 0 (138 distinct suites in one run, 123 in the next; one run ended in an unhandled exception inside runPool and reported exit 0). The product is unaffected: all fifteen dropped suites were executed individually and pass. No green from that harness may be trusted without diffing its suite list against the registry. Harness repair deferred to v3.8.",
+    "D31 OPEN and declared: a header row carrying no values is minted as numeric 0. No repair exists outside solver.mjs; the exact patch is specified unapplied in P7.10's card.",
+    "Phases 9 and 10 NOT EXECUTED by owner decision (programme/SCOPE_DECISION_2026-08-20.md): they become v3.8 work cut from the v3.7.7 tag.",
+    "Standing exclusions unchanged: Rogo-dependent packages (P5.7, P8.3, P8.4, P8.5, installed half of P8.6, Phase 10 rings). P5.6 (charts) deferred on the owner's challenge. External custody must never ship \u2014 see D51."
   ],
-  "next_gate": "P0.8 phase seal after P0.6 (this package) and P0.7 (architecture census)",
+  "next_gate": "P7.8 behavioural freeze (human act), then P8.8 immutable tag with the code-closure digest re-recorded on the frozen tree.",
   "owner": "principal engineering model (session-based); user owns merges and Rogo installs",
   "naming_conventions": {
     "issue_cards": "programme/P<phase>.<package>_issue_card.md",
