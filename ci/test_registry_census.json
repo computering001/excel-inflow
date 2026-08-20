@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 417,
-  "source_commit": "c28fbccdd106183bd31e14363afe28b0fece91bc",
-  "source_tree": "51d504de4aa82d11381fb3199aa8e3cb4aee631b",
+  "checks": 427,
+  "source_commit": "f21772b008cc2ff131cab29d9c1ffa311f70df50",
+  "source_tree": "222e496f8406f2c7115bf5b4594a79d1e295a0fa",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 201
+    "test_count": 206
   },
   "scripts": [
     {
@@ -83,6 +83,10 @@
     },
     {
       "script": "run_blocker_corpus_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_bounded_parallelism_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -308,6 +312,10 @@
     {
       "script": "run_development_gate.mjs",
       "disposition": "CI_GATE_MACHINERY"
+    },
+    {
+      "script": "run_differential_invalidation_tests.mjs",
+      "disposition": "REGISTERED"
     },
     {
       "script": "run_dual_read_migration_tests.mjs",
@@ -546,6 +554,10 @@
       "disposition": "CI_WORKFLOW_STEP"
     },
     {
+      "script": "run_metamorphic_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_model_owned_broker_demand_tests.py",
       "disposition": "REGISTERED"
     },
@@ -619,6 +631,10 @@
     },
     {
       "script": "run_phase9_broker_e2e_scenarios.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_physical_authority_mutation_tests.py",
       "disposition": "REGISTERED"
     },
     {
@@ -819,7 +835,7 @@
     },
     {
       "script": "run_standardised_design_contract_mutations.mjs",
-      "disposition": "ORPHANED_BARE_RUNNABLE"
+      "disposition": "SUBORDINATE_ORACLE"
     },
     {
       "script": "run_statement_classifier_tests.mjs",
@@ -887,6 +903,10 @@
     },
     {
       "script": "run_user_flow_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_visual_mutation_pairing_tests.py",
       "disposition": "REGISTERED"
     },
     {

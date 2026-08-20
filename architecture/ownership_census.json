@@ -306,6 +306,15 @@
       "concern": "local workbook review",
       "target_owner": "validators stay validators"
     },
+    "lib/metamorphic_relations.mjs": {
+      "count": 5,
+      "families": {
+        "economic_values": 5
+      },
+      "classification": "validator",
+      "concern": "P7.4 transform families + locality verdicts read from the equation graph; compares transformed pairs, never mutates a case in place",
+      "target_owner": "Corpus and oracles (Phase 7)"
+    },
     "lib/model_ir_v3.mjs": {
       "count": 8,
       "families": {

@@ -322,3 +322,46 @@ its own signal that the claim was load-bearing. `decisions` is now genuinely ena
 nodes reused, 228.3ms → 0); `evidence_review` CANNOT be enacted (its key includes an artifact
 its own work produces, and its intake plan carries live option handlers no artifact can hold)
 and now says so, reporting mode "verified" with its 884.5ms cost visible.
+
+# Wave 3 defects — metamorphic relations (P7.4). All five REPRODUCE and are pinned.
+
+## D28 / MG-1 — the equation graph omits statement.tax_expense -> cash.cfo (SEVERITY: HIGH)
+Perturbing tax moves CFO, but the graph does not declare the edge, so locality "escapes" on
+24 of 31 archetypes and 66 of 92 generated cases — and EVERY escape is accounted for by that
+one missing edge (proved necessary: dropping any declared missing edge leaves an escape
+unexplained, so the register cannot be padded to launder future escapes).
+Example: deferred_revenue_ratable.json, tax 0 -> 42.271, CFO 282.181 -> 239.697.
+
+SECOND-ORDER, AND THIS IS THE PART THAT MATTERS: the missing edge CLOSES A CYCLE. So
+assets/convergence-contract.v1.json's declared 13-node active SCC UNDERSTATES the real fixed
+point — pre_tax_income and tax_expense both move and neither is declared.
+
+Consequence for work already sealed, which I must state plainly: P4.7 proved the hand-written
+solve order agrees with the graph-derived order, and P3.3 proved the ETR path acyclic — BOTH
+were computed on this incomplete graph. Neither conclusion is wrong about the graph as
+declared; both are unproven about the graph as it should be. Re-running those proofs is
+required after MG-1 is repaired, and their issue cards should say so.
+
+## D29 / MG-2 — no debt or lease BALANCE node, so six balance->interest edges are absent
+The graph carries interest nodes but no balance node for the instrument that generates it, so
+the dependency of interest on the balance it accrues over is undeclared.
+
+## D30 / MG-3 — convergence is NOT scale-invariant (SEVERITY: HIGH)
+`revolver_undrawn_commitment_fee_only` converges with residual 6.04e-10 against an ABSOLUTE
+tolerance of 1e-8. Restate the identical economics in thousands and the solver throws
+SOLVER_NON_CONVERGENCE. In plain terms: an issuer reporting in thousands is REFUSED for
+economics an issuer reporting in millions is served. This is a real-world defect, not a
+synthetic curiosity — reporting scale is an issuer's presentation choice, not an economic one.
+Fix direction: the convergence tolerance must be relative to the magnitudes it judges, or
+declared scale-dependent and the envelope narrowed accordingly. Do NOT simply widen it.
+
+## D31 / MG-4 — a header row with no values is minted into statement_values as numeric 0
+A `row_type: "header"` row carrying no `values` becomes a real 0. This is a NEVER-ZERO
+violation of exactly the class the programme has closed twice already (D11 in opening
+provenance, D6 in printed dashes). Asymmetric and therefore diagnostic: the LEADING header
+appears and the trailing one does not.
+
+## D32 / MG-5 — the opening-debt bridge residual is order-dependent (latent)
+Seed 700577: -943.56 vs -943.5600000000002 depending on accumulation order; 26 drifts observed,
+all ~1e-13 relative against a 0.01 tolerance. Latent today, but it means the bridge's residual
+is not a function of the inputs alone.

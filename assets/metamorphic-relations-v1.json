@@ -1,0 +1,826 @@
+{
+  "schema_version": "metamorphic-relations/1.0",
+  "relations_version": "1.0.0",
+  "authority": {
+    "locality_graph": "assets/equation-graph.v1.json",
+    "locality_graph_id_expected": "canonical-equation-graph",
+    "locality_edge_activation": "scripts/lib/equation_graph.mjs :: activeEquationEdges(graph, circularity)",
+    "statement_binding_register": "scripts/lib/layered_graph_constitution.mjs :: ECONOMIC_STATEMENT_BINDING (P4.6)",
+    "topological_order_source": "scripts/lib/solver.mjs :: solveCase(...).solve_order_evidence (P4.7 Tarjan at solve time)",
+    "boundary_register": "assets/canonical-model-graph-v2.json (P4.4 nine-module boundary register)",
+    "case_generator": "scripts/lib/case_generator.mjs (P7.3)",
+    "note": "Locality is asserted against the equation graph's OWN active edge set for the case's declared circularity. No second dependency relation is invented here: a change is lawful only where the canonical graph already says a path exists."
+  },
+  "observation_planes": [
+    {
+      "id": "economic_solve",
+      "producer": "scripts/lib/solver.mjs :: solveCase",
+      "observable": "every forecast-period field classified economic below, rounded to 9 decimal places, plus converged and all_checks_pass",
+      "equality_primitive": "economic_signature_sha256",
+      "primitive_reused_from": "scripts/run_raw_input_black_box_canary.mjs:964-1007 and scripts/run_phase9_broker_e2e_scenarios.mjs:368-374",
+      "primitive_relation": "strict_superset",
+      "primitive_note": "The canary hashes 23 forecast fields; the phase-9 twin hashes emitted J/K/L cells of one sheet. This plane's signature covers all 72 economic forecast fields plus instrument_results and statement_values, so it is a strict superset of the canary's key set. The suite proves the superset containment rather than asserting it."
+    },
+    {
+      "id": "refusal_verdict",
+      "producer": "scripts/lib/solver.mjs :: solveCase (throw path)",
+      "observable": "the first line of the thrown message, split into its literal text and its embedded numeric magnitudes",
+      "equality_primitive": "refusal_verdict_equality",
+      "primitive_note": "A case the pipeline lawfully refuses has no economics to preserve, but its REFUSAL must still be label-independent. This plane carries the economics-preserving families over the refused population.",
+      "comparison": {
+        "literal_text": "compared EXACTLY \u2014 a different reason, a different case id or a different word is a violation",
+        "numeric_magnitudes": "compared at a declared relative epsilon of 1e-9, because a reported residual is a floating-point sum whose ORDER the register determines; every observed drift is bounded and recorded as MG-5",
+        "relative_epsilon": 1e-09,
+        "why_not_exact": "Comparing the message byte-for-byte would conflate two different claims: that the refusal IDENTITY is label-independent (it is, and that is asserted exactly) and that a printed residual is bit-reproducible under a register permutation (it is not, and that is registered as MG-5 with a bounded magnitude rather than hidden by a looser comparison)."
+      }
+    }
+  ],
+  "forecast_field_classes": {
+    "cash_from_operations": "graph_node_observable",
+    "ending_cash": "graph_node_observable",
+    "minimum_cash": "graph_node_observable",
+    "non_rcf_debt_issuance": "graph_node_observable",
+    "mandatory_repayment": "graph_node_observable",
+    "acquisition_interest": "graph_node_observable",
+    "rcf_commitment_fee": "graph_node_observable",
+    "gross_interest": "graph_node_observable",
+    "interest_income": "graph_node_observable",
+    "instrument_interest": "graph_node_observable",
+    "non_cash_instrument_interest": "graph_node_observable",
+    "lease_interest": "graph_node_observable",
+    "net_interest": "graph_node_observable",
+    "non_cash_interest": "graph_node_observable",
+    "other_interest": "graph_node_observable",
+    "rcf_interest": "graph_node_observable",
+    "lease_principal": "graph_node_observable",
+    "rcf_capacity_native": "graph_node_observable",
+    "rcf_draw": "graph_node_observable",
+    "ending_rcf": "graph_node_observable",
+    "liquidity_shortfall": "graph_node_observable",
+    "rcf_repayment": "graph_node_observable",
+    "ebit": "graph_node_observable",
+    "pre_tax_income": "graph_node_observable",
+    "tax": "graph_node_observable",
+    "net_income": "graph_node_observable",
+    "acquisition_cash_consideration": "outside_equation_graph_coverage",
+    "acquisition_debt": "outside_equation_graph_coverage",
+    "acquisition_debt_addition": "outside_equation_graph_coverage",
+    "acquisition_debt_proceeds": "outside_equation_graph_coverage",
+    "acquisition_debt_repayment": "outside_equation_graph_coverage",
+    "adjusted_ebitda": "outside_equation_graph_coverage",
+    "capex": "outside_equation_graph_coverage",
+    "cash_after_mandatory_repayment": "outside_equation_graph_coverage",
+    "cash_before_debt": "outside_equation_graph_coverage",
+    "cash_before_mandatory_repayment": "outside_equation_graph_coverage",
+    "cash_before_rcf": "outside_equation_graph_coverage",
+    "cash_from_investing": "outside_equation_graph_coverage",
+    "change_in_working_capital": "outside_equation_graph_coverage",
+    "depreciation_and_amortisation": "outside_equation_graph_coverage",
+    "drawn_commercial_paper": "outside_equation_graph_coverage",
+    "eligible_cash": "outside_equation_graph_coverage",
+    "ending_interest_bearing_lease": "outside_equation_graph_coverage",
+    "ending_lease": "outside_equation_graph_coverage",
+    "financing_before_mandatory": "outside_equation_graph_coverage",
+    "fx_effect_on_cash": "outside_equation_graph_coverage",
+    "fx_on_cash": "outside_equation_graph_coverage",
+    "gross_debt": "outside_equation_graph_coverage",
+    "lease_additions": "outside_equation_graph_coverage",
+    "lease_other_movements": "outside_equation_graph_coverage",
+    "net_debt": "outside_equation_graph_coverage",
+    "net_leverage": "outside_equation_graph_coverage",
+    "non_debt_financing": "outside_equation_graph_coverage",
+    "non_rcf_debt_repayment": "outside_equation_graph_coverage",
+    "non_rcf_issuance": "outside_equation_graph_coverage",
+    "non_rcf_repayment": "outside_equation_graph_coverage",
+    "opening_interest_bearing_lease": "outside_equation_graph_coverage",
+    "other_cash_debt_movement": "outside_equation_graph_coverage",
+    "other_non_operating": "outside_equation_graph_coverage",
+    "pre_rcf_debt_cash_flow": "outside_equation_graph_coverage",
+    "rcf_average_fx": "outside_equation_graph_coverage",
+    "rcf_draw_native": "outside_equation_graph_coverage",
+    "rcf_ending_fx": "outside_equation_graph_coverage",
+    "rcf_ending_native": "outside_equation_graph_coverage",
+    "rcf_fx_non_cash_movement": "outside_equation_graph_coverage",
+    "rcf_opening_fx": "outside_equation_graph_coverage",
+    "rcf_opening_native": "outside_equation_graph_coverage",
+    "rcf_repayment_native": "outside_equation_graph_coverage",
+    "revenue": "outside_equation_graph_coverage",
+    "standalone_revenue": "outside_equation_graph_coverage",
+    "total_liquidity": "outside_equation_graph_coverage",
+    "undrawn_rcf": "outside_equation_graph_coverage",
+    "instrument_results": "outside_equation_graph_coverage",
+    "statement_values": "outside_equation_graph_coverage",
+    "period": "identity",
+    "iterations": "solver_diagnostic",
+    "residual": "solver_diagnostic",
+    "converged": "solver_diagnostic",
+    "graph_driven_solve": "solver_diagnostic",
+    "typed_states": "solver_diagnostic",
+    "checks": "solver_diagnostic",
+    "definition_basis": "solver_diagnostic",
+    "lease_interest_basis": "solver_diagnostic",
+    "rcf_currency": "solver_diagnostic"
+  },
+  "forecast_field_class_semantics": {
+    "graph_node_observable": "The field is the forecast-plane realisation of exactly one equation-graph node. LOCALITY IS ASSERTED over this class: for an economics-changing transform, only the nodes forward-reachable from the perturbed node in the graph's own active edge set may move.",
+    "outside_equation_graph_coverage": "A real economic quantity that NO equation-graph node stands for. P4.6 declares this gap (economic_coverage.uncovered_node_families: instrument, lease, acquisition, cash_bucket, statement_row, schedule_row, period). Economics-PRESERVING relations are asserted over this class at full strength; locality is NOT, because the graph carries no node to reach.",
+    "solver_diagnostic": "Convergence bookkeeping, typed-state records and traces. Not an economic quantity: excluded from every signature and from locality, and named here so no field can be dropped silently.",
+    "identity": "The period label. Carried in the signature as identity, never as an economic quantity."
+  },
+  "node_observables": {
+    "cash.cash_interest_paid": {
+      "observable": null,
+      "unobservable_reason": "The cash-flow interest bridge is not exposed as a forecast-record field; it is realised only in the emitted workbook row."
+    },
+    "cash.cash_interest_received": {
+      "observable": null,
+      "unobservable_reason": "As cash.cash_interest_paid \u2014 bridge row only."
+    },
+    "cash.cfo": {
+      "observable": "cash_from_operations"
+    },
+    "cash.ending_balance": {
+      "observable": "ending_cash"
+    },
+    "cash.minimum_cash": {
+      "observable": "minimum_cash"
+    },
+    "cash.net_finance_addback": {
+      "observable": null,
+      "unobservable_reason": "Addback bridge row; the forecast record exposes the interest aggregates it is built from, not the addback."
+    },
+    "cash.noncash_interest_addback": {
+      "observable": null,
+      "unobservable_reason": "Addback bridge row; the forecast record exposes non_cash_interest, which is interest.noncash, not the addback."
+    },
+    "control.circularity": {
+      "observable": null,
+      "unobservable_reason": "The solver control carries no economic quantity by construction (P4.6 disposition solver_control)."
+    },
+    "debt.issuance": {
+      "observable": "non_rcf_debt_issuance"
+    },
+    "debt.mandatory_repayment": {
+      "observable": "mandatory_repayment"
+    },
+    "debt.maturity_repayment": {
+      "observable": null,
+      "unobservable_reason": "Per-instrument movement; the forecast record carries it only inside instrument_results, which P4.6 declares an uncovered instrument-family realisation."
+    },
+    "debt.pik_accretion": {
+      "observable": null,
+      "unobservable_reason": "Per-instrument principal accretion; realised in instrument_results (declared instrument-family gap)."
+    },
+    "debt.scheduled_amortisation": {
+      "observable": null,
+      "unobservable_reason": "Per-instrument movement; realised in instrument_results (declared instrument-family gap)."
+    },
+    "interest.acquisition": {
+      "observable": "acquisition_interest"
+    },
+    "interest.cash_income": {
+      "observable": null,
+      "unobservable_reason": "Aggregated into interest.income before the forecast record; interest_income is the aggregate, so a separate observation would double-count the same field."
+    },
+    "interest.commitment_fee": {
+      "observable": "rcf_commitment_fee"
+    },
+    "interest.gross_expense": {
+      "observable": "gross_interest"
+    },
+    "interest.income": {
+      "observable": "interest_income"
+    },
+    "interest.instrument_cash": {
+      "observable": "instrument_interest"
+    },
+    "interest.instrument_pik": {
+      "observable": "non_cash_instrument_interest"
+    },
+    "interest.lease": {
+      "observable": "lease_interest"
+    },
+    "interest.net_expense": {
+      "observable": "net_interest"
+    },
+    "interest.noncash": {
+      "observable": "non_cash_interest"
+    },
+    "interest.other": {
+      "observable": "other_interest"
+    },
+    "interest.rcf": {
+      "observable": "rcf_interest"
+    },
+    "lease.principal": {
+      "observable": "lease_principal"
+    },
+    "rcf.capacity": {
+      "observable": "rcf_capacity_native"
+    },
+    "rcf.draw": {
+      "observable": "rcf_draw"
+    },
+    "rcf.ending_balance": {
+      "observable": "ending_rcf"
+    },
+    "rcf.liquidity_shortfall": {
+      "observable": "liquidity_shortfall"
+    },
+    "rcf.repayment": {
+      "observable": "rcf_repayment"
+    },
+    "statement.ebit": {
+      "observable": "ebit"
+    },
+    "statement.finance_expense": {
+      "observable": null,
+      "unobservable_reason": "The income-statement finance expense is not a forecast-record field; the record exposes the interest-schedule aggregate gross_interest, which is interest.gross_expense."
+    },
+    "statement.finance_income": {
+      "observable": null,
+      "unobservable_reason": "As statement.finance_expense \u2014 the record exposes interest_income, which is interest.income."
+    },
+    "statement.cash_flow_start": {
+      "observable": null,
+      "unobservable_reason": "The cash-flow anchor line is a workbook row; the forecast record exposes cash_from_operations, which is cash.cfo."
+    },
+    "statement.pre_tax_income": {
+      "observable": "pre_tax_income"
+    },
+    "statement.effective_tax_rate": {
+      "observable": null,
+      "unobservable_reason": "A ratio input. The forecast record carries tax and pre_tax_income, never the rate, so observing it would re-derive a quotient rather than read a value."
+    },
+    "statement.tax_expense": {
+      "observable": "tax"
+    },
+    "statement.net_income": {
+      "observable": "net_income"
+    }
+  },
+  "transform_families": [
+    {
+      "id": "label_synonym",
+      "named_by_gap": "label-synonym",
+      "kind": "economics_preserving",
+      "targets": [
+        "statement_structure.*[].label",
+        "instruments[].name"
+      ],
+      "rationale": "A row's economic identity is carried by semantic_role and row_id; label is display text. If a synonym moves the economics, a label is being read as meaning.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      }
+    },
+    {
+      "id": "legal_suffix",
+      "named_by_gap": "legal-suffix",
+      "kind": "economics_preserving",
+      "targets": [
+        "issuer.name"
+      ],
+      "rationale": "The legal-form suffix (Limited / plc / Inc.) is part of the issuer's presented name. No economic quantity is a function of it.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      }
+    },
+    {
+      "id": "ticker_market_suffix",
+      "named_by_gap": "ticker-market",
+      "kind": "economics_preserving",
+      "targets": [
+        "issuer.identifiers.ticker"
+      ],
+      "rationale": "A market suffix (.L, .O, ' US') distinguishes listing venues of one issuer. Venue is not an economic input.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      }
+    },
+    {
+      "id": "row_reorder_statement",
+      "named_by_gap": "row-reorder",
+      "kind": "economics_preserving",
+      "targets": [
+        "statement_structure.income_statement",
+        "statement_structure.cash_flow",
+        "statement_structure.balance_sheet"
+      ],
+      "rationale": "Statement rows are addressed by row_id and semantic_role, never by array position. Reversing each section must not move a number.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 40,
+        "refused": 150
+      },
+      "applicability_note": "Most archetype cases declare one row per statement section, so reversing rows alone applies to 8. The family therefore reverses the ROW order within each section AND the SECTION traversal order, both of which are non-semantic, which lifts archetype applicability to every case with two or more sections."
+    },
+    {
+      "id": "row_reorder_instruments",
+      "named_by_gap": "row-reorder",
+      "kind": "economics_preserving",
+      "targets": [
+        "instruments"
+      ],
+      "rationale": "Instrument aggregates are sums over the register; each instrument keeps its own display_order, so presentation is untouched and the economics must be order-independent. This is also a floating-point-associativity probe.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 1,
+        "generated": 0,
+        "refused": 150
+      },
+      "applicability_note": "Only 2 of the 62 archetype cases carry two or more instruments, and the generated cohort cannot supply a multi-instrument SOLVABLE case: the generator pads an archetype's register with synthetic instruments, which the archetype's own debt_reconciliation opening-debt bridge then refuses (OPENING_DEBT_UNRESOLVED) or whose padded class the debt-class register refuses (lease_liability). Fabricating a matching reconciliation would be inventing evidence, so this family takes its volume from the REFUSAL plane, where ~200 multi-instrument generated cases live and where reordering the register must not change the refusal. The solve-plane floor is therefore 1."
+    },
+    {
+      "id": "whitespace_padding",
+      "named_by_gap": "whitespace",
+      "kind": "economics_preserving",
+      "targets": [
+        "statement_structure.*[].label",
+        "issuer.name"
+      ],
+      "rationale": "Leading, trailing, doubled and tab whitespace is an extraction artefact of the source document. It must not reach a number.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      }
+    },
+    {
+      "id": "repeated_header",
+      "named_by_gap": "repeated-header",
+      "kind": "economics_preserving",
+      "targets": [
+        "statement_structure.income_statement",
+        "statement_structure.cash_flow"
+      ],
+      "rationale": "A column header repeated mid-table is the commonest paginated-PDF artefact. A row_type header carries no values, so two of them must be as economically inert as none.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      },
+      "declared_signature_exception": {
+        "defect_id": "MG-4",
+        "field": "statement_values",
+        "added_key_prefix": "hdr.",
+        "added_value": 0,
+        "removals_allowed": false,
+        "note": "Applying this family exposed a real defect (MG-4): the inserted row_type header rows, which declare NO values at all, are materialised into the period's statement_values map as numeric 0. No solved economic quantity moves, so the family remains economics-preserving; the delta is PINNED to exactly this shape \u2014 only statement_values, only keys with this prefix, only the value 0, no key removed, no other field changed \u2014 rather than the relation being weakened."
+      }
+    },
+    {
+      "id": "unit_wording_label",
+      "named_by_gap": "unit-wording",
+      "kind": "economics_preserving",
+      "targets": [
+        "statement_structure.*[].label"
+      ],
+      "rationale": "The unit phrase inside a label ($m, USDm, 'in millions') restates the SAME declared unit in different words. issuer.units is the sole unit authority; a unit phrase in display text must not be read as a second one.",
+      "expected_effect": {
+        "economic_solve": "identical",
+        "refusal_verdict": "identical"
+      },
+      "minimum_applications": {
+        "archetypes": 30,
+        "generated": 40,
+        "refused": 150
+      }
+    },
+    {
+      "id": "unit_scale_restatement",
+      "named_by_gap": "unit-wording",
+      "kind": "economics_changing",
+      "targets": [
+        "issuer.units",
+        "every declared monetary path of the case"
+      ],
+      "rationale": "Restating the SAME economics from millions into thousands is the one unit transform that is not a relabel: the declared unit changes and every monetary magnitude changes with it. It is economics-changing with an EXACT expected change, which is what makes it a proof rather than a hash comparison.",
+      "expected_effect": {
+        "economic_solve": "scaled",
+        "scale_factor": 1000,
+        "currency_class_expectation": "every currency-tolerance-class observable scales by exactly 1000",
+        "ratio_class_expectation": "every ratio observable (net_leverage, and the ratio-tolerance-class node statement.effective_tax_rate) is INVARIANT",
+        "tolerance_class_authority": "assets/equation-graph.v1.json nodes[].tolerance_class (37 currency, 1 ratio, 1 control)"
+      },
+      "monetary_paths": [
+        "statement_structure.*[].values",
+        "statement_structure.*[].reported_historical_values",
+        "operating_metrics.*.values",
+        "instruments[].opening_balance",
+        "instruments[].facility_capacity",
+        "instruments[].scheduled_amortisation",
+        "instruments[].new_issuance",
+        "instruments[].forecast_ending_balances",
+        "instruments[].other_non_cash_movement",
+        "cash_policy.opening_cash",
+        "cash_policy.minimum_cash_override",
+        "cash_policy.historical_year_end_cash",
+        "cash_policy.buckets[].*",
+        "rcf_policy.capacity",
+        "rcf_policy.opening_draw",
+        "rcf_policy.commitment_fee_value",
+        "lease_policy.opening_liability",
+        "lease_policy.principal_repayment",
+        "lease_policy.additions",
+        "lease_policy.other_movements",
+        "lease_policy.historical_liabilities",
+        "lease_policy.forecast_liabilities",
+        "lease_policy.historical_interest_bearing_liabilities",
+        "lease_policy.forecast_interest_bearing_liabilities",
+        "other_interest",
+        "debt_reconciliation.*"
+      ],
+      "non_monetary_paths_held_fixed": [
+        "instruments[].coupon_or_all_in_rate",
+        "instruments[].pik_rate",
+        "instruments[].benchmark_rate",
+        "instruments[].benchmark_floor",
+        "instruments[].spread_bps",
+        "lease_policy.effective_rate",
+        "cash_policy.cash_yield",
+        "cash_policy.eligible_cash_percentage",
+        "cash_policy.buckets[].eligible_percentage",
+        "fx.*.average_rates",
+        "fx.*.period_end_rates",
+        "rcf_policy.commitment_fee_value when commitment_fee_convention is a rate",
+        "statement rows whose semantic_role is effective_tax_rate",
+        "debt_reconciliation keys matching percentage / _rate / ratio / tolerance_bps"
+      ],
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 40
+      }
+    },
+    {
+      "id": "perturb_effective_tax_rate",
+      "kind": "economics_changing",
+      "perturbed_node": "statement.effective_tax_rate",
+      "targets": [
+        "statement_structure.income_statement[semantic_role=effective_tax_rate].values"
+      ],
+      "rationale": "The tightest locality claim the graph makes: statement.effective_tax_rate has exactly one outgoing edge, to statement.tax_expense, which reaches only statement.net_income. Two observables may move and twenty-four may not.",
+      "expected_effect": {
+        "economic_solve": "local_to_forward_reachable_set"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 30
+      }
+    },
+    {
+      "id": "perturb_minimum_cash",
+      "kind": "economics_changing",
+      "perturbed_node": "cash.minimum_cash",
+      "targets": [
+        "cash_policy.minimum_cash_override"
+      ],
+      "rationale": "The minimum-cash floor enters the graph as a liquidity_constraint edge into rcf.draw and rcf.repayment, and with circularity on it reaches the whole interest-cash fixed point. The nodes it must NOT reach are EBIT, the tax rate, the debt schedule, the lease and every per-instrument interest node.",
+      "expected_effect": {
+        "economic_solve": "local_to_forward_reachable_set"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 30
+      }
+    },
+    {
+      "id": "perturb_lease_principal",
+      "kind": "economics_changing",
+      "perturbed_node": "lease.principal",
+      "targets": [
+        "lease_policy.principal_repayment"
+      ],
+      "rationale": "Lease principal repayment aggregates into debt.mandatory_repayment and from there into the cash waterfall. EBIT and the tax rate must not move.",
+      "expected_effect": {
+        "economic_solve": "local_to_forward_reachable_set"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 30
+      }
+    },
+    {
+      "id": "perturb_scheduled_amortisation",
+      "kind": "economics_changing",
+      "perturbed_node": "debt.scheduled_amortisation",
+      "targets": [
+        "instruments[0].scheduled_amortisation"
+      ],
+      "rationale": "Scheduled amortisation aggregates into debt.mandatory_repayment. EBIT and the tax rate must not move.",
+      "expected_effect": {
+        "economic_solve": "local_to_forward_reachable_set"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 30
+      }
+    },
+    {
+      "id": "perturb_debt_issuance",
+      "kind": "economics_changing",
+      "perturbed_node": "debt.issuance",
+      "targets": [
+        "instruments[0].new_issuance"
+      ],
+      "rationale": "Debt issuance enters the cash waterfall directly. EBIT and the tax rate must not move.",
+      "expected_effect": {
+        "economic_solve": "local_to_forward_reachable_set"
+      },
+      "minimum_applications": {
+        "archetypes": 25,
+        "generated": 30
+      }
+    }
+  ],
+  "generated_case_subspace": {
+    "declared_by": "P7.3 assets/generated-case-dimension-space-v1.json via scripts/lib/case_generator.mjs",
+    "why_restricted": "An economics-preserving relation over the economic_solve plane needs a case that HAS economics. The full P7.3 space is deliberately weighted into space the pipeline must refuse (one historical period, 52/53-week calendars, non-numeric opening balances, absent FX authority), where the only observable is the refusal. Those cases are NOT discarded: they carry the same economics-preserving families on the refusal_verdict plane.",
+    "restricted_axes": {
+      "historical_periods": [
+        "three_or_more"
+      ],
+      "historical_periods_declared": [
+        "three"
+      ],
+      "fiscal_calendar": [
+        "fixed_date"
+      ],
+      "declared_value_pathology": [
+        "well_formed"
+      ],
+      "currency_mix": [
+        "reporting_only",
+        "foreign_with_declared_fx"
+      ],
+      "instrument_book": [
+        "single",
+        "small_book",
+        "large_book"
+      ]
+    },
+    "free_axes_note": "Eleven axes are left free \u2014 accounting_framework, entity_type, filing_language_format, statement_topology, cash_flow_method, debt_instruments, broker_availability, acquisition_overlay, restructuring_complexity, identity_verdict, declared_language_adapter, refusal_pressure \u2014 so the sub-space still explores the declared dimension space rather than one point of it.",
+    "seed_shape_group": "economics",
+    "completion": {
+      "why": "generateCase carries six keys from its archetype seed shape (statement_structure, modules, controls, operating_metrics, forecast_assumptions, presentation_profile) and mints the rest, so the emitted model_case has no source_coverage, provenance or policy blocks and cannot enter the solver at all. The harness completes the case from the SAME seed shape it was generated against, and carries the archetype's execution_profile, so nothing is invented.",
+      "carried_from_seed_shape": "every top-level key the generator did not mint",
+      "generator_owned_keys": [
+        "contract_version",
+        "case_id",
+        "issuer",
+        "periods",
+        "instruments",
+        "fx"
+      ],
+      "execution_profile": "from the seed shape"
+    },
+    "root_seed": 700400,
+    "seed_count": 300
+  },
+  "known_defects": [
+    {
+      "id": "MG-1",
+      "title": "The canonical equation graph omits the cash-tax edge statement.tax_expense -> cash.cfo",
+      "severity": "high",
+      "status": "OPEN",
+      "class": "graph_dependency_gap",
+      "declared_elsewhere": false,
+      "missing_edges": [
+        {
+          "from": "statement.tax_expense",
+          "to": "cash.cfo"
+        }
+      ],
+      "found_by": "perturb_effective_tax_rate",
+      "reproducing_case": "test-fixtures/archetypes/economics/deferred_revenue_ratable.json",
+      "reproducing_seed": null,
+      "reproduction": "Append an income-statement row {semantic_role: effective_tax_rate, values: [0.25,0.25,0.25,0.28,0.28,0.28]} and solve. tax moves 0 -> 42.27117623444384 and cash_from_operations moves 282.18090452260935 -> 239.69731031714127, so the operating cash flow depends on the tax charge. The graph gives statement.tax_expense exactly one outgoing edge, to statement.net_income, and anchors the cash flow at statement.ebit, so no path exists.",
+      "escaping_nodes_observed": [
+        "cash.cfo",
+        "cash.ending_balance",
+        "interest.income",
+        "interest.net_expense",
+        "interest.gross_expense",
+        "interest.rcf",
+        "rcf.ending_balance",
+        "rcf.repayment",
+        "rcf.liquidity_shortfall",
+        "statement.pre_tax_income"
+      ],
+      "second_order_consequence": "The missing edge closes a cycle the repository does not declare: tax -> cfo -> ending_cash -> interest.cash_income -> interest.income -> statement.finance_income -> statement.pre_tax_income -> statement.tax_expense. assets/convergence-contract.v1.json declares ONE active SCC of 13 nodes for circularity 1 and it contains neither statement.pre_tax_income nor statement.tax_expense, yet both move under this perturbation. The declared fixed point therefore understates the solver's real fixed point.",
+      "repair_owner": "assets/equation-graph.v1.json + assets/convergence-contract.v1.json \u2014 both FORBIDDEN to this package. Recorded, not repaired.",
+      "retirement_condition": "When the edge lands, this suite fails at the reproduction assertion and this entry must be deleted."
+    },
+    {
+      "id": "MG-2",
+      "title": "The equation graph has no debt or lease BALANCE node, so every balance movement -> accrued interest dependency is absent",
+      "severity": "medium",
+      "status": "OPEN",
+      "class": "graph_dependency_gap",
+      "declared_elsewhere": "scripts/lib/layered_graph_constitution.mjs :: EQUATION_GRAPH_UNCOVERED_NODE_FAMILIES declares the instrument and lease families uncovered (P4.6). That declaration is about ROW realisation; this entry states the same gap as concrete missing EDGES, which is what a locality relation needs.",
+      "missing_edges": [
+        {
+          "from": "lease.principal",
+          "to": "interest.lease"
+        },
+        {
+          "from": "debt.scheduled_amortisation",
+          "to": "interest.instrument_cash"
+        },
+        {
+          "from": "debt.scheduled_amortisation",
+          "to": "interest.instrument_pik"
+        },
+        {
+          "from": "debt.issuance",
+          "to": "interest.instrument_cash"
+        },
+        {
+          "from": "debt.issuance",
+          "to": "interest.instrument_pik"
+        },
+        {
+          "from": "debt.issuance",
+          "to": "debt.maturity_repayment"
+        }
+      ],
+      "found_by": [
+        "perturb_lease_principal",
+        "perturb_scheduled_amortisation",
+        "perturb_debt_issuance"
+      ],
+      "reproducing_case": "test-fixtures/archetypes/economics/finance_lease_in_debt_and_leverage.json",
+      "reproducing_seed": null,
+      "reproduction": "Add 5 to every lease_policy.principal_repayment entry and solve: lease_interest moves, although the graph gives lease.principal one outgoing edge, to debt.mandatory_repayment. Symmetrically, adding 1 to instruments[0].scheduled_amortisation or 10 to instruments[0].new_issuance moves instrument_interest and non_cash_instrument_interest.",
+      "repair_owner": "assets/equation-graph.v1.json \u2014 FORBIDDEN to this package. Recorded, not repaired.",
+      "retirement_condition": "When a balance node or these edges land, this suite fails at the reproduction assertion and this entry must be updated or deleted."
+    },
+    {
+      "id": "MG-3",
+      "title": "Solver convergence is not scale-invariant: the fixed-point tolerance is absolute, so the same economics restated in thousands is refused",
+      "severity": "high",
+      "status": "OPEN",
+      "class": "scale_dependence",
+      "declared_elsewhere": false,
+      "found_by": "unit_scale_restatement",
+      "reproducing_case": "test-fixtures/archetypes/economics/revolver_undrawn_commitment_fee_only.json",
+      "reproducing_seed": null,
+      "reproduction": "Solve as filed: converges in 6 iterations with residual 6.0370997090331e-10 against convergence_tolerance 1e-8. Apply unit_scale_restatement (issuer.units millions -> thousands, every declared monetary path x1000) and the same economics throws SOLVER_NON_CONVERGENCE in forecast period 2027-12-31, because the residual scales with the magnitudes while SOLVER_ITERATION_POLICY.tolerance (scripts/lib/solver.mjs:1662) does not.",
+      "consequence": "An issuer that reports in thousands rather than millions can be refused for economics an issuer reporting in millions is served. The refusal is a function of the declared unit, not of the case.",
+      "repair_owner": "scripts/lib/solver.mjs / the solver iteration policy \u2014 FORBIDDEN to this package (scripts/lib/** except metamorphic_relations.mjs). Recorded, not repaired.",
+      "retirement_condition": "When the tolerance becomes relative, this suite fails at the reproduction assertion and this entry must be deleted."
+    },
+    {
+      "id": "MG-4",
+      "title": "A row_type header row, which declares no values, is materialised into statement_values as numeric 0",
+      "severity": "medium",
+      "status": "OPEN",
+      "class": "synthetic_zero",
+      "declared_elsewhere": false,
+      "found_by": "repeated_header",
+      "reproducing_case": "test-fixtures/archetypes/economics/non_controlling_interests.json",
+      "reproducing_seed": null,
+      "reproduction": "Insert {row_id: 'hdr.income-statement', label: 'Year ended 31 December', row_type: 'header'} at the head of statement_structure.income_statement and the same shape at the tail, then solve. forecast[0].statement_values gains hdr.income-statement: 0 and hdr.cash-flow: 0 / hdr.cash-flow-repeat: 0. The rows carry no values key at all, so the zero is minted rather than read. Every solved economic quantity is byte-identical, which is why repeated_header stays declared economics-preserving with a PINNED delta.",
+      "consequence": "The repository's own doctrine is that an absent value never becomes a number (scripts/lib/case_generator.mjs PATHOLOGY_RAW / NON_NUMBER_PATHOLOGIES). A header row is the most common paginated-PDF artefact, so this is the path by which a layout artefact acquires a numeric identity in a value map. Also observed: the trailing header (hdr.income-statement-repeat) does NOT appear while the leading one does, so the two identical rows are not treated identically.",
+      "repair_owner": "scripts/lib/solver.mjs statement-value normalisation \u2014 FORBIDDEN to this package. Recorded, not repaired.",
+      "retirement_condition": "When header rows stop entering statement_values, the pinned delta becomes empty, this suite fails at the MG-4 reproduction assertion and this entry must be deleted."
+    },
+    {
+      "id": "MG-5",
+      "title": "The opening-debt bridge residual is order-dependent: permuting the instrument register changes the reported residual",
+      "severity": "low_today_latent",
+      "status": "OPEN",
+      "class": "float_associativity",
+      "declared_elsewhere": false,
+      "found_by": "row_reorder_instruments",
+      "reproducing_case": "generated cohort, restricted sub-space",
+      "reproducing_seed": 700577,
+      "reproduction": "Generate seed 700577 in the declared sub-space, complete it, and solve: it refuses with OPENING_DEBT_UNRESOLVED reporting -943.56 USD unexplained. Reverse the instruments array \u2014 every instrument keeps its own display_order, so nothing about the case changes but the traversal order \u2014 and the same refusal reports -943.5600000000002 USD. The bridge sums the register without a canonical order, so the residual is a non-associative floating-point sum.",
+      "observed_relative_drift_bound": 1e-09,
+      "consequence": "Today every observed drift is ~1e-13 relative against a bridge tolerance of 0.01, so no VERDICT flips and this is latent rather than live. It is registered because a residual sitting within ~1e-12 of the tolerance would flip on register order alone, and because the reported number is evidence a reviewer reads.",
+      "repair_owner": "scripts/lib/opening_debt_bridge.mjs / the bridge's summation order \u2014 FORBIDDEN to this package. Recorded, not repaired.",
+      "retirement_condition": "When the bridge sums in a canonical order the drift becomes exactly zero, this suite fails at the MG-5 reproduction assertion and this entry must be deleted."
+    }
+  ],
+  "unit_scale_classes": {
+    "cash_from_operations": "currency",
+    "ending_cash": "currency",
+    "minimum_cash": "currency",
+    "non_rcf_debt_issuance": "currency",
+    "mandatory_repayment": "currency",
+    "acquisition_interest": "currency",
+    "rcf_commitment_fee": "currency",
+    "gross_interest": "currency",
+    "interest_income": "currency",
+    "instrument_interest": "currency",
+    "non_cash_instrument_interest": "currency",
+    "lease_interest": "currency",
+    "net_interest": "currency",
+    "non_cash_interest": "currency",
+    "other_interest": "currency",
+    "rcf_interest": "currency",
+    "lease_principal": "currency",
+    "rcf_capacity_native": "currency",
+    "rcf_draw": "currency",
+    "ending_rcf": "currency",
+    "liquidity_shortfall": "currency",
+    "rcf_repayment": "currency",
+    "ebit": "currency",
+    "pre_tax_income": "currency",
+    "tax": "currency",
+    "net_income": "currency",
+    "acquisition_cash_consideration": "currency",
+    "acquisition_debt": "currency",
+    "acquisition_debt_addition": "currency",
+    "acquisition_debt_proceeds": "currency",
+    "acquisition_debt_repayment": "currency",
+    "adjusted_ebitda": "currency",
+    "capex": "currency",
+    "cash_after_mandatory_repayment": "currency",
+    "cash_before_debt": "currency",
+    "cash_before_mandatory_repayment": "currency",
+    "cash_before_rcf": "currency",
+    "cash_from_investing": "currency",
+    "change_in_working_capital": "currency",
+    "depreciation_and_amortisation": "currency",
+    "drawn_commercial_paper": "currency",
+    "eligible_cash": "currency",
+    "ending_interest_bearing_lease": "currency",
+    "ending_lease": "currency",
+    "financing_before_mandatory": "currency",
+    "fx_effect_on_cash": "currency",
+    "fx_on_cash": "currency",
+    "gross_debt": "currency",
+    "lease_additions": "currency",
+    "lease_other_movements": "currency",
+    "net_debt": "currency",
+    "net_leverage": "invariant",
+    "non_debt_financing": "currency",
+    "non_rcf_debt_repayment": "currency",
+    "non_rcf_issuance": "currency",
+    "non_rcf_repayment": "currency",
+    "opening_interest_bearing_lease": "currency",
+    "other_cash_debt_movement": "currency",
+    "other_non_operating": "currency",
+    "pre_rcf_debt_cash_flow": "currency",
+    "rcf_average_fx": "invariant",
+    "rcf_draw_native": "currency",
+    "rcf_ending_fx": "invariant",
+    "rcf_ending_native": "currency",
+    "rcf_fx_non_cash_movement": "currency",
+    "rcf_opening_fx": "invariant",
+    "rcf_opening_native": "currency",
+    "rcf_repayment_native": "currency",
+    "revenue": "currency",
+    "standalone_revenue": "currency",
+    "total_liquidity": "currency",
+    "undrawn_rcf": "currency",
+    "instrument_results": "structured_not_scale_checked",
+    "statement_values": "structured_not_scale_checked"
+  },
+  "unit_scale_class_reasons": {
+    "net_leverage": "a leverage multiple: a ratio of two currency quantities, so a unit restatement must leave it alone",
+    "rcf_average_fx": "an FX rate, not a magnitude \u2014 a unit restatement of the reporting currency does not move a rate",
+    "rcf_ending_fx": "an FX rate, not a magnitude",
+    "rcf_opening_fx": "an FX rate, not a magnitude",
+    "instrument_results": "an array of per-instrument records; the scaling relation is asserted over the scalar economic fields, and P4.6 declares the instrument family uncovered by the graph",
+    "statement_values": "a per-row value map keyed by the case's own row ids, which vary case to case"
+  },
+  "unit_scale_class_semantics": {
+    "currency": "scales by exactly the declared scale_factor under unit_scale_restatement",
+    "invariant": "unchanged under unit_scale_restatement \u2014 a ratio or a rate, never a magnitude",
+    "structured_not_scale_checked": "a nested structure rather than a scalar; named here so its exclusion is declared, not silent"
+  }
+}

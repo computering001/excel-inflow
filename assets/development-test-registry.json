@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "metamorphic-relations",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_metamorphic_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "physical-authority-mutation",
       "phase": "proof",
       "runtime": "python",

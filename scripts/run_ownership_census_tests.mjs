@@ -115,6 +115,7 @@ const FILE_OWNERSHIP = {
   "lib/solve_order.mjs": { role: "validator", concern: "P4.7 Tarjan + topological derivation; checks the hand-written solve order against the case graph, never reorders it", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/canonical_model_modules.mjs": { role: "validator", concern: "P4.4 nine-module boundary register + the sealed per-module boundary digest; validates the declared contract against real solver output, never reorders or extracts", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/evidence_work_graph.mjs": { role: "canonical_writer", concern: "P6.3 evidence-half work nodes + recorded cache decisions (declares and measures; deliberately does not skip work)", target_owner: "Runtime governance (Phase 6)" },
+  "lib/metamorphic_relations.mjs": { role: "validator", concern: "P7.4 transform families + locality verdicts read from the equation graph; compares transformed pairs, never mutates a case in place", target_owner: "Corpus and oracles (Phase 7)" },
   "lib/case_generator.mjs": { role: "canonical_writer", concern: "P7.3 development-only seeded synthetic case generator (writes generated TEST cases and their seed registry; never mutates product state on a real run)", target_owner: "Corpus and generated cohort (Phase 7)" },
 };
 
