@@ -225,6 +225,42 @@ const report = {
   critical_requirements: Object.keys(CRITICAL_REQUIREMENTS),
   generated_at_source_identity_only: true,
 };
-await fs.mkdir(path.dirname(path.resolve(ROOT, outPath)), { recursive: true });
-await fs.writeFile(path.resolve(ROOT, outPath), `${JSON.stringify(report, null, 2)}\n`, "utf8");
-console.log(JSON.stringify({ status: "PASS", checks, scripts: rows.length, out: outPath }));
+// D20 (P0.9): a gate must not mutate the tree it validates. The default path
+// VERIFIES the committed census and refuses on drift; regeneration happens only
+// under --write, matching run_ownership_census_tests.mjs and the coercion
+// inventory. `source_commit`/`source_tree`/`toolchain` are declared-volatile:
+// they are recomputed from git HEAD, so a committed census can never match a
+// later run byte-for-byte and demanding that would be an unmeetable gate.
+const VOLATILE_CENSUS_FIELDS = ["source_commit", "source_tree", "toolchain"];
+const WRITE_CENSUS = process.argv.includes("--write");
+const resolvedOut = path.resolve(ROOT, outPath);
+const substantive = (value) => {
+  const copy = { ...value };
+  for (const field of VOLATILE_CENSUS_FIELDS) delete copy[field];
+  return JSON.stringify(copy, Object.keys(copy).sort());
+};
+if (WRITE_CENSUS) {
+  await fs.mkdir(path.dirname(resolvedOut), { recursive: true });
+  await fs.writeFile(resolvedOut, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+} else {
+  const committed = await fs
+    .readFile(resolvedOut, "utf8")
+    .then((text) => JSON.parse(text))
+    .catch(() => null);
+  check(
+    committed !== null,
+    `the committed census ${outPath} is absent; regenerate it with --write`,
+  );
+  check(
+    substantive(committed) === substantive(report),
+    `the committed census ${outPath} disagrees with the computed one on substantive content (script rows, checks, registry or critical requirements). Regenerate it with --write once you have confirmed the change is intended; the gate will not silently rewrite it.`,
+  );
+  checks += 2;
+}
+console.log(JSON.stringify({
+  status: "PASS",
+  checks,
+  scripts: rows.length,
+  out: outPath,
+  mode: WRITE_CENSUS ? "write" : "verify",
+}));

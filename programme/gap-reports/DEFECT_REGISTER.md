@@ -153,10 +153,14 @@ the budget went to preflight-stopped cases because 5 of 11 entity types are fina
 institutions. P7.3 now declares four strata drawn from the seed, so determinism is preserved.
 Value coverage alone hid this; LANE coverage is what exposed it.
 
-## D20 — a governance test mutates a tracked artifact as a side effect
-`node scripts/run_programme_control_tests.mjs` rewrites `ci/test_registry_census.json`
-while running (found by P7.2's re-verification, which had that file on its forbidden list
-and had to revert it after every run). A validator must not mutate the tree it validates:
+## D20 — a gate mutates a tracked artifact as a side effect
+**ATTRIBUTION CORRECTED (P0.9).** My original entry blamed
+`scripts/run_programme_control_tests.mjs`; that file is side-effect free across all 803
+tracked files. The actual writer is `scripts/run_ci_census_tests.mjs` — `:28` defaults
+`--out` to `ci/test_registry_census.json`, INSIDE the tracked tree, and `:229` writes it
+unconditionally with no flag and no verify mode. P7.2 saw the census change while running
+programme-control because programme-control's run had invoked it; the reverted file was
+census output, not programme-control's. A validator must not mutate the tree it validates:
 a gate run should be side-effect free, and a census artifact should be regenerated only by
 its own generator. Consequence today: any agent forbidden from `ci/**` sees a spurious dirty
 file, and a CI run could in principle commit a census it regenerated rather than verified.
@@ -178,3 +182,23 @@ aggregate forecast ownership… parent broker_consensus coexists with live child
 wc_*:explicit_zero". Both D21 and D22 are carried by the `nightly-frozen-cohort` quarantine
 entry (owner workbook-oracle, expires 2026-09-17) so the nightly tier fails loudly rather
 than silently skipping — but the quarantine EXPIRES, so they cannot sit unfixed.
+
+### D20 root cause (P0.9's finding)
+`source_commit` / `source_tree` are recomputed from git HEAD, so a COMMITTED census can never
+match a later run — which is precisely why the generator was made to overwrite rather than
+verify. Any fix must therefore compare the SUBSTANTIVE payload (script rows, checks, registry
+digest, critical requirements) and treat those three fields as declared-volatile, rather than
+demanding byte equality it can never achieve.
+
+### D20 sweep result
+All 192 registered suites run individually in a detached worktree: EXACTLY ONE offender
+(`ci-census`). All 192 declare `mutates_product_tree: false`, so this is a declared-contract
+violation rather than untidiness.
+
+### Method note worth keeping (P0.9)
+A digest-only side-effect sweep is INSUFFICIENT — it goes blind exactly when the committed
+artifact is already current, which is the CI case. The manifest now stamps `sha256:mtimeMs`
+so a byte-identical rewrite is still caught as `rewritten-identical`. Two of P0.9's six
+mutations survive a digest-only sweep.
+Also: an attribution sweep must never run in a SHARED tree. P0.9's auto-restore reverted a
+concurrent agent's in-flight edit once before it moved to a detached worktree.
