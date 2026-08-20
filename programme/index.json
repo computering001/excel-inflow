@@ -297,6 +297,16 @@
       "commit": "",
       "invariant": "the nine declared modules have checked boundaries and a sealed per-module version",
       "note": "4 of 6 invariants proven, 1 proven-partial with the remainder refused by a live blocker probe, 1 with a declared benign coarsening"
+    },
+    "P6.3": {
+      "commit": "cf2e2f8",
+      "invariant": "expensive evidence-half work is a declared graph whose every cache decision records a typed reason",
+      "note": "declares and measures but deliberately does not skip; a dishonest key is recorded, not served"
+    },
+    "P5.2": {
+      "commit": "cf2e2f8",
+      "invariant": "every emitted formula is an expression in the closed typed vocabulary, and the adjustment gate is applied and recognised structurally",
+      "note": "all 2980 parse and re-render byte-identically; 2213 raw literals recorded per formula with locus"
     }
   },
   "evidence_baseline": {

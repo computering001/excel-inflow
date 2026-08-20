@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 413,
-  "source_commit": "fed531ad55bc7a385202010da03499aa68fa72c9",
-  "source_tree": "46dc894aef7ae5f9840e04b187f0d7fbde7c1cc8",
+  "checks": 417,
+  "source_commit": "c28fbccdd106183bd31e14363afe28b0fece91bc",
+  "source_tree": "51d504de4aa82d11381fb3199aa8e3cb4aee631b",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 199
+    "test_count": 201
   },
   "scripts": [
     {
@@ -330,6 +330,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_emitted_formula_derivability_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_entity_identifier_strength_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -367,6 +371,10 @@
     },
     {
       "script": "run_evidence_run_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_evidence_work_graph_tests.mjs",
       "disposition": "REGISTERED"
     },
     {

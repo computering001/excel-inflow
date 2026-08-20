@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "emitted-formula-derivability",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_emitted_formula_derivability_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "evidence-work-graph",
       "phase": "workflow",
       "runtime": "node",

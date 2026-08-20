@@ -74,6 +74,13 @@ import { EQUATION_GRAPH, deriveStronglyConnectedComponents } from "./lib/equatio
 import { compileRowPlan } from "./lib/row_plan.mjs";
 import { solveCase, solverIterationDeclaration } from "./lib/solver.mjs";
 
+// The red proofs below assert what the asset looked like BEFORE this package.
+// They must read a PINNED commit, not HEAD: once P4.4 is committed HEAD carries
+// the register and a HEAD-relative proof inverts itself, which is exactly what
+// happened on first integration. 9008f5e is the last commit to touch this asset
+// before P4.4 (`git log --oneline -- assets/canonical-model-graph-v2.json`).
+const PRE_P44_BASELINE = "9008f5e";
+
 const root = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)));
 const CERTIFIED = ["standard-maximal-v2", "standard-net-cash-v2"];
 
@@ -104,7 +111,7 @@ const cloneBoundaries = () =>
 let shippedAsset = null;
 try {
   shippedAsset = JSON.parse(
-    execFileSync("git", ["show", "HEAD:assets/canonical-model-graph-v2.json"], {
+    execFileSync("git", ["show", `${PRE_P44_BASELINE}:assets/canonical-model-graph-v2.json`], {
       cwd: root,
       encoding: "utf8",
     }),
