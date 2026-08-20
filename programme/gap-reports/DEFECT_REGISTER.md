@@ -368,14 +368,82 @@ is not a function of the inputs alone.
 
 # Wave 4 — P4.9's corrections. Two defects were WRONG as registered.
 
-## D33 — a metamorphic guard tests a convention's NAME for its MEANING (NEW)
-`scripts/lib/metamorphic_relations.mjs:733` guards the commitment fee with
-`!/rate/i.test(commitment_fee_convention)`. The three conventions that exist in the repo —
-`bps_on_undrawn`, `captured_in_residual`, `none` — contain no "rate", so the guard has NEVER
-fired. The unit-scale transform therefore scales `rcf_policy.commitment_fee_value` from 35 to
-35,000 while the convention is `bps_on_undrawn`: a 350% commitment fee.
+## D33 — a metamorphic guard tests a convention's NAME for its MEANING (FIXED by P7.9)
+`scripts/lib/metamorphic_relations.mjs:733` guarded the commitment fee with
+`!/rate/i.test(commitment_fee_convention)`. P7.9's red proof enumerated the conventions from
+their DECLARED sources rather than by hand, and found FIVE, not the three the register
+recorded: `none`, `bps_on_undrawn`, `captured_in_residual` (model-case-v2), `percent_of_margin`
+(the legacy model-case schema) and `bps_on_committed` (the case-source schema). Not one
+contains the letters r-a-t-e, so the guard fired on nothing and the transform scaled the fee
+unconditionally — 35 to 35,000 on both revolver archetypes, a 35bp fee restated as 350%. Four
+of the five conventions are rates and the fifth is a declared zero placeholder, so there was no
+value at all on which the retired guard's behaviour was correct.
 
-## D30/MG-3 — CORRECTED: overstated, and its reproduction was contaminated by D33
+REPAIRED by dispatch on a declaration. `assets/metamorphic-relations-v1.json` now carries
+`unit_restatement_dimensions`: each quantity names its discriminator and the SCHEMA POINTER
+that admits its values, and classifies every admitted value as `monetary` (scale-covariant),
+`rate` (scale-invariant), `declared_zero_placeholder` or `non_numeric`, each with a stated
+reason citing the reader that consumes it. `validateUnitRestatementDimensionTotality()` runs at
+IMPORT on the same channel as the node-observable totality check: it resolves each declared
+schema pointer, requires every admitted value to be classified and every classification to be
+admitted by some schema, and throws if not. So adding a convention to the schema enum does not
+give it a default — it makes the whole metamorphic layer refuse to load until a human
+classifies it. At the call site an unclassified or absent convention raises
+`UNIT_DIMENSION_UNCLASSIFIED_CONVENTION`; there is no fallback branch to fall into.
+
+## D33's SIBLINGS inside the same transform — three more names standing in for meanings
+P7.9 swept the layer rather than fixing the one instance, on the view that this is a class.
+
+- **`NON_MONETARY_RECONCILIATION_KEY = /percentage|_rate|ratio|tolerance_bps/` (`:558`), tested
+  against `debt_reconciliation` KEY names.** Correct today only by a coincidence of spelling:
+  rename `maximum_residual_percentage` and a tolerance starts being multiplied by 1000; rename
+  `reported_opening_gross_debt` to end in `_ratio` and a balance stops restating. Neither
+  rename touches what the field means. FIXED: the schema closes the container
+  (`additionalProperties: false`, three keys), so the classification is total and a fourth key
+  throws.
+- **`key !== "eligible_percentage"` in the cash-bucket loop — a DENYLIST OF ONE KEY THAT DOES
+  NOT EXIST.** `$defs/cashBucket` declares no property called `eligible_percentage`; the string
+  appears nowhere else in the repository. The real keys are `net_debt_eligible_percentage` and
+  `interest_eligible_percentage` (both bounded by the schema to [0,1]) and `cash_yield` (a rate
+  series). The guard was unconditionally true, so the transform multiplied all three by the
+  unit factor, producing a case violating its own schema `maximum: 1`. It never fired in anger
+  only because NO case in the corpus carries `cash_policy.buckets` — dead code guarding a live
+  branch, which is D33 exactly. FIXED against the closed `$defs/cashBucket` key set, with the
+  branch exercised directly by a mutation since no fixture reaches it.
+- **`RATIO_SEMANTIC_ROLES = new Set(["effective_tax_rate"])` (`:557`).** A hand-written set
+  standing in for "the roles that are ratios". `assets/statement-semantic-taxonomy.v1.json`
+  declares that set — roles carrying `numeric_types: ["percentage"]` — and it has TWO members:
+  `margin` was missing, so a sourced margin row would have been multiplied by 1000. FIXED by
+  deriving the set from the taxonomy. The RESIDUAL cannot be closed in this layer and is
+  registered as MG-7 (below).
+
+Self-mutation, so the repair has provable bite: `run_metamorphic_tests.mjs` now renames each
+discriminator value and each container key through eight spellings that inject or remove the
+words the retired regexes matched on, and requires a NAMED throw for every one. It also replays
+both retired predicates over the same renames and asserts they disagree with the declared
+dimension — so the suite proves not only that the new guard is strict but that the old one was
+wrong. Two further checks prove the totality validator bites in six directions (unclassified
+value, orphan classification, undeclared dimension, unreasoned classification, unclosed
+container, unresolvable authority).
+
+## MG-6 (NEW, LOW) — `operating_metrics` is scaled with no dimension test at all
+`operating_metrics` is declared `additionalProperties: {$ref: metricSeries}` — an OPEN key
+space — and the transform scales `metric.values` for every key. All eleven keys the corpus
+carries are magnitudes, so nothing misfires; a margin, a yield or a headcount added under that
+open space would be multiplied by 1000 with no guard and no error. The same failure mode as
+D33, reached by having NO test rather than a wrong one, and NOT repairable here: a total
+classification needs a closed key set, and closing it is a schema change with compiler, solver
+and golden readers. Registered, with the reproduction, rather than papered over with a default.
+
+## MG-7 (NEW, LOW) — a row's dimension rests on a role the schema leaves an open string
+`statementRow.semantic_role` is `{"type": "string"}`, and the statement taxonomy types only
+some of its roles: of the 32 distinct roles the corpus uses, 13 carry no `numeric_types` and 4
+are absent from the taxonomy entirely. Those are scaled by omission. All 32 are magnitudes
+today. Same class as MG-6, same reason it cannot close inside this layer, and the suite asserts
+the residual rather than assuming it: a row with an untyped `gross_margin` role IS still scaled
+by 1000, and that assertion is pinned to this entry.
+
+## D30/MG-3 — CORRECTED (P4.9 found it, P7.9 landed it): HIGH -> MEDIUM, reproduction contaminated by D33
 As registered, MG-3 claimed convergence is not scale-invariant and that "an issuer reporting in
 thousands is refused for economics an issuer in millions is served". That reproduction was the
 350% fee, not the tolerance. Held at a faithful rate, the thousands restatement CONVERGES on
@@ -389,6 +457,24 @@ scale and strictly stricter below) with the absolute ceiling DECLARED rather tha
 applied: every period it decides carries `binding_term: "declared_absolute_ceiling"` and the
 uncapped scale-free tolerance beside it. Removing the ceiling is a joint change with three
 other readers and is specified, not attempted.
+
+P7.9 landed the register change P4.9 could not reach. MG-3 keeps `status: OPEN` — its mechanism
+is real — but its `severity` is now `medium`, its `title`, `reproduction`, `consequence`,
+`repair_owner` and `retirement_condition` state the corrected finding, and its suite pins are
+inverted: `run_metamorphic_tests.mjs` used to assert "MG-3 reproduces: the only case the
+restatement refuses is the registered one", and now asserts that a FAITHFUL restatement refuses
+NOTHING, across 31 archetypes and 92 generated cases alike (`archetypes_refused` 1 -> 0,
+`generated_refused` 1 -> 0, `archetypes_exact` 30 -> 31). What survives is pinned as a MEASURED
+margin rather than as prose: the worst faithfully restated period —
+`lease_only_no_funded_debt.json` period 0 at x1000 — lands at residual 9.9035e-9 against the
+declared 1e-8 ceiling, a margin of 0.97%, reporting `binding_term:
+"declared_absolute_ceiling"` and `within_declared_envelope: false`. The pin fails if that margin
+either WIDENS (the mechanism was repaired without retiring the entry) or CLOSES (it became a
+refusal). MG-3 is deliberately absent from the suite's `known_defects_reproduced` list and
+appears instead under `known_defects_corrected_not_reproduced`, so no reader can take the old
+attribution from the receipt. The historical reproduction is not deleted: the contamination is
+re-injected by hand in both suites, and a 350% commitment fee is still shown to be correctly
+refused.
 
 ## D28/MG-1 — NOT LANDED, and it exposed a FALSE sealed proof (SEVERITY: HIGH)
 Landing the edge requires FIVE artefacts to move together: the graph edge; the convergence
@@ -479,3 +565,70 @@ finance proof.
 
 Not closed: the value-equality check covers the HISTORICAL HARDCODE channel only. The
 forecast-authority channel remains oracle-only.
+
+# Wave 6 — P7.10's corrections. One defect CLOSED, one restated, one NEW sibling.
+
+## D32 / MG-5 — CLOSED (P7.10)
+The opening-debt bridge now accumulates its three register totals through
+`scripts/lib/canonical_sum.mjs`, which sums a multiset of doubles in an order derived only from
+the values themselves. Order-invariance is a written proof (a total order whose equality class
+holds only bit-identical doubles ⇒ the sorted sequence is unique ⇒ permuting bit-identical
+addends cannot change a partial sum), corroborated by a non-vacuous 500-shuffle test and a
+200-shuffle end-to-end test on seed 700577. The reported residual is UNCHANGED at -943.56; the
+reversed register now reports -943.56 too. The fix is a canonicalisation, not a rounding — the
+0.01 tolerance was not touched and no digit was snapped to it.
+
+RETIREMENT PENDING in files P7.10 may not edit: `run_metamorphic_tests.mjs`'s MG-5 reproduction
+assertion now fails BY DESIGN (its own retirement condition), and the MG-5 entry in
+`assets/metamorphic-relations-v1.json` must be deleted along with the 1e-9 relative epsilon at
+lines 32/34, whose only justification was MG-5. The verified patch is in P7.10's issue card.
+
+## D31 / MG-4 — RESTATED, still OPEN (blocked on a forbidden file)
+Two corrections to the registered description.
+
+(1) "The LEADING header appears and the trailing one does not" is true of the income statement
+and FALSE of the cash flow, whose trailing header also appears. Survival is decided by
+`projectIncomeStatementToDebtOverlay` (`row_plan.mjs:2711-2725`), which prunes header-led blocks
+after net income that hold no required row; the cash flow runs no such projection. The
+asymmetry is a row-pruning artefact, NOT a property of the coercion.
+
+(2) The mint is universal and PRE-EXISTS the transform. `normaliseStatementRows` inserts its own
+header (`adjusted_ebitda_bridge`, `row_plan.mjs:2420`) into the untransformed archetype and it
+is minted as 0 in the baseline solve. Across the solvable archetype corpus and a 24-seed
+generated cohort the escape rate is exactly zero: every valueless header reaching the solver is
+minted. `repeated_header` only made a standing mint visible as a delta.
+
+Mint site, confirmed: `solver.mjs` `statementRowForecastValue` returns literal 0 for
+`mechanism === "uncalculated"` — conflating "nothing computed it" with "a declared explicit
+zero" — while the forecast-authority layer correctly reports `value: null`,
+`declared_value: null`, `reason: "Presentation-only header."`. `statement_values` has exactly
+one writer (`solver.mjs:3334`) fed by exactly one producer (`resolveAll`, `solver.mjs:956`), so
+no repair exists outside `solver.mjs`. The patch is specified in P7.10's issue card, unapplied.
+
+Root cause of the CLASS (D11, D6, D31): the repository's typed value model is a shadow core.
+`typed_financial_value.mjs` is imported by 7 peripheral modules; `typed_arithmetic.mjs` by ZERO
+production modules. Neither `solver.mjs`, `row_plan.mjs`, `case_compiler.mjs`,
+`canonical_model_modules.mjs`, `fixed_point_constitution.mjs`, `forecast_authority.mjs` nor
+`attachment_ingress.mjs` imports any of them. Each instance is repaired where it was found; the
+untyped spine that produces them is never touched. 96 further risk sites are enumerated in
+P7.10's issue card, including `solver.mjs:923` (`if (!definition) return 0` — a dropped ref
+becomes a footed zero), `fixed_point_constitution.mjs:28` (the independent projector fabricates
+the zeros it verifies), `row_plan.mjs:3359` (a fabricated zero SEALED into
+`forecast_period_authorities` with a note claiming it was reported), and
+`solver.mjs:1668-1671` (a coercion that makes its own consistency assertion pass vacuously).
+
+## D36 — `reporting_total` is order-dependent (NEW, same class as D32, NOT repaired)
+(Renumbered by the coordinator from the D34 the package proposed: D34 was already taken by
+`policy.solver.relative_tolerance` in Wave 4.)
+`instrument_period_state.mjs:469-473` reduces `rows.filter(include_in_gross_debt)` in register
+order — the same multiset the bridge sums. Drifts on 3 of 13 multi-instrument registers in the
+700560+24 cohort: seeds 700563 (1502.9969999999998 -> 1502.997), 700569 (7147.594 ->
+7147.594000000001), 700577 (1163.56 -> 1163.5600000000002).
+
+Routing it through `canonicalSum` works, and was reverted: it moves a maintained fixture figure
+in its last place (`run_opening_instrument_provenance_tests.mjs:563`, 9335.506 ->
+9335.505999999998). Regenerating that number to land the repair is forbidden, and picking a
+different canonical order because it reproduces 9335.506 would be fitting the canonicalisation
+to the golden. The drift set is LOCKED by
+`scripts/run_never_zero_and_order_invariance_tests.mjs` and fails if it changes in either
+direction. The decision belongs to the fixture's owner.

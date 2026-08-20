@@ -26,6 +26,7 @@
  */
 
 import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
+import { canonicalSum } from "./canonical_sum.mjs";
 
 export const OPENING_DEBT_BRIDGE_SCHEMA_VERSION = "opening-debt-bridge/1.0";
 
@@ -144,9 +145,14 @@ export function compileOpeningDebtBridge(modelCase, openingState = null) {
 
   const reportingCurrency = state.reporting_currency;
   const lines = [];
-  let identifiedTotal = 0;
-  let fxTotal = 0;
-  let poolTotal = 0;
+  // P7.10 / D32: the bridge totals are accumulated OUT of the register's
+  // traversal order. Collecting the addends and summing them canonically makes
+  // each total a function of the register as a SET, so permuting the
+  // instruments array cannot move the reported residual. See canonical_sum.mjs
+  // for why the invariance holds rather than merely being asserted.
+  const identifiedAmounts = [];
+  const fxAmounts = [];
+  const poolAmounts = [];
   for (const row of state.rows) {
     if (!row.include_in_gross_debt) {
       lines.push({
@@ -178,13 +184,16 @@ export function compileOpeningDebtBridge(modelCase, openingState = null) {
           `1 ${row.basis_currency} = ${row.translation_rate} ${reportingCurrency} ` +
           `period-end at ${state.as_of} (${row.translation_method})`,
       });
-      fxTotal += fxAmount;
+      fxAmounts.push(fxAmount);
     }
-    if (row.is_residual_pool) poolTotal += row.reporting_amount;
-    else identifiedTotal += row.reporting_amount;
+    if (row.is_residual_pool) poolAmounts.push(row.reporting_amount);
+    else identifiedAmounts.push(row.reporting_amount);
   }
 
-  const explainedTotal = identifiedTotal + poolTotal;
+  const identifiedTotal = canonicalSum(identifiedAmounts, "instrument_opening amount");
+  const fxTotal = canonicalSum(fxAmounts, "fx_translation amount");
+  const poolTotal = canonicalSum(poolAmounts, "residual_pool amount");
+  const explainedTotal = canonicalSum([identifiedTotal, poolTotal], "explained subtotal");
   const unexplained = anchor.reported - explainedTotal;
   // Same money tolerance the reconciliation gate applies to a translated sum.
   const tolerance = Math.max(0.01, Math.abs(anchor.reported) * 1e-9);
