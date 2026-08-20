@@ -202,3 +202,39 @@ so a byte-identical rewrite is still caught as `rewritten-identical`. Two of P0.
 mutations survive a digest-only sweep.
 Also: an attribution sweep must never run in a SHARED tree. P0.9's auto-restore reverted a
 concurrent agent's in-flight edit once before it moved to a detached worktree.
+
+## D23 — ending_cash ships as a blue hardcode claiming a filed source on a derived row
+Surfaced by P5.3's new emitter refusal, and confirmed as the single OPEN survivor in P7.5's
+mutation-adequacy register (`cash-fx-identity-workbook::suite-failure`, owner release-proof,
+reproduced serially and independently red in a clean worktree).
+
+`node scripts/run_cash_fx_identity_workbook_tests.mjs` now fails at
+`refuseContradictedProvenance` (build_dynamic_model.mjs:784):
+  Operating Model!G64 / H64 / I64 — ending_cash is a DERIVED row in the case, but the cell
+  ships as a blue hardcode claiming a filed source.
+
+This is the exact class of contradiction P5.3 exists to refuse, so the refusal is correct and
+must NOT be relaxed. The open question is which side is wrong: either the emitter should ship
+a formula for a derived row (and the hardcode is the defect), or the case declares the row
+derived while supplying a filed value (and the case is the defect). Determine which before
+repairing — do not silence the refusal.
+
+IMPORTANT SCOPE NOTE: P5.3 reported "no real mis-colouring found" and that was TRUE for the
+two certified fixtures its gate covered. It was not a claim about the whole cohort. A gate
+scoped to two fixtures cannot speak for every workbook-producing suite — worth remembering
+when reading any "none found" result in this programme.
+
+## D24 — the mutation-adequacy compiler can register its own measuring suite as a survivor
+Observed during P7.5's integration. The compiler sweeps every mutation-class suite INCLUDING
+`mutation-adequacy` itself. While its own suite was transiently red (its artifact claimed 69
+mutation-class suites after integration had registered 71), the sweep recorded
+`mutation-adequacy` as a survivor — so the register asserted a survivor that existed only
+because the register was stale. Recompiling cleared it (score returned to 0.9919, one real
+survivor).
+
+This is the same self-reference class the programme has closed three times now (P7.6a's empty
+forbidden-import list published as evidence, P5.3's validator deriving its expectation from
+the artifact under test, D20's gate rewriting what it verifies). A measuring instrument should
+either exclude itself from its own measurement or declare the self-measurement explicitly.
+Low severity — it is self-correcting on recompile and cannot hide a real survivor — but it can
+manufacture a false one, which is the direction that wastes an owner's time.
