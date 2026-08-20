@@ -128,10 +128,13 @@ check("circularity OFF has no cyclic component — nothing to iterate", () => {
   assert.equal(derivedOff.components.length, EQUATION_GRAPH.nodes.length);
 });
 
-check("circularity ON has exactly one cyclic component of 13 nodes", () => {
+// P4.10 — 13 -> 17. The tax path was always iterated by the sweep; the graph
+// now declares the two net-income edges that make it so, and the component the
+// solve derives at solve time grew to match the solve it was already doing.
+check("circularity ON has exactly one cyclic component of 17 nodes", () => {
   assert.equal(derivedOn.cyclic_components.length, 1);
   const scc = derivedOn.components.find((component) => component.cyclic);
-  assert.equal(scc.nodes.length, 13);
+  assert.equal(scc.nodes.length, 17);
   assert.equal(scc.id, "interest_cash_rcf_feedback");
 });
 
@@ -168,7 +171,7 @@ check("the derived topological node order respects every inter-component edge", 
 });
 
 // ---------------------------------------------------------------------------
-// 2. The 13-entry literal against the graph-derived vector.
+// 2. The 17-entry literal against the graph-derived vector.
 // ---------------------------------------------------------------------------
 
 const literalOn = solverIterationDeclaration(1);
@@ -178,7 +181,7 @@ check("the literal iteration vector's node set IS the derived SCC node set", () 
   assert.equal(vectorOn.agrees, true, JSON.stringify(vectorOn.errors));
   assert.deepEqual(vectorOn.missing, []);
   assert.deepEqual(vectorOn.extra, []);
-  assert.equal(vectorOn.declared_nodes.length, 13);
+  assert.equal(vectorOn.declared_nodes.length, 17);
 });
 
 check("every literal tolerance class matches its equation node", () => {
@@ -204,13 +207,23 @@ check("MUTATION — a literal missing one SCC node is refused", () => {
 });
 
 check("MUTATION — a literal carrying a node outside the SCC is refused", () => {
+  // P4.10 — `statement.net_income` used to be the witness here and is now a
+  // real member of the fixed point. `statement.ebit` replaces it: it is a
+  // genuine source of the component and can never be inside it, because
+  // nothing in the graph computes EBIT.
+  assert.ok(
+    !derivedOn.components
+      .find((component) => component.cyclic)
+      .nodes.includes("statement.ebit"),
+    "the witness must genuinely lie outside the SCC",
+  );
   const mutant = {
     ...literalOn,
-    state_vector: [...literalOn.state_vector, { node_id: "statement.net_income", tolerance_class: "currency" }],
+    state_vector: [...literalOn.state_vector, { node_id: "statement.ebit", tolerance_class: "currency" }],
   };
   const result = checkIterationVectorDerivation(mutant, derivedOn, EQUATION_GRAPH);
   assert.equal(result.agrees, false);
-  assert.deepEqual(result.extra, ["statement.net_income"]);
+  assert.deepEqual(result.extra, ["statement.ebit"]);
 });
 
 check("MUTATION — a literal with a wrong tolerance class is refused", () => {
@@ -312,8 +325,15 @@ check("TEETH — an observed order that violates a real edge is reported", () =>
   const agreement = checkSolveOrderAgreement(observed, derivedOn);
   assert.equal(agreement.agrees, false);
   assert.ok(agreement.violations.length > 0);
+  // P4.10 — `statement.pre_tax_income` moved INSIDE the component, so the
+  // earliest inter-component edge out of EBIT that the swap now reverses is
+  // the cash-flow-bridge one. The check gains a clause rather than losing one:
+  // every reported violation must originate at the node that was moved.
   assert.ok(
-    agreement.violations.some((violation) => violation.edge_id === "edge.ebit_to_pre_tax_income"),
+    agreement.violations.some((violation) => violation.edge_id === "edge.ebit_to_cash_flow_start"),
+  );
+  assert.ok(
+    agreement.violations.every((violation) => violation.from === "statement.ebit"),
   );
 });
 
@@ -344,7 +364,7 @@ check("every solved period carries a per-SCC residual", () => {
       if (solution.equation_graph_evidence.active_circularity_state === 1) {
         assert.equal(residuals.length, 1, `${label}/${period.period}`);
         assert.equal(residuals[0].component_id, "interest_cash_rcf_feedback");
-        assert.equal(residuals[0].nodes, 13);
+        assert.equal(residuals[0].nodes, 17);
       }
     }
   }
@@ -562,21 +582,29 @@ check("TEETH — a repayment capped by the opening balance is named as such", ()
 // ---------------------------------------------------------------------------
 
 // M1 — a cycle introduced into the graph must be caught.
-check("M1 — an edge that drags the tax path into the interest SCC is caught", () => {
+check("M1 — an edge that drags a further node into the interest SCC is caught", () => {
+  // P4.10 — the old witness for this mutation was
+  // `statement.net_income -> statement.cash_flow_start`, which is now a
+  // DECLARED production edge because the solver has always walked it. The
+  // mutation is restated on a node that is genuinely outside the component and
+  // must stay outside: nothing in the graph computes EBIT, so an edge that
+  // makes the cash loop compute it is exactly the class of undeclared
+  // enlargement this check exists to catch.
   const mutant = structuredClone(EQUATION_GRAPH);
   mutant.edges.push({
-    id: "edge.mutant_net_income_to_cash_flow_start",
-    from: "statement.net_income",
-    to: "statement.cash_flow_start",
+    id: "edge.mutant_cfo_to_ebit",
+    from: "cash.cfo",
+    to: "statement.ebit",
     type: "statement_dependency",
     activation: "always",
   });
   const derived = deriveSolveOrder(mutant, 1);
   const scc = derived.components.find((component) => component.cyclic);
-  assert.ok(scc.nodes.length > 13, "the mutant cycle did not grow the SCC");
-  assert.ok(scc.nodes.includes("statement.tax_expense"), "the tax path stayed outside the SCC");
+  assert.ok(scc.nodes.length > 17, "the mutant cycle did not grow the SCC");
+  assert.ok(scc.nodes.includes("statement.ebit"), "EBIT stayed outside the SCC");
+  assert.ok(scc.nodes.includes("statement.tax_expense"), "the tax path left the SCC");
   const result = checkIterationVectorDerivation(literalOn, derived, mutant);
-  assert.equal(result.agrees, false, "the solver's 13-entry vector survived a bigger SCC");
+  assert.equal(result.agrees, false, "the solver's 17-entry vector survived a bigger SCC");
 });
 
 check("M1 — a self-loop introduced on a node is caught as a cyclic component", () => {
@@ -618,7 +646,7 @@ check("M1 — a SECOND cycle, wholly outside the interest SCC, is still caught",
   );
   assert.equal(
     derived.components.find((component) => component.id === "interest_cash_rcf_feedback").nodes.length,
-    13,
+    17,
     "the interest SCC was disturbed by an unrelated cycle",
   );
   const result = checkIterationVectorDerivation(literalOn, derived, mutant);

@@ -4,7 +4,7 @@
   "graph_binding": {
     "schema_version": "equation-graph/1.0",
     "graph_id": "canonical_debt_overlay_forecast",
-    "canonical_sha256": "c4505d067fd2e383ee226ef77260f2afc4ef86b2c25a0dea51684aac90076fd2",
+    "canonical_sha256": "cb453ab770d8cba9ef05f505acda46d0d95736abed12f6f9a32bc160a79148bc",
     "hash_encoding": "sha256_canonical_json"
   },
   "policy_binding": {
@@ -64,7 +64,7 @@
     "structural": [
       {
         "id": "interest_cash_rcf_feedback",
-        "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.cash_flow_start", "statement.finance_expense", "statement.finance_income"]
+        "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.net_expense", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.cash_flow_start", "statement.finance_expense", "statement.finance_income", "statement.net_income", "statement.pre_tax_income", "statement.tax_expense"]
       }
     ],
     "active_by_circularity": {
@@ -72,7 +72,7 @@
       "1": [
         {
           "id": "interest_cash_rcf_feedback",
-          "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.cash_flow_start", "statement.finance_expense", "statement.finance_income"]
+          "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.net_expense", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.cash_flow_start", "statement.finance_expense", "statement.finance_income", "statement.net_income", "statement.pre_tax_income", "statement.tax_expense"]
         }
       ]
     }
@@ -97,7 +97,11 @@
           { "node_id": "interest.gross_expense", "tolerance_class": "currency" },
           { "node_id": "interest.income", "tolerance_class": "currency" },
           { "node_id": "statement.finance_expense", "tolerance_class": "currency" },
-          { "node_id": "statement.finance_income", "tolerance_class": "currency" }
+          { "node_id": "statement.finance_income", "tolerance_class": "currency" },
+          { "node_id": "interest.net_expense", "tolerance_class": "currency" },
+          { "node_id": "statement.pre_tax_income", "tolerance_class": "currency" },
+          { "node_id": "statement.tax_expense", "tolerance_class": "currency" },
+          { "node_id": "statement.net_income", "tolerance_class": "currency" }
         ]
       }
     }

@@ -28,18 +28,35 @@
  *   1. PRESENCE — the four ETR roles each bind to exactly one node, with the
  *      six declared edges wired exactly as declared.
  *   2. ACYCLICITY — independently recomputed here, not read off the proof: a
- *      topological order exists in all three activation states, no ETR node
- *      lies inside ANY strongly connected component of the whole graph, and
- *      no edge leaves the ETR set.
+ *      topological order exists in all three activation states; the RATE is
+ *      exogenous and lies in no component; no ETR node reaches the rate; with
+ *      circularity OFF no ETR node lies in any component; and every ETR node
+ *      that IS iterated is DECLARED in the fixed point.
+ *
+ *      P4.10 — CORRECTED. Until P4.10 this section asserted that no ETR node
+ *      lay inside ANY strongly connected component and that no edge left the
+ *      ETR set. Both were true of the graph as it stood and FALSE of the
+ *      running solver: the sweep has always computed the tax charge from a
+ *      pre-tax income that consumes the iterated net interest, and has always
+ *      seeded operating cash flow from net income. This suite was therefore a
+ *      sealed proof of a property the system did not have. The assertions are
+ *      not removed and not loosened — they are replaced by the properties that
+ *      are true and that carry the protection P3.3 was reaching for, plus a
+ *      NEW obligation, stronger than either of the two it replaces: an ETR
+ *      node may be iterated only if the convergence contract and the solver's
+ *      state vector both declare it. That obligation would have caught this
+ *      defect on the day the solver first seeded cash flow from net income.
  *   3. NON-VACUITY — the path is connected: rate and base both reach the
  *      charge, the charge reaches the sink.
  *   4. DECLARATION — the three operators are enumerable members of the
  *      declared vocabulary, and an undeclared string sharing their prefix is
  *      now REFUSED by both former prefix-detection sites.
- *   5. MUTATION — a tax cycle, a missing edge, a missing node and a duplicated
- *      role are each caught, at the load-bearing validator.
+ *   5. MUTATION — a tax/rate cycle, a rate computed from inside the system, a
+ *      missing edge, a missing node, a duplicated role, and an ITERATED-BUT-
+ *      UNDECLARED tax node are each caught, at the load-bearing validator.
  *   6. CASE BINDING — the graph proved here is the graph both certified
- *      fixtures actually solved against, and the solver iterates no tax node.
+ *      fixtures actually solved against, and every tax node the solver
+ *      iterates appears in the solver's own declared state vector.
  */
 
 import assert from "node:assert/strict";
@@ -78,7 +95,7 @@ import {
 } from "./lib/tax_rate_policy.mjs";
 import { compileForecastCompletionCensus } from "./lib/forecast_completion_constitution.mjs";
 import { forecastCellProducerWitness } from "./lib/forecast_producer_contract.mjs";
-import { solveCase } from "./lib/solver.mjs";
+import { solveCase, solverIterationDeclaration } from "./lib/solver.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
@@ -193,34 +210,85 @@ for (const [label, edges] of [
   );
 }
 
-// No ETR node inside ANY strongly connected component of the WHOLE graph.
-// This is the DAG-safety statement itself: a node inside an SCC is solved by
-// iteration, which is what the tax/rate pair must never require.
+// THE RATE IS EXOGENOUS. `tax = PBT x rate` is circular only if something
+// inside the system computes the RATE; the tax rate policy exists to make the
+// rate an input derived from filed history outside it. Recomputed here.
+const rateNodeId = nodeByRole.get(declaration.rate_role).id;
+const rateInEdges = EQUATION_GRAPH.edges.filter((edge) => edge.to === rateNodeId);
+check(
+  rateInEdges.length === 0,
+  `nothing may compute the effective tax rate; found ${rateInEdges.map((e) => e.id).join(", ")}`,
+);
 for (const [label, options] of [
   ["structural", {}],
   ["circularity-off", { circularity: 0 }],
   ["circularity-on", { circularity: 1 }],
 ]) {
-  const trapped = deriveStronglyConnectedComponents(EQUATION_GRAPH, options)
+  check(
+    !deriveStronglyConnectedComponents(EQUATION_GRAPH, options).flat().includes(rateNodeId),
+    `the rate may not lie inside a ${label} strongly connected component`,
+  );
+}
+// NO ETR NODE REACHES THE RATE. This is the exact statement P3.3's blanket
+// "no edge leaves the ETR set" was approximating, and it forbids precisely the
+// two-equation cycle rather than every downstream consumer of tax.
+for (const id of nodeIds) {
+  if (id === rateNodeId) continue;
+  check(
+    !reaches(id, rateNodeId, EQUATION_GRAPH.edges),
+    `${id} must not reach the rate ${rateNodeId}: the tax/rate pair may never close`,
+  );
+}
+// WITH CIRCULARITY OFF, no ETR node lies in any component. P3.3's original
+// obligation, kept verbatim in the state where it is still true.
+{
+  const trapped = deriveStronglyConnectedComponents(EQUATION_GRAPH, { circularity: 0 })
     .flat()
     .filter((id) => members.has(id));
   check(
     trapped.length === 0,
-    `no ETR node may lie inside a ${label} strongly connected component; found ${trapped.join(", ")}`,
+    `with circularity off no ETR node may lie in a component; found ${trapped.join(", ")}`,
   );
 }
-// Nor may the ETR set feed anything outside itself.
-const escaping = EQUATION_GRAPH.edges.filter(
-  (edge) => members.has(edge.from) && !members.has(edge.to),
-);
+// EVERY ITERATED ETR NODE IS DECLARED — in the convergence contract's SCC AND
+// in the solver's state vector. Recomputed from the graph, then checked against
+// BOTH declarations independently, so neither can drift alone.
+const iteratedEtrNodes = deriveStronglyConnectedComponents(EQUATION_GRAPH, { circularity: 1 })
+  .flat()
+  .filter((id) => members.has(id))
+  .sort();
 check(
-  escaping.length === 0,
-  `the ETR path must terminate; ${escaping.map((edge) => edge.id).join(", ")} leaves the set`,
+  iteratedEtrNodes.length === 3 &&
+    iteratedEtrNodes.join(",") ===
+      "statement.net_income,statement.pre_tax_income,statement.tax_expense",
+  `the tax base, the charge and net income are iterated; found ${iteratedEtrNodes.join(", ")}`,
 );
+{
+  const declaredScc = new Set(
+    CONVERGENCE_CONTRACT.scc_contract.active_by_circularity["1"].flatMap(
+      (component) => component.nodes,
+    ),
+  );
+  const declaredVector = new Set(
+    CONVERGENCE_CONTRACT.solver_iteration.state_by_circularity["1"].state_vector.map(
+      (component) => component.node_id,
+    ),
+  );
+  const solverVector = new Set(
+    solverIterationDeclaration(1).state_vector.map((component) => component.node_id),
+  );
+  for (const id of iteratedEtrNodes) {
+    check(declaredScc.has(id), `${id} is iterated but the contract's SCC omits it`);
+    check(declaredVector.has(id), `${id} is iterated but the contract's state vector omits it`);
+    check(solverVector.has(id), `${id} is iterated but the SOLVER's state vector omits it`);
+  }
+}
 check(
-  proof.outside_every_strongly_connected_component === true && proof.acyclic === true &&
-    proof.terminates === true,
-  "the compiled proof affirms exactly the three properties recomputed above",
+  proof.acyclic === true && proof.rate_is_exogenous === true &&
+    proof.charge_never_reaches_the_rate === true &&
+    proof.acyclic_with_circularity_off === true &&
+    proof.iterated_and_declared_in_fixed_point.join(",") === iteratedEtrNodes.join(","),
+  "the compiled proof affirms exactly the properties recomputed above, and no others",
 );
 
 // ---------------------------------------------------------------------------
@@ -252,12 +320,29 @@ check(
   reaches("statement.ebit", baseId, EQUATION_GRAPH.edges),
   "EBIT reaches the tax base: the path is attached to the economics, not free-floating",
 );
+// P4.10 — this check formerly asserted that the tax charge reached NEITHER the
+// cash waterfall NOR CFO, on the reasoning that "this graph's cash flow starts
+// at EBIT". The solver's cash flow does not start at EBIT: `solveCase` seeds
+// `statement.cash_flow_start` from the declared cash-flow net-income row and
+// falls back to `netIncome`, and it seeds CFO from `netIncome` too. So the
+// claim was false about the running system, and the two edges that make it
+// false are now DECLARED. The check is inverted rather than deleted: the
+// connection must be PRESENT, because if it ever disappeared the fixed point
+// would be declaring three nodes it no longer contains.
 check(
-  !reaches(chargeId, "cash.ending_balance", EQUATION_GRAPH.edges) &&
-    !reaches(sinkId, "cash.cfo", EQUATION_GRAPH.edges),
-  "the tax charge reaches neither the cash waterfall nor CFO: this graph's cash flow starts " +
-    "at EBIT, which is exactly WHY the ETR path is acyclic — a tax line inside the cash " +
-    "bridge would close the loop back through cash interest into net interest",
+  reaches(sinkId, "cash.cfo", EQUATION_GRAPH.edges) &&
+    reaches(sinkId, "cash.ending_balance", EQUATION_GRAPH.edges) &&
+    reaches(chargeId, "cash.cfo", EQUATION_GRAPH.edges),
+  "net income reaches CFO and the cash waterfall, and the tax charge reaches CFO through it: " +
+    "this is the cash bridge the solver has always walked, and declaring it is what puts the " +
+    "tax path inside the fixed point instead of silently outside it",
+);
+check(
+  reaches(sinkId, "statement.pre_tax_income", activeEquationEdges(EQUATION_GRAPH, 1)) &&
+    !reaches(sinkId, "statement.pre_tax_income", activeEquationEdges(EQUATION_GRAPH, 0)),
+  "the loop closes ONLY when circularity is on: with the interest breaker off, net income " +
+    "still reaches cash but cash no longer reaches the tax base, which is why the tax path " +
+    "is acyclic in that state and iterated in the other",
 );
 
 // ---------------------------------------------------------------------------
@@ -441,32 +526,84 @@ check(
 // 5. MUTATION — every way of breaking DAG safety must be caught.
 // ---------------------------------------------------------------------------
 
-// (i) The realistic mistake: wire net income into the cash-flow bridge. That
-// closes net income -> cash flow start -> CFO -> cash -> cash interest income
-// -> interest income -> net interest -> pre-tax income -> tax -> net income.
+// (i) P4.10 — THE MUTATION THIS PACKAGE EXISTS FOR, and the replacement for
+// P3.3's cash-flow-bridge mutation (whose edge is now a declared production
+// edge because the solver has always walked it). The graph is left exactly as
+// shipped and the DECLARATION is withdrawn: a fixed point that no longer
+// admits the nodes it iterates must fail loudly. This is the defect P4.9
+// measured, driven as a mutation so it can never recur silently.
+{
+  const withdrawn = JSON.parse(JSON.stringify(CONVERGENCE_CONTRACT));
+  const iterated = new Set([
+    "statement.pre_tax_income",
+    "statement.tax_expense",
+    "statement.net_income",
+  ]);
+  for (const component of withdrawn.scc_contract.active_by_circularity["1"]) {
+    component.nodes = component.nodes.filter((id) => !iterated.has(id));
+  }
+  withdrawn.solver_iteration.state_by_circularity["1"].state_vector =
+    withdrawn.solver_iteration.state_by_circularity["1"].state_vector.filter(
+      (component) => !iterated.has(component.node_id),
+    );
+  const errors = validateEffectiveTaxRatePathAcyclicity(
+    EQUATION_GRAPH,
+    EFFECTIVE_TAX_RATE_PATH,
+    withdrawn,
+  );
+  for (const id of iterated) {
+    check(
+      errors.some((error) => error.includes(id) && error.includes("does not declare it a member")),
+      `MUTATION: ${id} iterated but withdrawn from the declared fixed point is caught`,
+    );
+    check(
+      errors.some((error) => error.includes(id) && error.includes("state vector omits it")),
+      `MUTATION: ${id} iterated but absent from the declared state vector is caught`,
+    );
+  }
+  let threw = false;
+  try {
+    compileEffectiveTaxRatePathProof(EQUATION_GRAPH, EFFECTIVE_TAX_RATE_PATH, withdrawn);
+  } catch (error) {
+    threw = /not DAG-safe/.test(error.message);
+  }
+  check(
+    threw,
+    "MUTATION: the proof compiler refuses to emit a proof over a fixed point that omits an " +
+      "iterated tax node — a declared fixed point must contain every node the solver iterates",
+  );
+}
+
+// (i-b) An edge that COMPUTES the rate from inside the equation system. This is
+// the mechanism the tax rate policy exists to forbid, and it is now checked
+// directly rather than through the blanket sink property.
 {
   const mutated = mutableGraph();
   mutated.edges.push({
-    id: "edge.net_income_to_cash_flow_start",
-    from: "statement.net_income",
-    to: "statement.cash_flow_start",
+    id: "edge.tax_expense_to_effective_tax_rate",
+    from: "statement.tax_expense",
+    to: "statement.effective_tax_rate",
     type: "statement_dependency",
-    activation: "circularity_on",
+    activation: "always",
   });
   const errors = validateEffectiveTaxRatePathAcyclicity(mutated);
   check(
-    errors.some((error) => error.includes("strongly connected")),
-    "MUTATION: a tax cycle through the cash-flow bridge is caught as an SCC trap",
+    errors.some((error) => error.includes("must enter the equation system as an INPUT")),
+    "MUTATION: a rate computed from the charge is caught — this IS `rate = tax / PBT`",
   );
   check(
-    errors.some((error) => error.includes("must terminate")),
-    "MUTATION: the same edge is independently caught by the sink property",
+    errors.some((error) => error.includes("reaches the rate")),
+    "MUTATION: the same edge is independently caught by the tax/rate closure obligation",
+  );
+  check(
+    errors.some((error) => error.includes("no structural topological order")),
+    "MUTATION: and independently again by the internal acyclicity certificate",
   );
   check(
     validateEquationGraph(mutated, CONVERGENCE_CONTRACT)
       .some((error) => error.includes("effective-tax-rate")),
-    "MUTATION: the load-bearing graph validator refuses the cycle, so no case can be " +
-      "solved against a graph in which the tax path is circular",
+    "MUTATION: the load-bearing graph validator refuses the tax/rate cycle, so no case can " +
+      "be solved against a graph in which the rate is derived from inside the system",
   );
   let threw = false;
   try {
@@ -475,6 +612,47 @@ check(
     threw = /not DAG-safe/.test(error.message);
   }
   check(threw, "MUTATION: the proof compiler refuses rather than emitting acyclic: true");
+}
+
+// (i-c) An edge that drags the RATE into the iterated block without touching
+// the charge at all. The rate must be exogenous even where nothing else moves.
+{
+  const mutated = mutableGraph();
+  mutated.edges.push({
+    id: "edge.cash_to_effective_tax_rate",
+    from: "cash.ending_balance",
+    to: "statement.effective_tax_rate",
+    type: "statement_dependency",
+    activation: "always",
+  });
+  const errors = validateEffectiveTaxRatePathAcyclicity(mutated);
+  check(
+    errors.some((error) => error.includes("must enter the equation system as an INPUT")),
+    "MUTATION: a rate computed from the cash balance is caught, charge untouched",
+  );
+  check(
+    errors.some((error) => error.includes("lies inside a circularity-on strongly connected")),
+    "MUTATION: the rate dragged into the active component is caught as an SCC trap",
+  );
+}
+
+// (i-d) With circularity OFF the tax path must still be outside every
+// component. P3.3's original obligation, driven as a live mutation.
+{
+  const mutated = mutableGraph();
+  mutated.edges.push({
+    id: "edge.mutant_cfo_to_pre_tax_income",
+    from: "cash.cfo",
+    to: "statement.pre_tax_income",
+    type: "statement_dependency",
+    activation: "always",
+  });
+  check(
+    validateEffectiveTaxRatePathAcyclicity(mutated)
+      .some((error) => error.includes("circularity-off strongly connected")),
+    "MUTATION: a tax cycle that survives the interest kill switch is caught with " +
+      "circularity OFF, where the tax path must never be iterated at all",
+  );
 }
 
 // (ii) The bare tax/rate pair: tax expense feeding the tax base back.
@@ -596,20 +774,36 @@ for (const fixture of ["standard-maximal-v2", "standard-net-cash-v2"]) {
     `${fixture} solved against the very graph this proof covers (hash-bound, so the ` +
       "acyclicity result is about the case's own equation graph and not a detached template)",
   );
+  // P4.10 — this formerly asserted that NO tax node appeared in the solved SCC
+  // evidence and that the solver iterated none. Both were false of the running
+  // solve and true only of the graph it was hash-bound to. The obligation is
+  // now the one that has teeth: whatever the solved case reports as its active
+  // component must be exactly what the solver declares it iterates, and the
+  // rate must appear in neither.
   const inScc = [
     ...evidence.structural_sccs.flatMap((component) => component.nodes),
     ...evidence.active_sccs.flatMap((component) => component.nodes),
   ].filter((id) => members.has(id));
-  check(
-    inScc.length === 0,
-    `${fixture}: no tax node appears in the solved SCC evidence; found ${inScc.join(", ")}`,
-  );
   const iterated = (evidence.solver_declaration?.state_vector ?? [])
     .map((component) => component.node_id)
     .filter((id) => members.has(id));
   check(
-    iterated.length === 0,
-    `${fixture}: the solver iterates no tax node; found ${iterated.join(", ")}`,
+    [...new Set(inScc)].sort().join(",") === iteratedEtrNodes.join(","),
+    `${fixture}: the solved SCC evidence must name exactly the iterated tax nodes; found ${[
+      ...new Set(inScc),
+    ]
+      .sort()
+      .join(", ")}`,
+  );
+  check(
+    [...new Set(iterated)].sort().join(",") === iteratedEtrNodes.join(","),
+    `${fixture}: the solver must iterate exactly the tax nodes the graph says are in the ` +
+      `component; found ${[...new Set(iterated)].sort().join(", ")}`,
+  );
+  check(
+    !inScc.includes(rateNodeId) && !iterated.includes(rateNodeId),
+    `${fixture}: the effective tax RATE is never iterated — it is an input, and that is the ` +
+      "property that breaks the tax/rate cycle",
   );
 }
 

@@ -147,6 +147,13 @@ const EXCLUDED_FROM_SCAN = new Set([
   path.join(root, "assets", "canonical-model-graph-v2.json"),
   path.join(root, "scripts", "lib", "canonical_model_modules.mjs"),
   path.join(root, "scripts", "run_canonical_model_module_tests.mjs"),
+  // P4.10 — a READER, not a producer. It asks the module contract whether the
+  // union of the declared iteration states equals the solver's own state
+  // vector, which is this package's own invariant seen from the other side.
+  // The allowance is not a hole: the production-side check below is computed
+  // over the FULL scan set, exclusions included, and no allow-list can satisfy
+  // it.
+  path.join(root, "scripts", "run_declared_fixed_point_completeness_tests.mjs"),
 ]);
 function walk(directory, out = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -183,6 +190,38 @@ for (const file of scanFiles) {
     }
   }
 }
+// R2b (P4.10) — the production-side statement, computed over EVERY file in the
+// scan roots INCLUDING the exclusions. A suite may READ the contract's fields;
+// only the owning module and the sealed asset may declare them. This cannot be
+// satisfied by adding a file to `EXCLUDED_FROM_SCAN`, so the allowance above
+// buys nothing here.
+{
+  const OWNERS = new Set([
+    path.join("scripts", "lib", "canonical_model_modules.mjs"),
+    path.join("assets", "canonical-model-graph-v2.json"),
+  ]);
+  const productionProducers = [];
+  for (const file of scanRoots.flatMap((directory) => walk(directory))) {
+    const relative = path.relative(root, file);
+    if (OWNERS.has(relative)) continue;
+    if (/^scripts[/\\]run_/.test(relative)) continue;
+    const text = fs.readFileSync(file, "utf8");
+    if (
+      CONTRACT_TOKENS.some((token) =>
+        new RegExp(`(?<![A-Za-z0-9_])${token}(?![A-Za-z0-9_])`).test(text),
+      )
+    ) {
+      productionProducers.push(relative);
+    }
+  }
+  check(
+    productionProducers.length === 0,
+    `R2b: a non-suite file outside the owning package declares a contract token: ${JSON.stringify(
+      productionProducers,
+    )}`,
+  );
+}
+
 for (const token of CONTRACT_TOKENS) {
   check(
     !producers.has(token),
@@ -453,10 +492,13 @@ const activeSccs = deriveStronglyConnectedComponents(EQUATION_GRAPH, {
   circularity: 1,
 });
 const sccNodes = activeSccs.flatMap((component) => component.nodes ?? component);
-check(activeSccs.length === 1 && sccNodes.length === 13, "C: the active SCC moved");
+// P4.10 — 13 -> 17. The tax path is inside the fixed point because the sweep
+// has always iterated it; the graph now declares the edges that make it so.
+check(activeSccs.length === 1 && sccNodes.length === 17, "C: the active SCC moved");
 const sccModules = [...new Set(sccNodes.map((nodeId) => owned.get(nodeId)))].sort();
 check(
-  JSON.stringify(sccModules) === JSON.stringify(["cash_rcf", "interest"]),
+  JSON.stringify(sccModules) ===
+    JSON.stringify(["cash_rcf", "interest", "tax_and_working_capital"]),
   `C: the node-level cycle spans ${JSON.stringify(sccModules)}`,
 );
 const declaredIteration = Object.values(CANONICAL_MODULE_BOUNDARIES)
@@ -469,13 +511,18 @@ check(
   JSON.stringify(declaredIteration) === JSON.stringify(solverVector),
   "C: the declared iteration states are not exactly the solver's state vector",
 );
-check(declaredIteration.length === 13, "C: the state vector is no longer 13 nodes");
+check(declaredIteration.length === 17, "C: the state vector is no longer 17 nodes");
 // The declared quotient coarsening, proven benign.
 const quotientOn = quotientSccs(1);
 check(
   quotientOn.length === 1 &&
     JSON.stringify(quotientOn[0]) ===
-      JSON.stringify(["cash_rcf", "debt_instruments", "interest"]),
+      JSON.stringify([
+        "cash_rcf",
+        "debt_instruments",
+        "interest",
+        "tax_and_working_capital",
+      ]),
   `C: the quotient component moved to ${JSON.stringify(quotientOn)}`,
 );
 check(

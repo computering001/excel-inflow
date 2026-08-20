@@ -1330,6 +1330,18 @@ export function workbookSemanticProofContract(
       rowPlan.interest_summary_rows?.interest_income_schedule,
     "statement.finance_expense": statementRowFor("interest_expense"),
     "statement.finance_income": statementRowFor("interest_income"),
+    // P4.10 — the tax path is inside the fixed point, so it must have a
+    // physical realisation like every other member. These four rows already
+    // participate in the emitted workbook's circular formula block: the tax
+    // charge is computed from a pre-tax income that consumes the interest
+    // schedule, and the cash-flow statement starts from net income. The
+    // independent OOXML oracle now requires them to occupy the SAME physical
+    // formula SCC as the interest and cash rows, which is the physical twin of
+    // the declaration this package landed.
+    "interest.net_expense": rowPlan.interest_summary_rows?.net_interest_expense,
+    "statement.pre_tax_income": statementRowFor("pre_tax_income"),
+    "statement.tax_expense": statementRowFor("tax_expense"),
+    "statement.net_income": statementRowFor("net_income"),
   };
   const expectedFixedPointNodes =
     CONVERGENCE_CONTRACT.scc_contract.active_by_circularity["1"][0].nodes;

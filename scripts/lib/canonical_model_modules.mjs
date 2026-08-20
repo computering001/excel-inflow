@@ -1302,7 +1302,7 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
 
   tax_and_working_capital: Object.freeze({
     module_id: "tax_and_working_capital",
-    module_version: "2.0.0",
+    module_version: "2.1.0",
     nodes: Object.freeze([
       "statement.effective_tax_rate",
       "statement.net_income",
@@ -1329,7 +1329,16 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
       write("forecast[].net_income"),
       write("forecast[].change_in_working_capital"),
     ]),
-    iteration_state: Object.freeze([]),
+    // P4.10 — this module ITERATES. The sweep computes the tax base from the
+    // iterated net interest and seeds operating cash flow from net income, so
+    // all three quantities are recomputed every sweep and are members of the
+    // active component. The empty declaration here was the module-level face of
+    // the same missing edge.
+    iteration_state: Object.freeze([
+      "statement.net_income",
+      "statement.pre_tax_income",
+      "statement.tax_expense",
+    ]),
     invariants: invariantsFor("tax_and_working_capital"),
   }),
 
@@ -1399,7 +1408,7 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
 
   cash_rcf: Object.freeze({
     module_id: "cash_rcf",
-    module_version: "2.0.0",
+    module_version: "2.1.0",
     nodes: Object.freeze([
       "cash.cash_interest_paid",
       "cash.cash_interest_received",
@@ -1427,6 +1436,11 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
       "edge.ebit_to_cash_flow_start",
       "edge.finance_expense_to_cash_flow_start",
       "edge.finance_income_to_cash_flow_start",
+      // P4.10 — net income enters the cash-flow bridge. Edge ownership follows
+      // the DEPENDENT, and both dependents (`statement.cash_flow_start`,
+      // `cash.cfo`) are this module's nodes.
+      "edge.net_income_to_cash_flow_start",
+      "edge.net_income_to_cfo",
       "edge.gross_to_cash_interest_paid",
       "edge.income_to_cash_interest_received",
       "edge.issuance_to_cash",
@@ -1456,6 +1470,10 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
       read("interest", "equation_edge", "statement.finance_income"),
       read("debt_instruments", "equation_edge", "debt.issuance"),
       read("debt_instruments", "equation_edge", "debt.mandatory_repayment"),
+      // P4.10 — this was declared as an ARTIFACT read while the equation graph
+      // denied the dependency existed. It is an equation edge, and the module
+      // contract said so before the graph did.
+      read("tax_and_working_capital", "equation_edge", "statement.net_income"),
       read("tax_and_working_capital", "artifact_path", "forecast[].net_income"),
       read("leases", "artifact_path", "forecast[].lease_principal"),
       read(null, "case", "cash_policy"),
@@ -1529,7 +1547,7 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
 
   interest: Object.freeze({
     module_id: "interest",
-    module_version: "2.0.0",
+    module_version: "2.1.0",
     nodes: Object.freeze([
       "interest.acquisition",
       "interest.cash_income",
@@ -1611,6 +1629,8 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
       "interest.commitment_fee",
       "interest.gross_expense",
       "interest.income",
+      // P4.10 — net interest is the tax base's input and is inside the loop.
+      "interest.net_expense",
       "interest.rcf",
       "statement.finance_expense",
       "statement.finance_income",
@@ -2155,7 +2175,7 @@ export const GRAPH_INVARIANT_DECLARATIONS = Object.freeze({
       "member of every active strongly connected component belongs to a module " +
       "that declares a non-empty iteration_state, and the union of the nine " +
       "declared iteration states equals the solver's own declared state vector " +
-      "EXACTLY (13 nodes, no more and no fewer)",
+      "EXACTLY (17 nodes, no more and no fewer)",
     declared_coarsening:
       "the module QUOTIENT graph at circularity=1 carries a three-module " +
       "component {cash_rcf, debt_instruments, interest} where the node graph " +

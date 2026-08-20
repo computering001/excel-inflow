@@ -84,13 +84,17 @@ const SCALE = 1000;
 
 // ---------------------------------------------------------------------------
 // Faithful unit restatement. P7.4's transform is the authority for WHICH paths
-// are monetary; the one correction below is D33, proved in section A.
+// are monetary.
+//
+// P4.9 carried a local correction here — a hand-written set of "rate-like" fee
+// conventions, applied on top of the transform's output — because the transform
+// itself was contaminated by D33 and P4.9 was forbidden to edit it. P7.9 landed
+// the repair at source: the transform now reads each quantity's dimension from
+// `unit_restatement_dimensions` in the relation register, checked total against
+// the governing JSON Schema at import. So the local correction is gone, and
+// with it the hand-written list, which was itself the same defect class in
+// miniature — a set of names standing in for a set of meanings.
 // ---------------------------------------------------------------------------
-const RATE_FEE_CONVENTIONS = new Set([
-  "bps_on_undrawn",
-  "percent_on_undrawn",
-  "bps_on_capacity",
-]);
 
 function leafPaths(value, prefix = "", into = []) {
   if (value === null || typeof value !== "object") {
@@ -110,16 +114,10 @@ function writePath(object, p, value) {
   keys.reduce((acc, key) => acc[key], object)[last] = value;
 }
 
-/** The monetary paths P7.4's own transform moves, minus the D33 contamination. */
+/** The monetary paths P7.4's own transform moves. */
 function monetaryPathsOf(modelCase) {
   const once = applyTransform("unit_scale_restatement", modelCase);
   if (!once) return null;
-  if (
-    RATE_FEE_CONVENTIONS.has(modelCase?.rcf_policy?.commitment_fee_convention) &&
-    typeof modelCase?.rcf_policy?.commitment_fee_value === "number"
-  ) {
-    once.rcf_policy.commitment_fee_value = modelCase.rcf_policy.commitment_fee_value;
-  }
   return leafPaths(modelCase).filter(
     (p) =>
       typeof readPath(modelCase, p) === "number" &&
@@ -169,7 +167,15 @@ check("RED — the retired criterion was scale-dependent by construction", () =>
   );
 });
 
-check("D33 — the transform that found MG-3 scales a RATE it declares fixed", () => {
+// D33, as P4.9 found it and as P7.9 repaired it.
+//
+// P4.9 wrote these three checks RED-first, pinning the defective guard by its
+// source text because it was forbidden to edit the file that held it. P7.9
+// landed the repair, so the pins are inverted: the transform must now HOLD the
+// rate, and the contamination is re-injected BY HAND to keep the historical
+// reproduction alive rather than deleting the evidence for it.
+
+check("D33 REPAIRED — the transform holds the RATE it declares fixed", () => {
   const family = transformFamily("unit_scale_restatement");
   assert.ok(
     family.non_monetary_paths_held_fixed.some((entry) =>
@@ -178,47 +184,86 @@ check("D33 — the transform that found MG-3 scales a RATE it declares fixed", (
     "the transform declares the rate-convention fee is held fixed",
   );
   assert.equal(registeredBase.rcf_policy.commitment_fee_convention, "bps_on_undrawn");
-  const transformed = applyTransform("unit_scale_restatement", registeredBase);
   assert.equal(registeredBase.rcf_policy.commitment_fee_value, 35);
+  const transformed = applyTransform("unit_scale_restatement", registeredBase);
   assert.equal(
     transformed.rcf_policy.commitment_fee_value,
-    35000,
-    "the transform scales the bps fee anyway — a 35bp commitment fee becomes 350%",
+    35,
+    "a basis-point fee is dimensionless; a unit restatement must leave it exactly alone",
   );
+  // The surrounding monetary paths still move, so this is a held RATE and not a
+  // transform that quietly stopped applying.
+  assert.equal(transformed.rcf_policy.capacity, registeredBase.rcf_policy.capacity * SCALE);
+  assert.equal(transformed.issuer.units, "thousands");
 });
 
-check("D33's cause is a NAME test standing in for a semantic one, and it never fires", () => {
-  // `metamorphic_relations.mjs:733` guards the fee with
-  // `!/rate/i.test(commitment_fee_convention)`. The repository declares exactly
-  // three conventions and not one of them contains the letters r-a-t-e, so the
-  // guard is dead code and the fee is scaled unconditionally.
+check("D33's cause was a NAME test, and the repair reads a DECLARED dimension", () => {
+  // P4.9's version of this check pinned the defective source text:
+  //   source.includes('!/rate/i.test(String(rcfPolicy.commitment_fee_convention ?? ""))')
+  // That guard is gone. What replaces it is a lookup in the relation register,
+  // checked total against the governing JSON Schema at import — so the property
+  // worth pinning is no longer "the bad string is present" but "no spelling can
+  // decide a dimension, and an unclassified value refuses".
+  // Comments are stripped first, deliberately: the repaired module QUOTES the
+  // retired guard in its own docblock so a reader can see what was wrong, and a
+  // check that could not tell a quotation from a live guard would be the same
+  // mistake in a new place — reading text where it should read behaviour.
   const source = fs.readFileSync(path.join(ROOT, "scripts", "lib", "metamorphic_relations.mjs"), "utf8");
+  const executable = source
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .filter((line) => !/^\s*\/\//.test(line))
+    .join("\n");
   assert.ok(
     source.includes('!/rate/i.test(String(rcfPolicy.commitment_fee_convention ?? ""))'),
-    "the guard this finding is about must still be the one in the tree",
+    "the module must keep quoting the retired guard, so the finding survives the fix",
   );
-  const conventions = ["bps_on_undrawn", "captured_in_residual", "none"];
-  for (const convention of conventions) {
-    assert.equal(/rate/i.test(convention), false, `${convention} would fire the guard`);
+  assert.ok(
+    !executable.includes('!/rate/i.test(String(rcfPolicy.commitment_fee_convention ?? ""))'),
+    "the D33 guard is back in the tree as live code",
+  );
+  // Enumerated from the schema, never hand-written: not one admitted convention
+  // contains the letters r-a-t-e, which is why the retired guard never fired.
+  const schema = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "assets", "model-case-v2.schema.json"), "utf8"),
+  );
+  const admitted = schema.properties.rcf_policy.properties.commitment_fee_convention.enum;
+  assert.ok(admitted.includes(registeredBase.rcf_policy.commitment_fee_convention));
+  for (const convention of admitted) {
+    assert.equal(/rate/i.test(convention), false, `${convention} would have fired the retired guard`);
   }
-  assert.equal(registeredBase.rcf_policy.commitment_fee_convention, conventions[0]);
+  // And the repaired dispatch refuses an unclassified convention rather than
+  // scaling it by default. Spelling it like a rate does not make it one.
+  const renamed = structuredClone(registeredBase);
+  renamed.rcf_policy.commitment_fee_convention = "bps_on_undrawn_rate";
+  assert.throws(
+    () => applyTransform("unit_scale_restatement", renamed),
+    /UNIT_DIMENSION_UNCLASSIFIED_CONVENTION/,
+    "a renamed convention must refuse, not inherit a class from its spelling",
+  );
 });
 
-check("MG-3's registered reproduction is explained by D33, not by the tolerance", () => {
-  const contaminated = applyTransform("unit_scale_restatement", registeredBase);
-  assert.throws(
-    () => solveCase(structuredClone(contaminated)),
-    /SOLVER_NON_CONVERGENCE/,
-    "the register's transform does refuse, as recorded",
-  );
-  const faithful = structuredClone(contaminated);
-  faithful.rcf_policy.commitment_fee_value = registeredBase.rcf_policy.commitment_fee_value;
-  const solved = solveCase(faithful);
+check("MG-3's registered reproduction was D33's 350% fee, not the tolerance", () => {
+  // The faithful restatement now comes straight out of the transform.
+  const faithful = applyTransform("unit_scale_restatement", registeredBase);
+  const solved = solveCase(structuredClone(faithful));
   assert.equal(solved.converged, true, "with the bps rate held fixed it converges");
   const expected = registeredSolved.forecast[0].cash_from_operations * SCALE;
   assert.ok(
     Math.abs(solved.forecast[0].cash_from_operations - expected) <= Math.abs(expected) * 1e-12,
     `and the economics scale: ${solved.forecast[0].cash_from_operations} vs ${expected}`,
+  );
+  // Re-inject exactly what the retired guard produced. The registered refusal
+  // returns, which is what proves the attribution: MG-3's reproduction was a
+  // 350% commitment fee being correctly refused, not a unit being refused.
+  const contaminated = structuredClone(faithful);
+  contaminated.rcf_policy.commitment_fee_value =
+    registeredBase.rcf_policy.commitment_fee_value * SCALE;
+  assert.equal(contaminated.rcf_policy.commitment_fee_value / 100, 350);
+  assert.throws(
+    () => solveCase(contaminated),
+    /SOLVER_NON_CONVERGENCE/,
+    "the register's recorded refusal must still reproduce from the contamination alone",
   );
 });
 
@@ -670,19 +715,42 @@ check("exactly the one declared archetype changed its sweep count", () => {
 });
 
 // ===========================================================================
-// E. D28 / MG-1 — the escape reproduces, the repair is measured, and the five
-//    artefacts it needs are named. NOTHING is written to any asset.
+// E. D28 / MG-1 — LANDED by P4.10. This section was written by P4.9 as a set of
+//    PREDICTIONS about a repair it could not perform: it added the edge to an
+//    in-memory copy of the graph and asked each sealed proof what it would say.
+//    P4.10 landed the repair, and measurement moved the edge: the solver's CFO
+//    tracks NET INCOME, not the tax charge (perturb the rate on
+//    `loss_making_no_nol_stock` and CFO moves by exactly the net-income delta,
+//    not the tax delta), and when an issuer DECLARES net income the sweep does
+//    not consume the standalone tax charge at all. So the landed edges are
+//    `statement.net_income -> statement.cash_flow_start` and
+//    `statement.net_income -> cash.cfo`, and the component is 17 nodes rather
+//    than the 16 P4.9 predicted — `statement.net_income` measurably moves every
+//    sweep and had to be inside the fixed point too.
+//
+//    Every obligation P4.9 stated is kept. Each one is now pointed at the
+//    SHIPPED artefacts, and the counterfactual is inverted: the graph with the
+//    edges REMOVED is held in memory, and the red proofs are re-run against it.
 // ===========================================================================
 
-const MISSING_EDGE = Object.freeze({
-  id: "edge.tax_expense_to_cfo",
-  from: "statement.tax_expense",
-  to: "cash.cfo",
-  type: "cash_flow_bridge",
-  activation: "always",
-});
+const LANDED_EDGES = Object.freeze([
+  Object.freeze({
+    id: "edge.net_income_to_cash_flow_start",
+    from: "statement.net_income",
+    to: "statement.cash_flow_start",
+    type: "statement_dependency",
+    activation: "always",
+  }),
+  Object.freeze({
+    id: "edge.net_income_to_cfo",
+    from: "statement.net_income",
+    to: "cash.cfo",
+    type: "cash_flow_bridge",
+    activation: "always",
+  }),
+]);
 
-const REPAIRED_SCC = Object.freeze([
+const LANDED_SCC = Object.freeze([
   "cash.cfo",
   "cash.ending_balance",
   "interest.cash_income",
@@ -697,13 +765,16 @@ const REPAIRED_SCC = Object.freeze([
   "statement.cash_flow_start",
   "statement.finance_expense",
   "statement.finance_income",
+  "statement.net_income",
   "statement.pre_tax_income",
   "statement.tax_expense",
 ]);
 
-const repairedGraph = (() => {
+/** The graph as it stood BEFORE P4.10 — the counterfactual, held in memory. */
+const unrepairedGraph = (() => {
   const graph = JSON.parse(JSON.stringify(EQUATION_GRAPH));
-  graph.edges.push({ ...MISSING_EDGE });
+  const landed = new Set(LANDED_EDGES.map((edge) => edge.id));
+  graph.edges = graph.edges.filter((edge) => !landed.has(edge.id));
   return graph;
 })();
 
@@ -727,23 +798,22 @@ function forwardReachable(startId, graph, circularity) {
   return seen;
 }
 
-check("the shipped asset is UNREPAIRED — this package wrote nothing to it", () => {
-  assert.equal(
-    EQUATION_GRAPH.edges.some(
-      (edge) => edge.from === MISSING_EDGE.from && edge.to === MISSING_EDGE.to,
-    ),
-    false,
-    "the graph must still lack the edge; landing it is proved impossible below",
-  );
+check("the shipped asset IS repaired — P4.10 landed both edges", () => {
+  for (const landed of LANDED_EDGES) {
+    const edge = EQUATION_GRAPH.edges.find((item) => item.id === landed.id);
+    assert.ok(edge, `${landed.id} is missing from the shipped graph`);
+    assert.deepEqual({ ...edge }, { ...landed });
+  }
   assert.equal(
     CONVERGENCE_CONTRACT.scc_contract.active_by_circularity["1"][0].nodes.length,
-    13,
-    "the contract must still declare the 13-node SCC",
+    17,
+    "the contract must declare the 17-node SCC",
   );
   assert.deepEqual(validateEquationGraph(EQUATION_GRAPH), []);
+  assert.deepEqual(validateEquationGraph(EQUATION_GRAPH, CONVERGENCE_CONTRACT), []);
 });
 
-check("RED — the tax charge reaches operating cash flow, and the graph denies it", () => {
+check("RED, still reproducible — the tax charge reaches operating cash flow", () => {
   const before = solveCase(archetype("deferred_revenue_ratable.json"));
   const after = solveCase(
     applyTransform("perturb_effective_tax_rate", archetype("deferred_revenue_ratable.json")),
@@ -752,13 +822,21 @@ check("RED — the tax charge reaches operating cash flow, and the graph denies 
   assert.equal(after.forecast[0].tax, 42.27117623444384);
   assert.equal(before.forecast[0].cash_from_operations, 282.18090452260935);
   assert.equal(after.forecast[0].cash_from_operations, 239.69731031714127);
-  const reachable = forwardReachable("statement.effective_tax_rate", EQUATION_GRAPH, 1);
-  assert.equal(reachable.has("cash.cfo"), false, "the shipped graph declares no path");
-  assert.equal(reachable.has("statement.tax_expense"), true);
+  // The graph USED to deny it. It no longer does.
+  assert.equal(
+    forwardReachable("statement.effective_tax_rate", unrepairedGraph, 1).has("cash.cfo"),
+    false,
+    "the pre-P4.10 graph declared no path — this is the red proof, preserved",
+  );
+  assert.equal(
+    forwardReachable("statement.effective_tax_rate", EQUATION_GRAPH, 1).has("cash.cfo"),
+    true,
+    "the shipped graph now declares the path the solve has always walked",
+  );
 });
 
-check("the one edge WOULD close the locality escape", () => {
-  const reachable = forwardReachable("statement.effective_tax_rate", repairedGraph, 1);
+check("the landed edges CLOSE the locality escape", () => {
+  const reachable = forwardReachable("statement.effective_tax_rate", EQUATION_GRAPH, 1);
   for (const node of [
     "cash.cfo",
     "cash.ending_balance",
@@ -771,53 +849,63 @@ check("the one edge WOULD close the locality escape", () => {
     "rcf.liquidity_shortfall",
     "statement.pre_tax_income",
   ]) {
-    assert.ok(reachable.has(node), `${node} is still unreachable with the edge added`);
+    assert.ok(reachable.has(node), `${node} is unreachable in the shipped graph`);
   }
 });
 
-check("the edge CLOSES A CYCLE: the active SCC grows from 13 nodes to 16", () => {
+check("the active SCC is 17 nodes, and is still empty with circularity off", () => {
   for (const options of [{}, { circularity: 1 }]) {
-    const components = deriveStronglyConnectedComponents(repairedGraph, options)
+    const components = deriveStronglyConnectedComponents(EQUATION_GRAPH, options)
       .filter((component) => component.length > 1)
       .map((component) => [...component].sort());
     assert.equal(components.length, 1);
-    assert.deepEqual(components[0], [...REPAIRED_SCC]);
+    assert.deepEqual(components[0], [...LANDED_SCC]);
   }
   assert.deepEqual(
-    deriveStronglyConnectedComponents(repairedGraph, { circularity: 0 }).filter(
+    deriveStronglyConnectedComponents(EQUATION_GRAPH, { circularity: 0 }).filter(
       (component) => component.length > 1,
     ),
     [],
     "circularity off must stay acyclic — the tax charge is not iterated there",
   );
+  const unrepaired = deriveStronglyConnectedComponents(unrepairedGraph, { circularity: 1 })
+    .filter((component) => component.length > 1);
+  assert.equal(unrepaired[0].length, 13, "the counterfactual is the 13-node component");
 });
 
-check("P3.3 RE-RUN — the ETR path is no longer DAG-safe, in exactly three ways", () => {
+check("P3.3 RE-RUN — its CORRECTED obligations pass on the shipped graph", () => {
   assert.deepEqual(
     validateEffectiveTaxRatePathAcyclicity(EQUATION_GRAPH),
     [],
-    "P3.3 holds on the graph as shipped",
+    "the corrected ETR proof holds on the graph as shipped",
   );
-  const errors = validateEffectiveTaxRatePathAcyclicity(repairedGraph);
-  assert.equal(errors.length, 3, `expected exactly three obligations to fail:\n- ${errors.join("\n- ")}`);
-  assert.ok(errors[0].includes("structural strongly connected component"));
-  assert.ok(errors[1].includes("circularity-on strongly connected component"));
-  assert.ok(errors[2].includes("the tax path must terminate"));
-  for (const error of errors.slice(0, 2)) {
-    assert.ok(error.includes("statement.pre_tax_income"));
-    assert.ok(error.includes("statement.tax_expense"));
-  }
+  // And the correction has teeth: the pre-P4.10 graph, judged against the
+  // SHIPPED contract, is refused — because the contract now declares three tax
+  // nodes iterated that that graph does not put in a component.
+  assert.deepEqual(
+    validateEffectiveTaxRatePathAcyclicity(unrepairedGraph),
+    [],
+    "the counterfactual graph is itself internally consistent; it is the CONTRACT " +
+      "pairing that fails, and validateEquationGraph below is where that is caught",
+  );
+  assert.ok(
+    validateEquationGraph(unrepairedGraph, CONVERGENCE_CONTRACT).some((error) =>
+      error.includes("solver iteration state vector must contain exactly"),
+    ),
+    "a graph whose component is smaller than the declared fixed point is refused",
+  );
 });
 
-check("the repaired graph does not load: the solver's iteration vector is coupled to the SCC", () => {
-  const errors = validateEquationGraph(repairedGraph, CONVERGENCE_CONTRACT);
-  const expected = [
+check("the shipped graph LOADS — the five artefacts moved together", () => {
+  assert.deepEqual(validateEquationGraph(EQUATION_GRAPH, CONVERGENCE_CONTRACT), []);
+  // The counterfactual does not, in exactly the four ways P4.9 predicted.
+  const errors = validateEquationGraph(unrepairedGraph, CONVERGENCE_CONTRACT);
+  for (const fragment of [
     "equation graph hash mismatch",
     "derived structural SCCs do not match",
     "circularity-on active SCCs do not match",
     "solver iteration state vector must contain exactly the circularity-on active SCC nodes",
-  ];
-  for (const fragment of expected) {
+  ]) {
     assert.ok(
       errors.some((error) => error.includes(fragment)),
       `expected a failure naming "${fragment}"; got:\n- ${errors.join("\n- ")}`,
@@ -825,41 +913,44 @@ check("the repaired graph does not load: the solver's iteration vector is couple
   }
 });
 
-check("P4.4 RE-RUN — the module partition refuses an edge no module owns", () => {
+check("P4.4 RE-RUN — the module partition owns both landed edges", () => {
   assert.deepEqual(
     validateModuleContractConformance({ graph: EQUATION_GRAPH }).filter((error) =>
       error.startsWith("MODULE_EDGE"),
     ),
     [],
-    "the shipped 71-edge partition is total",
+    "the shipped partition is total over the 73-edge graph",
   );
   assert.deepEqual(
-    validateModuleContractConformance({ graph: repairedGraph }).filter((error) =>
-      error.startsWith("MODULE_EDGE"),
-    ),
+    validateModuleContractConformance({ graph: unrepairedGraph })
+      .filter((error) => error.startsWith("MODULE_EDGE"))
+      .sort(),
     [
-      "MODULE_EDGE_OWNER_DISAGREEMENT: edge.tax_expense_to_cfo -> cash.cfo owned by cash_rcf, declared by nobody",
+      "MODULE_EDGE_ORPHAN: edge.net_income_to_cash_flow_start is declared but is not in the equation graph.",
+      "MODULE_EDGE_ORPHAN: edge.net_income_to_cfo is declared but is not in the equation graph.",
     ],
+    "and it is total in the other direction too — a withdrawn edge is orphaned, not ignored",
   );
 });
 
-check("P4.7 RE-RUN — the hand-written solve order STILL agrees with the repaired graph", () => {
+check("P4.7 RE-RUN — the hand-written solve order STILL agrees with the graph", () => {
   const solution = solveCase(certified("standard-maximal-v2"));
   const observed = solution.solve_order_evidence.observed_orders[0].order;
   assert.equal(solution.solve_order_evidence.observed_orders[0].agreement.agrees, true);
-  const repairedOrder = deriveSolveOrder(repairedGraph, 1);
-  const agreement = checkSolveOrderAgreement(observed, repairedOrder);
+  const order = deriveSolveOrder(EQUATION_GRAPH, 1);
+  const agreement = checkSolveOrderAgreement(observed, order);
   assert.equal(
     agreement.agrees,
     true,
-    `the observed order disagrees with the repaired graph: ${JSON.stringify(agreement.violations)}`,
+    `the observed order disagrees with the shipped graph: ${JSON.stringify(agreement.violations)}`,
   );
   assert.deepEqual(agreement.violations, []);
+  const before = checkSolveOrderAgreement(observed, deriveSolveOrder(unrepairedGraph, 1));
   assert.ok(
-    agreement.inter_component_edges_checked <
-      solution.solve_order_evidence.observed_orders[0].agreement.inter_component_edges_checked,
-    "absorbing three nodes into the SCC must move edges from inter- to intra-component",
+    agreement.inter_component_edges_checked < before.inter_component_edges_checked,
+    "absorbing four nodes into the SCC must move edges from inter- to intra-component",
   );
+  assert.equal(before.agrees, true, "and it agreed before the landing too");
 });
 
 console.log(JSON.stringify({ status: "PASS", checks }));

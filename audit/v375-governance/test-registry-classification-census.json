@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 66,
-      "cross_layer_integration": 88,
+      "cross_layer_integration": 89,
       "independent_economic_oracle": 4,
       "installed_host": 1,
       "real_corpus": 7,
@@ -24,16 +24,16 @@
       "release-proof": 48,
       "runtime-governance": 32,
       "runtime-performance": 16,
-      "semantic-constitution": 12,
+      "semantic-constitution": 13,
       "workbook-oracle": 4
     },
     "by_profile": {
       "custody": 12,
-      "portable": 198
+      "portable": 199
     },
     "self_confirmation_risk": {
       "false": 13,
-      "true": 197
+      "true": 198
     }
   },
   "records": [
@@ -2047,6 +2047,20 @@
         "FAIL": 1,
         "PASS": 0
       },
+      "id": "declared-fixed-point-completeness",
+      "owner": "semantic-constitution",
+      "phase": "graph",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
       "id": "release-dossier",
       "owner": "release-proof",
       "phase": "proof",
@@ -2980,8 +2994,8 @@
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "225f4fea4d9a2c1c095082e53077df89ae51ebdfc9f9e555ec27f3c36df31619",
-    "test_count": 210
+    "sha256": "c5aa0c2768163e69e06a485cc4d149c5c62d44cd480e958f499496b0454add20",
+    "test_count": 211
   },
   "schema_version": "development-test-classification-census/1.0"
 }

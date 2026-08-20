@@ -115,6 +115,8 @@
     { "id": "edge.pre_tax_income_to_tax_expense", "from": "statement.pre_tax_income", "to": "statement.tax_expense", "type": "statement_dependency", "activation": "always" },
     { "id": "edge.effective_tax_rate_to_tax_expense", "from": "statement.effective_tax_rate", "to": "statement.tax_expense", "type": "statement_dependency", "activation": "always" },
     { "id": "edge.pre_tax_income_to_net_income", "from": "statement.pre_tax_income", "to": "statement.net_income", "type": "statement_dependency", "activation": "always" },
-    { "id": "edge.tax_expense_to_net_income", "from": "statement.tax_expense", "to": "statement.net_income", "type": "statement_dependency", "activation": "always" }
+    { "id": "edge.tax_expense_to_net_income", "from": "statement.tax_expense", "to": "statement.net_income", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.net_income_to_cash_flow_start", "from": "statement.net_income", "to": "statement.cash_flow_start", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.net_income_to_cfo", "from": "statement.net_income", "to": "cash.cfo", "type": "cash_flow_bridge", "activation": "always" }
   ]
 }

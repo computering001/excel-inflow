@@ -34,8 +34,8 @@
       "boundary_sha256": "00149e8395d598b6dc782ad425b72827e9e69009d2b65175bdded59ab7c3c8c1"
     },
     "tax_and_working_capital": {
-      "module_version": "2.0.0",
-      "boundary_sha256": "c8aef3c520ca063186aa1b48d83de9fd71af86de3a2aa6c06bc709b4c363d066"
+      "module_version": "2.1.0",
+      "boundary_sha256": "38fe14c2b47d5a2681bca8cda2954bac9a05b304b88b8cbeb1010b48f30f3a0e"
     },
     "debt_instruments": {
       "module_version": "2.0.0",
@@ -46,12 +46,12 @@
       "boundary_sha256": "7bd4d4a52cf52cfa62203484486f07d3236b0891c1f75eb9df8cb2dd61bd269c"
     },
     "cash_rcf": {
-      "module_version": "2.0.0",
-      "boundary_sha256": "731d22cf4b80c79e77833043fbbeb34943b49e1d05a9ab89e6acad7d8d972af0"
+      "module_version": "2.1.0",
+      "boundary_sha256": "8bb459d7fad036f074ccd6237ad8acf113053029097670f2f165d92135c9922f"
     },
     "interest": {
-      "module_version": "2.0.0",
-      "boundary_sha256": "c1de20e54d11885647ac5c6cbf32e765684037ead22ae8385a15d3b016916638"
+      "module_version": "2.1.0",
+      "boundary_sha256": "08f26a96823cc9c18dfaeae2cf60793e4cbada117fbc5c2236c590ce6eb4946f"
     },
     "acquisition_overlay": {
       "module_version": "2.0.0",

@@ -72,6 +72,17 @@ const SOLVER_ON_ITERATION_VECTOR = Object.freeze([
   Object.freeze({ node_id: "interest.income", tolerance_class: "currency" }),
   Object.freeze({ node_id: "statement.finance_expense", tolerance_class: "currency" }),
   Object.freeze({ node_id: "statement.finance_income", tolerance_class: "currency" }),
+  // P4.10 — the tax path. These four are NOT new iterates: the sweep below has
+  // always computed `netInterest`, `preTaxIncome`, `taxCharge` and `netIncome`
+  // from the iterated interest quantities, and has always seeded operating cash
+  // flow from `netIncome`. Until this package the state vector simply did not
+  // say so, so the residual was an L-infinity norm over a strict SUBSET of the
+  // state the solve actually carries. The declared fixed point now contains
+  // every node the running solver iterates.
+  Object.freeze({ node_id: "interest.net_expense", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.pre_tax_income", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.tax_expense", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.net_income", tolerance_class: "currency" }),
 ]);
 
 export function solverIterationDeclaration(circularity) {
@@ -3158,6 +3169,15 @@ export function solveCase(
           "interest.income": interestIncome,
           "statement.finance_expense": -grossInterest,
           "statement.finance_income": interestIncome,
+          // P4.10 — the tax path, snapshotted at exactly the values the sweep
+          // above made final. `statement.tax_expense` carries the SIGNED
+          // statement quantity (`-taxCharge`), the same sign the statement
+          // override publishes, so the residual measures the row the workbook
+          // emits and not an internal sign convention.
+          "interest.net_expense": netInterest,
+          "statement.pre_tax_income": preTaxIncome,
+          "statement.tax_expense": -taxCharge,
+          "statement.net_income": netIncome,
         },
       );
       residual = iterationResidual(
