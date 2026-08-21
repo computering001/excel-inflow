@@ -592,7 +592,10 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
     "forecast-waterfall projection erased compatible supplemental broker evidence",
   );
   const screen = renderBrokerPreviewScreen(preview);
-  assert(screen.includes("FORECAST WATERFALL"), "degraded preview screen hides the selected authority mode");
+  assert(
+    screen.includes("NO SINGLE BROKER HOUSE"),
+    "degraded preview screen hides the selected authority mode",
+  );
 });
 
 await test("forecast-waterfall mode consumes compatible broker evidence when it exists", () => {
