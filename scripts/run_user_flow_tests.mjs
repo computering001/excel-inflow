@@ -419,9 +419,11 @@ await test("question path stops once and never treats action-required as success
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
   // Card-augmented queue: the acquisition_funding decision card plus the
-  // forecast assumption cards (derived.*) and the consolidated plausibility
-  // card the default baseline produces for this fixture.
-  assert(first.status === "ACTION_REQUIRED" && first.question_count === 4, JSON.stringify(first));
+  // forecast assumption cards (derived.*). The default baseline produces no
+  // liquidity-stress findings for this fixture, so the consolidated
+  // plausibility card is absent by design (flow_questions.mjs builds it only
+  // when findings exist).
+  assert(first.status === "ACTION_REQUIRED" && first.question_count === 3, JSON.stringify(first));
   assert(
     first.blocker_class === "USER_DECISION" && first.user_blocking === true,
     "action-required result lacks typed user-decision ownership",
@@ -491,10 +493,10 @@ await test("supplied answer persists and resumes deterministically", async () =>
       {
         answers: {
           acquisition_funding: "debt",
-          // assumption/plausibility cards surfaced at the decisions stop
+          // assumption cards surfaced at the decisions stop (no plausibility
+          // findings exist on the default baseline, so no such card is built)
           "derived.forecast.acquisitions_net_of_cash": "default",
           "derived.fx.effect": "default",
-          "plausibility.findings": "acknowledge",
         },
       },
       null,
@@ -539,10 +541,10 @@ await test("a case edited while the run waited blocks the resume by name", async
       {
         answers: {
           acquisition_funding: "debt",
-          // assumption/plausibility cards surfaced at the decisions stop
+          // assumption cards surfaced at the decisions stop (no plausibility
+          // findings exist on the default baseline, so no such card is built)
           "derived.forecast.acquisitions_net_of_cash": "default",
           "derived.fx.effect": "default",
-          "plausibility.findings": "acknowledge",
         },
       },
       null,
