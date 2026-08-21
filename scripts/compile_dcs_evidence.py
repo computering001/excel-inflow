@@ -5,6 +5,15 @@ This compiler never owns the source universe.  It verifies exact row/cell
 disposition against the extractor's immutable candidate manifest, computes
 every projected value from cell-addressed authorities, and accumulates all
 findings before deciding PASS/BLOCKED.
+
+Graceful empty close: zero projected instruments normally BLOCK, but when the
+case document passed via ``--case`` declares no reported gross debt expectation
+(``debt_reconciliation.reported_opening_gross_debt`` absent or null, or
+declared exactly zero) the compiler closes with an empty instrument register,
+emits a typed ``dcs_empty_instrument_set`` DEGRADE in ``dcs-degrades.json``,
+and writes no ``dcs-export.json`` (the export contract requires at least one
+instrument).  A case that reports a non-zero gross debt figure keeps the lane
+BLOCKED.
 """
 
 from __future__ import annotations
@@ -161,6 +170,42 @@ def valid_date(value: Any) -> bool:
         return dt.date.fromisoformat(str(value)).isoformat() == str(value)
     except (TypeError, ValueError):
         return False
+
+
+def declared_reported_gross_debt(case_path: str | None) -> tuple[str, Any]:
+    """Read the case's declared reported gross debt expectation.
+
+    Returns one of:
+      ("absent", None)   -- the case declares no reported gross debt
+                            expectation (no ``--case``, or the case document
+                            omits ``debt_reconciliation.reported_opening_gross_debt``
+                            or sets it null);
+      ("zero", 0)        -- the case declares a reported gross debt of exactly
+                            zero, which an empty instrument register
+                            reconciles exactly;
+      ("exists", value)  -- the case reports a non-zero gross debt figure an
+                            empty register cannot reconcile;
+      ("unreadable", None) -- an explicitly passed case document could not be
+                            read as JSON (fails closed).
+    """
+    if not case_path:
+        return "absent", None
+    try:
+        case = json.loads(Path(case_path).read_text(encoding="utf-8"))
+        reconciliation = case.get("debt_reconciliation") or {} if isinstance(case, dict) else {}
+        declared = reconciliation.get("reported_opening_gross_debt")
+    except (OSError, ValueError):
+        return "unreadable", None
+    if declared is None:
+        return "absent", None
+    if finite(declared) and float(declared) == 0:
+        return "zero", 0
+    return "exists", declared
+
+
+def degrade(code: str, message: str, **context: Any) -> dict[str, Any]:
+    """A typed, non-blocking DEGRADE entry for the DCS lane sidecar."""
+    return {"code": code, "kind": "DEGRADE", "message": message, **context}
 
 
 def projected_maturity(authority: dict[str, Any]) -> dict[str, Any] | None:
@@ -322,6 +367,15 @@ def main() -> int:
     parser.add_argument("source_tables")
     parser.add_argument("candidate_manifest")
     parser.add_argument("crosswalk")
+    parser.add_argument(
+        "--case",
+        help=(
+            "Optional model-case document. When zero model instruments are "
+            "projected, a case whose debt_reconciliation omits "
+            "reported_opening_gross_debt (or declares it null/0) closes "
+            "gracefully with an empty register; anything else stays BLOCKED."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     source_path, manifest_path, crosswalk_path = map(lambda value: Path(value).resolve(), [args.source_tables, args.candidate_manifest, args.crosswalk])
@@ -602,22 +656,61 @@ def main() -> int:
                 f"projection fails dcs-projection-v1.schema.json: {error}",
             )
         )
-    for error in schema_errors(dcs_export, "dcs-export.schema.json"):
-        findings.append(
-            finding(
-                "DCS-SCHEMA-CONTRACT",
-                f"dcs_export fails dcs-export.schema.json: {error}",
+    if projected_instruments:
+        # An empty register never emits an export: the export contract
+        # requires at least one instrument, and inventing one is not a close.
+        for error in schema_errors(dcs_export, "dcs-export.schema.json"):
+            findings.append(
+                finding(
+                    "DCS-SCHEMA-CONTRACT",
+                    f"dcs_export fails dcs-export.schema.json: {error}",
+                )
             )
-        )
-    out = Path(args.out).resolve()
-    out.mkdir(parents=True, exist_ok=True)
+    degrades: list[dict[str, Any]] = []
     status = "PASS" if not findings and projected_instruments else "BLOCKED"
     if not projected_instruments:
-        findings.append(finding("DCS-ZERO-MODEL-INSTRUMENTS", "No model-input instruments were projected"))
-        status = "BLOCKED"
+        declaration, declared_value = declared_reported_gross_debt(args.case)
+        if declaration in {"absent", "zero"}:
+            # Graceful empty close: the case declares no reported gross debt
+            # expectation (or declares exactly zero, which an empty register
+            # reconciles exactly), so an empty instrument register is the
+            # truthful projection.  Typed as a DEGRADE, never silent.
+            degrades.append(degrade(
+                "dcs_empty_instrument_set",
+                (
+                    "No model-input instruments were projected; the case "
+                    + (
+                        "declares reported_opening_gross_debt of 0, which an empty register reconciles exactly."
+                        if declaration == "zero"
+                        else "declares no reported gross debt expectation (debt_reconciliation.reported_opening_gross_debt absent or null)."
+                    )
+                    + " Closing with an empty instrument register; no dcs-export.json is emitted because the export contract requires at least one instrument."
+                ),
+                declared_reported_opening_gross_debt=0 if declaration == "zero" else None,
+                model_instruments=0,
+            ))
+            status = "PASS"
+        else:
+            if declaration == "exists":
+                detail = "; the case reports gross debt of %s, which an empty register cannot reconcile" % declared_value
+            elif declaration == "unreadable":
+                findings.append(finding("DCS-CASE-UNREADABLE", "--case %r could not be read as a JSON case document; failing closed" % args.case))
+                detail = "; the case gross-debt declaration is unreadable, failing closed"
+            else:
+                detail = "; declare an intentionally empty register by passing --case with a case document that omits debt_reconciliation.reported_opening_gross_debt"
+            findings.append(finding("DCS-ZERO-MODEL-INSTRUMENTS", "No model-input instruments were projected" + detail))
+            status = "BLOCKED"
+    out = Path(args.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
     (out / "dcs-projection.json").write_bytes(canonical(projection))
-    if status == "PASS":
+    if status == "PASS" and projected_instruments:
         (out / "dcs-export.json").write_bytes(canonical(dcs_export))
+    if degrades:
+        (out / "dcs-degrades.json").write_bytes(canonical({
+            "schema_version": "dcs-lane-degrades/1.0",
+            "stage": "compile_dcs_evidence",
+            "degrades": degrades,
+        }))
     receipt = {
         "schema_version": "dcs-evidence-receipt/1.0",
         "status": status,
@@ -653,7 +746,12 @@ def main() -> int:
         receipt["counts"]["violations"] = len(findings)
         receipt["violations"] = findings
     (out / "dcs-evidence-receipt.json").write_bytes(canonical(receipt))
-    print(json.dumps(receipt, indent=2))
+    printed = dict(receipt)
+    if degrades:
+        # Degrades are lane telemetry, not contract violations: persisted in
+        # the sidecar, echoed on stdout, never folded into the receipt.
+        printed["degrades"] = degrades
+    print(json.dumps(printed, indent=2))
     return 0 if status == "PASS" else 2
 
 

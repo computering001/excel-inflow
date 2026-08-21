@@ -4,6 +4,13 @@
 The output is deliberately upstream of any instrument classification.  It owns
 the source universe; later reviewers may disposition cells and rows but may not
 create or remove them.
+
+The census never blocks on export-quality questions it only observes.  A JSON
+source claiming dcs-export identity that drifts from the contract, or whose
+``as_of`` effective date misses the case period end (``--case-period-end``) by
+more than one fiscal year, is recorded as typed DEGRADE telemetry in
+``dcs-degrades.json`` — never as a receipt violation, which would block the
+lane on evidence the census itself can still read losslessly.
 """
 
 from __future__ import annotations
@@ -15,13 +22,18 @@ import hashlib
 import json
 import posixpath
 import re
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# The drift validator is shared, not duplicated: one implementation of the
+# dcs-export contract serves both lanes so they cannot silently diverge.
+from compile_dcs_evidence import schema_errors
 
-VERSION = "dcs-lossless-extractor/1.0"
+
+VERSION = "dcs-lossless-extractor/1.1"
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 PKG_REL_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
@@ -290,9 +302,79 @@ def xlsx_sheets(path: Path) -> list[dict[str, Any]]:
         return output
 
 
+def degrade(code: str, message: str, **context: Any) -> dict[str, Any]:
+    """A typed, non-blocking DEGRADE entry for the DCS lane sidecar."""
+    return {"code": code, "kind": "DEGRADE", "message": message, **context}
+
+
+def export_drift_degrades(payload: Any) -> list[dict[str, Any]]:
+    """Typed schema-drift findings naming every drifted field.
+
+    Only payloads that CLAIM dcs-export identity (a ``dcs-export*`` schema
+    version or an ``export_kind`` marker) are validated; an unrelated JSON
+    document is nobody's debt export and is not held to its contract.  Drift
+    degrades the lane — the lossless census itself stays intact and PASS.
+    """
+    if not isinstance(payload, dict):
+        return []
+    schema_version = payload.get("schema_version")
+    claims_export_identity = (
+        isinstance(schema_version, str) and schema_version.startswith("dcs-export")
+    ) or "export_kind" in payload
+    if not claims_export_identity:
+        return []
+    errors = schema_errors(payload, "dcs-export.schema.json")
+    if not errors:
+        return []
+    return [
+        degrade(
+            "dcs_export_drift",
+            "The incoming debt export claims dcs-export identity but drifts from dcs-export.schema.json; every drifted field is named.",
+            drifted_fields=errors,
+            drifted_field_count=len(errors),
+        )
+    ]
+
+
+def stale_export_degrade(export_date_text: Any, case_period_end_text: Any) -> dict[str, Any] | None:
+    """DEGRADE when the export's effective date misses the case period end by more than one fiscal year."""
+    if not export_date_text or not case_period_end_text:
+        return None
+    try:
+        export_date = dt.date.fromisoformat(str(export_date_text))
+        period_end = dt.date.fromisoformat(str(case_period_end_text))
+    except ValueError:
+        print(
+            "warning: could not parse export date %r or case period end %r as ISO dates; staleness was not evaluated"
+            % (export_date_text, case_period_end_text),
+            file=sys.stderr,
+        )
+        return None
+    gap_days = (period_end - export_date).days
+    if abs(gap_days) <= 366:
+        return None
+    direction = "older than" if gap_days > 0 else "newer than"
+    return degrade(
+        "dcs_export_stale",
+        "The export's effective date %s is %d days %s the case period end %s — more than one fiscal year apart."
+        % (export_date.isoformat(), abs(gap_days), direction, period_end.isoformat()),
+        export_date=export_date.isoformat(),
+        case_period_end=period_end.isoformat(),
+        gap_days=gap_days,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("request")
+    parser.add_argument(
+        "--case-period-end",
+        help=(
+            "Optional ISO date of the case period end. When the gap to the "
+            "export's effective date exceeds one fiscal year, a typed "
+            "dcs_export_stale DEGRADE is emitted."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     request_path = Path(args.request).resolve()
@@ -302,6 +384,7 @@ def main() -> int:
     source_path = Path(request["source_path"])
     if not source_path.is_absolute():
         source_path = (request_path.parent / source_path).resolve()
+    degrades: list[dict[str, Any]] = []
     suffix = source_path.suffix.lower()
     if suffix == ".csv":
         media_type, sheets = "text/csv", csv_sheets(source_path)
@@ -309,6 +392,15 @@ def main() -> int:
         media_type, sheets = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx_sheets(source_path)
     elif suffix == ".json":
         media_type, sheets = "application/json", json_sheets(source_path)
+        # json_sheets already parsed this file successfully, so this re-read
+        # cannot fail; the payload is inspected only for export-quality
+        # telemetry and is never allowed to alter the census.
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+        degrades.extend(export_drift_degrades(payload))
+        if isinstance(payload, dict):
+            stale = stale_export_degrade(payload.get("as_of"), args.case_period_end)
+            if stale:
+                degrades.append(stale)
     else:
         raise SystemExit("supported DCS source types are CSV, XLSX/XLSM and JSON")
 
@@ -351,7 +443,19 @@ def main() -> int:
         "violations": [] if sheets and cell_ids else [{"code": "DCS-EXTRACT-EMPTY", "message": "The source produced no nonblank cells."}],
     }
     (out / "dcs-extraction-receipt.json").write_bytes(canonical(receipt))
-    print(json.dumps(receipt, indent=2))
+    printed: Any = receipt
+    if degrades:
+        # Degrades are lane telemetry, not contract violations: persisted in
+        # the sidecar (mirroring the compiler), echoed on stdout, never folded
+        # into the receipt — a DEGRADE code in receipt violations would flip
+        # the pipeline's classify_extract_receipt toward BLOCKED_INTERNAL.
+        (out / "dcs-degrades.json").write_bytes(canonical({
+            "schema_version": "dcs-lane-degrades/1.0",
+            "stage": "extract_dcs_evidence",
+            "degrades": degrades,
+        }))
+        printed = {**receipt, "degrades": degrades}
+    print(json.dumps(printed, indent=2))
     return 0 if receipt["status"] == "PASS" else 2
 
 
