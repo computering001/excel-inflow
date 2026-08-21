@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
-
-import { createRunner } from "./lib/test_harness.mjs";
 
 import {
   classifyCiIdentityRoles,
@@ -11,11 +8,9 @@ import {
   validatePerformanceEvidence,
 } from "./lib/release_identity_governance.mjs";
 import { assertSkillVersionShape, declaredSkillVersion } from "./lib/skill_version_declaration.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const run = createRunner({
-  name: "release_identity_governance_tests",
-  importMetaUrl: import.meta.url,
-});
+const run = createRunner({ name: "release_identity_governance_tests", importMetaUrl: import.meta.url });
 const root = run.ROOT;
 const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
 const sourceCommit = "13cf667dbfbf66cb7c87fd1965a1eb3768a1138e";
@@ -31,8 +26,8 @@ const options = {
   limitationsExists: fs.existsSync(path.join(root, "KNOWN_LIMITATIONS.md")),
 };
 
-run.eq(validateIdentityConvergence(identity, options), [], "historical identity converges");
-run.eq(validatePerformanceEvidence(performance, options), [], "historical performance evidence converges");
+run.eq(validateIdentityConvergence(identity, options), [], "identity convergence validates cleanly");
+run.eq(validatePerformanceEvidence(performance, options), [], "performance evidence validates cleanly");
 // Freeze criterion 9 (P8.9). This line used to read "DELIBERATE TRIPWIRE, not
 // derivation": a copy of the version literal, kept so that a bump would fail
 // here until an owner re-read the identity-governance expectations. It did not
@@ -47,55 +42,38 @@ run.eq(validatePerformanceEvidence(performance, options), [], "historical perfor
 // anywhere in the shipped or checked surface. The property this suite needs --
 // that the ACTIVE candidate is not the historical release whose audit evidence
 // it validates -- is asserted directly below.
-run.check("runtime manifest declares a well-shaped skill version", () => {
-  assertSkillVersionShape(runtime.skill_version);
-  return true;
-});
-run.eq(runtime.skill_version, declaredSkillVersion(root), "runtime manifest version is the declared one");
-run.check(
-  "historical identity evidence is not read against a runtime manifest of the same version",
-  () => runtime.skill_version !== options.expectedVersion,
+run.ok(assertSkillVersionShape(runtime.skill_version), "runtime skill version has a valid declared shape");
+run.eq(runtime.skill_version, declaredSkillVersion(root), "runtime manifest version equals the declared skill version");
+run.ne(
+  runtime.skill_version,
+  options.expectedVersion,
+  "Historical identity evidence is being read against a runtime manifest of the same version.",
 );
-run.eq(runtime.status, "v2_development", "runtime status");
-run.eq(runtime.deployment_status, "not_installed", "deployment status");
-run.check(
-  "historical v3.7.3 identity does not masquerade as the active runtime-manifest candidate",
-  () => validateIdentityConvergence(identity, { ...options, expectedVersion: runtime.skill_version })
+run.eq(runtime.status, "v2_development", "runtime status is v2_development");
+run.eq(runtime.deployment_status, "not_installed", "runtime deployment status is not_installed");
+run.ok(
+  validateIdentityConvergence(identity, { ...options, expectedVersion: runtime.skill_version })
     .some((error) => error.includes("version")),
+  "Historical v3.7.3 identity masqueraded as the active runtime-manifest candidate.",
 );
 
 const staleVersion = structuredClone(identity);
 staleVersion.release.skill_version = "3.7.2";
-run.check(
-  "stale release version is rejected",
-  () => validateIdentityConvergence(staleVersion, options).some((error) => error.includes("version")),
-);
+run.ok(validateIdentityConvergence(staleVersion, options).some((error) => error.includes("version")), "stale release version is rejected");
 
 const mergeMasquerade = structuredClone(identity);
 mergeMasquerade.identity_roles.package_source.commit = mergeCommit;
-run.check(
-  "merge-test commit cannot masquerade as package source",
-  () => validateIdentityConvergence(mergeMasquerade, options).some((error) => error.includes("package source") || error.includes("merge-test")),
-);
+run.ok(validateIdentityConvergence(mergeMasquerade, options).some((error) => error.includes("package source") || error.includes("merge-test")), "merge-test commit masquerading as package source is rejected");
 
 const wrongTree = structuredClone(identity);
 wrongTree.identity_roles.package_source.tree = "f".repeat(40);
-run.check(
-  "wrong package-source tree is rejected",
-  () => validateIdentityConvergence(wrongTree, options).some((error) => error.includes("package source")),
-);
+run.ok(validateIdentityConvergence(wrongTree, options).some((error) => error.includes("package source")), "wrong package source tree is rejected");
 
-run.check(
-  "missing KNOWN_LIMITATIONS is reported",
-  () => validateIdentityConvergence(identity, { ...options, limitationsExists: false }).some((error) => error.includes("KNOWN_LIMITATIONS")),
-);
+run.ok(validateIdentityConvergence(identity, { ...options, limitationsExists: false }).some((error) => error.includes("KNOWN_LIMITATIONS")), "missing KNOWN_LIMITATIONS is rejected");
 
 const stalePerformance = structuredClone(performance);
 stalePerformance.source_identity.commit = "fd0f674934d07752906bb5f21ebc9f4c097a8437";
-run.check(
-  "performance evidence from another source commit is rejected",
-  () => validatePerformanceEvidence(stalePerformance, options).some((error) => error.includes("another source commit")),
-);
+run.ok(validatePerformanceEvidence(stalePerformance, options).some((error) => error.includes("another source commit")), "performance evidence bound to another source commit is rejected");
 
 const cleanRoles = classifyCiIdentityRoles({
   checkedOutCommit: sourceCommit,
@@ -107,7 +85,7 @@ const cleanRoles = classifyCiIdentityRoles({
   packageSourceCommit: sourceCommit,
   packageSourceTree: sourceTree,
 });
-run.eq(cleanRoles.status, "PASS", "clean identity roles pass");
+run.eq(cleanRoles.status, "PASS", "clean CI identity roles classify as PASS");
 const mergeCheckout = classifyCiIdentityRoles({
   checkedOutCommit: mergeCommit,
   checkedOutTree: sourceTree,
@@ -118,11 +96,8 @@ const mergeCheckout = classifyCiIdentityRoles({
   packageSourceCommit: mergeCommit,
   packageSourceTree: sourceTree,
 });
-run.eq(mergeCheckout.status, "FAIL", "merge checkout is not package source");
-run.check(
-  "merge checkout names the synthetic merge defect",
-  () => mergeCheckout.errors.some((error) => error.includes("synthetic merge") || error.includes("not pinned")),
-);
+run.eq(mergeCheckout.status, "FAIL", "merge-checkout identity roles classify as FAIL");
+run.ok(mergeCheckout.errors.some((error) => error.includes("synthetic merge") || error.includes("not pinned")), "merge-checkout failure names the synthetic-merge cause");
 
 run.finish({
   positive_checks: 6,

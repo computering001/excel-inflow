@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
 import process from "node:process";
 
 import { createRunner } from "./lib/test_harness.mjs";
-
 import { cancelProcessTreePids } from "./lib/process_tree.mjs";
 import {
   resolveRuntimeBudgetPolicy,
@@ -15,12 +13,8 @@ import {
   STAGE4_RUNTIME_STAGES,
 } from "./lib/runtime_budget_policy.mjs";
 
-const run = createRunner({
-  name: "phase5_operational_runtime_tests",
-  importMetaUrl: import.meta.url,
-});
+const run = createRunner({ name: "phase5_operational_runtime_tests", importMetaUrl: import.meta.url });
 const HERE = run.HERE;
-
 let mutations = 0;
 
 let clock = 0;
