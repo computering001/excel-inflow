@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -740,6 +741,12 @@ try {
     packagedInlineFixture,
     archiveEnv,
   );
+  if (packagedInline.code !== 0) {
+    throw new Error(`packaged inline-XBRL pipeline failed (exit ${packagedInline.code}): ${packagedInline.stderr?.slice(-2000) || packagedInline.stdout?.slice(-2000)}`);
+  }
+  if (!existsSync(path.join(packagedInlineFixture.out, "filings-run-state.json"))) {
+    throw new Error(`packaged inline-XBRL pipeline produced no filings-run-state.json (exit ${packagedInline.code}): ${packagedInline.stderr?.slice(-1500) || packagedInline.stdout?.slice(-1500)}`);
+  }
   const packagedInlineState = JSON.parse(
     await fs.readFile(path.join(packagedInlineFixture.out, "filings-run-state.json"), "utf8"),
   );
@@ -1320,5 +1327,5 @@ try {
   if (outputPath) await fs.writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 } finally {
-  await fs.rm(scratch, { recursive: true, force: true });
+  if (!process.env.IFC_KEEP_SCRATCH) await fs.rm(scratch, { recursive: true, force: true });
 }

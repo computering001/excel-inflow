@@ -1203,6 +1203,15 @@ async function main() {
     workspaceToken,
     "--json",
   ];
+  // The review gate is fail-closed: a resume may continue past it only when
+  // the caller explicitly accepted delivery (the canary and any scripted
+  // caller pass --review-deliver; a human at the terminal replies the same
+  // way). Forward the caller's reply onto the resume.
+  if (process.argv.includes("--review-deliver")) resumeArgs.push("--review-deliver");
+  if (process.argv.includes("--review-change")) {
+    const idx = process.argv.indexOf("--review-change");
+    if (idx >= 0 && process.argv[idx + 1]) resumeArgs.push("--review-change", process.argv[idx + 1]);
+  }
   resumeArgs.push("--python", pythonCommand);
   resumeArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
   resumeArgs.push("--soffice", sofficeCommand);

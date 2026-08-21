@@ -699,6 +699,15 @@ function evalCall(ast, ctxSheet) {
       return isErr(v) && v.__err === "#N/A" ? scalar(1) : v;
     }
     case "ISNUMBER": { const v = scalar(0); return typeof v === "number"; }
+    case "N": {
+      // Excel N(): number -> number, boolean -> 1/0, anything else (text,
+      // blank, error) -> 0. Mirrors plan_values.mjs; added alongside the B11
+      // leverage guards that emit IF(N(cell)=0, "n/m", ...).
+      const v = scalar(0);
+      if (typeof v === "number") return v;
+      if (typeof v === "boolean") return v ? 1 : 0;
+      return 0;
+    }
     case "ISBLANK": { const v = scalar(0); return v === BLANK; }
     case "ISERROR": { const v = scalar(0); return isErr(v); }
     case "ISTEXT": { const v = scalar(0); return typeof v === "string"; }
