@@ -1,0 +1,390 @@
+{
+  "schema_version": "real-filing-corpus-plan/1.0",
+  "plan_id": "seeded-real-filing-corpus-2026-08",
+  "purpose": "Declarative seed for the real-filing corpus: which issuers, which forms, which years, and the design-matrix tags every fetched candidate inherits. Raw filing bytes live in a LOCAL CUSTODY directory that is gitignored and never committed; only hashes and locators leave custody. The brief said 35 companies but enumerated 37; all 37 enumerated issuers are seeded.",
+  "custody": {
+    "default_dir": "corpus-custody",
+    "committed_to_repository": false,
+    "gitignored": true,
+    "rule": "Primary documents, iXBRL instances, companyfacts payloads, candidate inventories and manifests are written here and never enter the index."
+  },
+  "fetch": {
+    "rate_limit_requests_per_second": 8,
+    "token_bucket_capacity": 8,
+    "sec_hard_limit_note": "SEC fair-access limit is 10 req/s across sec.gov + data.sec.gov + efts.sec.gov combined; one shared token bucket covers all hosts.",
+    "user_agent_env_var": "EDGAR_USER_AGENT",
+    "user_agent_format": "Descriptive per SEC policy, e.g. 'Archie Preston archie@example.com' - name plus contact email. Refuses to run live without it.",
+    "cik_resolution": "https://www.sec.gov/files/company_tickers.json pattern; a plan cik is only a hint and is verified against the ticker file at fetch time.",
+    "submissions": "https://data.sec.gov/submissions/CIK##########.json filtered by form and report year; older filings pulled from the paginated submissions index files when needed."
+  },
+  "matrix_tags_vocabulary": {
+    "regime": ["us_gaap", "ifrs", "uk_domestic"],
+    "sector": ["industrials", "resources", "utilities", "financials", "healthcare", "tech", "consumer-staples", "telecom", "real-estate"],
+    "size_band": ["mega", "large", "mid"],
+    "debt_complexity": ["standard", "moderate", "complex"],
+    "fy_end": "MM-DD of the issuer's typical fiscal close",
+    "currency": "ISO 4217 reporting currency"
+  },
+  "license_basis_vocabulary": ["official_public_regulator", "issuer_ir_site", "third_party_local_custody_only"],
+  "issuers": [
+    {
+      "name": "Caterpillar Inc.",
+      "ticker": "CAT",
+      "cik": 18230,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "industrials", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Deere & Company",
+      "ticker": "DE",
+      "cik": 315189,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "notes": "Fiscal year closes the last Sunday of October; ~10-31 nominal.",
+      "matrix_tags": {"regime": "us_gaap", "sector": "industrials", "size_band": "large", "debt_complexity": "moderate", "fy_end": "10-31", "currency": "USD"}
+    },
+    {
+      "name": "Honeywell International Inc.",
+      "ticker": "HON",
+      "cik": 773840,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "industrials", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "RTX Corporation",
+      "ticker": "RTX",
+      "cik": 101829,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "industrials", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Exxon Mobil Corporation",
+      "ticker": "XOM",
+      "cik": 34088,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "resources", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Freeport-McMoRan Inc.",
+      "ticker": "FCX",
+      "cik": 831259,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "resources", "size_band": "large", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "NextEra Energy, Inc.",
+      "ticker": "NEE",
+      "cik": 753308,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "utilities", "size_band": "mega", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Duke Energy Corporation",
+      "ticker": "DUK",
+      "cik": 1326160,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "utilities", "size_band": "mega", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Dominion Energy, Inc.",
+      "ticker": "D",
+      "cik": 75108,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "flags": ["sale-leaseback-rich"],
+      "matrix_tags": {"regime": "us_gaap", "sector": "utilities", "size_band": "large", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "JPMorgan Chase & Co.",
+      "ticker": "JPM",
+      "cik": 19617,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "financials", "size_band": "mega", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Prudential Financial, Inc.",
+      "ticker": "PRU",
+      "cik": 1137774,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "financials", "size_band": "large", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Pfizer Inc.",
+      "ticker": "PFE",
+      "cik": 78003,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "healthcare", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Abbott Laboratories",
+      "ticker": "ABT",
+      "cik": 1800,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "healthcare", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "International Business Machines Corporation",
+      "ticker": "IBM",
+      "cik": 51143,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "us_gaap", "sector": "tech", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Oracle Corporation",
+      "ticker": "ORCL",
+      "cik": 1341439,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "notes": "Fiscal year ends 31 May.",
+      "matrix_tags": {"regime": "us_gaap", "sector": "tech", "size_band": "mega", "debt_complexity": "complex", "fy_end": "05-31", "currency": "USD"}
+    },
+    {
+      "name": "Cisco Systems, Inc.",
+      "ticker": "CSCO",
+      "cik": 858877,
+      "lane": "edgar",
+      "forms": ["10-K", "20-F"],
+      "years": [2021, 2022, 2023],
+      "notes": "Fiscal year closes the last Saturday of July; ~07-31 nominal.",
+      "matrix_tags": {"regime": "us_gaap", "sector": "tech", "size_band": "large", "debt_complexity": "standard", "fy_end": "07-31", "currency": "USD"}
+    },
+    {
+      "name": "AstraZeneca PLC",
+      "ticker": "AZN",
+      "cik": 901832,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "flags": ["canonical-ifrs-benchmark"],
+      "notes": "Reports in USD under IFRS; canonical IFRS lane benchmark.",
+      "matrix_tags": {"regime": "ifrs", "sector": "healthcare", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Shell plc",
+      "ticker": "SHEL",
+      "cik": 1306965,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "resources", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "BP p.l.c.",
+      "ticker": "BP",
+      "cik": 313807,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "resources", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "CRH plc",
+      "ticker": "CRH",
+      "cik": 84839,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2019, 2020, 2021, 2022],
+      "flags": ["layout-benchmark"],
+      "notes": "Layout benchmark. Historical 20-F IFRS filer; became a US domestic registrant filing Form 10-K from FY2023, so the IFRS lane targets FY2019-FY2022 only.",
+      "matrix_tags": {"regime": "ifrs", "sector": "industrials", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "Siemens Aktiengesellschaft",
+      "ticker": "SIEGY",
+      "cik": null,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2012, 2013, 2014],
+      "notes": "Deregistered after FY2014; EDGAR lane is historical-only.",
+      "matrix_tags": {"regime": "ifrs", "sector": "industrials", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "09-30", "currency": "EUR"}
+    },
+    {
+      "name": "Volkswagen AG",
+      "ticker": "VOW3",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "notes": "Never an SEC registrant; annual report acquired manually from issuer IR / German ERS.",
+      "matrix_tags": {"regime": "ifrs", "sector": "industrials", "size_band": "mega", "debt_complexity": "complex", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "Airbus SE",
+      "ticker": "EADSY",
+      "cik": null,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "industrials", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "Sanofi",
+      "ticker": "SAN",
+      "cik": 1121404,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "healthcare", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "ASML Holding N.V.",
+      "ticker": "ASML",
+      "cik": 937966,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "tech", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "SAP SE",
+      "ticker": "SAP",
+      "cik": 1000184,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "ifrs", "sector": "tech", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "Kerry Group plc",
+      "ticker": "KYGA",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "sector_adjacency": "industrials-adjacent",
+      "notes": "Consumer-staples issuer kept adjacent to the industrials lane; manual acquisition via issuer IR.",
+      "matrix_tags": {"regime": "ifrs", "sector": "consumer-staples", "size_band": "large", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "EUR"}
+    },
+    {
+      "name": "National Grid plc",
+      "ticker": "NGG",
+      "cik": null,
+      "lane": "edgar",
+      "forms": ["20-F"],
+      "years": [2021, 2022, 2023],
+      "notes": "NYSE-listed ADR; files Form 20-F. UK-adopted IFRS.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "utilities", "size_band": "mega", "debt_complexity": "complex", "fy_end": "03-31", "currency": "GBP"}
+    },
+    {
+      "name": "Severn Trent plc",
+      "ticker": "SVT",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "notes": "UK annual report via NSM / issuer IR; not an SEC registrant.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "utilities", "size_band": "mid", "debt_complexity": "complex", "fy_end": "03-31", "currency": "GBP"}
+    },
+    {
+      "name": "BAE Systems plc",
+      "ticker": "BA",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "matrix_tags": {"regime": "uk_domestic", "sector": "industrials", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "GBP"}
+    },
+    {
+      "name": "RELX PLC",
+      "ticker": "REL",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "notes": "Former SEC registrant, deregistered; current reports via issuer IR.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "tech", "size_band": "mega", "debt_complexity": "standard", "fy_end": "12-31", "currency": "GBP"}
+    },
+    {
+      "name": "Tesco PLC",
+      "ticker": "TSCO",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "sector_adjacency": "industrials-adjacent",
+      "notes": "Fiscal year closes the last Saturday of February; ~02-28 nominal.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "consumer-staples", "size_band": "mega", "debt_complexity": "moderate", "fy_end": "02-28", "currency": "GBP"}
+    },
+    {
+      "name": "Vodafone Group Plc",
+      "ticker": "VOD",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR", "20-F"],
+      "years": [2021, 2022, 2023],
+      "sector_adjacency": "tech-adjacent",
+      "notes": "Telecom issuer kept adjacent to the tech lane. Long-running SEC registrant but verify its current 20-F obligation before any live fetch; IR lane is the fallback.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "telecom", "size_band": "mega", "debt_complexity": "complex", "fy_end": "03-31", "currency": "EUR"}
+    },
+    {
+      "name": "Rolls-Royce Holdings plc",
+      "ticker": "RR",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "flags": ["hybrid-capital"],
+      "matrix_tags": {"regime": "uk_domestic", "sector": "industrials", "size_band": "large", "debt_complexity": "complex", "fy_end": "12-31", "currency": "GBP"}
+    },
+    {
+      "name": "SEGRO plc",
+      "ticker": "SGRO",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "sector_adjacency": "utilities-adjacent",
+      "flags": ["lease-heavy"],
+      "notes": "Real-estate issuer kept adjacent to the utilities lane (property lease economics).",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "real-estate", "size_band": "mid", "debt_complexity": "moderate", "fy_end": "12-31", "currency": "GBP"}
+    },
+    {
+      "name": "Tullow Oil plc",
+      "ticker": "TLW",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "flags": ["leveraged-loan-heavy"],
+      "notes": "Reports in USD despite UK listing.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "resources", "size_band": "mid", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    },
+    {
+      "name": "John Wood Group PLC",
+      "ticker": "WG",
+      "cik": null,
+      "lane": "manual",
+      "forms": ["AR"],
+      "years": [2021, 2022, 2023],
+      "notes": "Reports in USD; former SEC registrant lineage (Amec Foster Wheeler), now manual acquisition.",
+      "matrix_tags": {"regime": "uk_domestic", "sector": "industrials", "size_band": "mid", "debt_complexity": "complex", "fy_end": "12-31", "currency": "USD"}
+    }
+  ]
+}
