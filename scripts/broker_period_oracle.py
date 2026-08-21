@@ -2,9 +2,17 @@
 """Independent expected-period oracle for rendered broker evidence.
 
 This module deliberately does not import broker_period_recovery or any other
-production period decision helper. Source-frozen expected headers are closed
+production period decision helper.  Source-frozen expected headers are closed
 over rendered artifact bytes and compared independently with both model-host
 review and recovered output.
+
+Period labels are accepted in the widened surface grammar real rendered
+headers use (``FY25``, ``FY2025``, ``2025/26``, ``25/26``, ``FY25/26``,
+``CY2025``, plus the canonical ``YYYY``/``YYYYA``/``YYYYE``) and normalised to
+canonical annual labels before any comparison.  Normalisation is declared, not
+guessed: a label that resolves only by assumption (a bare split year such as
+``25/26``) always raises ``BROKER_PERIOD_LABEL_AMBIGUOUS`` so the frozen
+contract is re-stated unambiguously.
 """
 
 from __future__ import annotations
@@ -16,7 +24,70 @@ from pathlib import Path
 from typing import Any
 
 
+# Canonical annual labels: a four-digit year with an optional A(actual)/E(estimate)
+# suffix.  Every widened surface spelling below normalises into this shape.
 FULL_YEAR = re.compile(r"^(?:19|20)\d{2}(?:A|E)?$")
+
+# Widened surface grammar for real rendered broker headers.  The oracle stays
+# independent of production recovery code: it normalises labels itself and
+# never guesses silently — an uncenturied split year is resolvable under the
+# declared conventions but is always reported as an assumption via
+# BROKER_PERIOD_LABEL_AMBIGUOUS so the frozen contract gets re-stated
+# unambiguously.
+#
+#   2025, 2025A, 2025E  -> identity (existing grammar)
+#   FY2025, fy 2025     -> 2025            explicit-century fiscal prefix
+#   FY25                -> 2025            bare pair under the 00-49/50-99 pivot
+#   CY2025              -> 2025            calendar-year prefix
+#   2025/26             -> 2026            UK split, END year; second pair must
+#                                          be start+1 (1999/00 -> 2000)
+#   FY25/26             -> 2026            fiscal-prefixed split
+#   25/26               -> 2026 (AMBIGUOUS) no century and no convention prefix:
+#                                          resolvable, but never silently blessed
+PERIOD_LABEL = re.compile(
+    r"^(FY|CY)?\s*((?:19|20)\d{2}|\d{2})(?:\s*/\s*(\d{2}))?\s*([AE])?$",
+    re.IGNORECASE,
+)
+
+
+def _pivot_year(pair: str) -> int:
+    """Resolve a bare two-digit year under the declared 00-49/50-99 pivot."""
+    value = int(pair)
+    return 2000 + value if value <= 49 else 1900 + value
+
+
+def canonical_period_label(value: Any) -> tuple[str | None, bool]:
+    """Normalise one rendered period label to a canonical annual label.
+
+    Returns ``(canonical_label, ambiguous)``.  ``canonical_label`` is ``None``
+    when the label is outside the grammar entirely; ``ambiguous`` is True only
+    for labels the conventions resolve only by assumption (a bare two-digit
+    split year such as ``25/26``), which callers must surface as a finding
+    rather than accept silently.
+    """
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    match = PERIOD_LABEL.fullmatch(text)
+    if not match:
+        return None, False
+    prefix, first, second, suffix = match.groups()
+    prefix = (prefix or "").upper()
+    suffix = (suffix or "").upper()
+    if len(first) == 4:
+        start = int(first)
+        ambiguous = False
+    else:
+        # A bare pair is only accepted when some convention anchors it: a
+        # FY/CY prefix or an explicit split.  A naked "25" stays invalid.
+        if not prefix and not second:
+            return None, False
+        start = _pivot_year(first)
+        ambiguous = not prefix and bool(second)
+    if second:
+        end = start + 1
+        if end % 100 != int(second):
+            return None, False
+        return f"{end:04d}{suffix}", ambiguous
+    return f"{start:04d}{suffix}", ambiguous
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -49,6 +120,20 @@ def normal_headers(value: Any) -> list[dict[str, Any]]:
         ],
         key=lambda item: item["column"],
     )
+
+
+def canonical_headers(value: Any) -> list[dict[str, Any]]:
+    """Headers mapped into canonical annual-label space.
+
+    A label outside the grammar keeps its raw text so downstream comparisons
+    fail loudly rather than crash; ambiguity is surfaced separately by the
+    verification pass.
+    """
+    resolved: list[dict[str, Any]] = []
+    for item in normal_headers(value):
+        canonical, _ = canonical_period_label(item["period_label"])
+        resolved.append({"column": item["column"], "period_label": canonical or item["period_label"]})
+    return resolved
 
 
 def verify_period_expectations(
@@ -133,14 +218,25 @@ def verify_period_expectations(
 
         expected_headers = normal_headers(expected.get("headers"))
         if not expected_headers or any(
-            item["column"] < 1 or not FULL_YEAR.fullmatch(item["period_label"])
+            item["column"] < 1 or canonical_period_label(item["period_label"])[0] is None
             for item in expected_headers
         ):
-            fail("BROKER_PERIOD_EXPECTED_LABEL_INVALID", "Expected-period contract does not contain complete annual labels.", document_id=document_id, table_id=table_id)
+            fail("BROKER_PERIOD_EXPECTED_LABEL_INVALID", "Expected-period contract does not contain a recognised complete annual label.", document_id=document_id, table_id=table_id)
+        for item in expected_headers:
+            resolved_label, ambiguous = canonical_period_label(item["period_label"])
+            if ambiguous:
+                fail(
+                    "BROKER_PERIOD_LABEL_AMBIGUOUS",
+                    "Period label %r carries no century anchor; it resolves to %r only under the declared split-year conventions and must be re-stated unambiguously in the frozen contract." % (item["period_label"], resolved_label),
+                    document_id=document_id,
+                    table_id=table_id,
+                    column=item["column"],
+                )
+        expected_canonical = canonical_headers(expected.get("headers"))
         review_decision = review_decisions.get(target)
         if review_decision is None or str(review_decision.get("surface_id") or "") != surface_id:
             fail("BROKER_PERIOD_REVIEW_TARGET", "Review does not disposition the frozen rendered target.", document_id=document_id, table_id=table_id)
-        elif normal_headers(review_decision.get("headers")) != expected_headers:
+        elif canonical_headers(review_decision.get("headers")) != expected_canonical:
             fail("BROKER_PERIOD_EXPECTED_LABEL_MISMATCH", "Review labels differ from the source-frozen rendered-period expectation.", document_id=document_id, surface_id=surface_id, table_id=table_id)
 
         recovered_tables = {
@@ -151,12 +247,11 @@ def verify_period_expectations(
         if recovered_table is None:
             fail("BROKER_PERIOD_RECOVERED_TABLE", "Recovered output omits the frozen expected table.", document_id=document_id, table_id=table_id)
         else:
-            recovered_headers = normal_headers(recovered_table.get("effective_period_headers"))
             recovered_headers = [
-                item for item in recovered_headers
-                if item["column"] in {header["column"] for header in expected_headers}
+                item for item in canonical_headers(recovered_table.get("effective_period_headers"))
+                if item["column"] in {header["column"] for header in expected_canonical}
             ]
-            if recovered_headers != expected_headers:
+            if recovered_headers != expected_canonical:
                 fail("BROKER_PERIOD_RECOVERED_LABEL_MISMATCH", "Recovered headers differ from the source-frozen rendered-period expectation.", document_id=document_id, table_id=table_id)
 
     unexpected_review_targets = sorted(set(review_decisions) - expected_targets)
