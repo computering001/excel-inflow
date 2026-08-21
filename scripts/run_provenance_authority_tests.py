@@ -70,7 +70,10 @@ FIXTURES = ("standard-maximal-v2", "standard-net-cash-v2")
 # hash probe; net-cash-v2 is unaffected (its lease/ETR shape never hits those
 # rows). Re-certified at integration state 8f71118.
 CERTIFIED_XLSX = {
-    "standard-maximal-v2": "caa5b1774f025a55d0a6d6837c132a62672500495615790870f8ceebd134695b",
+    # fe18f8f (B11 funded-switch cache parity) moved the acquisition-adjustment
+  # leverage cells' cached values from 0 to the formula-faithful "n/m".
+  # Re-certified at that head; net-cash-v2 unaffected (no funded deal).
+    "standard-maximal-v2": "81a46bf4241c6fb70c8143464ba7a73781bb9b049d4b340b8f93454416c194d2",
     "standard-net-cash-v2": "f07023b6c52e27fcc2dba8038453b10b7b75fcd53540a43fa77d496ab01426fa",
 }
 
