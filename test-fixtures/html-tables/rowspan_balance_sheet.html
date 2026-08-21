@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!-- SYNTHETIC FIXTURE (mp-Q wave 3): balance sheet with rowspan/colspan
+     header layout. No inline XBRL. Exercises: grid expansion for a
+     rowspan=2 corner header, a colspan=2 super-header stitched with the
+     year sub-header into per-column instants ("As of Dec 31, 2025"),
+     and a body rowspan carrying its label across two data rows. -->
+<html lang="en">
+<head><title>Meridian Industrial Corp. Selected Financial Position</title></head>
+<body>
+<h3>Consolidated Balance Sheets (Condensed)</h3>
+<table id="balance-sheet">
+  <caption>Selected Financial Position (in millions)</caption>
+  <thead>
+    <tr>
+      <th rowspan="2">Category</th>
+      <th rowspan="2">Item</th>
+      <th colspan="2">As of Dec 31,</th>
+    </tr>
+    <tr>
+      <th>2025</th>
+      <th>2024</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="2">Current assets</td><td>Cash and equivalents</td><td>412</td><td>388</td></tr>
+    <tr><td>Receivables, net</td><td>275</td><td>301</td></tr>
+    <tr><td>Non-current assets</td><td>Property, net</td><td>1,120</td><td>(1,088)</td></tr>
+  </tbody>
+</table>
+</body>
+</html>
