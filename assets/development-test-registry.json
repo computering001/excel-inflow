@@ -19,7 +19,8 @@
       "proof": "release-proof",
       "real_corpus": "broker-and-real-corpus",
       "cohort": "workbook-oracle",
-      "performance": "runtime-performance"
+      "performance": "runtime-performance",
+      "release": "release-proof"
     },
     "expected_exit_contract": {
       "PASS": 0,
