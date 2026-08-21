@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
 import { acquisitionTransactionFlows } from "./lib/acquisition_policy.mjs";
 import {
   applyFundedAcquisitionPlan,
   applyFundedAcquisitionWorkbook,
 } from "./lib/funded_acquisition_plan.mjs";
 import { applyFundedAcquisitionRows } from "./lib/funded_acquisition_runtime.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
+
+const run = createRunner({ name: "funded_acquisition_transaction_tests", importMetaUrl: import.meta.url });
 
 const modelCase = {
   controls: { acquisition: 1 },
@@ -30,11 +32,11 @@ const modelCase = {
 };
 const before = JSON.stringify(modelCase.statement_structure);
 applyFundedAcquisitionRows(modelCase);
-assert.equal(JSON.stringify(modelCase.statement_structure), before, "funded acquisition must not author duplicate standalone rows");
-assert.equal(Math.abs(acquisitionTransactionFlows(modelCase, 0).consideration_cash_flow), 0);
-assert.equal(acquisitionTransactionFlows(modelCase, 1).consideration_cash_flow, -1482.5);
-assert.equal(acquisitionTransactionFlows(modelCase, 1).acquisition_debt_proceeds, 1187.5);
-assert.equal(acquisitionTransactionFlows(modelCase, 1).residual_cash_or_rcf_funding, 295);
+run.eq(JSON.stringify(modelCase.statement_structure), before, "funded acquisition must not author duplicate standalone rows");
+run.eq(Math.abs(acquisitionTransactionFlows(modelCase, 0).consideration_cash_flow), 0, "no consideration cash flow before close");
+run.eq(acquisitionTransactionFlows(modelCase, 1).consideration_cash_flow, -1482.5, "close period books the enterprise-value outflow");
+run.eq(acquisitionTransactionFlows(modelCase, 1).acquisition_debt_proceeds, 1187.5, "close period books acquisition debt proceeds");
+run.eq(acquisitionTransactionFlows(modelCase, 1).residual_cash_or_rcf_funding, 295, "residual cash or RCF funding balances the transaction");
 
 const rowPlan = {
   statement_rows: {
@@ -111,18 +113,18 @@ const workbookResult = applyFundedAcquisitionWorkbook(
   rowPlan,
   modelCase,
 );
-assert.equal(workbookResult.changed, 3);
-assert.match(cells.get("O65").formula, /-\$P\$5/);
-assert.doesNotMatch(cells.get("O65").formula, /101|fx/i);
-assert.equal(cells.get("O65").cachedValue, -1482.5);
-assert.equal(cells.get("O70").formula, "=O97");
-assert.equal(workbookResult.debt_proceeds_row, 70);
+run.eq(workbookResult.changed, 3, "workbook route changed exactly three cells");
+run.match(cells.get("O65").formula, /-\$P\$5/, "consideration formula binds to the EV input");
+run.doesNotMatch(cells.get("O65").formula, /101|fx/i, "consideration formula never references the fx row");
+run.eq(cells.get("O65").cachedValue, -1482.5, "consideration cell caches the negative EV");
+run.eq(cells.get("O70").formula, "=O97", "debt issuance row keeps its existing formula");
+run.eq(workbookResult.debt_proceeds_row, 70, "debt proceeds row is reported as row 70");
 
 const fxBoundPlan = structuredClone(rowPlan);
 fxBoundPlan.statement_rows.cash_flow.find(
   (row) => row.row_id === "cash_from_investing",
 ).calculation.refs = ["fx_effect_on_cash"];
-assert.throws(
+run.throws(
   () => applyFundedAcquisitionWorkbook(workbook, fxBoundPlan, modelCase),
   /investing|exactly once/i,
   "An acquisition consideration row not owned exactly once by investing cash flow was accepted.",
@@ -153,16 +155,16 @@ const capturedPlan = {
   ],
 };
 const capturedResult = applyFundedAcquisitionPlan(capturedPlan, modelCase);
-assert.equal(capturedResult.changed, 6);
-assert.match(capturedPlan.rows[0].cells[1].formula, /-\$P\$5/);
-assert.equal(capturedPlan.rows[2].cells[1].formula, "=0");
+run.eq(capturedResult.changed, 6, "captured-plan route changed all six addressed cells");
+run.match(capturedPlan.rows[0].cells[1].formula, /-\$P\$5/, "captured-plan consideration binds to the EV input");
+run.eq(capturedPlan.rows[2].cells[1].formula, "=0", "captured-plan fx row is left at zero");
 
 const duplicateCapturedPlan = structuredClone(capturedPlan);
 duplicateCapturedPlan.rows[2].semantic_role = "acquisitions_net_of_cash";
-assert.throws(
+run.throws(
   () => applyFundedAcquisitionPlan(duplicateCapturedPlan, modelCase),
   /exactly one|duplicate/i,
   "The captured-plan route accepted a second physical consideration row.",
 );
 
-console.log(JSON.stringify({status:"PASS",checks:16}));
+run.finish();

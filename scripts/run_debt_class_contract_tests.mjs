@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import {
@@ -16,13 +15,15 @@ import {
   DEBT_PRESENTATION_GROUPS,
   debtPresentationGroupKey,
 } from "./lib/row_plan.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
+const run = createRunner({ name: "debt_class_contract_tests", importMetaUrl: import.meta.url });
 const ROOT = new URL("../", import.meta.url);
 const readJson = (relative) =>
   JSON.parse(fs.readFileSync(new URL(relative, ROOT), "utf8"));
 const canonical = [...CANONICAL_DEBT_CLASSES].sort();
 const sameEnum = (actual, label) =>
-  assert.deepEqual([...actual].sort(), canonical, `${label} has drifted from the debt ontology`);
+  run.eq([...actual].sort(), canonical, `${label} has drifted from the debt ontology`);
 
 const dcsSchema = readJson("assets/dcs-export.schema.json");
 const modelCaseV2Schema = readJson("assets/model-case-v2.schema.json");
@@ -35,11 +36,11 @@ sameEnum(instrumentStateSchema.$defs.state.properties.class.enum, "instrument-pe
 sameEnum(publicTestSchema.$defs.instrument.properties.instrument_type.enum, "public test run");
 sameEnum(modelCaseSchema.$defs.instrument.properties.class.enum, "legacy model-case schema");
 
-assert.equal(canonicalDebtClass("fixed_bond"), "bond_fixed");
-assert.equal(canonicalDebtClass("floating_loan"), "term_loan_floating");
-assert.equal(canonicalDebtClass("mystery facility"), "unclassified");
-assert.throws(() => assertCanonicalDebtClass("fixed_bond"), /not canonical/);
-assert.throws(() => debtClassGroup("other_debt"), /not canonical/);
+run.eq(canonicalDebtClass("fixed_bond"), "bond_fixed", "legacy alias fixed_bond canonicalises to bond_fixed");
+run.eq(canonicalDebtClass("floating_loan"), "term_loan_floating", "legacy alias floating_loan canonicalises to term_loan_floating");
+run.eq(canonicalDebtClass("mystery facility"), "unclassified", "unknown free text falls back to unclassified");
+run.throws(() => assertCanonicalDebtClass("fixed_bond"), /not canonical/, "canonical guard rejects a legacy alias");
+run.throws(() => debtClassGroup("other_debt"), /not canonical/, "group lookup rejects an uncanonical class");
 
 const migrated = {
   instruments: [
@@ -49,16 +50,18 @@ const migrated = {
   ],
 };
 const migrationReceipt = migrateLegacyDebtClasses(migrated);
-assert.equal(migrated.debt_class_contract_version, "debt-class-ontology/1.0");
-assert.deepEqual(
+run.eq(migrated.debt_class_contract_version, "debt-class-ontology/1.0", "migration stamps the ontology contract version");
+run.eq(
   migrated.instruments.map((instrument) => instrument.class),
   ["bond_fixed", "unclassified", "rcf"],
+  "migration maps alias, unknown and current classes correctly",
 );
-assert.deepEqual(
+run.eq(
   migrationReceipt.map((item) => item.mapping),
   ["legacy_alias", "unrecognised_to_review"],
+  "migration receipt names its mappings",
 );
-assert.deepEqual(migrated.debt_class_migrations, migrationReceipt);
+run.eq(migrated.debt_class_migrations, migrationReceipt, "case retains its migration receipt");
 
 const expectedGroups = {
   bond_fixed: "bonds",
@@ -74,11 +77,12 @@ const expectedGroups = {
   unclassified: "unclassified_review",
 };
 for (const [debtClass, group] of Object.entries(expectedGroups)) {
-  assert.equal(debtPresentationGroupKey({ class: debtClass }), group);
+  run.eq(debtPresentationGroupKey({ class: debtClass }), group, `${debtClass} presentation group`);
 }
-assert.deepEqual(
+run.eq(
   DEBT_PRESENTATION_GROUPS.map(({ key }) => key),
   ["bonds", "bank_debt", "other_debt", "unclassified_review"],
+  "presentation group ordering is stable",
 );
 
 const fullLegalName = "XS0123456789 Example Holdings plc 3.125 per cent guaranteed notes series 12";
@@ -90,9 +94,9 @@ const fixedBond = {
   maturity_date: "2027-06-30",
   maturity_precision: "date",
 };
-assert.equal(instrumentDisplayLabel(fixedBond), "Senior Notes 3.125% due Jun-27");
-assert.equal(fixedBond.name, fullLegalName, "presentation changed the sourced legal name");
-assert.equal(
+run.eq(instrumentDisplayLabel(fixedBond), "Senior Notes 3.125% due Jun-27", "fixed bond renders a compact display label");
+run.eq(fixedBond.name, fullLegalName, "presentation changed the sourced legal name");
+run.eq(
   instrumentDisplayLabel({
     class: "term_loan_floating",
     rate_type: "floating",
@@ -101,8 +105,8 @@ assert.equal(
     maturity_date: "2029-12-31",
   }),
   "Floating Term Loan SOFR + 175bp due Dec-29",
-);
-assert.equal(
+ "floating term loan renders a compact display label",);
+run.eq(
   instrumentDisplayLabel({
     class: "rcf",
     rate_type: "floating",
@@ -111,23 +115,23 @@ assert.equal(
     maturity_date: "2030-04-30",
   }),
   "RCF SONIA + 110bp due Apr-30",
-);
-assert.equal(
+ "rcf renders a compact display label",);
+run.eq(
   instrumentDisplayLabel({
     class: "overdraft",
     rate_type: "unpriced",
     maturity_treatment: "non_maturing_within_forecast",
   }),
   "Overdraft non-maturing",
-);
+ "overdraft renders a compact display label",);
 
 const coverageCase = readJson("test-fixtures/cases/standard-maximal-v2.json");
 coverageCase.instruments[0].class = "unclassified";
 const classBlock = assessCoverage(coverageCase).checks.find(
   (check) => check.id === `instrument.${coverageCase.instruments[0].instrument_id}.class_review`,
 );
-assert.equal(classBlock?.status, "BLOCK");
-assert.match(classBlock?.message ?? "", /requires an explicit reviewed debt class/);
+run.eq(classBlock?.status, "BLOCK", "unclassified instrument blocks coverage");
+run.match(classBlock?.message ?? "", /requires an explicit reviewed debt class/, "class review block explains itself");
 
 const commercialPaperCase = {
   rcf_policy: { mode: "balancing_rcf", instrument_id: "rcf" },
@@ -146,11 +150,11 @@ applyExplicitSourcePolicies({
     },
   },
 });
-assert.equal(commercialPaperCase.instruments[0].class, "commercial_paper");
-assert.equal(commercialPaperCase.rcf_policy.commercial_paper_backstopped, false);
+run.eq(commercialPaperCase.instruments[0].class, "commercial_paper", "unbacked commercial paper keeps its class");
+run.eq(commercialPaperCase.rcf_policy.commercial_paper_backstopped, false, "unbacked paper is not marked backstopped");
 
 const rowPlanSource = fs.readFileSync(new URL("scripts/lib/row_plan.mjs", ROOT), "utf8");
-assert.equal(rowPlanSource.includes("CRH_DEBT_GROUPS"), false);
-assert.equal(rowPlanSource.includes("crhDebtGroup"), false);
+run.eq(rowPlanSource.includes("CRH_DEBT_GROUPS"), false, "row plan carries no CRH_DEBT_GROUPS literal");
+run.eq(rowPlanSource.includes("crhDebtGroup"), false, "row plan carries no crhDebtGroup literal");
 
-console.log(JSON.stringify({ status: "PASS", checks: 44 }, null, 2));
+run.finish();
