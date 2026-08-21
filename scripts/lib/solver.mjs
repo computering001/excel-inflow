@@ -1078,6 +1078,63 @@ export function assertCommitmentFeeConventionAdmitted(
   throw error;
 }
 
+// B15 — the DECLARED monotone-boundary fallback policy, mirroring
+// assets/economic-solve-policy.v1.json
+// (`solver.monotone_boundary_fallback`). The cash↔RCF boundary is the
+// analytic min/max projection named there; bisection refines it
+// deterministically when the fixed-point iteration oscillates across it.
+const MONOTONE_BOUNDARY_FALLBACK_POLICY = Object.freeze({
+  enabled: true,
+  method: "deterministic_bisection",
+  declared_boundaries_only: true,
+  boundary: "current_cash_rcf",
+  max_steps: 20,
+});
+
+function monotoneProjection(direction, state, image) {
+  return (
+    (image.cash - state.cash) * direction.cash +
+    (image.rcf - state.rcf) * direction.rcf +
+    (image.native - state.native) * direction.native
+  );
+}
+
+// Brackets the fixed point between the last two cycle states when their
+// sweep images project onto the joining direction with OPPOSITE signs — the
+// signature of a monotone crossing. Returns null when the observation cannot
+// bracket, leaving the existing damping behaviour in charge.
+export function initMonotoneBoundaryBracket(
+  stateLow,
+  imageLow,
+  stateHigh,
+  imageHigh,
+) {
+  const direction = {
+    cash: stateHigh.cash - stateLow.cash,
+    rcf: stateHigh.rcf - stateLow.rcf,
+    native: stateHigh.native - stateLow.native,
+  };
+  const norm2 =
+    direction.cash ** 2 + direction.rcf ** 2 + direction.native ** 2;
+  if (!(norm2 > 0) || !Number.isFinite(norm2)) return null;
+  const gLow = monotoneProjection(direction, stateLow, imageLow) / norm2;
+  const gHigh = monotoneProjection(direction, stateHigh, imageHigh) / norm2;
+  if (!Number.isFinite(gLow) || !Number.isFinite(gHigh)) return null;
+  if (Math.sign(gLow) === Math.sign(gHigh) || gLow === 0 || gHigh === 0) {
+    return null;
+  }
+  return {
+    lo: { ...stateLow },
+    hi: { ...stateHigh },
+    gLo: gLow,
+    gHi: gHigh,
+    direction,
+    norm2,
+    steps: 0,
+    method: MONOTONE_BOUNDARY_FALLBACK_POLICY.method,
+  };
+}
+
 function nonCashMovementComponents(instrument, forecastIndex) {
   const components = instrument.non_cash_movement_components;
   if (components && typeof components === "object") {
@@ -2653,6 +2710,38 @@ export function solveCase(
         modelCase.controls.circularity === 1
           ? rawCashCouponInterestReporting
           : 0;
+      // B18 — zero-coupon par discipline. An accreting zero-coupon
+      // instrument (all-in coupon identically 0, PIK accretion declared)
+      // earns its return ONLY through accretion: cash coupon leaking into
+      // the interest line is a DEGRADE finding, and at maturity the accreted
+      // balance may not sit below the face (par) it promises to redeem.
+      const couponSeries = asSeries3(instrument.coupon_or_all_in_rate, 0);
+      const accretingZeroCoupon =
+        couponSeries.every((value) => Number(value) === 0) &&
+        Number(asSeries3(instrument.pik_rate, 0)[forecastIndex]) > 0;
+      if (accretingZeroCoupon) {
+        if (Math.abs(Number(cashCouponInterestReporting)) > tolerance) {
+          recordSolverFinding("zero_coupon_cash_interest_leak", "DEGRADE", {
+            period: period.date,
+            scope: `instrument:${instrument.instrument_id}`,
+            instrument_id: instrument.instrument_id,
+            leaked_cash_coupon: cashCouponInterestReporting,
+          });
+        }
+        if (
+          matures &&
+          preMaturityEnding + tolerance <
+            Number(instrument.opening_balance ?? 0)
+        ) {
+          recordSolverFinding("zero_coupon_below_par_at_maturity", "DEGRADE", {
+            period: period.date,
+            scope: `instrument:${instrument.instrument_id}`,
+            instrument_id: instrument.instrument_id,
+            face: Number(instrument.opening_balance ?? 0),
+            accreted_at_maturity: preMaturityEnding,
+          });
+        }
+      }
       solveOrder.record("interest.instrument_cash");
       const rawInterestReporting =
         rawCashCouponInterestReporting + pikInterestReporting;
@@ -2891,6 +2980,20 @@ export function solveCase(
     let dampingIndex = 0;
     let cycleDetectionCount = 0;
     const dampingFactors = [0.5, 0.25];
+    // B16/B26 — damping DISCIPLINE state: engagement is sustained (the
+    // escalation index no longer survives as a permanent ratchet) and the
+    // period discloses that damping mediated its published values.
+    let dampingEngaged = false;
+    let quietSweepsSinceTwoCycle = 0;
+    let dampingMediated = false;
+    // B15 — deterministic bisection across the cash↔RCF boundary: bracket
+    // observations and per-period receipt counters.
+    let bisection = null;
+    let bisectionAttempted = false;
+    let bisectionStepsUsed = 0;
+    // (state, image) pairs observed per completed sweep — B15's brackets are
+    // built only from MATCHED pairs.
+    const cycleObservations = [];
     const iterationLimit = solverDeclaration.required ? maxIterations : 1;
 
     for (iteration = 1; iteration <= iterationLimit; iteration += 1) {
@@ -2900,6 +3003,19 @@ export function solveCase(
       // so net interest is zero. Gating only the tightest leg of the loop
       // would leave the model computing interest while reporting that the
       // breaker is on. Raw assumptions are untouched in both states.
+      // The sweep reads the CARRIED trial state; capture it before anything
+      // repositions it so B15 can pair states with their sweep images.
+      const sweepStartState = {
+        cash: endingCash,
+        rcf: endingRcf,
+        native: endingRcfNative,
+      };
+      // B15 — while bisecting, every sweep starts from the bracket midpoint.
+      if (bisection) {
+        endingCash = (bisection.lo.cash + bisection.hi.cash) / 2;
+        endingRcf = (bisection.lo.rcf + bisection.hi.rcf) / 2;
+        endingRcfNative = (bisection.lo.native + bisection.hi.native) / 2;
+      }
       const interestEnabled = modelCase.controls.circularity === 1;
       const leaseInterest = interestEnabled ? rawLeaseInterest : 0;
       solveOrder.record("interest.lease");
@@ -3431,9 +3547,7 @@ export function solveCase(
         fxEnding: rcfEndingFx,
         tolerance,
       });
-      const currentIterationSnapshot = solverIterationSnapshot(
-        solverDeclaration,
-        {
+      const iterationNodeValues = {
           "statement.cash_flow_start": cashFlowStart,
           "cash.cfo": cashFromOperations,
           "rcf.draw": rcfDraw,
@@ -3456,7 +3570,10 @@ export function solveCase(
           "statement.pre_tax_income": preTaxIncome,
           "statement.tax_expense": -taxCharge,
           "statement.net_income": netIncome,
-        },
+      };
+      const currentIterationSnapshot = solverIterationSnapshot(
+        solverDeclaration,
+        iterationNodeValues,
       );
       residual = iterationResidual(
         previousIterationSnapshot,
@@ -3475,6 +3592,28 @@ export function solveCase(
         : Number.POSITIVE_INFINITY;
       const twoCycleDetected = solverDeclaration.required && detectTwoCycle(previousPreviousIterationSnapshot, previousIterationSnapshot, currentIterationSnapshot, convergenceLimit);
       if (twoCycleDetected) cycleDetectionCount += 1;
+      // B15 — on the FIRST two-cycle detection, try to bracket the fixed
+      // point between the last two cycle states. When the projection signs
+      // oppose, subsequent sweeps run deterministic bisection; otherwise the
+      // damping path below stays in charge.
+      if (
+        MONOTONE_BOUNDARY_FALLBACK_POLICY.enabled &&
+        twoCycleDetected &&
+        !bisection &&
+        bisectionStepsUsed < MONOTONE_BOUNDARY_FALLBACK_POLICY.max_steps &&
+        cycleObservations.length === 2
+      ) {
+        const bracket = initMonotoneBoundaryBracket(
+          cycleObservations[0].state,
+          cycleObservations[0].image,
+          cycleObservations[1].state,
+          cycleObservations[1].image,
+        );
+        if (bracket) {
+          bisection = bracket;
+          bisectionAttempted = true;
+        }
+      }
       // P4.7 — the residual, DECOMPOSED per strongly-connected component of
       // the case's own graph. The published scalar is an L-infinity norm over
       // the whole state vector and cannot say which loop is still moving; this
@@ -3640,12 +3779,82 @@ export function solveCase(
         converged = true;
         break;
       }
-      if (twoCycleDetected) {
+      // B15 — pair the raw sweep image with the exact state this sweep started
+      // from, keeping the last two matched observations for bracketing.
+      cycleObservations.push({
+        state: { ...sweepStartState },
+        image: {
+          cash: nextEndingCash,
+          rcf: nextEndingRcf,
+          native: nextEndingRcfNative,
+        },
+      });
+      if (cycleObservations.length > 2) cycleObservations.shift();
+
+      if (bisection) {
+        // B15 — classify the midpoint this sweep started from: the sign of
+        // the projected image decides which half keeps the fixed point, then
+        // carry the NEW midpoint into the next sweep.
+        const gMid =
+          monotoneProjection(bisection.direction, sweepStartState, {
+            cash: nextEndingCash,
+            rcf: nextEndingRcf,
+            native: nextEndingRcfNative,
+          }) / bisection.norm2;
+        if (Math.sign(gMid) === Math.sign(bisection.gLo)) {
+          bisection.lo = { ...sweepStartState };
+          bisection.gLo = gMid;
+        } else {
+          bisection.hi = { ...sweepStartState };
+          bisection.gHi = gMid;
+        }
+        bisection.steps += 1;
+        bisectionStepsUsed += 1;
+        endingCash = (bisection.lo.cash + bisection.hi.cash) / 2;
+        endingRcf = (bisection.lo.rcf + bisection.hi.rcf) / 2;
+        endingRcfNative = (bisection.lo.native + bisection.hi.native) / 2;
+        if (bisection.steps >= MONOTONE_BOUNDARY_FALLBACK_POLICY.max_steps) {
+          // Budget exhausted: hand control back to the declared iteration
+          // policy. If convergence has not arrived by now the typed
+          // non-convergence refusal carries the bisection receipt.
+          bisection = null;
+        }
+      } else if (twoCycleDetected || dampingEngaged) {
+        // B16 — engagement is SUSTAINED: while damping is engaged the
+        // escalation index never resets and full steps cannot interleave.
+        if (twoCycleDetected) {
+          if (!dampingEngaged) {
+            dampingEngaged = true;
+            quietSweepsSinceTwoCycle = 0;
+          }
+          dampingMediated = true;
+        }
         const factor = dampingFactors[Math.min(dampingIndex, dampingFactors.length - 1)];
-        dampingIndex = Math.min(dampingIndex + 1, dampingFactors.length - 1);
+        if (twoCycleDetected) {
+          dampingIndex = Math.min(dampingIndex + 1, dampingFactors.length - 1);
+        } else {
+          // B16 — two consecutive sweeps without a two-cycle detection
+          // release damping; the index resets so any relapse starts gentle.
+          quietSweepsSinceTwoCycle += 1;
+          if (quietSweepsSinceTwoCycle >= 2) {
+            dampingEngaged = false;
+            dampingIndex = 0;
+            quietSweepsSinceTwoCycle = 0;
+          }
+        }
         endingCash = endingCash + factor * (nextEndingCash - endingCash);
         endingRcf = endingRcf + factor * (nextEndingRcf - endingRcf);
         endingRcfNative = endingRcfNative + factor * (nextEndingRcfNative - endingRcfNative);
+        // B26 — rebuild the snapshot history from the state actually CARRIED
+        // (prevPrev = prev = damped current), so the next residual measures
+        // the damped trajectory and not the discarded oscillation memory.
+        const dampedSnapshot = solverIterationSnapshot(solverDeclaration, {
+          ...iterationNodeValues,
+          "cash.ending_balance": endingCash,
+          "rcf.ending_balance": endingRcf,
+        });
+        previousPreviousIterationSnapshot = dampedSnapshot;
+        previousIterationSnapshot = dampedSnapshot;
       } else {
         endingCash = nextEndingCash;
         endingRcf = nextEndingRcf;
@@ -3663,6 +3872,15 @@ export function solveCase(
       // P4.9 — a refusal must say what it judged the residual against.
       error.convergence_criterion = lastConvergenceCriterion;
       error.two_cycle_detections = cycleDetectionCount;
+      // B15 — the refusal says whether the declared bisection fallback ran
+      // and how much of its deterministic budget it consumed.
+      error.bisection_used = {
+        attempted: bisectionAttempted,
+        applied: bisectionStepsUsed > 0,
+        steps: bisectionStepsUsed,
+        method: MONOTONE_BOUNDARY_FALLBACK_POLICY.method,
+        boundary: MONOTONE_BOUNDARY_FALLBACK_POLICY.boundary,
+      };
       // P4.7 — a refusal that says only "did not converge" cannot be told
       // apart from an oscillation or a divergence. The trace travels with it.
       error.convergence_trace = convergenceTrace.map((entry) => ({ ...entry }));
@@ -3864,6 +4082,17 @@ export function solveCase(
       // carries no iterative evidence. The flag marks exactly those periods;
       // additive observation only — nothing numeric reads it.
       stale_iteration: iterationLimit === 1,
+      // B16 — the period discloses that damping mediated the values it
+      // published. Additive observation only — nothing numeric reads it.
+      damping_mediation: dampingMediated,
+      // B15 — the deterministic-bisection receipt for this period's solve.
+      bisection_used: {
+        attempted: bisectionAttempted,
+        applied: bisectionStepsUsed > 0,
+        steps: bisectionStepsUsed,
+        method: MONOTONE_BOUNDARY_FALLBACK_POLICY.method,
+        boundary: MONOTONE_BOUNDARY_FALLBACK_POLICY.boundary,
+      },
       residual,
       // P4.7 — the solve's ORDER and CONVERGENCE, observed rather than assumed.
       // Additive observation only: no field below is read by the numeric path.
@@ -3939,6 +4168,13 @@ export function solveCase(
             tolerance,
           ).length === 0,
       },
+      // B18 — no zero-coupon par-discipline finding fired in this period.
+      zero_coupon_par_discipline: !solverFindings.some(
+        (finding) =>
+          (finding.code === "zero_coupon_cash_interest_leak" ||
+            finding.code === "zero_coupon_below_par_at_maturity") &&
+          finding.period === period.date,
+      ),
     };
 
     results.push(result);
@@ -3999,6 +4235,11 @@ export function solveCase(
     // B25 — top-level roll-up: true when ANY forecast period was published
     // from the forced single-pass path (see the per-period flag).
     stale_iteration: results.some((result) => result.stale_iteration === true),
+    // B16 — top-level roll-up: true when ANY period's published values were
+    // mediated by two-cycle damping.
+    damping_mediation: results.some(
+      (result) => result.damping_mediation === true,
+    ),
     residual: Math.max(0, ...results.map((result) => Number(result.residual ?? Number.POSITIVE_INFINITY))),
     // P4.9 — this field continues to name the DECLARED policy tolerance, not
     // the criterion applied. Two validators outside this package's mandate read

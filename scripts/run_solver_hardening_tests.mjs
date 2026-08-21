@@ -30,6 +30,7 @@ import {
   assertCommitmentFeeConventionAdmitted,
   assertRcfAverageFxUsable,
   detectTwoCycle,
+  initMonotoneBoundaryBracket,
   solveCase,
 } from "./lib/solver.mjs";
 import { validateRcfSweep } from "./lib/fixed_point_constitution.mjs";
@@ -406,6 +407,97 @@ check("B12: usable rates pass through untouched", () => {
       ).length,
       0,
     );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// B15 — monotone-boundary bisection: bracket maths + per-period receipt.
+// ---------------------------------------------------------------------------
+
+check("B15: a two-cycle observation brackets; matched images project opposite", () => {
+  const sLow = { cash: 100, rcf: 20, native: 20 };
+  const sHigh = { cash: 140, rcf: 30, native: 30 };
+  const bracket = initMonotoneBoundaryBracket(sLow, sHigh, sHigh, sLow);
+  assert.ok(bracket, "an exact two-cycle must bracket");
+  assert.equal(bracket.method, "deterministic_bisection");
+  assert.equal(Math.sign(bracket.gLo), 1);
+  assert.equal(Math.sign(bracket.gHi), -1);
+});
+check("B15: same-sign or degenerate observations refuse to bracket", () => {
+  const s = { cash: 1, rcf: 1, native: 1 };
+  const up = { cash: 2, rcf: 2, native: 2 };
+  assert.equal(initMonotoneBoundaryBracket(s, up, up, up), null, "same sign");
+  assert.equal(
+    initMonotoneBoundaryBracket(s, s, structuredClone(s), structuredClone(s)),
+    null,
+    "zero direction",
+  );
+});
+check("B15: every period publishes a bisection receipt", () => {
+  const solution = solveCase(readCase(path.join(CASES, "standard-maximal-v2.json")));
+  for (const period of solution.forecast) {
+    assert.deepEqual(period.bisection_used, {
+      attempted: false,
+      applied: false,
+      steps: 0,
+      method: "deterministic_bisection",
+      boundary: "current_cash_rcf",
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// B16/B26 — damping discipline flags are published and quiet on clean solves.
+// ---------------------------------------------------------------------------
+
+check("B16/B26: mediation flags roll up false when no two-cycle fired", () => {
+  const solution = solveCase(readCase(path.join(CASES, "standard-maximal-v2.json")));
+  assert.equal(solution.damping_mediation, false);
+  for (const period of solution.forecast) {
+    assert.equal(period.damping_mediation, false);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// B18 — zero-coupon par discipline.
+// ---------------------------------------------------------------------------
+
+{
+  const readArchetype = (file) => {
+    const value = JSON.parse(
+      fs.readFileSync(path.join(ARCHETYPES, file), "utf8"),
+    );
+    value.execution_profile = "reference_parity";
+    return value;
+  };
+  const clean = solveCase(readArchetype("zero_coupon_accreting_to_par.json"));
+  check("B18: the accreting-to-par archetype passes par discipline everywhere", () => {
+    for (const period of clean.forecast) {
+      assert.equal(period.checks.zero_coupon_par_discipline, true);
+    }
+    assert.equal(
+      clean.solver_findings.filter((finding) =>
+        ["zero_coupon_cash_interest_leak", "zero_coupon_below_par_at_maturity"].includes(
+          finding.code,
+        ),
+      ).length,
+      0,
+    );
+    // The discipline must actually have something to look at.
+    assert.ok(clean.forecast.some((p) => p.checks.zero_coupon_par_discipline !== undefined));
+  });
+  check("B18: cash coupon leaking onto a zero-coupon instrument is caught", () => {
+    const leaking = readArchetype("zero_coupon_accreting_to_par.json");
+    leaking.instruments[0].coupon_or_all_in_rate = [0.05, 0.05, 0.05];
+    const solution = solveCase(leaking);
+    const leaks = solution.solver_findings.filter(
+      (finding) => finding.code === "zero_coupon_cash_interest_leak",
+    );
+    assert.ok(leaks.length >= 1, "the leak must raise findings");
+    for (const finding of leaks) {
+      assert.equal(finding.severity, "DEGRADE");
+      assert.equal(finding.instrument_id, "zero_note");
+    }
   });
 }
 
