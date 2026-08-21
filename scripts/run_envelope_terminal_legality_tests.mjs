@@ -33,9 +33,17 @@ const REGISTRY_PATH = path.join(ROOT, "assets", "terminal-reason-registry-v1.jso
 
 let checks = 0;
 const failures = [];
+// Honest mutation accounting: every "mutation N:" check applies one real
+// defect to a copy of the classifier's inputs and is counted CAUGHT only
+// when production refuses it while the mutant is active.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^mutation \d/i.test(message);
+  if (isMutation) mutations_total += 1;
   checks += 1;
   if (!condition) failures.push(message);
+  else if (isMutation) mutations_caught += 1;
 }
 
 const { contract, sha256, version } = loadSupportEnvelope();
@@ -664,4 +672,4 @@ if (failures.length) {
   process.stderr.write(`${failures.length} failing check(s) of ${checks}\n`);
   process.exit(1);
 }
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

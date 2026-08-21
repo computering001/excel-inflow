@@ -63,6 +63,19 @@ const root = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)));
 const FIXTURES = ["standard-maximal-v2", "standard-net-cash-v2"];
 
 let checks = 0;
+// Honest mutation accounting: every MUTATION below applies a real defect to a
+// COPY of the subject (a dropped register entry, a corrupted role, a flipped
+// binding status, a tampered seal) and is counted CAUGHT only when production's
+// own validators refuse the copy while the mutant is active. A mutant that
+// survives throws before its catch is counted, so this count can never claim a
+// kill the suite did not observe.
+let mutations_total = 0;
+let mutations_caught = 0;
+function mutation(label, fn) {
+  mutations_total += 1;
+  fn();
+  mutations_caught += 1;
+}
 const failures = [];
 function check(condition, label) {
   checks += 1;
@@ -826,8 +839,82 @@ check(
   "both certified cases are bound by the same canonical register",
 );
 
+// ---------------------------------------------------------------------------
+// 8. MUTATION — real defects applied to copies, each refused by production.
+// ---------------------------------------------------------------------------
+
+mutation("a dropped register entry is refused", () => {
+  const mutant = { ...ECONOMIC_STATEMENT_BINDING };
+  delete mutant[EQUATION_GRAPH.nodes[0].id];
+  check(
+    validateEquationGraphRowBinding(mutant, EQUATION_GRAPH).some((error) =>
+      error.includes(EQUATION_GRAPH.nodes[0].id) && error.includes("no declared row binding"),
+    ),
+    "the binding validator refuses a register missing an equation-graph node",
+  );
+});
+
+mutation("a corrupted role is refused", () => {
+  const node = EQUATION_GRAPH.nodes[0];
+  const mutant = { ...ECONOMIC_STATEMENT_BINDING, [node.id]: { ...ECONOMIC_STATEMENT_BINDING[node.id], role: "mutated_role" } };
+  check(
+    validateEquationGraphRowBinding(mutant, EQUATION_GRAPH).some((error) =>
+      error.includes(node.id) && error.includes(node.role),
+    ),
+    "the binding validator refuses a register whose role disagrees with the graph",
+  );
+});
+
+mutation("a statement_row binding without a section is refused", () => {
+  const [nodeId, declared] = Object.entries(ECONOMIC_STATEMENT_BINDING)
+    .find(([, entry]) => entry.disposition === "statement_row");
+  const mutant = {
+    ...ECONOMIC_STATEMENT_BINDING,
+    [nodeId]: { ...declared, section: "", semantic_role: "" },
+  };
+  check(
+    validateEquationGraphRowBinding(mutant, EQUATION_GRAPH).some((error) =>
+      error.includes(nodeId) && error.includes("without a section and semantic role"),
+    ),
+    "the binding validator refuses a realisation that names no row",
+  );
+});
+
+const mutationArtifact = compiled.get("standard-maximal-v2").artifact;
+mutation("a flipped binding status is refused", () => {
+  const mutant = structuredClone(mutationArtifact);
+  const economicLayer = mutant.layers.find((layer) => layer.layer_id === "economic");
+  const boundNode = economicLayer.nodes.find((node) => node.binding_status === "bound");
+  boundNode.binding_status = "row_absent";
+  check(
+    validateLayeredGraphConstitution(mutant).length > 0,
+    "the constitution validator refuses an economic node that silently abandons its row",
+  );
+});
+
+mutation("a withdrawn cross-layer edge is refused", () => {
+  const mutant = structuredClone(mutationArtifact);
+  const economicLayer = mutant.layers.find((layer) => layer.layer_id === "economic");
+  economicLayer.edges = (economicLayer.edges ?? []).filter(
+    (edge) => !(edge.cross_layer === true && edge.type === "realises_statement_row"),
+  );
+  check(
+    validateLayeredGraphConstitution(mutant).length > 0,
+    "the constitution validator refuses an economic layer that claims bindings it no longer carries",
+  );
+});
+
+mutation("a tampered closure seal is refused", () => {
+  const mutant = structuredClone(mutationArtifact);
+  mutant.closure_sha256 = "0".repeat(64);
+  check(
+    validateLayeredGraphConstitution(mutant).length > 0,
+    "the constitution validator refuses a closure hash that does not match its bindings",
+  );
+});
+
 if (failures.length > 0) {
   console.error(failures.map((item) => `- ${item}`).join("\n"));
   assert.fail(`${failures.length} canonical graph binding checks failed`);
 }
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

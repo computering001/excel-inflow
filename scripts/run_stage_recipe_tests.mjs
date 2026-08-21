@@ -82,11 +82,23 @@ const cases = path.resolve(
 
 let checks = 0;
 const failures = [];
+// Honest mutation accounting: every MUTATION-declared check applies one real
+// defect (a moved closure, a foreign policy version, a rewritten hash, a
+// downgraded schema, a stripped recipe) to a copy of a receipt/recipe pair
+// and is counted CAUGHT only when production refuses it while the mutant is
+// active; a surviving mutant lands in failures and fails the suite.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   checks += 1;
   if (!condition) failures.push(message);
+  else if (isMutation) mutations_caught += 1;
 }
 function rejects(message, callback, pattern) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   checks += 1;
   try {
     callback();
@@ -94,7 +106,9 @@ function rejects(message, callback, pattern) {
   } catch (error) {
     if (pattern && !pattern.test(String(error.message))) {
       failures.push(`${message}: refused with the wrong reason: ${error.message}`);
+      return;
     }
+    if (isMutation) mutations_caught += 1;
   }
 }
 
@@ -406,7 +420,7 @@ try {
   // The production writer cannot omit the recipe: it has nowhere to get one.
   releaseStageRecipes();
   rejects(
-    "a stage receipt written with no bound recipe",
+    "MUTATION — a stage receipt written with no bound recipe",
     () => stageRecipeFor({ stageId: "inputs", inputHashes, controllerVersion: FLOW_CONTROLLER_VERSION }),
     /No stage recipe is bound/,
   );
@@ -445,7 +459,7 @@ try {
     outputHashes,
     recipe: movedClosure,
   });
-  check(!movedClosureVerdict.resumable, "a receipt from a different code closure was reusable");
+  check(!movedClosureVerdict.resumable, "MUTATION — a receipt from a different code closure was reusable");
   check(
     movedClosureVerdict.errors.some((reason) => /is not the active recipe/.test(reason)),
     "the refusal did not name the recipe disagreement",
@@ -460,7 +474,7 @@ try {
   });
   check(
     !verifyStageReceipt(receipt, { runId: "recipe-run", stageId: "decisions", recipe: movedPolicy }).resumable,
-    "a receipt from a different policy version was reusable",
+    "MUTATION — a receipt from a different policy version was reusable",
   );
   const movedMemberCount = createStageRecipe({
     stageId: "decisions",
@@ -471,7 +485,7 @@ try {
   });
   check(
     !verifyStageReceipt(receipt, { runId: "recipe-run", stageId: "decisions", recipe: movedMemberCount }).resumable,
-    "a receipt claiming a different closure size was reusable",
+    "MUTATION — a receipt claiming a different closure size was reusable",
   );
 
   // A tampered recipe cannot be made to agree by rewriting its own hash.
@@ -480,7 +494,7 @@ try {
     recipe: { ...receipt.recipe, code_closure_sha256: "d".repeat(64) },
   };
   const tamperedVerdict = verifyStageReceipt(tampered, { runId: "recipe-run", stageId: "decisions" });
-  check(!tamperedVerdict.resumable, "a tampered recipe body was reusable");
+  check(!tamperedVerdict.resumable, "MUTATION — a tampered recipe body was reusable");
   check(
     tamperedVerdict.errors.some((reason) => /recipe hash does not match its own body/.test(reason)),
     "a tampered recipe body was not detected",
@@ -501,7 +515,7 @@ try {
     outputHashes,
     recipe,
   });
-  check(!legacyVerdict.ok, "a user-stage-receipt/1.0 receipt was accepted as current");
+  check(!legacyVerdict.ok, "MUTATION — a user-stage-receipt/1.0 receipt was accepted as current");
   check(!legacyVerdict.resumable, "a user-stage-receipt/1.0 receipt was reusable");
   check(
     legacyVerdict.errors.some((reason) => /superseded by user-stage-receipt\/1\.1/.test(reason)),
@@ -527,7 +541,7 @@ try {
   });
   const recipelessVerdict = verifyStageReceipt(recipeless, { runId: "recipe-run", stageId: "decisions" });
   check(recipeless.recipe === null, "a recipe-less receipt did not record the absence");
-  check(!recipelessVerdict.resumable, "a recipe-less receipt was reusable");
+  check(!recipelessVerdict.resumable, "MUTATION — a recipe-less receipt was reusable");
   check(
     recipelessVerdict.errors.some((reason) => /never reusable/.test(reason)),
     "a recipe-less receipt was not refused by name",
@@ -778,5 +792,5 @@ if (failures.length > 0) {
   console.log(JSON.stringify({ status: "FAIL", checks, violations: failures.length }));
   process.exitCode = 1;
 } else {
-  console.log(JSON.stringify({ status: "PASS", checks }));
+  console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));
 }

@@ -22,6 +22,12 @@ const SCRATCH = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-runtime-mo
 const SHA = (seed) => identitySha256({ seed });
 const GIT = (character) => character.repeat(40);
 const passed = [];
+// Honest mutation accounting: every MUTATION-prefixed test tampers a copy of
+// an installed-identity artefact (or withholds a required receipt) and is
+// counted CAUGHT only when production refuses it while the mutant is active;
+// a surviving mutant throws and no count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -62,9 +68,12 @@ async function rewriteRecord(target, field, mutate) {
 }
 
 async function test(name, work) {
+  const isMutation = /^MUTATION/.test(name);
+  if (isMutation) mutations_total += 1;
   await work();
   passed.push(name);
   process.stdout.write(`PASS ${name}\n`);
+  if (isMutation) mutations_caught += 1;
 }
 
 async function refuses(work, code) {
@@ -351,7 +360,7 @@ await test("certified package with exact pointer promotion and rollback derives 
   assert.equal(result.installed_placement.previous_slot_id, "slot-previous-good");
 });
 
-await test("compiled package without installation receipt refuses", async () => {
+await test("MUTATION — compiled package without installation receipt refuses", async () => {
   const fixture = await basePackage({ mode: "development" });
   await refuses(
     () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
@@ -359,7 +368,7 @@ await test("compiled package without installation receipt refuses", async () => 
   );
 });
 
-await test("candidate without read-back active pointer refuses", async () => {
+await test("MUTATION — candidate without read-back active pointer refuses", async () => {
   const fixture = await installFixture();
   await fs.rm(fixture.paths.pointer);
   await refuses(
@@ -368,7 +377,7 @@ await test("candidate without read-back active pointer refuses", async () => {
   );
 });
 
-await test("install-state root inside immutable skill refuses", async () => {
+await test("MUTATION — install-state root inside immutable skill refuses", async () => {
   const fixture = await basePackage({ mode: "development", checkout: true });
   const inside = path.join(fixture.packageRoot, "install-state");
   await fs.mkdir(inside);
@@ -378,7 +387,7 @@ await test("install-state root inside immutable skill refuses", async () => {
   );
 });
 
-await test("install-state symlink is rejected", async () => {
+await test("MUTATION — install-state symlink is rejected", async () => {
   const fixture = await installFixture();
   const link = path.join(SCRATCH, `state-link-${Date.now()}-${Math.random()}`);
   await fs.symlink(fixture.stateRoot, link);
@@ -388,7 +397,7 @@ await test("install-state symlink is rejected", async () => {
   );
 });
 
-await test("tampered installation record fails its self hash", async () => {
+await test("MUTATION — tampered installation record fails its self hash", async () => {
   const fixture = await installFixture();
   const value = JSON.parse(await fs.readFile(fixture.paths.installation, "utf8"));
   value.installation_generation += 1;
@@ -399,7 +408,7 @@ await test("tampered installation record fails its self hash", async () => {
   );
 });
 
-await test("strict installation schema rejects missing installation identity", async () => {
+await test("MUTATION — strict installation schema rejects missing installation identity", async () => {
   const fixture = await installFixture();
   await rewriteRecord(fixture.paths.installation, "receipt_sha256", (value) => {
     delete value.installation_identity;
@@ -410,7 +419,7 @@ await test("strict installation schema rejects missing installation identity", a
   );
 });
 
-await test("tampered installed archive refuses exact package join", async () => {
+await test("MUTATION — tampered installed archive refuses exact package join", async () => {
   const fixture = await installFixture();
   await fs.appendFile(fixture.paths.archive, "tamper");
   await refuses(
@@ -419,7 +428,7 @@ await test("tampered installed archive refuses exact package join", async () => 
   );
 });
 
-await test("installed mode requires a hash-bound post-doctor capability receipt", async () => {
+await test("MUTATION — installed mode requires a hash-bound post-doctor capability receipt", async () => {
   const fixture = await installFixture();
   await refuses(
     () => deriveRuntimeMode({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
@@ -437,7 +446,7 @@ await test("installed mode requires a hash-bound post-doctor capability receipt"
   );
 });
 
-await test("candidate requires candidate_slot_ready and exact capability joins", async () => {
+await test("MUTATION — candidate requires candidate_slot_ready and exact capability joins", async () => {
   const fixture = await installFixture();
   const notReady = capabilityFor(fixture, { candidateReady: false });
   await refuses(
@@ -463,7 +472,7 @@ await test("candidate requires candidate_slot_ready and exact capability joins",
   );
 });
 
-await test("production active refuses missing promotion receipt", async () => {
+await test("MUTATION — production active refuses missing promotion receipt", async () => {
   const fixture = await installFixture({ mode: "certified", production: true });
   await fs.rm(fixture.paths.promotion);
   await refuses(
@@ -472,7 +481,7 @@ await test("production active refuses missing promotion receipt", async () => {
   );
 });
 
-await test("stale activation generation refuses production", async () => {
+await test("MUTATION — stale activation generation refuses production", async () => {
   const fixture = await installFixture({ mode: "certified", production: true });
   const newPromotionRawSha = await rewriteRecord(fixture.paths.promotion, "receipt_sha256", (value) => {
     value.activation_generation -= 1;
@@ -486,7 +495,7 @@ await test("stale activation generation refuses production", async () => {
   );
 });
 
-await test("wrong active pointer cannot demote a promoted package silently", async () => {
+await test("MUTATION — wrong active pointer cannot demote a promoted package silently", async () => {
   const fixture = await installFixture({ mode: "certified", production: true });
   await rewriteRecord(fixture.paths.pointer, "pointer_sha256", (value) => {
     value.slot_id = "different-active-slot";
@@ -497,7 +506,7 @@ await test("wrong active pointer cannot demote a promoted package silently", asy
   );
 });
 
-await test("tampered rollback package refuses production active", async () => {
+await test("MUTATION — tampered rollback package refuses production active", async () => {
   const fixture = await installFixture({ mode: "certified", production: true });
   await fs.appendFile(fixture.paths.rollback, "tamper");
   await refuses(
@@ -506,7 +515,7 @@ await test("tampered rollback package refuses production active", async () => {
   );
 });
 
-await test("portable-certified package is never production active", async () => {
+await test("MUTATION — portable-certified package is never production active", async () => {
   const fixture = await installFixture({ mode: "portable_certified", production: true });
   await refuses(
     () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
@@ -514,7 +523,7 @@ await test("portable-certified package is never production active", async () => 
   );
 });
 
-await test("caller cannot provide mode status or installation identity overrides", async () => {
+await test("MUTATION — caller cannot provide mode status or installation identity overrides", async () => {
   const fixture = await basePackage({ mode: "development", checkout: true });
   for (const extra of [
     { runtimeMode: "PRODUCTION_ACTIVE" },
@@ -530,3 +539,6 @@ await test("caller cannot provide mode status or installation identity overrides
 
 await fs.rm(SCRATCH, { recursive: true, force: true });
 process.stdout.write(`\n${passed.length}/${passed.length} runtime-mode tests pass\n`);
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", tests: passed.length, mutations_total, mutations_caught })}\n`,
+);

@@ -39,7 +39,15 @@ import { numericValueOf } from "./lib/typed_financial_value.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
+// Honest mutation accounting: every "mutation:" check applies one real
+// defect to a copy of the register and is counted CAUGHT only when
+// production refuses it while the mutant is active; a surviving mutant
+// rethrows and no count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 const check = (label, fn) => {
+  const isMutation = /^mutation:/.test(label);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -47,6 +55,7 @@ const check = (label, fn) => {
     throw error;
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 
 const periods = [
@@ -583,4 +592,4 @@ check("the maintained fixture opening totals are pinned", () => {
   assert.equal(maximal.rows.length, 12);
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

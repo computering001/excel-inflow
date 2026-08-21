@@ -84,13 +84,23 @@ const ARCHETYPES = path.join(ROOT, "test-fixtures", "archetypes", "economics");
 const CASES = path.join(ROOT, "test-fixtures", "cases");
 
 let checks = 0;
+// Honest mutation accounting: the MUTATION checks below each apply a real
+// defect to a COPY of a declared artefact (withdrawn edges, a shrunken fixed
+// point, an emptied iteration state, an unowned edge, a starved workbook row)
+// and are counted CAUGHT only when production refuses the copy while the mutant
+// is active. A surviving mutant exits the suite before its catch is counted.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(description, fn) {
+  const isMutation = /^MUTATION/.test(description);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
     console.error(`FAIL ${description}\n${error?.message ?? error}`);
     process.exit(1);
   }
+  if (isMutation) mutations_caught += 1;
   checks += 1;
 }
 
@@ -913,4 +923,4 @@ check("MUTATION — a fixed-point node with no workbook row is refused at build"
   );
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

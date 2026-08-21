@@ -51,7 +51,16 @@ const clone = (value) => structuredClone(value);
 const near = (left, right, tolerance = 1e-6) =>
   Math.abs(Number(left) - Number(right)) <= tolerance;
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check smuggles one
+// real defect into a copy of the typed schedule (a bare number, an alien
+// state, an unresolved input, a drifted numeric) and is counted CAUGHT only
+// when production refuses it while the mutant is active; a surviving mutant
+// rethrows and no count line prints.
+let mutations_total = 0;
+let mutations_caught = 0;
 const check = (label, fn) => {
+  const isMutation = /^MUTATION/.test(label);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -59,6 +68,7 @@ const check = (label, fn) => {
     throw error;
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 
 const solvedMaximal = solveCase(clone(maximal));
@@ -232,14 +242,14 @@ check("no balancing RCF types as not_applicable, never zero", () => {
 
 // ---------------------------------------------------------------------------
 // 6. MUTATION: a bare number smuggled into a typed slot is caught.
-check("bare-number smuggle into a typed slot is caught", () => {
+check("MUTATION — bare-number smuggle into a typed slot is caught", () => {
   const shadow = clone(compileScheduleTypedStates(directInput()));
   shadow.rcf.draw = 123; // the old world: an untyped number
   const errors = validateScheduleTypedStates(shadow);
   assert.ok(errors.some((error) => error.startsWith("rcf.draw is not a typed financial value")));
 });
 
-check("alien state smuggled into a schedule slot is caught", () => {
+check("MUTATION — alien state smuggled into a schedule slot is caught", () => {
   const shadow = clone(compileScheduleTypedStates(directInput()));
   shadow.cash.ending_cash = {
     contract_version: "1.0.0",
@@ -257,7 +267,7 @@ check("alien state smuggled into a schedule slot is caught", () => {
 
 // ---------------------------------------------------------------------------
 // 7. MUTATION: an unresolved input must NOT surface as a typed zero.
-check("unresolved inputs become state unresolved, never typed zero", () => {
+check("MUTATION — unresolved inputs become state unresolved, never typed zero", () => {
   const input = directInput();
   input.rcf.draw = undefined;
   input.cash.buckets[0].ending_balance = Number.NaN;
@@ -278,7 +288,7 @@ check("unresolved inputs become state unresolved, never typed zero", () => {
   assert.ok(errors.some((error) => error.includes("can never surface as a typed value")));
 });
 
-check("typed reading disagreeing with the numeric schedule field is caught", () => {
+check("MUTATION — typed reading disagreeing with the numeric schedule field is caught", () => {
   const shadow = clone(compileScheduleTypedStates(directInput()));
   const errors = validateScheduleTypedStates(shadow, { "rcf.draw": 999 });
   assert.ok(errors.some((error) => error.includes("disagrees with the numeric schedule field")));
@@ -406,4 +416,4 @@ check("typed shadow is additive; stripped solutions hash identically", () => {
   assert.equal(strip(solvedNetCash), strip(solveCase(clone(netCash))));
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

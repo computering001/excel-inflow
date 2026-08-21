@@ -60,7 +60,14 @@ const ARCHETYPES = path.join(ROOT, "test-fixtures", "archetypes", "economics");
 const CASES = path.join(ROOT, "test-fixtures", "cases");
 
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check applies a real
+// defect and is counted CAUGHT only when production refuses it while the
+// mutant is active; a surviving mutant exits the suite before any count line.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(description, fn) {
+  const isMutation = /^MUTATION/.test(description);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -68,6 +75,7 @@ function check(description, fn) {
     process.exit(1);
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 }
 
 const readCase = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
@@ -980,4 +988,4 @@ check("P4.7 RE-RUN — the hand-written solve order STILL agrees with the graph"
   assert.equal(before.agrees, true, "and it agreed before the landing too");
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

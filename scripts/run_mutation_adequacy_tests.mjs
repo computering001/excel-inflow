@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import {
+  MEASUREMENT_COVERAGE_FLOOR,
   MUTATION_SCOPES,
   NON_COUNT_MUTATION_FIELD_PATTERN,
   OBSERVED_MUTATION_COUNT_FIELDS,
@@ -97,6 +98,14 @@ check(artifact.corpus.suites_reporting_a_mutation_count === reporting, "suites_r
 check(
   Math.abs(artifact.corpus.measurement_coverage - reporting / mutationTests.length) < 1e-4,
   "measurement_coverage must be the computed fraction (to the artifact's 4dp), not a declared constant",
+);
+check(
+  artifact.corpus.measurement_coverage >= MEASUREMENT_COVERAGE_FLOOR,
+  `measurement coverage ${artifact.corpus.measurement_coverage} is below the ratchet floor ${MEASUREMENT_COVERAGE_FLOOR} — measurement regressed. Restore the lost count line(s) or follow the raise procedure documented on MEASUREMENT_COVERAGE_FLOOR in scripts/lib/mutation_adequacy.mjs.`,
+);
+check(
+  MEASUREMENT_COVERAGE_FLOOR > 0 && MEASUREMENT_COVERAGE_FLOOR <= 1,
+  "the measurement-coverage floor must itself stay within (0, 1]",
 );
 check(
   artifact.corpus.measurement_coverage < 1 ? artifact.measurement_gaps.length > 0 : true,

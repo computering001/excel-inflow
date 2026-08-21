@@ -76,9 +76,18 @@ const cases = path.resolve(
 
 let checks = 0;
 const failures = [];
+// Honest mutation accounting: every MUTATION-declared check applies one real
+// defect to a copy of the declaration or documentation surface and is
+// counted CAUGHT only when production refuses it while the mutant is active;
+// a surviving mutant lands in failures and fails the suite.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   checks += 1;
   if (!condition) failures.push(message);
+  else if (isMutation) mutations_caught += 1;
 }
 async function rejects(message, callback, pattern) {
   checks += 1;
@@ -190,7 +199,7 @@ const keylessDeclaration = EVIDENCE_WORK_NODES.map((node) =>
 const keylessViolations = validateEvidenceWorkGraph(keylessDeclaration);
 check(
   keylessViolations.some((violation) => /forecast_plan/.test(violation) && /cache key/i.test(violation)),
-  `a node with no declared cache key was admitted: ${JSON.stringify(keylessViolations)}`,
+  `MUTATION — a node with no declared cache key was admitted: ${JSON.stringify(keylessViolations)}`,
 );
 
 // MUTATION — a node that depends on itself, or on an undeclared node, is refused.
@@ -200,7 +209,7 @@ check(
       node.id === "forecast_plan" ? { ...node, depends_on: ["forecast_plan"] } : node,
     ),
   ).length > 0,
-  "a self-dependent node was admitted",
+  "MUTATION — a self-dependent node was admitted",
 );
 check(
   validateEvidenceWorkGraph(
@@ -208,7 +217,7 @@ check(
       node.id === "forecast_plan" ? { ...node, depends_on: ["no_such_node"] } : node,
     ),
   ).length > 0,
-  "a node depending on an undeclared node was admitted",
+  "MUTATION — a node depending on an undeclared node was admitted",
 );
 // MUTATION — a node with no invalidation rule is refused.
 check(
@@ -217,7 +226,7 @@ check(
       node.id === "forecast_plan" ? { ...node, invalidated_by: "" } : node,
     ),
   ).length > 0,
-  "a node with no invalidation rule was admitted",
+  "MUTATION — a node with no invalidation rule was admitted",
 );
 
 // The reason vocabulary is CLOSED and every listed reason has a producer.
@@ -781,7 +790,7 @@ const driftedBack = skillText.replace(
 check(driftedBack !== skillText, "the corrected sentence was not found in SKILL.md");
 check(
   documentedCheckpointClaimViolations(driftedBack, inventory).some((violation) => /thirteen|13/.test(violation)),
-  "the historical 'thirteen' wording is still admitted by the checker",
+  "MUTATION — the historical 'thirteen' wording is still admitted by the checker",
 );
 
 // MUTATION — dropping the checkpoint the documentation used to omit must be refused.
@@ -789,7 +798,7 @@ const droppedName = skillText.replace(/forecast-ownership physical verification;
 check(droppedName !== skillText, "the restored checkpoint name was not found in SKILL.md");
 check(
   documentedCheckpointClaimViolations(droppedName, inventory).length > 0,
-  "a documentation surface that omits a real checkpoint is still admitted",
+  "MUTATION — a documentation surface that omits a real checkpoint is still admitted",
 );
 
 // MUTATION — a fifteenth checkpoint in the orchestrator must make the docs red.
@@ -801,7 +810,7 @@ const grownInventory = releaseCheckpointInventory(fifteenth);
 check(grownInventory.ids.length === 15, `the inventory did not see the added checkpoint: ${grownInventory.ids.length}`);
 check(
   documentedCheckpointClaimViolations(skillText, grownInventory).length > 0,
-  "a documentation surface that undercounts a newly added checkpoint is still admitted",
+  "MUTATION — a documentation surface that undercounts a newly added checkpoint is still admitted",
 );
 
 // MUTATION — a documentation surface that forgets the per-sheet render leaves.
@@ -809,7 +818,7 @@ const noLeaves = skillText.replace(/,\s*plus one further\s*render leaf per rende
 check(noLeaves !== skillText, "the render-leaf clause was not found in SKILL.md");
 check(
   documentedCheckpointClaimViolations(noLeaves, inventory).some((violation) => /render leaf|leaves/i.test(violation)),
-  "a documentation surface that omits the per-sheet render leaves is still admitted",
+  "MUTATION — a documentation surface that omits the per-sheet render leaves is still admitted",
 );
 
 // The three surfaces say the SAME thing — central-instructions.md and
@@ -843,5 +852,5 @@ if (failures.length > 0) {
   console.log(JSON.stringify({ status: "FAIL", checks, violations: failures.length }));
   process.exit(1);
 }
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));
 assert.ok(checks > 0);
