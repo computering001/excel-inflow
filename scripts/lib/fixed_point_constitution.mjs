@@ -110,7 +110,7 @@ export function circularityLiveRoleValues(period) {
   };
 }
 
-function validateRcfSweep(period, tolerance, prefix, errors) {
+export function validateRcfSweep(period, tolerance, prefix, errors) {
   const averageFx = Number(period.rcf_average_fx ?? 1);
   const openingNative = Number(period.rcf_opening_native ?? 0);
   const capacityNative = Number(period.rcf_capacity_native ?? 0);
@@ -147,7 +147,17 @@ function validateRcfSweep(period, tolerance, prefix, errors) {
     ["ending_cash", period.ending_cash, expectedEndingCash],
     ["liquidity_shortfall", period.liquidity_shortfall, expectedShortfall],
   ]) {
-    if (!near(actual, expected, tolerance)) {
+    // B21(twin) — the reporting-unit rows (draw, repayment, ending cash,
+    // shortfall) live in the issuer's reporting currency while the declared
+    // tolerance is written against NATIVE units; comparing them unscaled
+    // judges those rows `tolerance / averageFx` times stricter than policy
+    // intends. Scale the tolerance by |averageFx| for reporting-unit rows —
+    // the same state-scale principle P4.9 applies to the convergence
+    // criterion — while native rows keep the policy constant untouched.
+    const rowTolerance = name.endsWith("_native")
+      ? tolerance
+      : tolerance * Math.abs(averageFx);
+    if (!near(actual, expected, rowTolerance)) {
       errors.push(
         `${prefix}.${name}=${actual} does not match independently recomputed sweep value ${expected}.`,
       );
