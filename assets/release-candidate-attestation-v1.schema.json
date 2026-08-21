@@ -80,6 +80,20 @@
         "p0_status": { "const": "PASS" }
       }
     },
+    "d52_closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total", "closed", "custody_deferred", "open", "ledger_sha256"
+      ],
+      "properties": {
+        "total": { "type": "integer", "minimum": 1 },
+        "closed": { "type": "integer", "minimum": 0 },
+        "custody_deferred": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 },
+        "ledger_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "prerequisites": {
       "type": "object",
       "additionalProperties": false,
