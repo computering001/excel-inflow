@@ -11716,8 +11716,16 @@ function solverFormulaCaches(
     };
     const standaloneDebtValues = debtValues(standalone);
     const proFormaDebtValues = debtValues(proForma);
-    const ratio = (numerator, denominator) =>
-      Number(denominator) === 0 ? 0 : Number(numerator) / Number(denominator);
+    // B11 parity, column-faithful: the visible formula is
+      // IF($P$4=0, 0, IFERROR(IF(N(den)=0, "n/m", num/den))). In the
+      // standalone/forecast columns the funded switch is 0, so the cell is 0;
+      // only where the deal is funded can the denominator guard produce "n/m".
+      const ratio = (numerator, denominator, fundedSwitchValue) =>
+        Number(fundedSwitchValue) === 0
+          ? 0
+          : Number(denominator) === 0
+            ? "n/m"
+            : Number(numerator) / Number(denominator);
     // The adjustment block on its own terms: every additive measure is the
     // pro-forma figure less the standalone figure, which is what the
     // adjustment column's own subtotals foot to.
@@ -11742,11 +11750,17 @@ function solverFormulaCaches(
       // multiple less standalone multiple" against a cell whose formula is
       // `=N156/N161` puts a number on the face that the formula bar
       // contradicts the moment Excel recalculates.
+      // The visible formula short-circuits on the funded control:
+      // IF($P$4=0, 0, ...). Mirror it: an unfunded deal caches plain 0 for
+      // every column; a funded deal's adjustment column can legitimately
+      // show "n/m" when its EBITDA denominator is zero.
+      const FUNDED = modelCase.acquisition?.enabled === true || modelCase.acquisition?.enabled === 1 ? 1 : 0;
       const adjustmentRatio =
         id === "net_debt_excluding_leases_to_adjusted_ebitda"
           ? ratio(
               adjustmentDebtValues.net_debt_excluding_leases,
               adjustmentDebtValues.leverage_adjusted_ebitda,
+              FUNDED,
             )
           : id === "net_debt_to_adjusted_ebitda"
             ? ratio(
@@ -11757,16 +11771,19 @@ function solverFormulaCaches(
                     : "net_debt_excluding_leases"
                 ],
                 adjustmentDebtValues.leverage_adjusted_ebitda,
+                FUNDED,
               )
             : id === "adjusted_ebitda_to_net_interest"
               ? ratio(
                   adjustmentDebtValues.leverage_adjusted_ebitda,
                   adjustmentDebtValues.leverage_net_interest,
+                  FUNDED,
                 )
               : id === "net_debt_company_reported_to_adjusted_ebitda"
                 ? ratio(
                     adjustmentDebtValues.net_debt_company_reported,
                     adjustmentDebtValues.company_reported_adjusted_ebitda,
+                    FUNDED,
                   )
                 : null;
       caches.set(
