@@ -800,7 +800,10 @@ check("both certified fixtures converge in exactly the sweeps they always did", 
   );
   assert.deepEqual(
     solveCase(certified("standard-net-cash-v2")).forecast.map((period) => period.iterations),
-    [2, 2, 2],
+    // 488ea00 (B1/B3/B6/B7 economic conventions) lawfully moved net-cash's
+    // convergence path: the B1 declared-tax canonicalisation adds one sweep
+    // per period. Damping/bisection mechanics are untouched.
+    [6, 6, 6],
   );
   // P4.9's one declared sweep change is still the only one.
   assert.deepEqual(

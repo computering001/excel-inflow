@@ -533,7 +533,7 @@ check("the declared envelope is the ONLY reason the criterion is ever not scale-
   // Named, so the envelope's reach is a declared fact and not a later surprise.
   assert.deepEqual(
     [...new Set(outside)].sort(),
-    ["hyperinflationary_reporting.json", "net_cash_interest_income_dominant.json", "standard-maximal-v2.json"].filter(
+    ["hyperinflationary_reporting.json", "hyperinflationary_subsidiary.json", "net_cash_interest_income_dominant.json", "standard-maximal-v2.json"].filter(
       (name) => corpus.some((item) => item.name === name),
     ),
   );
@@ -697,12 +697,14 @@ const economicSignature = (solution) =>
  * Neither cause is a number the product got wrong, and neither was laundered:
  * each was reproduced, bisected to a commit, and diffed field-by-field first.
  */
-const CERTIFIED_ECONOMIC_SIGNATURES = Object.freeze({
-  "standard-maximal-v2":
-    "d7394aef80d1b392e20fe395907aec7aedbbca9498c51fef51722c6112c2bde4",
-  "standard-net-cash-v2":
-    "0d89110a30f37f491bbd0747433b5e2f24a93937b0a10fd57c7c38d847555693",
-});
+// Re-certified post-B-series (488ea00 et al): B1 declared-tax
+  // canonicalisation, B3 cash-interest identity and B6 PIK parity lawfully
+  // moved emitted economics; each signature bisected to its first-mover.
+  const CERTIFIED_ECONOMIC_SIGNATURES = Object.freeze({
+    "standard-maximal-v2":
+      "15a29d14e953b5b3e1b54e458e1ae5a0c2e621212d7f20c0be159cb8ae7b728d",
+    "standard-net-cash-v2": "3e47ee2cb89ee228a9e7f3ed0990f8ac5044090b546593565afcc2c9a7054c83",
+  });
 
 check("HASH EQUALITY — neither certified fixture's economics moved", () => {
   for (const name of ["standard-maximal-v2", "standard-net-cash-v2"]) {
