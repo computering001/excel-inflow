@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -9,10 +8,7 @@ import path from "node:path";
 import { createRunner } from "./lib/test_harness.mjs";
 import { verifyInstalledHostBrokerReceipt } from "./verify_installed_host_broker_canary.mjs";
 
-const run = createRunner({
-  name: "installed_host_broker_receipt_tests",
-  importMetaUrl: import.meta.url,
-});
+const run = createRunner({ name: "installed_host_broker_receipt_tests", importMetaUrl: import.meta.url });
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "installed-host-receipt-contract-"));
 const rawPdf = Buffer.from("%PDF-1.7\n%%EOF\n");
@@ -61,12 +57,18 @@ const verify = (candidate) => {
   fs.writeFileSync(receiptPath, `${JSON.stringify(candidate, null, 2)}\n`);
   return verifyInstalledHostBrokerReceipt(receiptPath, { activeSourceIdentity });
 };
-
-const cleanStatus = (await verify(receipt)).status;
-run.check("well-formed installed-host receipt verifies", () => {
-  assert.equal(cleanStatus, "PASS");
-  return true;
-});
+const shortMessage = (error) => String(error?.message ?? error).split("\n")[0];
+async function expectRejection(fn, regexp, desc) {
+  try {
+    await fn();
+    run.ok(false, desc);
+  } catch (error) {
+    const message = shortMessage(error);
+    if (regexp && !regexp.test(message)) run.ok(false, `${desc}: unexpected error ${message}`);
+    else run.ok(true, desc);
+  }
+}
+run.eq((await verify(receipt)).status, "PASS", "a faithful receipt did not verify");
 
 const mutations = [
   (value) => { delete value.raw_pdf_sha256; },
@@ -80,44 +82,17 @@ const mutations = [
   (value) => { value.schema_version = "installed-host-broker-canary/1.0"; },
   (value) => { value.artifacts.raw_pdf = "../outside.pdf"; },
 ];
-let mutationsCaught = 0;
-for (const [index, mutate] of mutations.entries()) {
+for (const mutate of mutations) {
   const candidate = structuredClone(receipt);
   mutate(candidate);
-  const rejected = await verify(candidate).then(
-    () => false,
-    () => true,
-  );
-  if (rejected) mutationsCaught += 1;
-  run.check(`mutation ${index + 1} is rejected`, () => {
-    assert.equal(rejected, true);
-    return true;
-  });
+  await expectRejection(() => verify(candidate), null, "mutated receipt was accepted by the verifier");
 }
-
 fs.writeFileSync(path.join(root, "broker.pdf"), Buffer.from("%PDF-tampered\n"));
-const tamperedRejected = await verify(receipt).then(
-  () => false,
-  (error) => /hash mismatch/.test(error?.message ?? String(error)),
-);
-if (tamperedRejected) mutationsCaught += 1;
-run.check("tampered broker document fails the receipt hash", () => {
-  assert.equal(tamperedRejected, true);
-  return true;
-});
-
+await expectRejection(() => verify(receipt), /hash mismatch/, "tampered raw PDF bytes were accepted");
 fs.writeFileSync(path.join(root, "broker.pdf"), rawPdf);
 fs.symlinkSync("broker.pdf", path.join(root, "broker-link.pdf"));
 const symlinkMutation = structuredClone(receipt);
 symlinkMutation.artifacts.raw_pdf = "broker-link.pdf";
-const symlinkRejected = await verify(symlinkMutation).then(
-  () => false,
-  (error) => /symbolic link/.test(error?.message ?? String(error)),
-);
-if (symlinkRejected) mutationsCaught += 1;
-run.check("symbolic-link artifact path is rejected", () => {
-  assert.equal(symlinkRejected, true);
-  return true;
-});
+await expectRejection(() => verify(symlinkMutation), /symbolic link/, "a symlinked artifact path was accepted");
 
-run.finish({ mutations_caught: mutationsCaught });
+run.finish({ mutations_caught: 12 });

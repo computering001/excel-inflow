@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
+import { createRunner } from "./lib/test_harness.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import {
   applyRunScopedBrokerConcepts,
@@ -11,6 +11,7 @@ import {
   validateRunScopedBrokerConcepts,
 } from "./lib/run_scoped_broker_concepts.mjs";
 
+const run = createRunner({ name: "broker_dynamic_concept_tests", importMetaUrl: import.meta.url });
 const clone = (value) => structuredClone(value);
 const runId = "run-dynamic-concept-test";
 const body = {
@@ -43,17 +44,12 @@ const body = {
   review_status: "reviewed",
 };
 const concept = { ...body, contract_sha256: runScopedConceptHash(body) };
-let checks = 0;
-const check = (condition, message) => {
-  assert.ok(condition, message);
-  checks += 1;
-};
 
 const schema = JSON.parse(
   fs.readFileSync(new URL("../assets/run-scoped-broker-concept-v1.schema.json", import.meta.url)),
 );
-check(validateJsonSchema(concept, schema).length === 0, "valid contract must satisfy its schema");
-check(
+run.ok(validateJsonSchema(concept, schema).length === 0, "valid contract must satisfy its schema");
+run.ok(
   validateRunScopedBrokerConcepts([concept], { runId }).errors.length === 0,
   "valid contract must satisfy executable validation",
 );
@@ -67,8 +63,8 @@ const python = spawnSync(
     encoding: "utf8",
   },
 );
-check(python.status === 0, `Python validator must run: ${python.stderr}`);
-check(python.stdout.trim() === concept.contract_sha256, "Python and JavaScript contract hashes must agree");
+run.ok(python.status === 0, `Python validator must run: ${python.stderr}`);
+run.ok(python.stdout.trim() === concept.contract_sha256, "Python and JavaScript contract hashes must agree");
 
 for (const mutate of [
   (value) => { value.run_id = "another-run"; },
@@ -78,7 +74,7 @@ for (const mutate of [
 ]) {
   const changed = clone(concept);
   mutate(changed);
-  check(
+  run.ok(
     validateRunScopedBrokerConcepts([changed], { runId }).errors.length > 0,
     "mutated contract must fail executable validation",
   );
@@ -119,9 +115,9 @@ const findings = [];
 applyRunScopedBrokerConcepts(modelCase, {
   add(id, severity, message) { findings.push({ id, severity, message }); },
 });
-check(findings.length === 0, "valid insertion must not create findings");
+run.ok(findings.length === 0, "valid insertion must not create findings");
 const bound = modelCase.statement_structure.cash_flow.find((row) => row.row_id === "known_child");
-check(bound?.broker_metric_id === concept.metric_id, "existing company row must consume the contracted metric");
+run.ok(bound?.broker_metric_id === concept.metric_id, "existing company row must consume the contracted metric");
 
 const unsafe = clone(modelCase);
 unsafe.broker_pack.run_scoped_concepts[0].row_relation = {
@@ -137,9 +133,9 @@ const unsafeFindings = [];
 applyRunScopedBrokerConcepts(unsafe, {
   add(id, severity, message) { unsafeFindings.push({ id, severity, message }); },
 });
-check(
+run.ok(
   unsafeFindings.some((finding) => finding.severity === "BLOCK"),
   "a broker-only additive row must be rejected before it can enter the company equation graph",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks, mutation_count: 4 }, null, 2));
+run.finish({ mutation_count: 4 });

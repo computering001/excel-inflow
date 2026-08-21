@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 
-import assert from "node:assert/strict";
-
 import { createRunner } from "./lib/test_harness.mjs";
 import { applyHistoricalNormalisation } from "./lib/historical_normalisation.mjs";
-
-const run = createRunner({
-  name: "historical_normalisation_tests",
-  importMetaUrl: import.meta.url,
-});
 
 // A filed Adjusted EBITDA can sit directly below a filed operating-profit row
 // whose declared identity already depends on Adjusted EBITDA. The historical
@@ -54,55 +47,37 @@ const inverseIdentityCase = {
   },
 };
 
+const run = createRunner({ name: "historical_normalisation_tests", importMetaUrl: import.meta.url });
+
 const normalized = applyHistoricalNormalisation(inverseIdentityCase);
 const income = new Map(
   normalized.model_case.statement_structure.income_statement.map((row) => [row.row_id, row]),
 );
-
-run.check("inverse identity cycle is rejected", () => {
-  assert.equal(
-    income.get("adjusted_ebitda").calculation,
-    undefined,
-    "A numerically exact inverse identity was inferred into a historical dependency cycle.",
-  );
-  return true;
-});
-
-run.check("filed adjusted EBITDA values are preserved", () => {
-  assert.deepEqual(
-    income.get("adjusted_ebitda").values.slice(0, 3),
-    [120, 126, 132],
-    "The filed Adjusted EBITDA authority was not preserved after rejecting the inverse identity.",
-  );
-  return true;
-});
-
-run.check("valid one-way operating-profit identity is preserved", () => {
-  assert.deepEqual(
-    income.get("ebit").calculation.refs,
-    ["adjusted_ebitda", "depreciation_and_amortisation"],
-    "The valid one-way operating-profit identity was changed.",
-  );
-  return true;
-});
-
-run.check("exact reported operating-profit identity is promoted", () => {
-  assert(
-    normalized.receipt.exact_reported_total_promotions.some((item) => item.row_id === "ebit"),
-    "The valid exact reported operating-profit identity was not promoted.",
-  );
-  return true;
-});
-
-run.check("inverse adjusted-EBITDA dependency is not recorded as inferred", () => {
-  assert(
-    !normalized.receipt.exact_reported_total_promotions.some(
-      (item) => item.row_id === "adjusted_ebitda" && item.dependency_inferred,
-    ),
-    "The inverse Adjusted EBITDA dependency was recorded as inferred.",
-  );
-  return true;
-});
+run.eq(
+  income.get("adjusted_ebitda").calculation,
+  undefined,
+  "A numerically exact inverse identity was inferred into a historical dependency cycle.",
+);
+run.eq(
+  income.get("adjusted_ebitda").values.slice(0, 3),
+  [120, 126, 132],
+  "The filed Adjusted EBITDA authority was not preserved after rejecting the inverse identity.",
+);
+run.eq(
+  income.get("ebit").calculation.refs,
+  ["adjusted_ebitda", "depreciation_and_amortisation"],
+  "The valid one-way operating-profit identity was changed.",
+);
+run.ok(
+  normalized.receipt.exact_reported_total_promotions.some((item) => item.row_id === "ebit"),
+  "The valid exact reported operating-profit identity was not promoted.",
+);
+run.ok(
+  !normalized.receipt.exact_reported_total_promotions.some(
+    (item) => item.row_id === "adjusted_ebitda" && item.dependency_inferred,
+  ),
+  "The inverse Adjusted EBITDA dependency was recorded as inferred.",
+);
 
 run.finish({
   inverse_identity_cycle_rejected: true,
