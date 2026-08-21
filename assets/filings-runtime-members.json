@@ -5,6 +5,7 @@
     "scripts/extract_filing_statements.py",
     "scripts/extract_inline_xbrl.py",
     "scripts/lib/filings_acquisition.mjs",
+    "scripts/lib/extraction_cache.mjs",
     "scripts/lib/source_ingress_security.mjs",
     "scripts/lib/workflow_state.mjs",
     "scripts/lib/face_statement_manifest.mjs",
