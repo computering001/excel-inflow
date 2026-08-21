@@ -7414,6 +7414,12 @@ function configureOperatingModel(
           `B4 XOR violation in ${modelCase.case_id}: lease instrument(s) ${ambiguousPoolMembers.join(", ")} are members of the mandatory repayment pool while also carried on the lease principal lane. Principal repayment must flow through exactly one lane.`,
         );
       }
+      // B24 — the pool aggregates terms in NATIVE units and translates the
+      // repayment once, by pool.averageFx: opening re-enters native via
+      // /priorEndFx, component rows roll forward natively, and endFx touches
+      // only the face. This mirrors solver.mjs:2445-2457 — cash flows translate
+      // at average FX, stocks at period-end FX — with the non-cash revaluation
+      // isolated on the debt_fx_translation row instead of inside this pool.
       const expressions = pools.map((pool) => {
         const openingAndMovements = aggregateTerms(
           pool.openingAndMovementTerms,
@@ -8835,7 +8841,9 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${interestRows.cash_interest_paid}`,
-        `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}`,
+        // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+        // gross build-up but is accreted, not cash — subtract it here too.
+        `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.lease_interest}-${column}${interestRows.non_cash_interest}`,
       );
     }
     const filedReceived = filedCashInterestReceivedValues[index];
@@ -9051,7 +9059,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${interestRows.cash_interest_paid}`,
-      `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.lease_interest}-${column}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(column)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -9182,7 +9192,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${proFormaColumn}${interestRows.cash_interest_paid}`,
-      `=${proFormaColumn}${interestRows.gross_interest_expense}-${proFormaColumn}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${proFormaColumn}${interestRows.gross_interest_expense}-${proFormaColumn}${interestRows.lease_interest}-${proFormaColumn}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(proFormaColumn)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -9334,7 +9346,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.cash_interest_paid}`,
-      `=${adjustmentColumn}${interestRows.gross_interest_expense}-${adjustmentColumn}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${adjustmentColumn}${interestRows.gross_interest_expense}-${adjustmentColumn}${interestRows.lease_interest}-${adjustmentColumn}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(adjustmentColumn)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -11356,8 +11370,11 @@ function statementSolverValues(
   for (const [role, value] of [
     [
       "cash_interest_paid",
+      // B3 parity (solver.mjs:2981-2984): exclude accreted lease interest —
+      // gross_interest contains it and it settles as lease principal instead.
       -(
         result.gross_interest -
+        result.lease_interest -
         result.non_cash_interest -
         result.non_cash_instrument_interest
       ),
@@ -12027,9 +12044,15 @@ function solverFormulaCaches(
       gross_interest_expense: -result.gross_interest,
       interest_income_schedule: result.interest_income,
       net_interest_expense: -result.net_interest,
+      // B3 parity (solver.mjs:2981-2984) — accreted lease interest is NOT cash
+      // interest paid: it settles through the lease principal lane in
+      // financing. gross_interest already contains lease_interest, so the
+      // lease leg is subtracted inside the negation alongside the other
+      // non-cash legs.
       cash_interest_paid:
         -(
           result.gross_interest -
+          result.lease_interest -
           result.non_cash_interest -
           result.non_cash_instrument_interest
         ),
