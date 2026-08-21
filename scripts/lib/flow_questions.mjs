@@ -66,11 +66,16 @@ import {
   MATERIALITY_POLICY,
 } from "./flow_impact.mjs";
 import {
+  forecastRowMateriality,
+  resolveForecastAuthority,
+} from "./forecast_authority.mjs";
+import {
   exportInstruments,
   outstandingAmount,
 } from "./flow_reconcile.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
-import { normalisedCashBuckets } from "./solver.mjs";
+import { plausibilityFindingIds } from "./plausibility_acknowledgements.mjs";
+import { normalisedCashBuckets, solveCase } from "./solver.mjs";
 
 export const QUESTION_LIMIT = 5;
 
@@ -774,6 +779,256 @@ function describeRow(row) {
   return byType[row.instrument_type] ?? "borrowings";
 }
 
+// ── assumption topics: the forecast plan's own defaults, as cards ──────────
+//
+// Stage 3 used to end at the debt-side decision graph. Everything the
+// FORECAST side would assume on the user's behalf was printed afterwards on
+// the material forecast plan receipt, where reading it was the only way to
+// challenge it. This section converts those printed defaults into the same
+// instrument as everything else at this stop: a card with a marked default.
+//
+// The card taxonomy at the decisions stop is one queue, three classes:
+//
+//   DECISION CARDS     G6-surviving registered ambiguities (the registry
+//                      above), priority by measured exceedance.
+//   ASSUMPTION CARDS   one per material independent forecast row whose
+//                      authority is an assumption-class default -- a policy
+//                      zero, a standing convention, trend or carry-forward
+//                      inference, guidance or indication. Never formula,
+//                      schedule or captured legs: those calculate.
+//   PLAUSIBILITY CARD  ONE consolidated card for every liquidity-stress
+//                      finding the default baseline produces, replacing the
+//                      silent acknowledgement the build used to apply on the
+//                      user's behalf.
+//
+// Skipping a card records nothing anywhere: skipping IS accepting the
+// default, and an accepted default leaves the case-source byte-identical to
+// a run that never showed the card. An override is receipted in
+// case-source.answers through the lawful channel the compiler already
+// consumes -- `derived.forecast.<row_id>`, or the translation-effect row's
+// dedicated `derived.fx.effect` -- and the mutation happens at compile time,
+// never here. Skipped defaults therefore remain lawful deferred defaults.
+
+export const ASSUMPTION_DEFAULT_METHODS = Object.freeze([
+  "user_assumption",
+  "explicit_zero",
+  "seasonal_run_rate",
+  "historical_average",
+  "historical_trend",
+  "carry_forward",
+  "company_guidance",
+  "company_indication",
+]);
+
+// The consolidated plausibility card's id. Per-finding acknowledgements are
+// receipted as `plausibility.<finding>` answers -- exactly the keys
+// explicitPlausibilityAcknowledgements already reads off stage_three_answers.
+export const PLAUSIBILITY_TOPIC_ID = "plausibility.findings";
+
+function assumptionTopicId(row) {
+  return row.semantic_role === "fx_effect_on_cash"
+    ? "derived.fx.effect"
+    : `derived.forecast.${row.row_id}`;
+}
+
+function assumptionMethodLabel(method) {
+  switch (method) {
+    case "user_assumption":
+      return "a declared default";
+    case "explicit_zero":
+      return "the standing zero convention";
+    case "seasonal_run_rate":
+      return "the seasonal run-rate";
+    case "historical_average":
+      return "the historical average";
+    case "historical_trend":
+      return "the historical trend";
+    case "carry_forward":
+      return "the last reported year carried forward";
+    case "company_guidance":
+      return "company guidance";
+    case "company_indication":
+      return "a company indication";
+    default:
+      return method.replaceAll("_", " ");
+  }
+}
+
+function describePlausibilityFindings(findings, maxParts = 4) {
+  const parts = [];
+  const seen = new Set();
+  for (const finding of findings ?? []) {
+    const body = /^(?:standalone|pro_forma)_(.+)$/.exec(String(finding))?.[1] ??
+      String(finding);
+    const periodMatch = /period_(\d+)$/.exec(body);
+    const kind = body.replace(/_period_\d+$/, "").replaceAll("_", " ");
+    const label = periodMatch
+      ? `${kind} in forecast year ${Number(periodMatch[1])}`
+      : kind;
+    if (!seen.has(label)) {
+      seen.add(label);
+      parts.push(label);
+    }
+  }
+  const shown = parts.slice(0, maxParts);
+  const hidden = parts.length - shown.length;
+  if (hidden > 0) shown.push(`${hidden} more`);
+  return shown.join(", ");
+}
+
+/**
+ * Build the ONE consolidated plausibility card from a findings list, or null
+ * when there is nothing to acknowledge. Exported so fixtures can assert on
+ * consolidation without solving anything.
+ */
+export function buildPlausibilityTopic(findings) {
+  const unique = [...new Set(findings ?? [])].sort();
+  if (unique.length === 0) return null;
+  const described = describePlausibilityFindings(unique);
+  return {
+    id: PLAUSIBILITY_TOPIC_ID,
+    kind: "plausibility_acknowledgement",
+    instrument: "plausibility",
+    subject_line: `liquidity stress the defaults produce (${described})`,
+    prompt: `On today's defaults the model projects ${described}. These figures are plausible, not confirmed. Acknowledge them, or raise them for review?`,
+    context_line: null,
+    other_phrase: "raise them",
+    seeds: [],
+    parents: [],
+    findings: unique,
+    options: [
+      {
+        id: "acknowledge",
+        word: "acknowledge",
+        // Acknowledging is receipted per finding -- exactly the keys the
+        // build's economic-plausibility validator reads -- so the answer
+        // survives recompilation instead of living only on this round.
+        apply: (modelCase) => {
+          if (!modelCase) return modelCase;
+          modelCase.stage_three_answers = {
+            ...(modelCase.stage_three_answers ?? {}),
+            ...Object.fromEntries(
+              unique.map((finding) => [`plausibility.${finding}`, "acknowledged"]),
+            ),
+          };
+          return modelCase;
+        },
+      },
+      { id: "raise", word: "raise", apply: (modelCase) => modelCase },
+    ],
+    default_option: "acknowledge",
+    assumption: (option) =>
+      option === "acknowledge"
+        ? `Liquidity stress (${described}) is acknowledged as plausible rather than confirmed.`
+        : `Liquidity stress (${described}) is left unacknowledged for review at delivery.`,
+  };
+}
+
+/**
+ * Enumerate the material forecast rows that would otherwise be silently
+ * assumed. Detection reads the same authority machinery the forecast-plan
+ * screen prints under, so a card exists exactly where the receipt would have
+ * shown an independent assumption-class producer.
+ *
+ * `presentedIds` suppresses topics already served in an earlier decision
+ * round of this run: a topic answered at its default must not resurface, and
+ * one answered with an override is carried by its own receipt.
+ */
+export function detectAssumptionTopics({ draftCase, presentedIds = [] }) {
+  const presented =
+    presentedIds instanceof Set ? presentedIds : new Set(presentedIds ?? []);
+  const topics = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of draftCase?.statement_structure?.[section] ?? []) {
+      if (row.row_type === "header") continue;
+      const authorities = [0, 1, 2].map((index) =>
+        resolveForecastAuthority(draftCase, row, index),
+      );
+      // The same independence test the material forecast plan prints under:
+      // formula and schedule legs calculate and are never cards.
+      const independent = authorities.every((authority) =>
+        ["broker", "hardcode", "zero", "uncalculated", "block"].includes(
+          authority.mechanism,
+        ),
+      );
+      if (!independent) continue;
+      const methods = [
+        ...new Set(authorities.map((authority) =>
+          String(authority.method ?? "unresolved"),
+        )),
+      ];
+      if (
+        !methods.every((method) => ASSUMPTION_DEFAULT_METHODS.includes(method))
+      ) {
+        continue;
+      }
+      // A figure the user already authored is a receipted decision, not a
+      // default; re-asking would downgrade their own answer back into a card.
+      if (
+        authorities.some(
+          (authority) =>
+            authority.method === "user_assumption" &&
+            String(authority.source_id ?? "").startsWith("derived."),
+        )
+      ) {
+        continue;
+      }
+      const material =
+        authorities.some((authority) => authority.material === true) ||
+        forecastRowMateriality(draftCase, row) === true;
+      if (!material) continue;
+      const id = assumptionTopicId(row);
+      if (presented.has(id)) continue;
+      const label = String(row.label ?? row.row_id);
+      const values = authorities.map((authority, index) => {
+        if (Number.isFinite(Number(authority.value))) {
+          return Number(authority.value);
+        }
+        const seriesValue = Number(row.values?.[index + 3]);
+        return Number.isFinite(seriesValue) ? seriesValue : null;
+      });
+      const methodText = assumptionMethodLabel(methods[0]);
+      const valuesText = values
+        .map((value) =>
+          value === null ? "n/a" : formatMoney(value, draftCase?.issuer?.reporting_currency),
+        )
+        .join(", ");
+      topics.push({
+        id,
+        kind: "assumption_topic",
+        instrument: "assumption",
+        section,
+        row_id: row.row_id,
+        methods,
+        current_values: values,
+        subject_line: `whether ${label} stays at ${methodText}`,
+        prompt: `${label} is held at ${valuesText} a year, from ${methodText}. Accept that default, or supply your own three figures?`,
+        context_line: "This is a stated model default, not filed evidence.",
+        other_phrase: "supply figures",
+        seeds: [],
+        parents: [],
+        material,
+        options: [
+          { id: "default", word: "default", apply: (modelCase) => modelCase },
+          // The override mutates nothing here: it is receipted into
+          // case-source.answers and applied when the case recompiles.
+          { id: "override", word: "override", apply: null },
+        ],
+        default_option: "default",
+        // An override either arrives as the bare option (the answer file then
+        // carries the three figures under the same id) or as the three
+        // figures themselves; both are receipted into case-source.answers and
+        // applied when the case recompiles -- never mutated here.
+        assumption: (option) =>
+          option === "override" || Array.isArray(option)
+            ? `Your own figures replace ${methodText} for all three forecast years of ${label}, recorded against the case.`
+            : `${label} stays at ${methodText} across the forecast.`,
+      });
+    }
+  }
+  return topics.sort((left, right) => left.id.localeCompare(right.id));
+}
+
 // ── the discipline checks ──────────────────────────────────────────────────
 
 const SNAKE_CASE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/;
@@ -1026,6 +1281,9 @@ export function pruneDecisionGraph(candidates, resolved) {
  * @param {object} [args.reconciliation] outcome of the reconciliation stop
  * @param {Map<string,string>} [args.resolved] answers already known (rebuild path)
  * @param {number} [args.limit]
+ * @param {string[]|Set<string>} [args.presentedDecisions] assumption or
+ *        plausibility topic ids already served in an earlier round of this
+ *        run; suppressed so a defaulted topic never resurfaces.
  */
 export function planQuestions({
   draftCase,
@@ -1033,6 +1291,7 @@ export function planQuestions({
   reconciliation = null,
   resolved = new Map(),
   limit = QUESTION_LIMIT,
+  presentedDecisions = [],
 }) {
   const context = { draftCase, intake, reconciliation };
   const detected = detectAll(context);
@@ -1206,6 +1465,26 @@ export function planQuestions({
       moved_but_unreachable: entry.check.moved_but_unreachable,
     }));
 
+  // The forecast plan's own defaults join the same material-first queue, and
+  // the liquidity-stress findings the default baseline produces surface as
+  // ONE consolidated card instead of a silent acknowledgement at build time.
+  // A baseline that does not solve has no findings to show; infeasibility is
+  // handled above as blocked or only-feasible.
+  let plausibilityFindings = [];
+  try {
+    plausibilityFindings = plausibilityFindingIds(solveCase(baseline));
+  } catch {
+    plausibilityFindings = [];
+  }
+  const plausibilityTopic = resolved?.has?.(PLAUSIBILITY_TOPIC_ID)
+    ? null
+    : buildPlausibilityTopic(plausibilityFindings);
+  const assumptionTopics = detectAssumptionTopics({
+    draftCase,
+    presentedIds: presentedDecisions,
+    resolved,
+  });
+
   const base = {
     detected: detected.map((instance) => instance.id),
     candidates: candidates.map((instance) => instance.id),
@@ -1221,6 +1500,8 @@ export function planQuestions({
       manifest_edges: graph.manifest_edge_count,
       augmented_edges: graph.augmented_edge_count,
     },
+    assumption_topics: assumptionTopics.map((topic) => topic.id),
+    plausibility_findings: plausibilityFindings,
   };
 
   if (blocked.length > 0) {
@@ -1233,7 +1514,36 @@ export function planQuestions({
     };
   }
 
-  if (ordered.length > limit) {
+  // ONE queue at the stop: decision cards first (measured exceedance), then
+  // assumption cards, then the consolidated plausibility card. The cap is
+  // presentation, never evidence of defect: whatever does not fit stays
+  // pending and is replanned once the answers land.
+  //
+  // The cards ride an EXISTING decision round; they never open one. A case
+  // with nothing to decide keeps the ordinary path -- the forecast-plan
+  // receipt still prints every material independent row, so no default is
+  // silent, and no undeclared pre-build stop appears. A topic answered in an
+  // earlier round (default or override) is carried by its receipt and is not
+  // served twice.
+  const consolidated = plausibilityTopic ? [plausibilityTopic] : [];
+  const combined =
+    ordered.length === 0
+      ? []
+      : [...ordered, ...assumptionTopics, ...consolidated];
+
+  if (combined.length === 0) {
+    return { ...base, status: "no_questions", questions: [] };
+  }
+
+  const questions = combined.slice(0, limit);
+  const result = {
+    ...base,
+    status: "ask",
+    questions,
+    survivors: ordered,
+    pending_topic_count: Math.max(0, combined.length - limit),
+  };
+  if (combined.length > limit) {
     const groups = Object.entries(
       ordered.reduce((accumulator, question) => {
         (accumulator[question.kind] ??= []).push(question.id);
@@ -1242,22 +1552,12 @@ export function planQuestions({
     )
       .map(([kind, question_ids]) => ({ kind, question_ids }))
       .sort((left, right) => left.kind.localeCompare(right.kind));
-    const questions = ordered.slice(0, limit);
-    return {
-      ...base,
-      status: "ask",
-      questions,
-      survivors: ordered,
-      pending_questions: ordered.slice(limit).map((question) => question.id),
-      remaining_question_count: ordered.length - questions.length,
-      decision_round: 1,
-      unresolved_groups: groups,
-    };
+    result.pending_questions = combined.slice(limit).map((entry) => entry.id);
+    result.remaining_question_count = combined.length - limit;
+    result.decision_round = 1;
+    result.unresolved_groups = groups;
   }
-  if (ordered.length === 0) {
-    return { ...base, status: "no_questions", questions: [] };
-  }
-  return { ...base, status: "ask", questions: ordered };
+  return result;
 }
 
 function describeImmateriality(impact, currency) {

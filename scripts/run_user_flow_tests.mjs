@@ -409,7 +409,10 @@ await test("tampered stage output invalidates only that stage", async () => {
 await test("question path stops once and never treats action-required as success", async () => {
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
-  assert(first.status === "ACTION_REQUIRED" && first.question_count === 1, JSON.stringify(first));
+  // Card-augmented queue: the acquisition_funding decision card plus the
+  // forecast assumption cards (derived.*) and the consolidated plausibility
+  // card the default baseline produces for this fixture.
+  assert(first.status === "ACTION_REQUIRED" && first.question_count === 4, JSON.stringify(first));
   assert(
     first.blocker_class === "USER_DECISION" && first.user_blocking === true,
     "action-required result lacks typed user-decision ownership",
@@ -473,7 +476,22 @@ await test("delivery blocker constitution covers every terminal user-flow outcom
 
 await test("supplied answer persists and resumes deterministically", async () => {
   const answers = path.join(out, "acquisition-answers.json");
-  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  await fs.writeFile(
+    answers,
+    `${JSON.stringify(
+      {
+        answers: {
+          acquisition_funding: "debt",
+          // assumption/plausibility cards surfaced at the decisions stop
+          "derived.forecast.acquisitions_net_of_cash": "default",
+          "derived.fx.effect": "default",
+          "plausibility.findings": "acknowledge",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, [
     "--answers", answers,
@@ -506,7 +524,22 @@ await test("invalid evidence blocks before reconciliation", async () => {
 
 await test("a case edited while the run waited blocks the resume by name", async () => {
   const answers = path.join(out, "pause-mutation-answers.json");
-  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  await fs.writeFile(
+    answers,
+    `${JSON.stringify(
+      {
+        answers: {
+          acquisition_funding: "debt",
+          // assumption/plausibility cards surfaced at the decisions stop
+          "derived.forecast.acquisitions_net_of_cash": "default",
+          "derived.fx.effect": "default",
+          "plausibility.findings": "acknowledge",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   const runDir = path.join(out, "pause-mutation-run");
   const workspaceToken = "workspace:pause-mutation-fixture";
   const paused = await flow(acquisitionEvidence, runDir, [
