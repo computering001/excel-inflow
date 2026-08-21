@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,8 +21,15 @@ EXTRACTOR = ROOT / "scripts/extract_filing_statements.py"
 
 # Source-declared reporting facts needed by the production extractor.  The
 # corpus manifest binds the raw bytes but intentionally contains only
-# classification dimensions, so extraction facts are bound here by raw hash.
-EXTRACTION_FACTS_BY_SHA = {
+# classification dimensions, so extraction facts are DERIVED per document at
+# run time: historical periods come from the dated headers extracted out of
+# the document text, and reporting currency/units come from document-text
+# regexes.  The historical hand-bound table below is demoted to a marked,
+# fail-closed fallback: it is consulted only when text derivation cannot bind
+# every fact (or when the derived attempt does not survive extraction), and an
+# outcome it produced records ``extraction_facts_source: "legacy_table"``
+# instead of laundering hand-bound data as derived evidence.
+LEGACY_EXTRACTION_FACTS_BY_SHA = {
     "596d7443051fef134c502bb0fc9a2895245cdce9de8b1a982345da91eb57f158": {
         "historical_periods": ["2023-12-31", "2024-12-31", "2025-12-31"],
         "reporting_currency": "USD", "units": "millions",
@@ -47,6 +55,137 @@ EXTRACTION_FACTS_BY_SHA = {
         "reporting_currency": "CNY", "units": "thousands",
     },
 }
+
+FACT_KEYS = ("historical_periods", "reporting_currency", "units")
+MONTHS = {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
+    "december": 12, "sept": 9,
+}
+MONTH_RE = "|".join(MONTHS)
+# Dated headers: "31 March 2025", "September 30, 2025", "January 1,1989",
+# "2025-09-30".
+DMY_DATE_RE = re.compile(
+    r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(%s)\.?,?\s+(\d{4})\b" % MONTH_RE, re.IGNORECASE)
+MDY_DATE_RE = re.compile(
+    r"\b(%s)\.?\s+(\d{1,2}),?\s*(\d{4})\b" % MONTH_RE, re.IGNORECASE)
+ISO_DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+YEAR_TOKEN_RE = re.compile(r"\b((?:19|20)\d{2})\b")
+CURRENCY_PATTERNS = (
+    (re.compile(r"US\$|\bUSD\b|(?<!HK)\$"), "USD"),
+    (re.compile(r"£|\bGBP\b"), "GBP"),
+    (re.compile(r"€|\bEUR\b"), "EUR"),
+    (re.compile(r"\b(?:RMB|CNY)\b|¥"), "CNY"),
+)
+UNIT_WORD_RE = re.compile(r"\b(?:in|of)\s+(thousands|millions|billions)\b", re.IGNORECASE)
+SYMBOL_UNIT_RE = re.compile(r"((?:US)?\$|[£€])[\s('']?(m|k|bn|b)\b")
+RMB_THOUSANDS_RE = re.compile(r"(?:RMB|CNY)\s*[(’']?000", re.IGNORECASE)
+
+
+def pdf_document_text(target: Path) -> str:
+    """Extracted header/body text of a PDF, best effort."""
+    try:
+        import fitz
+    except Exception:
+        return ""
+    try:
+        with fitz.open(target) as document:
+            return "\n".join(page.get_text() for page in document)
+    except Exception:
+        return ""
+
+
+def derive_historical_periods(text: str) -> list[str] | None:
+    """Bind three historical periods from dated headers in the document text."""
+    dated: dict[int, dict[str, int]] = {}
+
+    def record(year: int, month: int, day: int) -> None:
+        if 1 <= month <= 12 and 1 <= day <= 31 and 1900 <= year <= 2100:
+            dated.setdefault(year, {})
+            key = f"{month:02d}-{day:02d}"
+            dated[year][key] = dated[year].get(key, 0) + 1
+
+    for match in DMY_DATE_RE.finditer(text):
+        record(int(match.group(3)), MONTHS[match.group(2).lower()], int(match.group(1)))
+    for match in MDY_DATE_RE.finditer(text):
+        record(int(match.group(3)), MONTHS[match.group(1).lower()], int(match.group(2)))
+    for match in ISO_DATE_RE.finditer(text):
+        record(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    if not dated:
+        return None
+    anchor_year = max(dated)
+    anchor_md = sorted(dated[anchor_year].items(), key=lambda item: (-item[1], item[0]))[0][0]
+    anchor_number = int(anchor_year)
+    window = {
+        int(year) for year in YEAR_TOKEN_RE.findall(text)
+        if anchor_number - 4 <= int(year) <= anchor_number
+    }
+    window.add(anchor_number)
+    recent = sorted(window)[-3:]
+    if len(recent) < 3:
+        return None
+    return [f"{year}-{anchor_md}" for year in recent]
+
+
+def derive_reporting_currency(text: str) -> str | None:
+    counts: dict[str, int] = {}
+    for pattern, code in CURRENCY_PATTERNS:
+        hits = len(pattern.findall(text))
+        if hits:
+            counts[code] = counts.get(code, 0) + hits
+    return max(counts, key=lambda code: (counts[code], code)) if counts else None
+
+
+def derive_units(text: str) -> str | None:
+    magnitudes = {"m": "millions", "k": "thousands", "bn": "billions", "b": "billions"}
+    counts: dict[str, int] = {}
+    for word in UNIT_WORD_RE.findall(text):
+        counts[word.lower()] = counts.get(word.lower(), 0) + 1
+    for symbol, suffix in SYMBOL_UNIT_RE.findall(text):
+        magnitude = magnitudes.get(suffix.lower())
+        if magnitude:
+            counts[magnitude] = counts.get(magnitude, 0) + 1
+    if RMB_THOUSANDS_RE.search(text):
+        counts["thousands"] = counts.get("thousands", 0) + 1
+    return max(counts, key=lambda word: (counts[word], word)) if counts else None
+
+
+def derive_extraction_facts(target: Path) -> dict[str, Any]:
+    """Facts bound from the extracted document text alone (possibly partial)."""
+    text = pdf_document_text(target)
+    derived: dict[str, Any] = {}
+    periods = derive_historical_periods(text)
+    if periods:
+        derived["historical_periods"] = periods
+    currency = derive_reporting_currency(text)
+    if currency:
+        derived["reporting_currency"] = currency
+    units = derive_units(text)
+    if units:
+        derived["units"] = units
+    return derived
+
+
+def extraction_fact_candidates(target: Path, raw_sha256: str) -> list[tuple[str, dict[str, Any]]]:
+    """Ordered (source, request_facts) bindings: derived first, legacy fallback.
+
+    A derived candidate is offered only when text derivation bound EVERY fact;
+    a partial derivation would poison extraction rather than help it.  The
+    legacy candidate is the historical hand-bound entry verbatim, tried as the
+    marked fallback whenever derivation is incomplete or did not pass.
+    """
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    derived = derive_extraction_facts(target)
+    if all(key in derived for key in FACT_KEYS):
+        candidates.append(("document_text", {key: derived[key] for key in FACT_KEYS}))
+    legacy = LEGACY_EXTRACTION_FACTS_BY_SHA.get(raw_sha256)
+    if legacy is not None:
+        candidates.append(("legacy_table", {key: legacy[key] for key in FACT_KEYS}))
+    if not candidates:
+        raise AssertionError(
+            f"No extraction facts are derivable or bound for sha {raw_sha256}"
+        )
+    return candidates
 
 
 def digest_bytes(value: bytes) -> str:
@@ -102,6 +241,7 @@ def compile_live(manifest_path: Path, classification: dict[str, Any]) -> dict[st
         source = documents_by_sha[raw_sha]
         media = source["media_kind"]
         attempted = False
+        facts_source = None
         if media == "html":
             # The structured lane: Inline XBRL facts ARE the machine-readable
             # half of an HTML filing. The document is attempted, not waved
@@ -133,35 +273,42 @@ def compile_live(manifest_path: Path, classification: dict[str, Any]) -> dict[st
                     )
         else:
             attempted = True
-            facts = EXTRACTION_FACTS_BY_SHA.get(raw_sha)
-            assert facts is not None, f"No extraction facts are bound for {source['candidate_id']}"
             with tempfile.TemporaryDirectory(prefix="real-filing-extraction-") as temp:
                 temp_root = Path(temp)
                 request_path = temp_root / "request.json"
                 extraction_root = temp_root / "extraction"
-                request = {
-                    "schema_version": "filings-extraction-request/1.0",
-                    "run_id": f"real-corpus-{source['candidate_id']}",
-                    "documents": [{
-                        "document_id": declaration["document_id"],
-                        "attachment_id": declaration["document_id"],
-                        "source_id": declaration["document_id"],
-                        "path": str(target),
-                    }],
-                    "filing_facts": facts,
-                }
-                request_path.write_bytes(canonical(request))
-                completed = subprocess.run(
-                    [sys.executable, str(EXTRACTOR), str(request_path), "--out", str(extraction_root)],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=300,
-                )
                 receipt_path = extraction_root / "filings-native-extraction-receipt.json"
-                if not receipt_path.is_file():
+                native_receipt = None
+                completed = None
+                for facts_source, facts in extraction_fact_candidates(target, raw_sha):
+                    request = {
+                        "schema_version": "filings-extraction-request/1.0",
+                        "run_id": f"real-corpus-{source['candidate_id']}",
+                        "documents": [{
+                            "document_id": declaration["document_id"],
+                            "attachment_id": declaration["document_id"],
+                            "source_id": declaration["document_id"],
+                            "path": str(target),
+                        }],
+                        "filing_facts": facts,
+                    }
+                    request_path.write_bytes(canonical(request))
+                    receipt_path.unlink(missing_ok=True)
+                    completed = subprocess.run(
+                        [sys.executable, str(EXTRACTOR), str(request_path), "--out", str(extraction_root)],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=300,
+                    )
+                    if not receipt_path.is_file():
+                        continue
+                    native_receipt = json.loads(receipt_path.read_text("utf-8"))
+                    if completed.returncode == 0 and native_receipt["status"] == "PASS":
+                        break
+                if native_receipt is None:
                     raise AssertionError(
                         f"Production extractor emitted no receipt for {source['candidate_id']} "
-                        f"(exit {completed.returncode})."
+                        f"under any extraction-facts binding."
                     )
-                native_receipt = json.loads(receipt_path.read_text("utf-8"))
+                assert completed is not None
                 receipt_sha = digest_bytes(receipt_path.read_bytes())
                 if completed.returncode == 0 and native_receipt["status"] == "PASS":
                     terminal = "EXTRACTION_PASS"
@@ -181,6 +328,7 @@ def compile_live(manifest_path: Path, classification: dict[str, Any]) -> dict[st
             "attempted": attempted,
             "terminal_status": terminal,
             "receipt_sha256": receipt_sha if attempted else None,
+            "extraction_facts_source": facts_source,
             "reason": reason,
         })
     extraction_pass_count = sum(item["terminal_status"] == "EXTRACTION_PASS" for item in outcomes)

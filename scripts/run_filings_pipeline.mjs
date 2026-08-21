@@ -365,6 +365,7 @@ function compileResponse({ response, request, sourceHashes }) {
 async function main() {
   const performance = {
     source_acquisition_ms: null,
+    structured_filing_extraction_ms: null,
     filing_extraction_ms: null,
     semantic_recovery_ms: null,
   };
@@ -392,14 +393,15 @@ async function main() {
   const runtimeReceipt = {
     schema_version: "filings-runtime-budget-receipt/1.1",
     receipt_kind: "stage_budget_only",
-    scope: ["source_acquisition", "filing_extraction"],
+    scope: ["source_acquisition", "structured_filing_extraction", "filing_extraction"],
     pipeline_authority: false,
     pipeline_status_source: "filings-run-state.json",
     status_semantics:
-      "PASS means only that the named budgeted stages passed; it never means the filings pipeline passed.",
+      "PASS means only that the named budgeted stages passed; it never means the filings pipeline passed. A failed structured stage that the PDF-geometry fallback rescued still yields a passing extraction stage.",
     status: "ACTIVE",
     stages: {
       source_acquisition: { budget_ms: sourceAcquisitionTimeoutMs, duration_ms: null, outcome: "ACTIVE" },
+      structured_filing_extraction: { budget_ms: filingExtractionTimeoutMs, duration_ms: null, outcome: "NOT_REQUIRED" },
       filing_extraction: { budget_ms: filingExtractionTimeoutMs, duration_ms: null, outcome: "NOT_REQUIRED" },
     },
   };
@@ -532,13 +534,118 @@ async function main() {
     return 2;
   }
   const nativeArtifacts = {};
+  // Lane detection happens once, up front: the Inline XBRL marker decides
+  // which extraction lane each document owes. Documents carrying tagged
+  // facts go to the structured lane FIRST; PDF geometry is engaged only as
+  // the fallback for documents the structured lane could not bind.
+  const inlineXbrlDocumentIds = [];
+  for (const document of request.documents) {
+    const raw = await fs.readFile(resolveFrom(requestBase, document.path), "latin1");
+    if (XBRL_MARKER.test(raw)) inlineXbrlDocumentIds.push(document.document_id);
+  }
+  const structuredLaneOutcomeById = new Map();
   if (!responsePath) {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
     const pythonExecutable = await resolveFilingsPython();
+    if (inlineXbrlDocumentIds.length > 0) {
+      const structuredExtractionStarted = process.hrtime.bigint();
+      const factsRoot = path.join(nativeRoot, "structured-facts");
+      await fs.mkdir(factsRoot, { recursive: true });
+      let structuredTimedOut = false;
+      let structuredTerminationVerified = true;
+      const structuredSurvivorPids = [];
+      for (const documentId of inlineXbrlDocumentIds) {
+        const declaration = request.documents.find((entry) => entry.document_id === documentId);
+        const target = resolveFrom(requestBase, declaration.path);
+        const factsPath = path.join(factsRoot, `${documentId}.inline-xbrl-facts.json`);
+        const attempt = await runProcessTree(
+          pythonExecutable,
+          [path.join(HERE, "extract_inline_xbrl.py"), target, "--out", factsPath],
+          {
+            cwd: HERE,
+            maxBuffer: 32 * 1024 * 1024,
+            timeout: filingExtractionTimeoutMs,
+            env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+          },
+        );
+        structuredTimedOut = structuredTimedOut || attempt.timed_out === true;
+        if (attempt.timed_out) {
+          structuredTerminationVerified = structuredTerminationVerified && attempt.termination_verified === true;
+          structuredSurvivorPids.push(...(attempt.survivor_pids ?? []));
+        }
+        let bound = false;
+        const outcome = {
+          facts_path: factsPath,
+          exit_code: attempt.code,
+          timed_out: attempt.timed_out === true,
+        };
+        if (attempt.ok) {
+          try {
+            const factTable = await readJson(factsPath, "inline XBRL fact table");
+            bound = factTable.source_sha256 === sourceHashes[documentId];
+            if (bound) outcome.fact_table_sha256 = await sha256File(factsPath);
+          } catch {
+            bound = false;
+          }
+        }
+        outcome.bound = bound;
+        structuredLaneOutcomeById.set(documentId, outcome);
+      }
+      performance.structured_filing_extraction_ms =
+        Number(process.hrtime.bigint() - structuredExtractionStarted) / 1e6;
+      const structuredPassed = inlineXbrlDocumentIds.every((documentId) =>
+        structuredLaneOutcomeById.get(documentId)?.bound === true);
+      runtimeReceipt.stages.structured_filing_extraction = {
+        budget_ms: filingExtractionTimeoutMs,
+        duration_ms: performance.structured_filing_extraction_ms,
+        outcome: structuredTimedOut ? "TIMEOUT" : structuredPassed ? "PASS" : "FAIL",
+        process_tree_termination_verified: structuredTerminationVerified,
+        survivor_pids: structuredSurvivorPids,
+        documents: Object.fromEntries(structuredLaneOutcomeById),
+      };
+      await writeRuntimeReceipt();
+    }
+    // PDF geometry is the fallback lane: it receives only the documents the
+    // structured lane did not bind — all of them when none carry Inline
+    // XBRL, which preserves the historical single-subprocess behavior.
+    const fallbackDocuments = request.documents.filter((document) =>
+      !(structuredLaneOutcomeById.get(document.document_id)?.bound === true));
+    if (fallbackDocuments.length === 0) {
+      // The structured lane bound every document. Geometry is not required,
+      // but selected face-statement authority is still owed before this run
+      // can compile — fail closed into review rather than laundering the
+      // fact tables into face-statement authority.
+      runtimeReceipt.status = runtimeReceipt.stages.structured_filing_extraction.outcome === "PASS" ? "PASS" : "FAIL";
+      await writeRuntimeReceipt();
+      await writeState(statePath, {
+        ...base,
+        pipeline_status: "NEEDS_EXTRACTION_REVIEW",
+        user_blocking: false,
+        blocker_class: "INTERNAL_WORK",
+        artifacts: { structured_fact_tables: path.join(nativeRoot, "structured-facts") },
+        tasks: [{
+          task_kind: "filing_extraction_adjudication",
+          request_path: effectiveRequestPath,
+          structured_document_ids: inlineXbrlDocumentIds,
+          instruction: "The Inline XBRL structured lane bound every document's tagged facts; adjudicate selected face-statement authority from the structured fact tables. Do not rerun PDF geometry over structured-bound documents.",
+        }],
+        summary: {
+          document_count: request.documents.length,
+          structured_bound_count: inlineXbrlDocumentIds.length,
+          violations: [],
+        },
+      });
+      return 2;
+    }
+    let geometryRequestPath = effectiveRequestPath;
+    if (fallbackDocuments.length < request.documents.length) {
+      geometryRequestPath = path.join(nativeRoot, "geometry-fallback-request.json");
+      await atomicJson(geometryRequestPath, { ...request, documents: fallbackDocuments });
+    }
     const filingExtractionStarted = process.hrtime.bigint();
     const completed = await runProcessTree(
       pythonExecutable,
-      [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
+      [path.join(HERE, "extract_filing_statements.py"), geometryRequestPath, "--out", nativeRoot],
       {
         cwd: HERE,
         maxBuffer: 32 * 1024 * 1024,
@@ -554,7 +661,9 @@ async function main() {
       process_tree_termination_verified: completed.timed_out ? completed.termination_verified === true : true,
       survivor_pids: completed.survivor_pids ?? [],
     };
-    runtimeReceipt.status = completed.ok ? "PASS" : "FAIL";
+    const structuredStageOutcome = runtimeReceipt.stages.structured_filing_extraction.outcome;
+    runtimeReceipt.status =
+      completed.ok && structuredStageOutcome !== "TIMEOUT" ? "PASS" : "FAIL";
     await writeRuntimeReceipt();
     const nativeResponse = path.join(nativeRoot, "filings-extraction-response.json");
     const nativeReceiptPath = path.join(nativeRoot, "filings-native-extraction-receipt.json");
@@ -642,11 +751,9 @@ async function main() {
   // without XBRL are recorded as typed-unreconciled, never silently skipped.
   const xbrlArtifactPath = path.join(extractionRoot, "xbrl-reconciliation.json");
   let xbrlReconciliation;
-  const inlineXbrlDocumentIds = [];
-  for (const document of request.documents) {
-    const raw = await fs.readFile(resolveFrom(requestBase, document.path), "latin1");
-    if (XBRL_MARKER.test(raw)) inlineXbrlDocumentIds.push(document.document_id);
-  }
+  // inlineXbrlDocumentIds was resolved once during lane selection above and
+  // is reused here so reconciliation and extraction agree on which filings
+  // carry Inline XBRL.
   if (inlineXbrlDocumentIds.length === 0) {
     const documentsWithoutXbrl = (response.documents ?? []).map((document) => ({
       document_id: document.document_id,
