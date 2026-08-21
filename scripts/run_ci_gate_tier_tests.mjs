@@ -150,7 +150,14 @@ const live = validateRegister({ register, workflowTexts, registryTestIds });
 assert.deepEqual(live.violations, [], `CI_TIER_FAIL:\n${live.violations.join("\n")}`);
 checks += live.checks;
 
+// Honest mutation accounting: each mutate() applies one real defect to a
+// copy of the register and is counted CAUGHT only when the tier validator
+// refuses it while the mutant is active; a surviving mutant throws and no
+// count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 const mutate = (label, transform, expected) => {
+  mutations_total += 1;
   const mutated = transform({
     register: structuredClone(register),
     workflowTexts: new Map(workflowTexts),
@@ -167,6 +174,7 @@ const mutate = (label, transform, expected) => {
     `mutation "${label}" escaped the tier validator; expected a violation containing ${JSON.stringify(expected)}, got:\n${violations.join("\n") || "(none)"}`,
   );
   checks += 1;
+  mutations_caught += 1;
 };
 
 const tierOf = (state, id) => state.register.tiers.find((tier) => tier.id === id);
@@ -361,4 +369,4 @@ if (declarationOut) {
   });
 }
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));
