@@ -183,10 +183,11 @@ jobs:
           node scripts/compile_exact_head_ci_job_receipt.mjs package --source-identity "${{ runner.temp }}/source/source-identity.json" \
             --raw "${{ runner.temp }}/package-a/build/package-a.build-receipt.json" --job-id package_a \
             --out "${{ runner.temp }}/package-a/package-a-receipt.json"
-          mkdir -p "${{ runner.temp }}/package-a/harness/scripts/lib"
+          mkdir -p "${{ runner.temp }}/package-a/harness/scripts/lib" "${{ runner.temp }}/package-a/harness/scripts/verify"
           install -m 0644 scripts/run_archive_only_capability_ci.mjs "${{ runner.temp }}/package-a/harness/scripts/"
           install -m 0644 scripts/lib/exact_head_package_ci.mjs scripts/lib/package_ab_comparison.mjs scripts/lib/identity_vocabulary.mjs \
             "${{ runner.temp }}/package-a/harness/scripts/lib/"
+          install -m 0644 scripts/verify/installed_capability_oracle.py "${{ runner.temp }}/package-a/harness/scripts/verify/"
       - name: Retain package A, archive, inventory, log and harness
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -65,6 +65,7 @@ function exactHeadAssertions(text) {
   const archive = jobBlock(text, "archive-only-capability") ?? "";
   assert.doesNotMatch(archive, /actions\/checkout@/, "Archive-only job must not have a source checkout.");
   assert.match(archive, /run_archive_only_capability_ci\.mjs/, "Archive-only job lacks the real archive harness.");
+  assert.match(jobBlock(text, "package-a") ?? "", /installed_capability_oracle\.py/, "Archive-only harness omits its independent oracle.");
   assert.match(archive, /capability receipt and independent oracle/i, "Archive-only job lacks capability/oracle custody.");
   const merge = jobBlock(text, "synthetic-merge") ?? "";
   assert.match(merge, /actions\/checkout@[a-f0-9]{40}[\s\S]*fetch-depth:\s*0/, "Synthetic merge job lacks full merge-object checkout.");
