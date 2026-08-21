@@ -99,9 +99,19 @@ import { solveCase, solverIterationDeclaration } from "./lib/solver.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
+// Honest mutation accounting: every check whose message declares itself a
+// MUTATION applies a real defect to a copy of the subject and is counted
+// CAUGHT only when production refuses it while the mutant is active. A
+// surviving mutant throws before its catch is counted, and the suite exits
+// non-zero without printing a count line at all.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   assert.ok(condition, message);
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 }
 const clone = (value) => structuredClone(value);
 /** A mutable deep copy of the canonical graph (the export is frozen). */
@@ -807,4 +817,6 @@ for (const fixture of ["standard-maximal-v2", "standard-net-cash-v2"]) {
   );
 }
 
-process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught })}\n`,
+);

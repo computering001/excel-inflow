@@ -31,6 +31,17 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
   checks += 1;
 }
+// Honest mutation accounting: each mutation() below applies a real defect to
+// a COPY of a compiled artefact (or mints an unlawful row) and is counted
+// CAUGHT only when production throws while the mutant is active. A surviving
+// mutant throws out of the suite, which exits non-zero without a count line.
+let mutations_total = 0;
+let mutations_caught = 0;
+function mutation(fn) {
+  mutations_total += 1;
+  fn();
+  mutations_caught += 1;
+}
 
 const FIXTURES = new URL("../test-fixtures/cases/", import.meta.url);
 function loadCase(name) {
@@ -120,29 +131,31 @@ function loadCase(name) {
     "Bonds-group instrument must keep its subtotal edge.",
   );
 
-  // A group node absent from the manifest must be a TYPED violation, never a
-  // silently dropped edge.
-  const tampered = structuredClone(rowPlan);
-  for (const candidate of tampered.instruments) {
-    if (candidate.instrument_id === "smc_other_debt_pool") {
-      candidate.display_group_key = "group_that_was_never_minted";
+  // MUTATION — a group node absent from the manifest must be a TYPED
+  // violation, never a silently dropped edge.
+  mutation(() => {
+    const tampered = structuredClone(rowPlan);
+    for (const candidate of tampered.instruments) {
+      if (candidate.instrument_id === "smc_other_debt_pool") {
+        candidate.display_group_key = "group_that_was_never_minted";
+      }
     }
-  }
-  let violation = null;
-  try {
-    compileSemanticManifest(modelCase, tampered, { instrumentPeriodState });
-  } catch (error) {
-    violation = error;
-  }
-  assert(
-    violation,
-    "Absent group subtotal node must surface a violation, not a silent drop.",
-  );
-  assert(
-    violation.violation_code === "ECONOMIC_GRAPH_GROUP_NODE_ABSENT" &&
-      String(violation.message).includes("ECONOMIC_GRAPH_GROUP_NODE_ABSENT"),
-    `Group-node violation must be typed ECONOMIC_GRAPH_GROUP_NODE_ABSENT, got: ${violation.message}`,
-  );
+    let violation = null;
+    try {
+      compileSemanticManifest(modelCase, tampered, { instrumentPeriodState });
+    } catch (error) {
+      violation = error;
+    }
+    assert(
+      violation,
+      "Absent group subtotal node must surface a violation, not a silent drop.",
+    );
+    assert(
+      violation.violation_code === "ECONOMIC_GRAPH_GROUP_NODE_ABSENT" &&
+        String(violation.message).includes("ECONOMIC_GRAPH_GROUP_NODE_ABSENT"),
+      `Group-node violation must be typed ECONOMIC_GRAPH_GROUP_NODE_ABSENT, got: ${violation.message}`,
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -155,29 +168,31 @@ function loadCase(name) {
     "KNOWN_ROW_ID_COLLISIONS must be exported and include cash_interest_paid.",
   );
 
-  // A NEW collision must throw at plan compile time.
-  const colliding = loadCase("standard-maximal-v2.json");
-  colliding.statement_structure.cash_flow.push({
-    row_id: "minimum_cash",
-    label: "Synthetic colliding memo row",
-    row_type: "input",
-    style_role: "line",
+  // MUTATION — a NEW collision must throw at plan compile time.
+  mutation(() => {
+    const colliding = loadCase("standard-maximal-v2.json");
+    colliding.statement_structure.cash_flow.push({
+      row_id: "minimum_cash",
+      label: "Synthetic colliding memo row",
+      row_type: "input",
+      style_role: "line",
+    });
+    let thrown = null;
+    try {
+      compileRowPlan(colliding);
+    } catch (error) {
+      thrown = error;
+    }
+    assert(
+      thrown,
+      "A new rows_by_id collision (statement minimum_cash vs waterfall mint) must throw at compile time (S6).",
+    );
+    assert(
+      String(thrown.message).includes("ROW_PLAN_DUPLICATE_ROW_ID") &&
+        String(thrown.message).includes("minimum_cash"),
+      `Duplicate-mint violation must be typed ROW_PLAN_DUPLICATE_ROW_ID naming the row_id, got: ${thrown.message}`,
+    );
   });
-  let thrown = null;
-  try {
-    compileRowPlan(colliding);
-  } catch (error) {
-    thrown = error;
-  }
-  assert(
-    thrown,
-    "A new rows_by_id collision (statement minimum_cash vs waterfall mint) must throw at compile time (S6).",
-  );
-  assert(
-    String(thrown.message).includes("ROW_PLAN_DUPLICATE_ROW_ID") &&
-      String(thrown.message).includes("minimum_cash"),
-    `Duplicate-mint violation must be typed ROW_PLAN_DUPLICATE_ROW_ID naming the row_id, got: ${thrown.message}`,
-  );
 
   // The KNOWN collision stays lawful and keeps its current runtime shape: the
   // schedule mint wins in rows_by_id while the statement row survives in
@@ -226,4 +241,4 @@ function loadCase(name) {
   }
 }
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));
