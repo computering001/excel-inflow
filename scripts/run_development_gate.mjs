@@ -53,6 +53,7 @@ function usage() {
     "Usage: run_development_gate.mjs [--phase all|workflow,evidence,graph,economic,economics,forecast,proof,real_corpus,cohort,performance]",
     "  [--profile all|portable|custody]",
     "  [--only <comma-separated exact registry test IDs>]",
+    "  [--shard <index>/<total>]",
     "  [--cases <case-directory>] [--representative <compiled-case.json>]",
     "  [--broker-corpus <external-corpus.json>]",
     "  [--broker-real-pack-manifest <external-reviewed-pack-manifest.json>]",
@@ -375,7 +376,7 @@ const profileTests = selectRegistryTests(registry, { profile, phases: selectedPh
 const requestedIds = options.only
   ? [...new Set(String(options.only).split(",").map((item) => item.trim()).filter(Boolean))]
   : null;
-const selectedTests = requestedIds
+let selectedTests = requestedIds
   ? profileTests.filter((test) => requestedIds.includes(test.id))
   : profileTests;
 if (requestedIds) {
@@ -384,6 +385,22 @@ if (requestedIds) {
   if (missingIds.length > 0) {
     throw new Error(`Requested registry test IDs are absent from the ${profile} selection: ${missingIds.join(", ")}.`);
   }
+}
+// A matrix shard takes a deterministic interleaved slice of the selection so
+// N runners cover it exactly once between them (position % total). The slice
+// is stamped into the report; scripts/aggregate_development_gate_reports.mjs
+// re-joins the shards against the full profile selection afterwards.
+let shard = null;
+if (options.shard !== undefined) {
+  const match = /^([1-9]\d*)\/([1-9]\d*)$/.exec(String(options.shard));
+  if (!match) throw new Error(`--shard expects <index>/<total>, e.g. 2/3.\n${usage()}`);
+  const shardIndex = Number(match[1]);
+  const shardTotal = Number(match[2]);
+  if (shardIndex > shardTotal) throw new Error(`--shard index ${shardIndex} exceeds its total ${shardTotal}.\n${usage()}`);
+  const shardedSelection = selectedTests.filter((_, position) => position % shardTotal === shardIndex - 1);
+  if (shardedSelection.length === 0) throw new Error(`Shard ${shardIndex}/${shardTotal} selects no ${profile} test.\n${usage()}`);
+  shard = { index: shardIndex, total: shardTotal };
+  selectedTests = shardedSelection;
 }
 const inputs = substitutions(options);
 const invocationErrors = validateRegistryInvocationContract(
@@ -452,6 +469,7 @@ const report = canonical({
   },
   selection: {
     profile,
+    ...(shard ? { shard } : {}),
     selected_test_count: selectedTests.length,
     selected_test_ids: selectedTests.map((test) => test.id).sort(),
     selected_test_ids_sha256: testIdSetSha256(selectedTests),
