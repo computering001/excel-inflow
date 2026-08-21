@@ -62,6 +62,7 @@ export const FORMULA_FUNCTIONS = Object.freeze([
   "COUNT",
   "ISNUMBER",
   "DATE",
+  "N",
 ]);
 
 /** Closed binary-operator vocabulary, with Excel's precedence levels. */
