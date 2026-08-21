@@ -90,9 +90,18 @@ const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "dmu-differential-inva
 
 let checks = 0;
 const violations = [];
+// Honest mutation accounting: every MUTATION-declared check applies a real
+// defect (a superseded literal, an undeclared input, a forbidden table) and
+// is counted CAUGHT only when production refuses it while the mutant is
+// active; a surviving mutant lands in violations and fails the suite.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   checks += 1;
   if (!condition) violations.push(message);
+  else if (isMutation) mutations_caught += 1;
 }
 
 async function command(script, args) {
@@ -167,7 +176,7 @@ for (const change of Object.keys(CHANGE_INVALIDATION)) {
 const historical = changeInvalidationDisagreements(SUPERSEDED_CHANGE_INVALIDATION);
 check(
   historical.length === 8,
-  `the historical invalidation literal no longer disagrees on eight entries: ${historical.length}`,
+  `MUTATION — the superseded invalidation literal is refused on eight entries: ${historical.length}`,
 );
 check(
   historical.every((entry) => entry.direction === "later_than_measured"),
@@ -212,7 +221,7 @@ try {
 } catch {
   unknownChangeRefused = true;
 }
-check(unknownChangeRefused, "an undeclared change type was given an invalidation answer");
+check(unknownChangeRefused, "MUTATION — an undeclared change type was given an invalidation answer");
 
 // EXACTLY THE EXPECTED NODES, AND NO OTHERS — at graph level, for every
 // declared change type.
@@ -358,7 +367,7 @@ const forbidden = validateErrorClassificationTable(
 );
 check(
   forbidden.length > 0,
-  "the table validator accepted a class whose terminal state the registry does not allow",
+  "MUTATION — the table validator accepted a class whose terminal state the registry does not allow",
 );
 
 // ---------------------------------------------------------------------------
@@ -837,4 +846,6 @@ if (violations.length > 0) {
   process.stdout.write(`${JSON.stringify({ status: "FAIL", checks, violations: violations.length })}\n`);
   process.exit(1);
 }
-process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught })}\n`,
+);

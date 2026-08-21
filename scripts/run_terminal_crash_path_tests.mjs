@@ -24,9 +24,18 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check applies a real
+// defect (an unlawful mint, a tampered payload) and is counted CAUGHT only
+// when production refuses it while the mutant is active; a surviving mutant
+// throws and the suite exits non-zero without a count line.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   if (!condition) throw new Error(message);
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 }
 
 const registry = JSON.parse(
@@ -54,7 +63,7 @@ for (const outcome of ["decision_replay_blocked", "decision_graph_blocked"]) {
   }
   check(
     caught !== null && /ACTION_REQUIRED cannot own blocker class/.test(caught.message),
-    `${outcome}: ACTION_REQUIRED+INTERNAL_WORK must stay contract-illegal`,
+    `MUTATION — ${outcome}: ACTION_REQUIRED+INTERNAL_WORK must stay contract-illegal`,
   );
 }
 
@@ -179,4 +188,6 @@ for (const outcome of ["decision_replay_blocked", "decision_graph_blocked"]) {
   );
 }
 
-process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught })}\n`,
+);

@@ -72,7 +72,16 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const libDir = path.join(root, "scripts", "lib");
 let checks = 0;
+// Honest mutation accounting: the D11 MUTATION proofs each reinstate or
+// remove a load-bearing guard line inside a COPY of the module and are
+// counted CAUGHT only when production refuses the mutant while it is active;
+// a surviving mutant rethrows and no count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
+const isMutationLabel = (label) => /^D11 MUTATION/.test(label);
 const check = (label, fn) => {
+  const isMutation = isMutationLabel(label);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -80,8 +89,11 @@ const check = (label, fn) => {
     throw error;
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 const checkAsync = async (label, fn) => {
+  const isMutation = isMutationLabel(label);
+  if (isMutation) mutations_total += 1;
   try {
     await fn();
   } catch (error) {
@@ -89,6 +101,7 @@ const checkAsync = async (label, fn) => {
     throw error;
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 
 const clone = (value) => structuredClone(value);
@@ -717,4 +730,4 @@ check("D12: the contract now declares the LANE that delivers the refused class",
   }
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

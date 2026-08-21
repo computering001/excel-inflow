@@ -59,9 +59,18 @@ const ROLL_FORWARD = "debt.instrument_roll_forward";
 const TOLERANCE = 1e-8;
 
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check drops one real
+// term from the roll-forward identity (or flips its sign) and is counted
+// CAUGHT only when the invariant refuses while the mutant is active; a
+// surviving mutant throws and no count line prints.
+let mutations_total = 0;
+let mutations_caught = 0;
 const check = (condition, message) => {
+  const isMutation = typeof message === "string" && /^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   assert.ok(condition, message);
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 const near = (left, right, tolerance = 1e-9) =>
   Number.isFinite(Number(left)) &&
@@ -399,7 +408,7 @@ function movementSetIsLoadBearing() {
     const violations = rollForwardErrors(syntheticSolution(withoutTerm));
     check(
       violations.length === 1,
-      `dropping ${term.field} from the ending must FAIL — if it passes, the invariant has lost that term`,
+      `MUTATION — dropping ${term.field} from the ending must FAIL — if it passes, the invariant has lost that term`,
     );
     check(
       near(
@@ -417,7 +426,7 @@ function movementSetIsLoadBearing() {
   // A term present with the WRONG SIGN is also caught: flipping amortisation
   // into an addition moves the ending by twice its amount.
   const flipped = rollForwardErrors(syntheticSolution(HONEST_ENDING + 2 * 41));
-  check(flipped.length === 1, "a sign-flipped amortisation term must fail");
+  check(flipped.length === 1, "MUTATION — a sign-flipped amortisation term must fail");
 
   // Absent (undefined) movement fields must be read as zero, not as NaN — an
   // instrument with no accretion at all must still pass cleanly.
@@ -514,4 +523,6 @@ wrongPikAmountStillFails(pikSolution);
 movementSetIsLoadBearing();
 certifiedFixtureStaysClean();
 
-process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught })}\n`,
+);

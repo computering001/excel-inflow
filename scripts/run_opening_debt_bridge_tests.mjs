@@ -51,7 +51,15 @@ const clone = (value) => structuredClone(value);
 const near = (left, right, tolerance = 1e-9) =>
   Math.abs(Number(left) - Number(right)) <= tolerance;
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check applies a real
+// defect to a copy of the register and is counted CAUGHT only when the
+// bridge refuses it while the mutant is active; a surviving mutant rethrows
+// and no count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 const check = (label, fn) => {
+  const isMutation = /^MUTATION/.test(label);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -59,6 +67,7 @@ const check = (label, fn) => {
     throw error;
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 };
 
 const assertSchemaValid = (artifact, label) => {
@@ -164,7 +173,7 @@ check("solveCase attaches the bridge artifact on the reconciled path", () => {
 // 5. (a) RED-PROOF MUTATION: an unexplained +50 sneaks into the pool row.
 //    The old world absorbed it silently (the pool IS the plug); the bridge
 //    refuses with the registered terminal reason code.
-check("unexplained residual sneaked into the pool row is refused, typed", () => {
+check("MUTATION — unexplained residual sneaked into the pool row is refused, typed", () => {
   const sneaked = clone(fixture);
   sneaked.instruments.find((i) => i.instrument_id === "smc_other_debt_pool")
     .opening_balance += 50;
@@ -196,7 +205,7 @@ check("unexplained residual sneaked into the pool row is refused, typed", () => 
 });
 
 // 6. Over-identification (no negative pool exists): typed refusal too.
-check("over-identified register refuses typed", () => {
+check("MUTATION — over-identified register refuses typed", () => {
   const overIdentified = clone(fixture);
   overIdentified.instruments.find((i) => i.instrument_id === "smc_usd_bond_2029")
     .opening_balance += 100;
@@ -371,4 +380,4 @@ check("schema rejects a refusal without the registered reason code", () => {
   assert.ok(validateJsonSchema(wrongCode, schema).length > 0);
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));
