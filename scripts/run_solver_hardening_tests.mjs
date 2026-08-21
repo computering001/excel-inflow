@@ -27,10 +27,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  assertCommitmentFeeConventionAdmitted,
   assertRcfAverageFxUsable,
   detectTwoCycle,
   solveCase,
 } from "./lib/solver.mjs";
+import { validateRcfSweep } from "./lib/fixed_point_constitution.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..");
@@ -267,6 +269,145 @@ check("B12: usable rates pass through untouched", () => {
   assert.doesNotThrow(() => assertRcfAverageFxUsable(1.0875, {}));
   assert.doesNotThrow(() => assertRcfAverageFxUsable("1.0875", {}));
 });
+
+// ---------------------------------------------------------------------------
+// B21(twin) — reporting-unit sweep rows are judged at fx-scaled tolerance.
+// ---------------------------------------------------------------------------
+
+{
+  const sweepPeriod = {
+    rcf_currency: "EUR",
+    rcf_average_fx: 15,
+    rcf_opening_native: 100,
+    rcf_capacity_native: 500,
+    cash_after_mandatory_repayment: -50,
+    minimum_cash: 0,
+    // deficit = 50 -> draw native = 50/15 = 3.333… ; draw reporting = 50.
+    rcf_draw_native: 50 / 15,
+    rcf_repayment_native: 0,
+    rcf_ending_native: 100 + 50 / 15,
+    rcf_draw: 50 + 1e-7, // > native tolerance, < tolerance × 15
+    rcf_repayment: 0,
+    ending_cash: -50 + 50 + 1e-7,
+    liquidity_shortfall: 0,
+  };
+  const errorsAtScaledTolerance = [];
+  validateRcfSweep(sweepPeriod, 1e-8, "twin", errorsAtScaledTolerance);
+  check("B21(twin): sub-tolerance reporting-unit noise passes at fx scale", () => {
+    assert.deepEqual(errorsAtScaledTolerance, []);
+  });
+  check("B21(twin): the same noise FAILS against the unscaled native tolerance", () => {
+    // Prove the test discriminates the regression: the pre-fix behaviour is
+    // recovered by re-running with averageFx normalised away.
+    const strictErrors = [];
+    validateRcfSweep(
+      { ...sweepPeriod, rcf_currency: "", rcf_average_fx: undefined },
+      1e-8,
+      "strict",
+      strictErrors,
+    );
+    assert.ok(strictErrors.length >= 2);
+  });
+  check("B21(twin): a genuinely wrong native row is still caught", () => {
+    const errors = [];
+    validateRcfSweep(
+      { ...sweepPeriod, rcf_draw_native: 50 / 15 + 1e-6 },
+      1e-8,
+      "native",
+      errors,
+    );
+    assert.ok(errors.some((e) => e.includes("rcf_draw_native")));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// B22 — commitment_fee_convention vocabulary guard + captured_in_residual LOG.
+// ---------------------------------------------------------------------------
+
+{
+  const base = readCase(path.join(CASES, "standard-maximal-v2.json"));
+  const badConvention = structuredClone(base);
+  badConvention.rcf_policy.commitment_fee_convention = "percent_of_undrawn";
+  check("B22: an unadmitted convention refuses typed (solver guard)", () => {
+    assert.throws(
+      () =>
+        assertCommitmentFeeConventionAdmitted("percent_of_undrawn", {
+          caseId: badConvention.case_id,
+        }),
+      (error) =>
+        error.code === "COMMITMENT_FEE_CONVENTION_INVALID" &&
+        error.typed_internal_outcome.reason_code ===
+          "COMMITMENT_FEE_CONVENTION_INVALID" &&
+        error.typed_internal_outcome.declared === "percent_of_undrawn" &&
+        error.typed_internal_outcome.downstream_invalidation_scope ===
+          "solve_and_below",
+      "the typed transport must carry reason/declared/scope",
+    );
+  });
+  check("B22: the case-shape layer also refuses it before the solve", () => {
+    assert.throws(
+      () => solveCase(badConvention),
+      (error) =>
+        Array.isArray(error.validationErrors) &&
+        error.validationErrors.some((message) =>
+          message.includes("commitment_fee_convention"),
+        ),
+      "schema layer must name the offending field",
+    );
+  });
+  const captured = structuredClone(base);
+  captured.rcf_policy.commitment_fee_convention = "captured_in_residual";
+  const capturedSolution = solveCase(captured);
+  check("B22: captured_in_residual solves, logs one finding per period, fee stays none", () => {
+    const findings = capturedSolution.solver_findings.filter(
+      (finding) => finding.code === "rcf_commitment_fee_captured_in_residual",
+    );
+    assert.equal(findings.length, capturedSolution.forecast.length);
+    for (const finding of findings) {
+      assert.equal(finding.severity, "LOG");
+      assert.equal(finding.treated_as, "none");
+    }
+    for (const period of capturedSolution.forecast) {
+      assert.equal(period.rcf_commitment_fee, 0);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// B23 — binding amortisation caps and balance floors raise DEGRADE findings.
+// ---------------------------------------------------------------------------
+
+{
+  const modelCase = readCase(path.join(CASES, "standard-maximal-v2.json"));
+  const pool = modelCase.instruments ?? modelCase.debt_instruments;
+  const termLoan = pool.find((item) => item.opening_balance > 0);
+  termLoan.scheduled_amortisation = [50000, 50000, 50000];
+  const solution = solveCase(modelCase);
+  check("B23: every capped period names instrument/period and requested-vs-applied", () => {
+    const findings = solution.solver_findings.filter(
+      (finding) => finding.code === "scheduled_amortisation_capped_at_balance",
+    );
+    assert.equal(findings.length, solution.forecast.length);
+    for (const finding of findings) {
+      assert.equal(finding.severity, "DEGRADE");
+      assert.equal(finding.instrument_id, termLoan.instrument_id);
+      assert.equal(finding.requested, 50000);
+      assert.ok(finding.applied < 50000, "the cap actually bound");
+    }
+  });
+  check("B23: an uncapped twin raises no cap findings", () => {
+    const quiet = readCase(path.join(CASES, "standard-maximal-v2.json"));
+    const quietSolution = solveCase(quiet);
+    assert.equal(
+      quietSolution.solver_findings.filter(
+        (finding) =>
+          finding.code === "scheduled_amortisation_capped_at_balance" ||
+          finding.code === "debt_balance_floored_at_zero",
+      ).length,
+      0,
+    );
+  });
+}
 
 // ---------------------------------------------------------------------------
 // B25 — the forced single-pass path publishes stale_iteration.

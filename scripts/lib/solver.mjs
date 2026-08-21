@@ -1045,6 +1045,39 @@ export function assertRcfAverageFxUsable(rcfAverageFx, context = {}) {
   throw error;
 }
 
+// B22 — the admitted vocabulary for `rcf_policy.commitment_fee_convention`.
+// An ABSENT field stays legal (legacy cases predate the declaration); a
+// PRESENT value outside this set refuses typed instead of silently reading 0.
+export const COMMITMENT_FEE_CONVENTIONS = [
+  "none",
+  "bps_on_undrawn",
+  "captured_in_residual",
+];
+
+// B22 — the typed refusal consumed by the sweep; solveCase calls it at every
+// period where the convention is read, so a value that slips past the JSON
+// schema (programmatic cases) still cannot silently price as `none`.
+export function assertCommitmentFeeConventionAdmitted(
+  commitmentFeeConvention,
+  context = {},
+) {
+  if (COMMITMENT_FEE_CONVENTIONS.includes(commitmentFeeConvention)) return;
+  const error = new Error(
+    `COMMITMENT_FEE_CONVENTION_INVALID: case ${context.caseId ?? "?"} declares ` +
+      `rcf_policy.commitment_fee_convention ${JSON.stringify(commitmentFeeConvention)}; ` +
+      `admitted values are ${COMMITMENT_FEE_CONVENTIONS.join(", ")}.`,
+  );
+  error.code = "COMMITMENT_FEE_CONVENTION_INVALID";
+  error.typed_internal_outcome = {
+    reason_code: "COMMITMENT_FEE_CONVENTION_INVALID",
+    earliest_responsible_layer: "policy_declaration",
+    downstream_invalidation_scope: "solve_and_below",
+    declared: commitmentFeeConvention,
+    admitted_values: COMMITMENT_FEE_CONVENTIONS,
+  };
+  throw error;
+}
+
 function nonCashMovementComponents(instrument, forecastIndex) {
   const components = instrument.non_cash_movement_components;
   if (components && typeof components === "object") {
@@ -2418,12 +2451,36 @@ export function solveCase(
         ? Number(compiledState.other_non_cash_movement.basis_amount)
         : Number(nonCashComponents.other ?? 0);
       const nonPikNonCashNative = fairValueNative + otherNonCashNative;
+      // B23 — a cap or floor that binds is an economic suppression, not a
+      // silent rounding: name the instrument, the period, and the
+      // requested-vs-applied pair in a DEGRADE finding (deduped per
+      // code/severity/period/scope by recordSolverFinding).
+      const scheduledAmortisationRequested = asSeries3(
+        instrument.scheduled_amortisation,
+        0,
+      )[forecastIndex];
       const amortisationNative = compiledState
         ? Number(compiledState.scheduled_amortisation.basis_amount)
         : Math.min(
             Math.max(0, openingNative + issuanceNative + nonPikNonCashNative),
-            asSeries3(instrument.scheduled_amortisation, 0)[forecastIndex],
+            scheduledAmortisationRequested,
           );
+      if (
+        !compiledState &&
+        amortisationNative < scheduledAmortisationRequested - tolerance
+      ) {
+        recordSolverFinding(
+          "scheduled_amortisation_capped_at_balance",
+          "DEGRADE",
+          {
+            period: period.date,
+            scope: `instrument:${instrument.instrument_id}`,
+            instrument_id: instrument.instrument_id,
+            requested: scheduledAmortisationRequested,
+            applied: amortisationNative,
+          },
+        );
+      }
       solveOrder.record("debt.scheduled_amortisation");
       // B6 — instrument timing is CONTRACT-AGNOSTIC. The legacy (v1) path used
       // to skip it entirely and approximate maturity-year PIK as a flat
@@ -2451,10 +2508,21 @@ export function solveCase(
         : dynamicV2
         ? timing.matures
         : modelCase.controls.debt_maturities_roll === 1 && periodEnd >= maturity;
-      const baseEndingBeforePik = Math.max(
-        0,
-        openingNative + issuanceNative + nonPikNonCashNative - amortisationNative,
-      );
+      const rawEndingBeforePik =
+        openingNative + issuanceNative + nonPikNonCashNative - amortisationNative;
+      if (!compiledState && rawEndingBeforePik < -tolerance) {
+        recordSolverFinding("debt_balance_floored_at_zero", "DEGRADE", {
+          period: period.date,
+          scope: `instrument:${instrument.instrument_id}`,
+          instrument_id: instrument.instrument_id,
+          quantity: "ending_before_pik",
+          requested: rawEndingBeforePik,
+          applied: 0,
+        });
+      }
+      const baseEndingBeforePik = compiledState
+        ? Number(compiledState.ending_pre_repayment.basis_amount)
+        : Math.max(0, rawEndingBeforePik);
       const pikRate = asSeries3(instrument.pik_rate, 0)[forecastIndex];
       const pikInterestNative = compiledState
         ? Number(compiledState.pik_accretion.basis_amount)
@@ -2470,9 +2538,20 @@ export function solveCase(
             )
           : 0;
       solveOrder.record("interest.instrument_pik");
+      const rawPreMaturityEnding = baseEndingBeforePik + pikInterestNative;
+      if (!compiledState && rawPreMaturityEnding < -tolerance) {
+        recordSolverFinding("debt_balance_floored_at_zero", "DEGRADE", {
+          period: period.date,
+          scope: `instrument:${instrument.instrument_id}`,
+          instrument_id: instrument.instrument_id,
+          quantity: "pre_maturity_ending",
+          requested: rawPreMaturityEnding,
+          applied: 0,
+        });
+      }
       const preMaturityEnding = compiledState
         ? Number(compiledState.ending_pre_repayment.basis_amount)
-        : Math.max(0, baseEndingBeforePik + pikInterestNative);
+        : Math.max(0, rawPreMaturityEnding);
       solveOrder.record("debt.pik_accretion");
       const maturityRepaymentNative = compiledState
         ? Number(compiledState.maturity_repayment.basis_amount)
@@ -2842,8 +2921,32 @@ export function solveCase(
             rcfCapacity - (openingRcfNative + endingRcfNative) / 2,
           ) * rcfAverageFx
         : Math.max(0, rcfCapacity - (openingRcf + endingRcf) / 2);
+      // B22 — the convention is DECLARED vocabulary. A present value outside
+      // the admitted set refuses typed rather than silently reading as none;
+      // `captured_in_residual` keeps its economics (the fee sits inside the
+      // issuer's reported interest line) and is disclosed as a LOG finding;
+      // an absent field stays legal for legacy cases.
+      const commitmentFeeConvention =
+        modelCase.rcf_policy?.commitment_fee_convention;
+      if (commitmentFeeConvention !== undefined) {
+        assertCommitmentFeeConventionAdmitted(commitmentFeeConvention, {
+          caseId: modelCase.case_id,
+        });
+      }
+      if (commitmentFeeConvention === "captured_in_residual") {
+        recordSolverFinding(
+          "rcf_commitment_fee_captured_in_residual",
+          "LOG",
+          {
+            period: period.date,
+            scope: "rcf_policy.commitment_fee_convention",
+            convention: "captured_in_residual",
+            treated_as: "none",
+          },
+        );
+      }
       const commitmentFeeRate =
-        modelCase.rcf_policy?.commitment_fee_convention === "bps_on_undrawn"
+        commitmentFeeConvention === "bps_on_undrawn"
           ? Number(modelCase.rcf_policy.commitment_fee_value ?? 0) / 10000
           : 0;
       const commitmentFee = interestEnabled
