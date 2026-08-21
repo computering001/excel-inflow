@@ -310,7 +310,13 @@ check(runtimeSloSample({ cohort: "COLD", scope: SCOPE, ledger: seedLedger }).com
 const evidenceRun = path.join(workspace, "acquisition-question-evidence-run.json");
 await command("run_evidence_run_tests.mjs", [CASES, "--emit-acquisition-question", evidenceRun]);
 const answers = path.join(workspace, "answers.json");
-await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+    // J2's assumptions-cards lawfully surface two derived follow-ups at the
+    // decisions stop; the SLO harness must settle them like a real user.
+    await fs.writeFile(answers, `${JSON.stringify({ answers: {
+      acquisition_funding: "debt",
+      "derived.forecast.acquisitions_net_of_cash": "default",
+      "derived.fx.effect": "default",
+    } }, null, 2)}\n`);
 
 const samples = [];
 const cohortLedgers = [];
