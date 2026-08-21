@@ -73,12 +73,12 @@
       "maximum_exclusive_version": "1.26.6",
       "version_parser": "python_distribution",
       "required_by_lanes": ["evidence", "broker", "workbook"],
-      "reason": "1.26.5 is the exact version that passed PDF extraction, selected-cell rendering and workbook PDF inspection locally. Portable CI installs PyMuPDF without pinning its resolved version, so that execution does not justify a wider numerical range.",
+      "reason": "1.26.5 is the exact version that passed PDF extraction, selected-cell rendering and workbook PDF inspection locally and is pinned by portable CI so the exact-head capability probes exercise the same admitted patch.",
       "version_source": "importlib.metadata.version('PyMuPDF') through the selected interpreter; the runtime import remains fitz",
       "api_evidence": ["fitz.open", "fitz.Rect", "fitz.Matrix", "Page.get_pixmap", "Page.get_texttrace"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "1.26.5", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and Phase-2 installed filing probe" },
-        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs pymupdf without a version receipt" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "1.26.5", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml pins pymupdf==1.26.5 and the exact-head doctor records the resolved distribution" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     },
@@ -91,12 +91,12 @@
       "maximum_exclusive_version": "6.1.2",
       "version_parser": "python_distribution",
       "required_by_lanes": ["evidence"],
-      "reason": "6.1.1 is the exact local version that passed the Inline XBRL parser. Portable CI installs lxml unpinned and therefore supplies API execution evidence but no additional numeric boundary.",
+      "reason": "6.1.1 is the exact local version that passed the Inline XBRL parser and is pinned by portable CI so the same parser APIs are exercised at the admitted patch.",
       "version_source": "importlib.metadata.version('lxml') through the selected interpreter",
       "api_evidence": ["lxml.etree.HTMLParser", "lxml.etree.fromstring", "namespace-aware fact and context traversal"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "6.1.1", "precision": "exact", "evidence_pointer": "Phase-2 selected-interpreter probe and installed Inline XBRL capability" },
-        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs lxml without a version receipt" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "6.1.1", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml pins lxml==6.1.1 and the exact-head doctor records the resolved distribution" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     },
@@ -114,7 +114,7 @@
       "api_evidence": ["openpyxl.load_workbook", "Workbook save", "formula/data_only dual read", "style and number-format preservation"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "3.1.5", "precision": "exact", "evidence_pointer": "references/validation.md and local Phase-2 capability run" },
-        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs openpyxl without a version receipt" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "3.1.5", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml pins openpyxl==3.1.5 and the exact-head doctor records the resolved distribution" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     },
@@ -127,12 +127,12 @@
       "maximum_exclusive_version": "11.3.1",
       "version_parser": "python_distribution",
       "required_by_lanes": ["workbook"],
-      "reason": "11.3.0 is the exact local version that passed render-image loading and pixel comparison. CI installs Pillow unpinned, so a wider range would be invented rather than observed.",
+      "reason": "11.3.0 is the exact local version that passed render-image loading and pixel comparison and is pinned by portable CI so the same image APIs are exercised at the admitted patch.",
       "version_source": "importlib.metadata.version('Pillow') through the selected interpreter; the import is PIL",
       "api_evidence": ["PIL.Image.open", "image conversion", "pixel array preparation"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "11.3.0", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and local Phase-2 capability run" },
-        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs pillow without a version receipt" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "11.3.0", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml pins pillow==11.3.0 and the exact-head doctor records the resolved distribution" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     },
@@ -145,12 +145,12 @@
       "maximum_exclusive_version": "2.0.3",
       "version_parser": "python_distribution",
       "required_by_lanes": ["workbook"],
-      "reason": "2.0.2 is the exact local version exercised by the render pixel and baseline checks. CI installs NumPy without recording its version, so only the captured patch is admitted today.",
+      "reason": "2.0.2 is the exact local version exercised by the render pixel and baseline checks and is pinned by portable CI so the same array APIs are exercised at the admitted patch.",
       "version_source": "importlib.metadata.version('numpy') through the selected interpreter",
       "api_evidence": ["numpy.asarray", "absolute pixel difference", "mask and percentile operations"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "2.0.2", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and local Phase-2 capability run" },
-        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs numpy without a version receipt" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "2.0.2", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml pins numpy==2.0.2 and the exact-head doctor records the resolved distribution" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     },
@@ -159,15 +159,16 @@
       "runtime_kind": "external_binary",
       "import_name": null,
       "distribution_name": "LibreOffice",
-      "minimum_version": "26.2.5.2",
+      "minimum_version": "24.2.7.2",
       "maximum_exclusive_version": "26.2.6.0",
       "version_parser": "libreoffice_banner",
       "required_by_lanes": ["workbook"],
-      "reason": "26.2.5.2 is the exact authoring-host build that passed headless workbook recalculation and rendering. No current Rogo version receipt exists, so broader or different builds are not pre-approved.",
+      "reason": "24.2.7.2 is the Ubuntu portable-CI boundary and 26.2.5.2 is the authoring-host boundary. Both must pass the same headless workbook recalculation and rendering probes before this candidate can publish; no current Rogo version receipt exists, so installed-host validation remains promotion-blocking.",
       "version_source": "first numeric version in the selected soffice --version banner",
       "api_evidence": ["--headless isolated user profile", "xlsx open and recalculate", "xlsx save", "PDF conversion"],
       "exercise_evidence": [
         { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "26.2.5.2", "precision": "exact", "evidence_pointer": "local Phase-2 capability run using /opt/homebrew/bin/soffice" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "24.2.7.2", "precision": "exact", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs Ubuntu libreoffice-calc and the exact-head doctor records and functionally probes its banner version" },
         { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
       ]
     }

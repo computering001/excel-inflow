@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Capture exact-head source identity
         run: |
           set -euo pipefail
@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Run the exact targeted selection
         run: |
           set -euo pipefail
@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Run every portable test once and compile lifecycle
         run: |
           set -euo pipefail
@@ -172,7 +172,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Build package A from its own clean checkout
         run: |
           set -euo pipefail
@@ -213,7 +213,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Build package B from its own clean checkout
         run: |
           set -euo pipefail
