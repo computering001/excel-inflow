@@ -65,6 +65,8 @@ function usage() {
     "  [--real-filing-corpus-manifest <external-corpus-manifest.json>]",
     "  [--out <report-directory>]",
     "  [--concurrency <1-4>] [--timeout-ms <explicit per-test override milliseconds>]",
+    "Each input also resolves from its UPPERCASE custody-name environment variable",
+    " (PYTHON, SOFFICE, CASES, REPRESENTATIVE, ...) when its flag is absent; the flag wins.",
     "Reports contain source, registry and input hashes. Paths, commands and captured output are redacted.",
   ].join("\n");
 }
@@ -80,38 +82,32 @@ async function exists(target) {
 }
 
 function substitutions(options) {
+  // Every custody input resolves flag-first, then from its declared custody
+  // name in the environment (e.g. PYTHON=... SOFFICE=... CASES=...), and only
+  // then counts as absent.  This keeps the hosted portable harness — which
+  // exports the custody names rather than repeating every flag — able to
+  // satisfy the contract WITHOUT weakening anything: a resolved name still
+  // has to exist on disk or the suite stays BLOCKED (fail-closed), and an
+  // explicit flag always wins over the environment.
+  const resolveInput = (flag, name) => {
+    const supplied = options[flag] ?? process.env[name];
+    return supplied ? path.resolve(supplied) : null;
+  };
   return {
-    CASES: options.cases ? path.resolve(options.cases) : null,
-    REPRESENTATIVE: options.representative ? path.resolve(options.representative) : null,
-    BROKER_CORPUS: options["broker-corpus"] ? path.resolve(options["broker-corpus"]) : null,
-    BROKER_REAL_PACK_MANIFEST: options["broker-real-pack-manifest"]
-      ? path.resolve(options["broker-real-pack-manifest"])
-      : null,
-    FIXED_POINT_CASES_MANIFEST: options["fixed-point-cases-manifest"]
-      ? path.resolve(options["fixed-point-cases-manifest"])
-      : null,
-    DEGRADED_DELIVERY_REPORT: options["degraded-delivery-report"]
-      ? path.resolve(options["degraded-delivery-report"])
-      : null,
-    USABLE_BROKER_WORKBOOK: options["usable-broker-workbook"]
-      ? path.resolve(options["usable-broker-workbook"])
-      : null,
-    RAW_CANARY_EVIDENCE: options["raw-canary-evidence"]
-      ? path.resolve(options["raw-canary-evidence"])
-      : null,
-    REAL_FILINGS_REQUEST: options["real-filings-request"]
-      ? path.resolve(options["real-filings-request"])
-      : null,
-    REAL_FILINGS_EXPECTATIONS: options["real-filings-expectations"]
-      ? path.resolve(options["real-filings-expectations"])
-      : null,
-    REAL_FILING_CORPUS_MANIFEST: options["real-filing-corpus-manifest"]
-      ? path.resolve(options["real-filing-corpus-manifest"])
-      : null,
-    PYTHON: options.python ? path.resolve(options.python) : null,
-    SOFFICE: options.soffice ? path.resolve(options.soffice) : null,
-    INSTALLED_HOST_BROKER_RECEIPT: options["installed-host-broker-receipt"]
-      ? path.resolve(options["installed-host-broker-receipt"]) : null,
+    CASES: resolveInput("cases", "CASES"),
+    REPRESENTATIVE: resolveInput("representative", "REPRESENTATIVE"),
+    BROKER_CORPUS: resolveInput("broker-corpus", "BROKER_CORPUS"),
+    BROKER_REAL_PACK_MANIFEST: resolveInput("broker-real-pack-manifest", "BROKER_REAL_PACK_MANIFEST"),
+    FIXED_POINT_CASES_MANIFEST: resolveInput("fixed-point-cases-manifest", "FIXED_POINT_CASES_MANIFEST"),
+    DEGRADED_DELIVERY_REPORT: resolveInput("degraded-delivery-report", "DEGRADED_DELIVERY_REPORT"),
+    USABLE_BROKER_WORKBOOK: resolveInput("usable-broker-workbook", "USABLE_BROKER_WORKBOOK"),
+    RAW_CANARY_EVIDENCE: resolveInput("raw-canary-evidence", "RAW_CANARY_EVIDENCE"),
+    REAL_FILINGS_REQUEST: resolveInput("real-filings-request", "REAL_FILINGS_REQUEST"),
+    REAL_FILINGS_EXPECTATIONS: resolveInput("real-filings-expectations", "REAL_FILINGS_EXPECTATIONS"),
+    REAL_FILING_CORPUS_MANIFEST: resolveInput("real-filing-corpus-manifest", "REAL_FILING_CORPUS_MANIFEST"),
+    PYTHON: resolveInput("python", "PYTHON"),
+    SOFFICE: resolveInput("soffice", "SOFFICE"),
+    INSTALLED_HOST_BROKER_RECEIPT: resolveInput("installed-host-broker-receipt", "INSTALLED_HOST_BROKER_RECEIPT"),
   };
 }
 
@@ -429,7 +425,10 @@ const source = await sourceIdentity();
 const startedAt = new Date().toISOString();
 const pool = await runPool(selectedTests, concurrency, {
   inputs,
-  python: options.python ?? "python3",
+  // The python runtime is the same custody-resolved PYTHON input the suites
+  // were gated on — never a silent fallback to bare `python3` when the env
+  // var (rather than the flag) supplied it.
+  python: inputs.PYTHON ?? "python3",
   timeoutOverrideMs,
   out,
 });
