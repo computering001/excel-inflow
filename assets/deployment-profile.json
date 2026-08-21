@@ -465,6 +465,7 @@
     "lib/typed_financial_value.mjs",
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",
+    "lib/wb_style.mjs",
     "lib/workbook_semantic_inventory.mjs",
     "lib/workflow_state.mjs",
     "migrate_run_carrier.mjs",
