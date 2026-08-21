@@ -462,6 +462,7 @@
     "lib/statement_topology.mjs",
     "lib/support_envelope.mjs",
     "lib/tax_rate_policy.mjs",
+    "lib/test_harness.mjs",
     "lib/typed_financial_value.mjs",
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",
