@@ -1,0 +1,149 @@
+{
+  "schema_version": "excel-inflow-commit-to-finding-map/1.0",
+  "programme": "v3.7.9 bootstrap and installed-filings hardening",
+  "audited_base": {
+    "commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "branch": "agent/excel-inflow-v378-installed-filings-repair"
+  },
+  "consolidation_policy": {
+    "reason": "The implementation was consolidated before the post-audit attribution requirement was re-applied.",
+    "mapping_semantics": "Each recommended work package is mapped to the consolidated implementation commit and, where applicable, the exact-head fixture correction. The final source identity is supplied externally because a file cannot truthfully name the commit that contains its own bytes.",
+    "implementation_commit": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+    "exact_head_fixture_commit": "07779c751d6c41c01d3be3ed7c6defe237382fe4"
+  },
+  "work_packages": [
+    {
+      "recommended_commit": 1,
+      "name": "public bootstrap core",
+      "findings": ["public_pre_import_failure_seam", "false_liveness_company_screen", "package_bootstrap_missing"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "scripts/run_excel_inflow_bootstrap.mjs",
+        "scripts/run_excel_inflow_vnext.mjs",
+        "assets/runtime-bootstrap-refusal-v1.schema.json",
+        "assets/terminal-reason-registry-v1.json",
+        "assets/deployment-profile.json",
+        "SKILL.md",
+        "central-instructions.md"
+      ],
+      "proof_suites": ["public-bootstrap", "user-flow"]
+    },
+    {
+      "recommended_commit": 2,
+      "name": "bootstrap mutation tests",
+      "findings": ["bootstrap_import_failure_not_typed", "partial_company_screen_escape", "archive_member_drift"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "scripts/run_public_bootstrap_tests.mjs",
+        "scripts/run_packaged_path_acceptance_tests.mjs",
+        "assets/development-test-registry.json"
+      ],
+      "proof_suites": ["public-bootstrap", "packaged-path-acceptance"]
+    },
+    {
+      "recommended_commit": 3,
+      "name": "runtime-doctor portability and physical host proof",
+      "findings": ["url_path_portability", "permission_only_work_root_probe", "unmeasured_disk_space", "late_host_failure"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "scripts/lib/runtime_doctor.mjs",
+        "scripts/lib/filesystem_probe.mjs",
+        "scripts/lib/disk_space_policy.mjs",
+        "scripts/lib/disk_space_measurement_builder.mjs",
+        "resources/disk-space-evidence-v1/",
+        "scripts/run_runtime_doctor_tests.mjs"
+      ],
+      "proof_suites": ["runtime-doctor", "disk-space-policy", "disk-space-measurement-builder"]
+    },
+    {
+      "recommended_commit": 4,
+      "name": "compatibility and installed-host capability smoke",
+      "findings": ["one_interpreter_closure", "lazy_fitz_help_smoke", "libreoffice_exists_not_works", "inline_xbrl_host_unproven"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "assets/runtime-compatibility-v1.json",
+        "assets/runtime-compatibility-v1.schema.json",
+        "assets/installed-inline-xbrl-capability-probe-v1.json",
+        "scripts/lib/runtime_compatibility.mjs",
+        "scripts/lib/libreoffice_workbook_capability.mjs",
+        "scripts/lib/installed_inline_xbrl_probe.mjs",
+        "scripts/run_installed_filings_capability_tests.mjs",
+        "scripts/run_libreoffice_workbook_capability_tests.mjs",
+        "scripts/run_installed_inline_xbrl_probe_tests.mjs"
+      ],
+      "proof_suites": ["runtime-compatibility", "installed-filings-capability", "libreoffice-workbook-capability", "installed-inline-xbrl-capability"]
+    },
+    {
+      "recommended_commit": 5,
+      "name": "independent installed-capability oracle",
+      "findings": ["self_attested_host_receipt", "pointer_hash_unverified", "installed_inventory_oracle_missing"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "scripts/verify/installed_capability_oracle.py",
+        "scripts/run_installed_capability_oracle_tests.mjs",
+        "assets/installed-capability-receipt-v1.3.schema.json"
+      ],
+      "proof_suites": ["installed-capability-independent-oracle", "installed-capability-receipt-v13"]
+    },
+    {
+      "recommended_commit": 6,
+      "name": "runtime mode and durable screen-session contract",
+      "findings": ["host_ready_misrepresented_as_production", "temporary_screen_preflight", "cross_session_receipt_reuse", "static_screen_continuation"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e"],
+      "principal_paths": [
+        "scripts/lib/runtime_mode.mjs",
+        "scripts/lib/installed_runtime_identity.mjs",
+        "scripts/lib/screen_session.mjs",
+        "scripts/lib/flow_screens.mjs",
+        "assets/screen-session-receipt-v1.schema.json",
+        "scripts/run_runtime_mode_tests.mjs",
+        "scripts/run_screen_session_tests.mjs"
+      ],
+      "proof_suites": ["runtime-mode", "screen-session-one-use-binding", "phase3-runtime-session-integration"]
+    },
+    {
+      "recommended_commit": 7,
+      "name": "exact-head CI and external evidence custody",
+      "findings": ["committed_self_attestation", "untruthful_exact_head_gate", "package_reproducibility_unproven", "mutation_measurement_omission"],
+      "commits": [
+        "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+        "07779c751d6c41c01d3be3ed7c6defe237382fe4"
+      ],
+      "principal_paths": [
+        ".github/workflows/read-only-development-gate.yml",
+        "scripts/run_ci_governance_tests.mjs",
+        "scripts/run_exact_head_package_build_ci.mjs",
+        "scripts/compare_exact_head_package_builds.mjs",
+        "scripts/run_archive_only_capability_ci.mjs",
+        "scripts/compile_exact_head_ci_job_receipt.mjs",
+        "scripts/run_exact_head_ci_job_receipt_tests.mjs",
+        "scripts/run_exact_head_package_ci_tests.mjs"
+      ],
+      "proof_suites": ["ci-governance", "exact-head-package-ci", "exact-head-ci-job-receipt"]
+    },
+    {
+      "recommended_commit": 8,
+      "name": "candidate preparation and immutable predecessor preservation",
+      "findings": ["candidate_identity_reuse", "predecessor_package_overwrite", "candidate_release_notes_missing"],
+      "commits": ["d5eea9dee3d6bb04fb7908f64c414f065331809e", "HEAD_CONTAINING_THIS_MAP"],
+      "principal_paths": [
+        "assets/runtime-manifest.json",
+        "scripts/lib/skill_version_declaration.mjs",
+        "scripts/verify_v378_preservation.mjs",
+        "KNOWN_LIMITATIONS.md",
+        "RELEASE_NOTES.md",
+        "audit/v379/commit-to-finding-map.json"
+      ],
+      "proof_suites": ["skill-version-declaration", "v378-preservation"]
+    }
+  ],
+  "external_evidence_required": [
+    "final exact source commit and tree",
+    "GitHub Actions exact-head run and artifact hashes",
+    "final reproducible package identities",
+    "inactive-slot installation receipt",
+    "installed-host black-box matrix",
+    "promotion and rollback receipts",
+    "native Microsoft Excel certification"
+  ]
+}
