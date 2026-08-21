@@ -162,7 +162,8 @@ export const UNOWNED_EQUATION_NODES = Object.freeze([
  * callback: a carrier's relationship to the solver's own scalars is DATA, so a
  * validator can print it, hash it and refuse to let it drift, and so a future
  * reader can see that `cash.cash_interest_paid` is minus (gross interest less
- * the non-cash part) rather than take it on trust.
+ * every non-cash leg: accreted lease interest, non-cash instrument interest and
+ * the PIK/non-cash build-up) rather than take it on trust.
  */
 function evaluateMirror(expression, period) {
   if (expression === null || expression === undefined) return null;
@@ -288,9 +289,24 @@ export const NODE_CARRIERS = Object.freeze({
   }),
 
   // --- cash_rcf -----------------------------------------------------------
+  // B3 parity (solver.mjs statementOverrides + build_dynamic_model.mjs
+  // formula/cache writer, aligned in 5b81088): accreted lease interest rides
+  // inside the gross build-up but settles through the lease principal
+  // waterfall, and non-cash instrument interest never settles as cash either.
+  // The mirror is the SAME four-term identity both of those publish — the
+  // two-term form here was the stale side of the disagreement the carrier
+  // check caught on the certified fixtures.
   "cash.cash_interest_paid": Object.freeze({
     channel: "statement_row", denomination: "reporting",
-    mirror: neg(sub(field("gross_interest"), field("non_cash_interest"))),
+    mirror: neg(
+      sub(
+        sub(
+          sub(field("gross_interest"), field("lease_interest")),
+          field("non_cash_interest"),
+        ),
+        field("non_cash_instrument_interest"),
+      ),
+    ),
   }),
   "cash.cash_interest_received": Object.freeze({
     channel: "statement_row", denomination: "reporting",
@@ -1408,7 +1424,9 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
 
   cash_rcf: Object.freeze({
     module_id: "cash_rcf",
-    module_version: "2.1.0",
+    // 2.2.0 — B3: claimed the `lease_interest_cash_split` check this module
+    // has emitted since the cash-interest bridge gained the lease leg.
+    module_version: "2.2.0",
     nodes: Object.freeze([
       "cash.cash_interest_paid",
       "cash.cash_interest_received",
@@ -1514,6 +1532,11 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
       write("forecast[].checks.liquidity_shortfall_visible"),
       write("forecast[].checks.rcf_draw_repayment_mutually_exclusive"),
       write("forecast[].checks.shortfall_only_when_capacity_exhausted"),
+      // B3 — the cash-interest bridge identity this module's
+      // `cash.cash_interest_paid` carrier must satisfy (gross less every
+      // non-cash leg, accreted lease interest included). Checked by
+      // `lease_interest_cash_split` in the same breath the row is written.
+      write("forecast[].checks.lease_interest_cash_split"),
       write(
         "forecast[].reported_cash",
         "case_conditional",
@@ -1701,6 +1724,13 @@ export const CANONICAL_MODULE_BOUNDARIES = Object.freeze({
  * fixed point was reached, and no module's outputs depend on them. They were
  * classified here because this census caught them the moment P4.7's delta
  * landed in the shared tree — which is what the census is for.
+ *
+ * The B15/B16/B18/B25 receipts (`stale_iteration`, `damping_mediation`,
+ * `bisection_used`, `zero_coupon_par_discipline`) join them for the same
+ * reason, matching the `solver_diagnostic` classification the metamorphic
+ * register already carries: they observe HOW each period's solve behaved and
+ * nothing numeric reads them. `solver_findings` is the typed findings ledger
+ * (B2/B7) — likewise additive observation, never a module output.
  */
 export const SOLVER_FRAME_FIELDS = Object.freeze({
   solution: Object.freeze([
@@ -1714,6 +1744,12 @@ export const SOLVER_FRAME_FIELDS = Object.freeze({
     "all_checks_pass",
     "equation_graph_evidence",
     "solve_order_evidence",
+    // B25 — any period published from the forced single pass.
+    "stale_iteration",
+    // B16 — any period's published values were damping-mediated.
+    "damping_mediation",
+    // B2/B7 — the typed solver-findings ledger.
+    "solver_findings",
   ]),
   period: Object.freeze([
     "period",
@@ -1721,6 +1757,11 @@ export const SOLVER_FRAME_FIELDS = Object.freeze({
     "iterations",
     "residual",
     "graph_driven_solve",
+    // B15/B16/B18/B25 — per-period solver receipts (see above).
+    "stale_iteration",
+    "damping_mediation",
+    "bisection_used",
+    "zero_coupon_par_discipline",
   ]),
   typed_states: Object.freeze([
     "schema_version",

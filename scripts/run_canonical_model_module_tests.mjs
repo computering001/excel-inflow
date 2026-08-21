@@ -610,7 +610,7 @@ for (const name of CERTIFIED) {
     `D: ${name} resolved ${carriers.filter((c) => c.bound).length} carriers; 37 expected (cash.noncash_interest_addback is P4.6 row_absent on both certified fixtures)`,
   );
   const writes = artifact.modules.flatMap((module) => module.writes);
-  check(writes.length === 94, `D: ${name} declared ${writes.length} write paths`);
+  check(writes.length === 95, `D: ${name} declared ${writes.length} write paths`);
   check(
     writes
       .filter((write) => write.presence === "always")
@@ -685,7 +685,9 @@ for (const file of fs.readdirSync(archetypeDirectory).sort()) {
     `E: ${file} census ${JSON.stringify(solverFieldCensusErrors(solution).slice(0, 3))}`,
   );
 }
-check(swept === 31, `E: swept ${swept} archetypes, expected 31`);
+// 39 of the 41 fixtures solve (the two adversarial refusals are typed); the
+// eight adversarial archetypes from mp-L raised the count from 31.
+check(swept === 39, `E: swept ${swept} archetypes, expected 39`);
 check(
   typedRefusals.length === 2 && typedRefusals.every(([, code]) => Boolean(code)),
   `E: refusals are not both typed: ${JSON.stringify(typedRefusals)}`,
