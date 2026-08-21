@@ -89,6 +89,7 @@ const FILE_OWNERSHIP = {
   "lib/layered_graph_constitution.mjs": { role: "canonical_writer", concern: "layered graph constitution records", target_owner: "Canonical graph compiler (Phase 3)" },
   "lib/local_workbook_review.mjs": { role: "validator", concern: "local workbook review", target_owner: "validators stay validators" },
   "lib/ownership_census.mjs": { role: "derived_reader", concern: "ownership census view (derived, never a writer)", target_owner: "derived view of the canonical graph (Phase 3)" },
+  "lib/why_this_number.mjs": { role: "derived_reader", concern: "why-this-number digest projected from the sealed selected-authority contract (pure projection, never a writer; its row_topology hit is the === comparison at line 93)", target_owner: "derived view of the Authority selector output (Phase 3)" },
   "lib/performance_receipt.mjs": { role: "canonical_writer", concern: "performance receipts", target_owner: "Runtime governance (Phase 6)" },
   "lib/runtime_doctor.mjs": { role: "canonical_writer", concern: "installed-host capability report, receipt and pointer state", target_owner: "Runtime governance (Phase 6)" },
   "lib/controller_handoff.mjs": { role: "canonical_writer", concern: "cryptographically bound one-use controller handoff state", target_owner: "Runtime governance (Phase 6)" },
