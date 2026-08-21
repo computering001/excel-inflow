@@ -26,6 +26,8 @@ COLUMNS = [100.0, 200.0, 300.0]
 
 failures: list[str] = []
 checks = 0
+mutations_caught: list[str] = []
+mutated_inventory_cases: list[tuple[str, list, str]] = []
 
 
 def check(condition: bool, message: str) -> None:
@@ -372,14 +374,48 @@ else:
             validator(raw_rows, scoped_rows, inventory) == [],
             "a complete scope inventory was rejected by its own validator",
         )
-        tampered = [record for record in inventory if record["source_line_id"] != "is.dividends"]
-        errors = validator(raw_rows, scoped_rows, tampered)
-        check(
-            any("is.dividends" in error for error in errors),
-            f"a scope-dropped row missing from the inventory escaped detection: {errors}",
-        )
+        # Measured mutation adequacy (P7.5 discipline): each entry below is a
+        # real defective projection/inventory applied to fresh copies; the
+        # validator must REJECT it before it may be counted. A surviving
+        # mutant is recorded as a failure, never silently dropped, and no
+        # count below is written as a literal.
+        mutated_inventory_cases = [
+            (
+                "scope-dropped-row-omitted-from-inventory",
+                [record for record in inventory if record["source_line_id"] != "is.dividends"],
+                "is.dividends",
+            ),
+            (
+                "retained-row-also-recorded-out-of-scope",
+                [*copy.deepcopy(inventory), dict(inventory[0], source_line_id="is.revenue")],
+                "is.revenue",
+            ),
+            (
+                "inventory-record-invented-without-source-row",
+                [*copy.deepcopy(inventory), dict(inventory[0], source_line_id="is.ghost_row")],
+                "is.ghost_row",
+            ),
+            (
+                "record-strips-provenance-fields",
+                [
+                    dict(record, reason_code="", page_or_note="")
+                    if record["source_line_id"] == "is.dividends"
+                    else record
+                    for record in copy.deepcopy(inventory)
+                ],
+                "omits statement",
+            ),
+        ]
+        for name, tampered, fragment in mutated_inventory_cases:
+            errors = validator(raw_rows, scoped_rows, tampered)
+            if any(fragment in error for error in errors):
+                mutations_caught.append(name)
+            else:
+                check(False, f"surviving mutation {name}: defective inventory escaped detection")
 
 report = {"status": "FAIL" if failures else "PASS", "checks": checks}
+report["mutations_total"] = len(mutated_inventory_cases) if validator is not None and isinstance(scope_result, tuple) and len(scope_result) == 2 else 0
+report["mutations_caught"] = len(mutations_caught)
 if failures:
     report["violations"] = len(failures)
     report["failures"] = failures

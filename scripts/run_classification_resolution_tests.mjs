@@ -180,22 +180,100 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-// 9–10: digest discipline under tampering.
+// 9+: measured mutation adequacy — every mutant below is a REAL defective
+// ledger applied to the production build/verify path. It is counted only when
+// this suite's oracle rejects it; a surviving mutant fails the suite. Counts
+// come from the loop, never from literals (P7.5 discipline).
 // ---------------------------------------------------------------------------
-const tampered = clone(ledger);
-tampered.rows[0].rationale = "tampered after sealing";
-let tamperRejected = false;
-try { verifyClassificationResolutionLedger(tampered); } catch { tamperRejected = true; }
-check("tampered-row-rejected", tamperRejected, "a mutated ledger row passed verification");
+const mutationsCaught = [];
+const MUTATIONS_TOTAL = [];
 
-const strippedEntries = clone(ledger.rows).map((row) => ({ ...row }));
-strippedEntries[0].resolver_id = null;
-strippedEntries[0].resolution = "declared_role";
-const strippedLedger = buildClassificationResolutionLedger(strippedEntries, { case_id: ledger.case_id });
+// Positive control: the synthetic base rows must be ADMITTED, so the
+// rejections below attribute to each specific defect rather than to a
+// malformed base row or a blanket block.
+const validResolvedRow = {
+  section: "income_statement",
+  source_line_id: "is.synthetic_control_row",
+  label: "Synthetic control row",
+  resolution: "declared_role",
+  resolver_id: "statement_map@mutation-control",
+  evidence_basis: [{ channel: "declaration", detail: "authored role other_operating" }],
+  rationale: "Authored declaration names the owning role explicitly.",
+  status: "PASS",
+};
+const validQuestionRow = {
+  section: "income_statement",
+  source_line_id: "is.synthetic_question_row",
+  label: "Synthetic question row",
+  resolution: "unresolved_question",
+  resolver_id: null,
+  question: { id: "q.mutation-control", prompt: "Which declared role owns this line?", candidates: [] },
+  status: "QUESTION",
+};
+const controlLedger = buildClassificationResolutionLedger(
+  [clone(validResolvedRow), clone(validQuestionRow)],
+  { case_id: ledger.case_id },
+);
 check(
-  "resolverless-resolution-refused",
-  strippedLedger.status === "BLOCK" && strippedLedger.violations.length > 0,
-  `a resolution without a resolver id sealed as ${strippedLedger.status}`,
+  "mutation-positive-control-admitted",
+  controlLedger.status !== "BLOCK" && controlLedger.violations.length === 0,
+  `the synthetic control rows were refused: ${JSON.stringify(controlLedger.violations).slice(0, 200)}`,
+);
+
+function expectLedgerMutation(name, mutatedEntries, fragment) {
+  MUTATIONS_TOTAL.push(name);
+  const built = buildClassificationResolutionLedger(mutatedEntries, { case_id: ledger.case_id });
+  const rejected =
+    built.status === "BLOCK" &&
+    built.violations.some((violation) => violation.includes(fragment));
+  if (rejected) {
+    mutationsCaught.push(name);
+    return;
+  }
+  check(`mutation-${name}`, false, `surviving mutation ${name}: expected rejection "${fragment}", sealed as ${built.status}`);
+}
+
+// Mutant 1: a sealed row edited after sealing must fail digest verification.
+{
+  MUTATIONS_TOTAL.push("row-edited-after-seal");
+  const edited = clone(ledger);
+  edited.rows[0].rationale = "tampered after sealing";
+  let rejectedByVerify = false;
+  try { verifyClassificationResolutionLedger(edited); } catch { rejectedByVerify = true; }
+  if (rejectedByVerify) mutationsCaught.push("row-edited-after-seal");
+  else check("mutation-row-edited-after-seal", false, "surviving mutation: a post-seal edit passed verification");
+}
+
+// Mutants 2–6: defective ledgers offered to the production seal path.
+expectLedgerMutation(
+  "resolution-without-resolver",
+  [{ ...clone(validResolvedRow), resolver_id: null }],
+  "must record WHO resolved it",
+);
+expectLedgerMutation(
+  "canned-vocabulary-stamp",
+  [{ ...clone(validResolvedRow), resolution: "manual_reviewed" }],
+  "not in the closed vocabulary",
+);
+expectLedgerMutation(
+  "open-question-names-a-resolver",
+  [{ ...clone(validQuestionRow), resolver_id: "statement_map@usurper" }],
+  "must not name a resolver",
+);
+expectLedgerMutation(
+  "open-question-without-its-body",
+  [{ ...clone(validQuestionRow), question: null }],
+  "must carry the question itself",
+);
+expectLedgerMutation(
+  "duplicate-ledger-row",
+  [clone(validResolvedRow), clone(validResolvedRow)],
+  "duplicate ledger row",
+);
+expectLedgerMutation(
+  "projection-contract-string-as-rationale",
+  [{ ...clone(validResolvedRow), rationale: LEGACY_DECLARED_REASON }],
+  "projection contract string is not a rationale",
 );
 
 // ---------------------------------------------------------------------------
@@ -310,4 +388,11 @@ check(
   "re-sealing the sealed rows changed the digest",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(
+  JSON.stringify({
+    status: "PASS",
+    checks,
+    mutations_total: MUTATIONS_TOTAL.length,
+    mutations_caught: mutationsCaught.length,
+  }),
+);
