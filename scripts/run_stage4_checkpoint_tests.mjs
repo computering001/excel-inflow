@@ -204,6 +204,9 @@ await fs.access(path.join(receiptDir, "recalculate.json")).then(
 const recovered = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  // The review gate is fail-closed; the recovery pass replays the user's
+  // accept so delivery can complete.
+  "--review-deliver",
 ]);
 assert(recovered.status === "PASS_PENDING_MANUAL" && recovered.stage === "delivery", `Recovery did not deliver: ${JSON.stringify(recovered)}`);
 const recoveredBuild = JSON.parse(await fs.readFile(path.join(runDir, "stages", "build_checks", "build-result.json"), "utf8"));
