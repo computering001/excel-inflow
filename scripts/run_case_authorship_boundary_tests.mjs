@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
+import { createRunner } from "./lib/test_harness.mjs";
 import { validateEvidenceRun } from "./lib/evidence_run.mjs";
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+const run = createRunner({
+  name: "case_authorship_boundary_tests",
+  importMetaUrl: import.meta.url,
+});
 
 const minimalCompilerEnvelope = {
   schema_version: "evidence-run/1.0",
@@ -27,19 +29,19 @@ const minimalCompilerEnvelope = {
 };
 
 const cleanBoundary = validateEvidenceRun(minimalCompilerEnvelope);
-assert(
-  !cleanBoundary.findings.some(
+run.check(
+  "a declarations-only first run is not classified as caller-authored",
+  () => !cleanBoundary.findings.some(
     (entry) => entry.id === "evidence.authorship.caller_model_case",
   ),
-  "A declarations-only first run was incorrectly classified as caller-authored.",
 );
-assert(
-  cleanBoundary.case_compile_report,
-  "Evidence validation did not return the compiler's complete report.",
+run.check(
+  "evidence validation returns the compiler's complete report",
+  () => Boolean(cleanBoundary.case_compile_report),
 );
-assert(
-  typeof cleanBoundary.compiled_model_case_sha256 === "string",
-  "Evidence validation did not bind the compiled case hash.",
+run.check(
+  "evidence validation binds the compiled case hash",
+  () => typeof cleanBoundary.compiled_model_case_sha256 === "string",
 );
 
 const injectedCase = {
@@ -50,15 +52,15 @@ const injectedCase = {
   },
 };
 const rejected = validateEvidenceRun(injectedCase);
-assert(
-  rejected.findings.some(
+run.check(
+  "a first-run caller-supplied model_case fails the authorship boundary",
+  () => rejected.findings.some(
     (entry) => entry.id === "evidence.authorship.caller_model_case" && entry.severity === "BLOCK",
   ),
-  "A first-run caller-supplied model_case did not fail the authorship boundary.",
 );
-assert(
-  rejected.handoff === null,
-  "A caller-supplied first-run model case reached the production handoff.",
+run.check(
+  "a caller-supplied first-run model case never reaches the production handoff",
+  () => rejected.handoff === null,
 );
 
 const manifestSplit = {
@@ -73,11 +75,11 @@ const manifestSplit = {
   },
 };
 const splitResult = validateEvidenceRun(manifestSplit);
-assert(
-  splitResult.findings.some(
+run.check(
+  "different filing and compiler manifest lanes are rejected",
+  () => splitResult.findings.some(
     (entry) => entry.id === "evidence.authorship.manifest_lane_mismatch",
   ),
-  "Evidence validation accepted different filing and compiler manifest lanes.",
 );
 
-console.log("PASS case-authorship boundary: declarations compile; caller case and split manifests block");
+run.finish();
