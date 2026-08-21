@@ -85,16 +85,18 @@ export function createRunner({ name = null, importMetaUrl = null, defaults = {} 
     ROOT,
     defaults,
 
-    /** Count one named check; truthy passes, falsy (or throwing fn) fails. */
-    check(desc, fnOrValue) {
-      if (typeof fnOrValue === "function") {
+    /** Count one named check. `check(fn)` counts fn's success; `check(desc, fn|value)` names it. */
+    check(descOrFn, fnOrValue) {
+      const desc = typeof descOrFn === "string" ? descOrFn : undefined;
+      const candidate = desc === undefined ? descOrFn : fnOrValue;
+      if (typeof candidate === "function") {
         try {
-          return record(fnOrValue(), desc);
+          return record(candidate(), desc);
         } catch (error) {
           return record(false, `${describe(desc, "check failed")}: ${shortMessage(error)}`);
         }
       }
-      return record(fnOrValue, desc);
+      return record(candidate, desc);
     },
 
     /** Truthy assertion. */
@@ -120,6 +122,16 @@ export function createRunner({ name = null, importMetaUrl = null, defaults = {} 
       } catch (error) {
         return record(false, describe(desc, shortMessage(error)));
       }
+    },
+
+    /** value matches regexp */
+    match(value, regexp, desc) {
+      return record(regexp.test(String(value)), desc);
+    },
+
+    /** value must NOT match regexp */
+    doesNotMatch(value, regexp, desc) {
+      return record(!regexp.test(String(value)), desc);
     },
 
     /** fn must throw; when `match` is given it must match message/name. */
