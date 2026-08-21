@@ -5441,6 +5441,13 @@ function configureOperatingModel(
   // Adding, removing or reordering instruments therefore changes the reducer's
   // membership, never a manually maintained formula.
   const mandatoryRepaymentPools = Array.from({ length: 3 }, () => new Map());
+  // B4 — the mandatory-repayment pool and the lease principal waterfall are
+  // XOR lanes: an instrument's principal repayment flows through exactly one
+  // of them, never both. Lease-liability instruments belong to the lease lane
+  // (the cash flow states lease principal on its own line beneath the debt
+  // movement), so they are excluded from the pools here and recorded for the
+  // typed finding written on the lease principal line.
+  const mandatoryPoolLeaseExclusions = [];
   const instrumentTimingExpressions = (
     plan,
     instrument,
@@ -5878,22 +5885,42 @@ function configureOperatingModel(
         !plan.fair_value_row &&
         !plan.other_non_cash_row;
       if (plan.has_mandatory_repayment) {
-        const poolKey = balanceCurrency;
-        const pool = mandatoryRepaymentPools[index].get(poolKey) ?? {
-          currency: poolKey,
-          averageFx,
-          openingAndMovementTerms: [],
-          closingTerms: [],
-        };
-        pool.openingAndMovementTerms.push(
-          opening,
-          ...(issuance !== "0" ? [issuance] : []),
-          ...(fairValue !== "0" ? [fairValue] : []),
-          ...(otherNonCash !== "0" ? [otherNonCash] : []),
-          ...(plan.pik_row ? [`$${column}${plan.pik_row}`] : []),
-        );
-        pool.closingTerms.push(closingNative);
-        mandatoryRepaymentPools[index].set(poolKey, pool);
+        // B4 XOR enforcement: a lease-liability instrument's principal is
+        // stated on the lease principal waterfall line; letting it into this
+        // pool as well would count the same repayment twice in cash before
+        // RCF. Exclusions are recorded, not silent — see the
+        // LEASE_PRINCIPAL_XOR finding on the waterfall line.
+        if (instrument.class === "lease_liability") {
+          mandatoryPoolLeaseExclusions.push({
+            index,
+            instrument_id: plan.instrument_id,
+            label: instrument.name ?? plan.instrument_id,
+          });
+          if (mandatoryPoolLeaseExclusions.length === 1) {
+            process.stderr.write(
+              `${modelCase.case_id}: LEASE_PRINCIPAL_XOR lease-liability instrument(s) with mandatory repayment states are excluded from the mandatory repayment pool and carried on the lease principal line only.\n`,
+            );
+          }
+        } else {
+          const poolKey = balanceCurrency;
+          const pool = mandatoryRepaymentPools[index].get(poolKey) ?? {
+            currency: poolKey,
+            averageFx,
+            openingAndMovementTerms: [],
+            closingTerms: [],
+            members: [],
+          };
+          pool.members.push(plan.instrument_id);
+          pool.openingAndMovementTerms.push(
+            opening,
+            ...(issuance !== "0" ? [issuance] : []),
+            ...(fairValue !== "0" ? [fairValue] : []),
+            ...(otherNonCash !== "0" ? [otherNonCash] : []),
+            ...(plan.pik_row ? [`$${column}${plan.pik_row}`] : []),
+          );
+          pool.closingTerms.push(closingNative);
+          mandatoryRepaymentPools[index].set(poolKey, pool);
+        }
       }
       applyFormula(
         sheet,
@@ -7361,6 +7388,22 @@ function configureOperatingModel(
       const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
       const proFormaColumn = PRO_FORMA_COLUMNS[index];
       const pools = [...mandatoryRepaymentPools[index].values()];
+      // B4 assertion — the XOR invariant is structural, not conventional: an
+      // instrument excluded to the lease principal lane must never appear as
+      // a pool member. If a future edit routes leases back into the pools,
+      // fail the build loudly rather than double-counting their principal.
+      const ambiguousPoolMembers = pools
+        .flatMap((pool) => pool.members ?? [])
+        .filter((memberId) =>
+          mandatoryPoolLeaseExclusions.some(
+            (exclusion) => exclusion.instrument_id === memberId,
+          ),
+        );
+      if (ambiguousPoolMembers.length > 0) {
+        throw new Error(
+          `B4 XOR violation in ${modelCase.case_id}: lease instrument(s) ${ambiguousPoolMembers.join(", ")} are members of the mandatory repayment pool while also carried on the lease principal lane. Principal repayment must flow through exactly one lane.`,
+        );
+      }
       const expressions = pools.map((pool) => {
         const openingAndMovements = aggregateTerms(
           pool.openingAndMovementTerms,
@@ -7478,6 +7521,28 @@ function configureOperatingModel(
         `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
         `=${sumCells(blockColumn, leasePrincipalRows)}`,
       );
+      // B4 finding: the XOR lane split is surfaced, not silent. Lease
+      // instruments with mandatory repayment states are carried exclusively
+      // here and excluded from the mandatory repayment total above, so the
+      // reader of the face can see why the two lines do not overlap.
+      if (mandatoryPoolLeaseExclusions.length > 0) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
+          [
+            "LEASE_PRINCIPAL_XOR: lease-liability instruments with mandatory repayment states are carried exclusively on this line.",
+            `Excluded from the mandatory debt repayment pool: ${[
+              ...new Set(
+                mandatoryPoolLeaseExclusions.map(
+                  (exclusion) => exclusion.label,
+                ),
+              ),
+            ].join(", ")}.`,
+            "Principal repayment flows through exactly one lane — this lease principal line OR the mandatory repayment total, never both.",
+          ].join("\n"),
+        );
+      }
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.cash_before_rcf}`,
