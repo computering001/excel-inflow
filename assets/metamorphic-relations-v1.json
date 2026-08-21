@@ -118,6 +118,10 @@
     "graph_driven_solve": "solver_diagnostic",
     "typed_states": "solver_diagnostic",
     "checks": "solver_diagnostic",
+    "stale_iteration": "solver_diagnostic",
+    "damping_mediation": "solver_diagnostic",
+    "bisection_used": "solver_diagnostic",
+    "zero_coupon_par_discipline": "solver_diagnostic",
     "definition_basis": "solver_diagnostic",
     "lease_interest_basis": "solver_diagnostic",
     "rcf_currency": "solver_diagnostic"
