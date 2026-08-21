@@ -143,6 +143,17 @@ function addStatementStressRows(caseData, kind, seed) {
       item.aggregation_role = "contributing_child";
       item.economic_class = "other_operating";
       item.operation_scope = index === 0 ? "continuing" : "discontinued";
+      // The combined parent owns its forecast as the exact sum of these
+      // children (derived_from_children), and forecast-authority validation
+      // refuses an identity parent whose children stand down ("incomplete
+      // children-owned forecast authority"). Leave each component live with a
+      // revenue-scaled roll-forward so the family's forecast stays child-owned
+      // and the combined restated total keeps reconciling exactly.
+      item.forecast_treatment = "formula";
+      item.forecast_calculation = {
+        operator: "prior_period_scaled_by",
+        refs: [item.row_id, "revenue"],
+      };
     });
     const childRefs = rows.map((item) => item.row_id);
     rows.unshift({
@@ -515,7 +526,23 @@ function addWorkingChildren(caseData, parentId, definitions, { derived = false }
     parent.calculation = { operator: "sum", refs: children.map((item) => item.row_id) };
     parent.aggregation_authority = "derived_from_children";
   } else {
+    // The parent keeps independent forecast ownership (reported total; its
+    // broker metric or declared series carries the forecast), so the visible
+    // children must stand down. Leaving their forecast cells unstated is NOT
+    // neutral here: the legacy inference mints each blank child into an
+    // explicit_zero live forecast, and forecast-authority validation refuses a
+    // broker_consensus parent coexisting with live children as mixed aggregate
+    // forecast ownership. Declare the stand-down explicitly instead.
+    // (Frozen-cohort defect 2, quarantine frozen-cohort-compiler-membership-order
+    // in assets/ci-gate-tiers-v1.json.)
     parent.aggregation_authority = "reported_parent";
+    for (const child of children) {
+      child.forecast_period_authorities = [0, 1, 2].map(() => ({
+        method: "not_applicable",
+        source_kind: "none",
+        note: `${child.row_id} is presentation detail of the reported ${parentId} total, which carries the forecast once.`,
+      }));
+    }
   }
   // Source order is parent first, then its visible children. The presentation
   // compiler preserves that semantic hierarchy and must not have to move a
@@ -638,7 +665,24 @@ function addCashFlowWorkings(caseData, kind) {
       classification_confidence: 1,
       indent: 1,
     }));
+    // Same shape as the working-capital reported-parent family above: the
+    // reported `capex` total keeps independent forecast ownership (its broker
+    // metric carries the forecast once), so these presentation children must
+    // stand down. Leaving their forecast cells unstated is NOT neutral — the
+    // legacy inference mints each blank child into an explicit_zero live
+    // forecast, and forecast-authority validation refuses a broker_consensus
+    // parent coexisting with live children as mixed aggregate forecast
+    // ownership. Declare the stand-down explicitly instead.
+    // (Frozen-cohort defect 4, quarantine frozen-cohort-compiler-membership-order
+    // in assets/ci-gate-tiers-v1.json.)
     capex.aggregation_authority = "reported_parent";
+    for (const child of children) {
+      child.forecast_period_authorities = [0, 1, 2].map(() => ({
+        method: "not_applicable",
+        source_kind: "none",
+        note: `${child.row_id} is presentation detail of the reported ${capex.row_id} total, which carries the forecast once.`,
+      }));
+    }
     insertBefore(caseData, "cash_flow", "capex", children);
   }
 }
@@ -1019,7 +1063,18 @@ function applyAcquisitionOverlay(caseData, value) {
 
 function makeThreeHouseBrokerPack(caseData, seed) {
   const rng = mulberry32(seed ^ 0xa5a5a5a5);
-  const names = ["Northstar Securities", "Harbour Lane Research", "Moorland Capital"];
+  // The roster is written in house order for readability, but sealed membership
+  // must satisfy scripts/lib/broker_consensus.mjs verifyBrokerConsensusMembership,
+  // which requires contributor names to be unique AND canonically sorted. Sort
+  // once here so metric.brokers keys and the sealed contributor list share that
+  // canonical order; consensus maths averages the included houses, so ordering
+  // never moves a synthesised value. (Frozen-cohort defect 1, quarantine
+  // frozen-cohort-compiler-membership-order in assets/ci-gate-tiers-v1.json.)
+  const names = [
+    "Northstar Securities",
+    "Harbour Lane Research",
+    "Moorland Capital",
+  ].sort();
   for (const [metricId, metric] of Object.entries(caseData.broker_pack.metrics)) {
     const compiled = compileBrokerConsensusMetric(caseData, metricId);
     const consensus = compiled.periods.map((period, index) => {
