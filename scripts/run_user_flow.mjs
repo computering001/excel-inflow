@@ -55,9 +55,21 @@ import {
   renderDeliveryReport,
   renderFailure,
   renderForecastPlanScreen,
+  renderReviewGateScreen,
   renderStageStatus,
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
+// The REVIEW gate: the display-only pause between BUILD AND CHECKS and
+// DELIVERY, plus the plain-language translation of its change requests.
+import {
+  compileReviewBriefing,
+  resolveReviewReply,
+  reviewQualityFrom,
+} from "./lib/flow_review.mjs";
+import {
+  classifyChangeComplaint,
+  describeReviseEntry,
+} from "./lib/flow_remediation.mjs";
 import { deriveRuntimeMode } from "./lib/runtime_mode.mjs";
 import { verifyScreenSession } from "./lib/screen_session.mjs";
 import {
@@ -665,7 +677,7 @@ async function main() {
         "[--broker-intake-choice <choice.json>] [--broker-confirmation <confirmation.json>] [--answers <answers.txt|json>] " +
         "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
-        "[--stop-after <stage>] [--json], or " +
+        "[--stop-after <stage>] [--review-deliver | --review-change <text>] [--json], or " +
         "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|delivery> " +
         "[private top-controller capability handoff]",
     );
@@ -2464,6 +2476,103 @@ async function main() {
         carrier: carrier.path,
         evidence_run: stage1Evidence,
         model_case: answeredCasePath,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+
+  // REVIEW GATE — the last look before delivery, display-only by construction.
+  // It writes no stage receipt and owns no milestone: it renders what the build
+  // already produced and blocks until the controller is told one of exactly
+  // two replies. `--review-deliver` continues into the ordinary delivery stage
+  // unchanged; `--review-change "<what to change>"` records the complaint,
+  // classifies it onto the declared change types, and stops WITHOUT
+  // delivering. No reply at all leaves the run paused here — the gate is
+  // fail-closed by the same rule resolveReviewReply enforces.
+  const reviewReply = resolveReviewReply({
+    reviewDeliver:
+      options["review-deliver"] !== undefined && options["review-deliver"] !== false,
+    reviewChange:
+      typeof options["review-change"] === "string"
+        ? options["review-change"]
+        : options["review-change"] === true
+          ? true
+          : null,
+  });
+  if (reviewReply.mode !== "deliver") {
+    const reviewDir = path.join(runDir, "stages", "review");
+    await fs.mkdir(reviewDir, { recursive: true });
+    let reviewBrokerPreview = brokerPreview;
+    if (!reviewBrokerPreview) {
+      try {
+        reviewBrokerPreview = await readJson(brokerPreviewPath, "Broker preview");
+      } catch {
+        reviewBrokerPreview = null;
+      }
+    }
+    const reviewBriefing = compileReviewBriefing({
+      modelCase: await readJson(answeredCasePath, "Compiled decision case"),
+      quality: reviewQualityFrom({ brokerPreview: reviewBrokerPreview }),
+    });
+    const reviewScreen = renderReviewGateScreen(reviewBriefing);
+    await writeTextAtomic(
+      path.join(reviewDir, "review-gate.txt"),
+      `${reviewScreen}\n`,
+    );
+    if (reviewReply.mode === "blocked") {
+      const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
+        model_case: answeredCasePath,
+        workbook,
+      });
+      return finish({
+        runDir,
+        screen: reviewScreen,
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "PAUSED",
+          stage: "build_checks",
+          next_stage: nextStageId("build_checks"),
+          awaiting: "review_gate_reply",
+          message:
+            'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
+          carrier: carrier.path,
+          model_case: answeredCasePath,
+          reused_stages: reusedStages,
+        },
+      });
+    }
+    const reviewClassification = classifyChangeComplaint(reviewReply.complaint);
+    const reviewChangeRecord = {
+      schema_version: "flow-review-change/1.0",
+      complaint: reviewReply.complaint,
+      change_types: reviewClassification.change_types,
+      classified: reviewClassification.classified,
+      invalidated_from_stage: reviewClassification.stage_id,
+      invalidated_from_milestone: reviewClassification.milestone_label,
+      revise_entry: describeReviseEntry(reviewClassification),
+      recorded_at: new Date().toISOString(),
+      delivered: false,
+    };
+    await writeJsonAtomic(
+      path.join(reviewDir, "review-change.json"),
+      reviewChangeRecord,
+    );
+    return finish({
+      runDir,
+      screen: reviewScreen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "PAUSED",
+        stage: "build_checks",
+        next_stage: null,
+        review_change: reviewChangeRecord,
+        message: `${describeReviseEntry(reviewClassification)} Nothing was delivered.`,
         reused_stages: reusedStages,
       },
     });

@@ -41,6 +41,97 @@ export function asciiText(value) {
   return text.normalize("NFKD").replace(/[^\x00-\x7F·]/g, "?");
 }
 
+// ── company language (generalised from lintQuestion) ───────────────────────
+//
+// flow_questions.mjs enforces company language on question prompts: a prompt
+// may not name the model's internal vocabulary. The same rule applies to every
+// screen: the reader is a company person, not the controller, and the ten
+// phrases below are controller dialect — provenance plumbing, degradation
+// machinery and receipt bookkeeping that mean nothing on the page.
+//
+// `lintScreenLanguage` DETECTS; `plainCompanyLanguage` REPLACES. Every screen
+// passes through finishScreen, which applies the replacement pass to ALL
+// renderer output — including text interpolated from upstream artifacts the
+// screens do not author — so a banned phrase can no longer reach the page even
+// when the data carrying it is owned elsewhere. Session nonce and host-marker
+// text is deliberately untouched: it is security furniture, not jargon.
+export const BANNED_SCREEN_LANGUAGE = Object.freeze([
+  Object.freeze({
+    term: "FORECAST WATERFALL",
+    pattern: /\bforecast[\s_-]*waterfall\b/gi,
+    replacement: "fallback forecast",
+  }),
+  Object.freeze({
+    term: "House id",
+    pattern: /\bhouse[\s_-]*ids?\b/gi,
+    replacement: "house",
+  }),
+  Object.freeze({
+    term: "attestation SHA-256",
+    pattern: /\battestation[\s_-]*sha[- ]?256\b/gi,
+    replacement: "delivery proof record",
+  }),
+  Object.freeze({
+    term: "stage receipt",
+    pattern: /\bstage[\s_-]*receipts?\b/gi,
+    replacement: "run record",
+  }),
+  Object.freeze({
+    term: "custody",
+    pattern: /\bcustod(y|ies|iary)\b/gi,
+    replacement: "safekeeping",
+  }),
+  Object.freeze({
+    term: "quarantine",
+    pattern: /\bquarantin(?:e|es|ed|ing)\b/gi,
+    replacement: "set aside",
+  }),
+  Object.freeze({
+    term: "authority contract",
+    pattern: /\bauthority[\s_-]*contracts?\b/gi,
+    replacement: "authority agreement",
+  }),
+  Object.freeze({
+    term: "model authority",
+    pattern: /\bmodel[\s_-]*authority\b/gi,
+    replacement: "the model's inputs",
+  }),
+  Object.freeze({
+    term: "Preview hash",
+    pattern: /\bpreview[\s_-]*hash\b/gi,
+    replacement: "preview record",
+  }),
+  Object.freeze({
+    term: "design epoch",
+    pattern: /\bdesign[\s_-]*epochs?\b/gi,
+    replacement: "design version",
+  }),
+]);
+
+/** Every banned phrase present in `text`, with the match that fired. */
+export function lintScreenLanguage(text) {
+  const source = String(text ?? "");
+  const detections = [];
+  for (const entry of BANNED_SCREEN_LANGUAGE) {
+    const pattern = new RegExp(entry.pattern.source, entry.pattern.flags);
+    let match;
+    while ((match = pattern.exec(source)) !== null) {
+      detections.push({ term: entry.term, matched: match[0] });
+      if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
+    }
+  }
+  return detections;
+}
+
+/** `text` with every banned phrase rewritten to its plain replacement. */
+export function plainCompanyLanguage(text) {
+  let out = String(text ?? "");
+  for (const entry of BANNED_SCREEN_LANGUAGE) {
+    out = out.replace(entry.pattern, entry.replacement);
+  }
+  return out;
+}
+
 export function inspectScreen(screen) {
   const rendered = String(screen ?? "");
   const body = rendered.startsWith("```text\n") && rendered.endsWith("\n```")
@@ -98,12 +189,16 @@ export function inspectScreen(screen) {
 }
 
 function finishScreen(lines, { summariseOverflow = false } = {}) {
-  let clean = lines.map((line) => asciiText(line));
+  // Company language is enforced here, at the one door every screen passes
+  // through: banned controller dialect is rewritten to its plain replacement
+  // before the screen contract is checked, so no renderer — and no upstream
+  // artifact a renderer quotes — can put jargon on the page.
+  let clean = lines.map((line) => plainCompanyLanguage(asciiText(line)));
   if (summariseOverflow && clean.length > SCREEN_CONTRACT.max_lines) {
     clean = [
       ...clean.slice(0, SCREEN_CONTRACT.max_lines - 3),
       "",
-      "   More detail is preserved in the stage receipt.",
+      "   More detail is preserved in the run record.",
       RULE,
     ];
   }
@@ -144,6 +239,79 @@ export function renderStageStatus({ stageId, status, summary, nextAction = null 
     for (const line of indented(nextAction, 3, RULE_WIDTH - 3)) lines.push(line);
   }
   lines.push("", RULE);
+  return finishScreen(lines);
+}
+
+/**
+ * The REVIEW gate's screen: the last look before a workbook is delivered.
+ * Render-only — it draws what the build already produced (the quality mode,
+ * headline numbers, the plain-English read, stated assumptions and judgement
+ * calls) and names the gate's exactly two replies. The gate itself lives in
+ * run_user_flow.mjs; this screen decides nothing and is reused for both the
+ * blocked pause and the recorded change request.
+ */
+export function renderReviewGateScreen(briefing) {
+  const periods = (Array.isArray(briefing?.periods) ? briefing.periods : [])
+    .map((period) => String(period ?? "").slice(0, 4));
+  const quality = briefing?.quality ?? {};
+  const lines = [
+    RULE,
+    "   REVIEW BEFORE DELIVERY",
+    RULE,
+    "",
+    `   ${String(briefing?.issuer ?? "Issuer").slice(0, RULE_WIDTH - 6).trimEnd()}`,
+    `   Forecast years .......... ${periods.join(", ") || "none"}`,
+    `   Reporting basis ......... ${briefing?.reporting_currency ?? "not reported"}`,
+    "",
+    `   QUALITY: ${String(quality.mode ?? "NOT ASSESSED").toUpperCase()}`,
+    ...indented(quality.detail ?? "", 3, RULE_WIDTH - 3),
+    "",
+    "   HEADLINE FORECAST",
+  ];
+  for (const row of Array.isArray(briefing?.headline) ? briefing.headline : []) {
+    lines.push(
+      `   ${String(row?.period ?? "").slice(0, 4)}  net debt ${previewNumber(row?.net_debt)}  leverage ${previewNumber(row?.net_leverage)}  cash ${previewNumber(row?.total_liquidity)}`,
+    );
+  }
+  lines.push("", "   THE MODEL IN PLAIN WORDS");
+  const readLines = indented(briefing?.read ?? "", 3, RULE_WIDTH - 3)
+    .filter((line) => line.trim() !== "");
+  lines.push(...readLines.slice(0, 12));
+  if (readLines.length > 12) {
+    lines.push("   ... the full read arrives with the workbook.");
+  }
+  const assumptions = (Array.isArray(briefing?.top_assumptions)
+    ? briefing.top_assumptions
+    : []
+  ).slice(0, 4);
+  if (assumptions.length > 0) {
+    lines.push("", "   STATED ASSUMPTIONS");
+    for (const assumption of assumptions) {
+      lines.push(...indented(`- ${assumption}`, 3, RULE_WIDTH - 3));
+    }
+  }
+  const plausibleOnly = (Array.isArray(briefing?.plausible_only)
+    ? briefing.plausible_only
+    : []
+  ).slice(0, 4);
+  if (plausibleOnly.length > 0) {
+    lines.push("", "   NUMBERS THAT DEPEND ON JUDGEMENT");
+    for (const check of plausibleOnly) {
+      lines.push(...indented(`- ${check}`, 3, RULE_WIDTH - 3));
+    }
+  }
+  lines.push(
+    "",
+    "   The last look before delivery. Exactly two replies:",
+    "",
+    "   reply: deliver - deliver the workbook as it stands",
+    "   reply: change <what to change> - stop here; nothing",
+    "       is delivered and the note is recorded",
+    "",
+    "   No other reply leaves the run waiting at this gate.",
+    "",
+    RULE,
+  );
   return finishScreen(lines);
 }
 
@@ -230,11 +398,10 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     `   Raw houses preserved .... ${preview?.evidence_inventory?.raw_house_count ?? 0}`,
     `   Raw tables preserved .... ${preview?.evidence_inventory?.raw_table_count ?? 0}`,
     `   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,
-    `   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,
+    `   Cells set aside ........ ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,
     "",
-    `   SELECTION MODE ......... ${waterfallMode ? "FORECAST WATERFALL" : "PRIMARY HOUSE"}`,
+    `   SELECTION MODE ......... ${waterfallMode ? "NO SINGLE BROKER HOUSE" : "PRIMARY HOUSE"}`,
     `   RECOMMENDED PRIMARY: ${selected?.house_name ?? (waterfallMode ? "none - no coherent primary house" : "none")}`,
-    `   House id ............... ${selected?.house_id ?? (waterfallMode ? "FORECAST_WATERFALL" : "none")}`,
     `   Headline anchor ........ ${preview?.headline_anchor ?? "none"}`,
     "",
     "   SELECTED MODEL VALUES       FY1       FY2       FY3",
@@ -258,7 +425,7 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     }
   }
   if (waterfallMode) {
-    lines.push("", "   BROKER AUTHORITY GAPS");
+    lines.push("", "   WHERE EACH FORECAST NUMBER CAME FROM");
     for (const reason of preview?.forecast_waterfall_reasons ?? []) {
       for (const line of indented(reason, 3, RULE_WIDTH - 3)) lines.push(line);
     }
@@ -282,7 +449,8 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     "",
     "   Full tables, exact source cells and alternates are in",
     "   broker-preview.json. The clean recommendation is accepted",
-    "   automatically and cannot promote quarantined evidence.",
+    "   automatically and cannot promote evidence that the",
+    "   checks have set aside.",
     ...(confirmationErrors.length > 0
       ? [
           "",
@@ -292,10 +460,10 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
       : [
           "",
           "   The controller continues automatically into the",
-          "   ordinary forecast waterfall and model decisions.",
+          "   fallback forecast checks and model decisions.",
         ]),
     "",
-    `   Preview hash: ${String(preview?.preview_sha256 ?? "").slice(0, 16)}...`,
+    `   Preview sealed for this run: ${String(preview?.preview_sha256 ?? "").slice(0, 16)}...`,
     RULE,
   );
   return finishScreen(lines, { summariseOverflow: true });
@@ -493,7 +661,7 @@ export function renderBrokerIntakeScreen(issuerName = "the company") {
       "",
       "The reports improve forecast authority but are optional.",
       "Extraction, OCR and reconciliation stay internal. Any",
-      "unusable value is dropped through the forecast waterfall;",
+      "single unusable number is dropped, never guessed at;",
       "it does not stop the model.",
       "",
       "Or continue with company evidence and historical drivers.",
@@ -1097,7 +1265,7 @@ export function renderFailure({ stage, what_failed, why, what_would_fix_it }) {
   }
   if (what_would_fix_it.length > SCREEN_CONTRACT.max_failure_remedies) {
     lines.push(
-      `   - ${what_would_fix_it.length - SCREEN_CONTRACT.max_failure_remedies} more in the stage receipt`,
+      `   - ${what_would_fix_it.length - SCREEN_CONTRACT.max_failure_remedies} more in the run record`,
     );
   }
   lines.push("", RULE);
