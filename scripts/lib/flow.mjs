@@ -112,6 +112,7 @@ export function runIntake({
   residualDecision = null,
   priorAnswers = null,
   limit = QUESTION_LIMIT,
+  presentedDecisions = [],
 }) {
   // Stage 1 — node N0. One implementation, one vocabulary: the intake bundle
   // carries `export` in exactly the shape dcs-export.schema.json declares, so
@@ -306,6 +307,7 @@ export function runIntake({
     reconciliation: { ...reconciliation, residual_carried: false },
     resolved,
     limit,
+    presentedDecisions,
   });
 
   if (plan.status === "blocked") {
@@ -344,8 +346,18 @@ export function runIntake({
     working_case: workingCase,
     reconciliation,
     stage_one: stageOne,
-    screen: renderQuestionScreen(plan.questions),
+    screen: renderQuestionScreen(plan.questions, {
+      round: plan.decision_round ?? 1,
+      remainingTopics: plan.pending_topic_count ?? 0,
+    }),
     answer_template: renderAnswerTemplate(plan.questions),
+    // The topics this stop put in front of the user. The controller records
+    // them so a topic answered at its default is never served twice across
+    // decision rounds; decision cards are not listed (they stay pending
+    // until actually answered).
+    served_topics: plan.questions
+      .filter((question) => question.instrument && question.instrument !== "decision")
+      .map((question) => question.id),
   };
 }
 
