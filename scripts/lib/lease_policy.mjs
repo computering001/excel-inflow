@@ -319,3 +319,48 @@ export function leaseProjectionErrors(
   }
   return errors;
 }
+
+// B3 — the CASH/ACCRETED interest split. Accreted lease interest raises the
+// lease liability and is settled through the principal waterfall, so it must
+// NOT also leave as `cash_interest_paid`; paying it twice hits net debt twice
+// per period. This validator independently recomputes the published cash
+// interest from the gross build-up and refuses any drift. Sign convention: the
+// solver publishes `cash_interest_paid` as a NEGATIVE outflow, hence the
+// negated right-hand side.
+export function leaseInterestCashSplitErrors(
+  {
+    cash_interest_paid: cashInterestPaid,
+    gross_interest: grossInterest,
+    lease_interest: leaseInterest,
+    non_cash_interest: nonCashInterest,
+    non_cash_instrument_interest: nonCashInstrumentInterest,
+  } = {},
+  tolerance = 1e-8,
+) {
+  if (
+    cashInterestPaid === null ||
+    cashInterestPaid === undefined ||
+    !Number.isFinite(Number(cashInterestPaid))
+  ) {
+    // Nothing was published under this role (supplied-absent or unresolvable):
+    // there is no split claim to verify.
+    return [];
+  }
+  const expected =
+    -(Number(grossInterest ?? 0) -
+      Number(leaseInterest ?? 0) -
+      Number(nonCashInterest ?? 0) -
+      Number(nonCashInstrumentInterest ?? 0));
+  const errors = [];
+  if (Math.abs(Number(cashInterestPaid) - expected) > tolerance) {
+    errors.push(
+      `cash_interest_paid=${Number(cashInterestPaid)} does not equal ` +
+        `-(gross interest ${Number(grossInterest ?? 0)} - lease interest ` +
+        `${Number(leaseInterest ?? 0)} - non-cash interest ` +
+        `${Number(nonCashInterest ?? 0)} - non-cash instrument interest ` +
+        `${Number(nonCashInstrumentInterest ?? 0)}) = ${expected}; the accreted ` +
+        `lease share must stay out of cash interest paid.`,
+    );
+  }
+  return errors;
+}

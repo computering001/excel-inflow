@@ -86,8 +86,10 @@ const NEAR_ZERO_PBT_FRACTION = 0.02;
 
 /** A normal usable rate is a positive fraction with a defensible ceiling.
  * Above this the period is distorted (one-off settlements, valuation
- * allowances) and must be excluded rather than averaged in. */
-const MAX_USABLE_RATE = 0.6;
+ * allowances) and must be excluded rather than averaged in. Exported so the
+ * solver publishes its forecast ETR under the SAME ceiling it applies to the
+ * historical rates this policy normalises (B7). */
+export const MAX_USABLE_RATE = 0.6;
 
 function findRow(modelCase, predicate) {
   return [

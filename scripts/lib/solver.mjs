@@ -3,12 +3,17 @@ import {
   normaliseStatementRows,
 } from "./row_plan.mjs";
 export { combineHistoricalEntities } from "./historical_normalisation.mjs";
+import { canonicaliseDeclaredTaxExpense } from "./historical_normalisation.mjs";
 import {
   balancingRcfInstrument,
   hasBalancingRcf,
   validateBalancingRcf,
 } from "./rcf_policy.mjs";
-import { leaseForecast, validateLeasePolicy } from "./lease_policy.mjs";
+import {
+  leaseForecast,
+  leaseInterestCashSplitErrors,
+  validateLeasePolicy,
+} from "./lease_policy.mjs";
 import {
   resolveForecastAuthority,
   resolveMetricForecastAuthority,
@@ -48,6 +53,10 @@ import {
 } from "./schedule_typed_states.mjs";
 import { selectedEbitdaRow } from "./semantic_roles.mjs";
 import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
+// B7 — the published forecast ETR is clamped to the SAME usable band the tax
+// rate policy applies when normalising history, imported rather than restated
+// so the two ceilings cannot drift apart.
+import { MAX_USABLE_RATE } from "./tax_rate_policy.mjs";
 import {
   acquisitionValuation,
   acquisitionValuationErrors,
@@ -1895,6 +1904,26 @@ export function solveCase(
     throw error;
   }
   const observedSolveOrders = [];
+  // B2/B7/B8/B22/B23 — typed solver findings, collected across the whole solve
+  // and published additively at `solver_findings`. Severities follow the
+  // finding vocabulary the audit settled on: ASK = a declaration is missing and
+  // a human should confirm one; DEGRADE = an economic effect was suppressed by
+  // a floor/clamp and the number moved because of it; LOG = a convention or
+  // assumption was applied silently before and is now disclosed. Deduped per
+  // (code, period, scope) so per-iteration re-evaluation cannot flood the list.
+  const solverFindings = [];
+  const emittedFindingKeys = new Set();
+  const recordSolverFinding = (code, severity, detail = {}) => {
+    const key = JSON.stringify([
+      code,
+      severity,
+      detail.period ?? null,
+      detail.scope ?? null,
+    ]);
+    if (emittedFindingKeys.has(key)) return;
+    emittedFindingKeys.add(key);
+    solverFindings.push({ code, severity, ...detail });
+  };
   const dynamicV2 = Number(modelCase.contract_version) === 2;
   const compiledInstrumentPeriodState = instrumentPeriodState ??
     (dynamicV2 ? compileInstrumentPeriodState(modelCase) : null);
@@ -2365,7 +2394,15 @@ export function solveCase(
             asSeries3(instrument.scheduled_amortisation, 0)[forecastIndex],
           );
       solveOrder.record("debt.scheduled_amortisation");
-      const timing = dynamicV2 && !compiledState
+      // B6 — instrument timing is CONTRACT-AGNOSTIC. The legacy (v1) path used
+      // to skip it entirely and approximate maturity-year PIK as a flat
+      // `opening × rate / 2`, so the same Sep/Mar/Dec maturity produced three
+      // different answers in solver-legacy, solver-dynamicV2 and the workbook.
+      // Computing `timing` for both contract versions routes every PIK leg
+      // through the same day-weighted weighted base; with undated movements
+      // `instrumentTiming` falls back to activeFraction/2 for flows, i.e.
+      // exactly the historic average-balance convention on full years.
+      const timing = !compiledState
         ? instrumentTiming(modelCase, periodIndex, instrument, {
             opening: openingNative,
             issuance: issuanceNative,
@@ -2391,19 +2428,15 @@ export function solveCase(
       const pikInterestNative = compiledState
         ? Number(compiledState.pik_accretion.basis_amount)
         : modelCase.controls.circularity === 1
-          ? dynamicV2
-            ? solvedPikAccretion(
-                timing.weightedBase,
-                pikRate,
-                timing.activeFraction,
-              )
-            : matures
-              ? Math.max(0, openingNative * Number(pikRate ?? 0) / 2)
-              : solvedPikAccretion(
-                  (openingNative + baseEndingBeforePik) / 2,
-                  pikRate,
-                  1,
-                )
+          // B6 — one accretion evaluator for both contract versions. The
+          // weighted base runs to min(periodEnd, maturityDate) with the
+          // instrument's active fraction, so a maturity-year PIK accrues only
+          // over the days actually held, matching the workbook formula.
+          ? solvedPikAccretion(
+              timing.weightedBase,
+              pikRate,
+              timing.activeFraction,
+            )
           : 0;
       solveOrder.record("interest.instrument_pik");
       const preMaturityEnding = compiledState
@@ -2888,12 +2921,40 @@ export function solveCase(
           ? baseEbit - (standaloneGrossInterest - interestIncome) +
             otherNonOperating
           : declaredStandalonePreTax;
-      // Losses are economic outputs too.  Do not silently rewrite a negative
-      // target PBT to zero: the inherited visible tax-rate assumption then
-      // determines the corresponding tax benefit in both solver and workbook.
+      // Losses are economic outputs too.  Neither side of the consolidation
+      // silently books an automatic tax benefit for a loss: standalone AND
+      // target losses are floored to zero tax at the same rate-led formula
+      // (B2), and every floor that binds raises a DEGRADE finding naming the
+      // benefit the model declined to invent.
       const targetPreTaxIncome =
         targetEbit * acquisitionTiming - acquisitionInterest;
       const preTaxIncome = standalonePreTaxIncome + targetPreTaxIncome;
+      if (standalonePreTaxIncome < -tolerance) {
+        recordSolverFinding(
+          "loss_benefit_not_realised",
+          "DEGRADE",
+          {
+            period: period.date,
+            scope: "standalone",
+            pre_tax_income: standalonePreTaxIncome,
+            unrealised_benefit:
+              Math.abs(Math.min(0, standalonePreTaxIncome)) * taxRate,
+          },
+        );
+      }
+      if (targetPreTaxIncome < -tolerance && acquisitionTiming > 0) {
+        recordSolverFinding(
+          "loss_benefit_not_realised",
+          "DEGRADE",
+          {
+            period: period.date,
+            scope: "target",
+            pre_tax_income: targetPreTaxIncome,
+            unrealised_benefit:
+              Math.abs(Math.min(0, targetPreTaxIncome)) * taxRate,
+          },
+        );
+      }
       // Tax and net income belong to the issuer's declared statement graph too.
       // Most cases derive them from PBT and an effective rate, but a legitimate
       // issuer/broker workflow may instead supply net income and tax expense,
@@ -2901,10 +2962,24 @@ export function solveCase(
       // that graph instead of silently restoring a global PBT-led hierarchy.
       const declaredStandaloneTaxExpense =
         operatingGraph.resolveRole("tax_expense");
+      // B1 — consume the DECLARED tax through its canonical sign. The old
+      // `-Number(declared)` hard-coded the expense-negative filing convention
+      // and turned a positive-convention filer's expense into a credit. The
+      // convention is inferred from the filed HISTORY (profit-period-anchored
+      // majority, ties to expense-negative — identical to tax_rate_policy.mjs)
+      // and disclosed per period next to the numbers it produced.
+      const declaredTaxConvention =
+        declaredStandaloneTaxExpense === null
+          ? null
+          : canonicaliseDeclaredTaxExpense(
+              statementRowForRole(modelCase, "tax_expense")?.values ?? [],
+              statementRowForRole(modelCase, "pre_tax_income")?.values ?? [],
+              declaredStandaloneTaxExpense,
+            );
       const standaloneTaxCharge =
         declaredStandaloneTaxExpense === null
           ? Math.max(0, standalonePreTaxIncome) * taxRate
-          : -Number(declaredStandaloneTaxExpense);
+          : declaredTaxConvention.canonical_expense;
       const declaredStandaloneNetIncome =
         operatingGraph.resolveRole("net_income");
       const standaloneNetIncome =
@@ -2937,6 +3012,32 @@ export function solveCase(
         otherInvesting -
         acquisitionCashConsideration +
         (interestIncomeInInvesting ? interestIncome : 0);
+      // B7 — the published effective tax rate is a DISCLOSURE derived from the
+      // solved charge and profit, not a free variable. A declared charge that
+      // implies a rate outside the usable band [0, MAX_USABLE_RATE] — the same
+      // ceiling tax_rate_policy.mjs applies to historical rates — is clamped in
+      // the published row only: tax_expense and net_income keep the declared
+      // economics untouched. Every period where the clamp binds raises a
+      // DEGRADE finding naming both rates, so a distorted charge is visible
+      // instead of silently reshaping the published rate.
+      const rawEffectiveTaxRate = preTaxIncome > 0 ? taxCharge / preTaxIncome : 0;
+      const publishedEffectiveTaxRate = Math.min(
+        Math.max(rawEffectiveTaxRate, 0),
+        MAX_USABLE_RATE,
+      );
+      if (publishedEffectiveTaxRate !== rawEffectiveTaxRate) {
+        recordSolverFinding(
+          "effective_tax_rate_clamped",
+          "DEGRADE",
+          {
+            period: period.date,
+            scope: "effective_tax_rate",
+            unclamped_value: rawEffectiveTaxRate,
+            published_value: publishedEffectiveTaxRate,
+            bounds: [0, MAX_USABLE_RATE],
+          },
+        );
+      }
       const statementOverrides = new Map([
         ["revenue", revenue + targetRevenue * acquisitionTiming],
         [ebitdaRole, ebitda + targetEbitda * acquisitionTiming],
@@ -2953,7 +3054,7 @@ export function solveCase(
         // row.
         ["net_finance_addback", netInterest],
         ["pre_tax_income", preTaxIncome],
-        ["effective_tax_rate", preTaxIncome > 0 ? taxCharge / preTaxIncome : 0],
+        ["effective_tax_rate", publishedEffectiveTaxRate],
         ["tax_expense", -taxCharge],
         ["net_income", netIncome],
         ["recurring_disclosed_adjustments", adjustments],
@@ -2978,9 +3079,19 @@ export function solveCase(
           forecastIndex,
         )
       ) {
+        // B3 — accreted lease interest is NOT cash interest. It settles
+        // through the lease principal waterfall in financing; publishing it
+        // here as well paid the same interest twice against net debt in one
+        // period. Non-cash legs stay excluded exactly as before. SIGN: the
+        // lease leg sits INSIDE the negation because `grossInterest` already
+        // includes `leaseInterest` (see the build-up above) — subtracting it
+        // outside as well removed it twice and overstated the outflow.
         statementOverrides.set(
           "cash_interest_paid",
-          -(grossInterest - nonCashInterest - nonCashInstrumentInterest),
+          -(grossInterest -
+            leaseInterest -
+            nonCashInterest -
+            nonCashInstrumentInterest),
         );
       }
       if (
@@ -3580,6 +3691,12 @@ export function solveCase(
           : 0),
       iterations: iteration,
       converged,
+      // B25 — a period published from the FORCED SINGLE PASS
+      // (`solverDeclaration.required === false` caps `iterationLimit` at 1)
+      // never had the chance to fail convergence, so its `converged: true`
+      // carries no iterative evidence. The flag marks exactly those periods;
+      // additive observation only — nothing numeric reads it.
+      stale_iteration: iterationLimit === 1,
       residual,
       // P4.7 — the solve's ORDER and CONVERGENCE, observed rather than assumed.
       // Additive observation only: no field below is read by the numeric path.
@@ -3627,6 +3744,33 @@ export function solveCase(
                   item.maturity_repayment_native),
             ) <= tolerance,
         ),
+        // B3 — the published cash-interest bridge must equal the gross
+        // build-up minus every non-cash leg INCLUDING accreted lease interest
+        // (it settles through the lease principal waterfall, not as cash).
+        // Routed through leaseInterestCashSplitErrors so this check and the
+        // standalone validator can never disagree about the identity.
+        // Supplied rows are declared authorities, not derivations: only the
+        // CALCULATED path claims the identity, mirroring the override above —
+        // for anything supplied the validator receives nothing to verify.
+        lease_interest_cash_split:
+          leaseInterestCashSplitErrors(
+            {
+              cash_interest_paid:
+                statementRoleIsCalculated(
+                  modelCase,
+                  "cash_interest_paid",
+                  forecastIndex,
+                )
+                  ? lastComputation.statement_values?.cash_interest_paid ?? null
+                  : null,
+              gross_interest: lastComputation.gross_interest,
+              lease_interest: lastComputation.lease_interest,
+              non_cash_interest: lastComputation.non_cash_interest,
+              non_cash_instrument_interest:
+                lastComputation.non_cash_instrument_interest,
+            },
+            tolerance,
+          ).length === 0,
       },
     };
 
@@ -3685,6 +3829,9 @@ export function solveCase(
       results.length === forecastPeriods.length &&
       results.every((result) => result.converged === true),
     iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),
+    // B25 — top-level roll-up: true when ANY forecast period was published
+    // from the forced single-pass path (see the per-period flag).
+    stale_iteration: results.some((result) => result.stale_iteration === true),
     residual: Math.max(0, ...results.map((result) => Number(result.residual ?? Number.POSITIVE_INFINITY))),
     // P4.9 — this field continues to name the DECLARED policy tolerance, not
     // the criterion applied. Two validators outside this package's mandate read
@@ -3698,6 +3845,10 @@ export function solveCase(
     // criterion HERE is a joint change with those two readers — see P4.9's
     // issue card, "Unresolved".
     convergence_tolerance: tolerance,
+    // B2/B7 — the typed solver findings collected by `recordSolverFinding`
+    // (see the collection note at the top of solveCase), published additively
+    // in first-emission order. Nothing numeric reads this list.
+    solver_findings: solverFindings,
     all_checks_pass: results.every((result) =>
       Object.values(result.checks).every(Boolean),
     ),

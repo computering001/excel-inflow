@@ -298,6 +298,85 @@ function replaceHistoricalValues(target, values, label) {
   target.values = [...values, ...target.values.slice(3)];
 }
 
+// B1 — the filing SIGN of the declared tax expense is a property of the
+// issuer's history, not of one forecast cell, and consuming it with the wrong
+// sign turns a positive-convention filer's expense into a credit (net income
+// can then exceed pre-tax income). The inference is PROFIT-PERIOD-ANCHORED and
+// deliberately identical to tax_rate_policy.mjs:166-177: only periods with a
+// positive PBT anchor the vote (a loss period's tax sign IS the benefit
+// question), a non-zero tax value in a profit period votes once, and the
+// majority sign wins with ties falling to `expense_negative` — the canonical
+// statement convention this repository otherwise assumes.
+export function canonicaliseDeclaredTaxExpense(taxes, pbts, declaredValue = null) {
+  const series = (values) =>
+    [0, 1, 2].map((index) => {
+      const raw = Array.isArray(values) ? values[index] : undefined;
+      return raw === null || raw === undefined || !Number.isFinite(Number(raw))
+        ? null
+        : Number(raw);
+    });
+  const taxSeries = series(taxes);
+  const pbtSeries = series(pbts);
+  const anchorTaxes = [];
+  for (let index = 0; index < taxSeries.length; index += 1) {
+    const tax = taxSeries[index];
+    const pbt = pbtSeries[index];
+    if (tax !== null && tax !== 0 && pbt !== null && pbt > 0) {
+      anchorTaxes.push(tax);
+    }
+  }
+  const negativeCount = anchorTaxes.filter((value) => value < 0).length;
+  const positiveCount = anchorTaxes.length - negativeCount;
+  const convention =
+    negativeCount >= positiveCount ? "expense_negative" : "expense_positive";
+  const declared =
+    declaredValue === null ||
+      declaredValue === undefined ||
+      !Number.isFinite(Number(declaredValue))
+      ? null
+      : Number(declaredValue);
+  return {
+    convention,
+    // No profit period ⇒ no evidence either way ⇒ the canonical
+    // expense-negative shape is assumed, exactly as tax_rate_policy does.
+    anchor_period_count: anchorTaxes.length,
+    negative_count: negativeCount,
+    positive_count: positiveCount,
+    declared_value: declared,
+    // The EXPENSE-POSITIVE charge the solver consumes: what P&L "tax charge"
+    // means regardless of how the filer presented the row.
+    canonical_expense:
+      declared === null
+        ? null
+        : convention === "expense_negative"
+          ? -declared
+          : declared,
+  };
+}
+
+/** B1 — read the case's filed tax/PBT rows so the convention can be recorded
+ * in the normalisation receipt without duplicating the row-resolution rules. */
+function declaredTaxConventionReceipt(modelCase) {
+  const rows = [
+    ...(modelCase?.statement_structure?.income_statement ?? []),
+    ...(modelCase?.statement_structure?.cash_flow ?? []),
+  ];
+  const taxRow =
+    rows.find(
+      (row) => row.row_id === "tax_expense" || row.semantic_role === "tax_expense",
+    ) ?? null;
+  const pbtRow =
+    rows.find(
+      (row) =>
+        row.row_id === "pre_tax_income" || row.semantic_role === "pre_tax_income",
+    ) ?? null;
+  return canonicaliseDeclaredTaxExpense(
+    taxRow?.values ?? [],
+    pbtRow?.values ?? [],
+    null,
+  );
+}
+
 /**
  * Compile predecessor/calendarised historical entities into the canonical case.
  *
@@ -318,6 +397,9 @@ export function applyHistoricalNormalisation(modelCase) {
         entity_ids: [],
         metrics: [],
         exact_reported_total_promotions: [],
+        // B1 — the declared-tax sign convention is disclosed even when the
+        // module is off, so every consumer sees the same inference.
+        declared_tax_convention: declaredTaxConventionReceipt(modelCase),
       },
     };
   }
@@ -336,6 +418,9 @@ export function applyHistoricalNormalisation(modelCase) {
       : [],
     metrics: [],
     exact_reported_total_promotions: [],
+    // B1 — record the profit-period-anchored sign convention in the receipt so
+    // downstream consumers can audit which sign the declared tax carried.
+    declared_tax_convention: declaredTaxConventionReceipt(normalizedCase),
   };
 
   for (const [metricId, values] of Object.entries(combined)) {
