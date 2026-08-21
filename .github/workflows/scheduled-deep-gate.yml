@@ -77,15 +77,8 @@ jobs:
           # freshness with merge-base --is-ancestor, which a shallow
           # clone cannot answer.
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
-      - name: Install portable runtime dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Install the frozen-cohort toolchain
+        uses: ./.github/actions/setup-toolchain
       - name: Declare what this tier covers and what it defers
         run: |
           mkdir -p "${{ runner.temp }}/frozen"

@@ -52,7 +52,13 @@ function universalAssertions(name, text) {
   const findings = FORBIDDEN.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
   assert.deepEqual(findings, [], `${name} violates read-only/fail-closed shell governance.`);
   const actions = [...text.matchAll(ACTION_USE)].map((match) => match[1]);
-  assert(actions.length > 0 && actions.every((value) => /@[a-f0-9]{40}$/.test(value)), `${name} contains an unpinned action.`);
+  // Remote actions must be commit-SHA pinned. Local references are allowed
+  // only into the repository's own composite-action directory, where every
+  // nested uses: is itself reviewed and pinned.
+  const unpinned = actions.filter((value) => !value.startsWith("./.github/actions/") && !/@[a-f0-9]{40}$/.test(value));
+  const strayLocal = actions.filter((value) => value.startsWith("./") && !value.startsWith("./.github/actions/"));
+  assert(actions.length > 0 && unpinned.length === 0 && strayLocal.length === 0,
+    `${name} contains an unpinned or out-of-scope action: ${[...unpinned, ...strayLocal].join(", ")}`);
 }
 function exactHeadAssertions(text) {
   assert.deepEqual(workflowJobs(text), REQUIRED_EXACT_HEAD_JOBS, "Exact-head workflow does not contain exactly the eleven ordered jobs.");
