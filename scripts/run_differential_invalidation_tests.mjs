@@ -654,7 +654,22 @@ check(unclaimed.violations.length === 1, "a stage-receipt reuse recorded outside
 const acquisitionEvidence = path.join(workspace, "acquisition-question-evidence-run.json");
 await command("run_evidence_run_tests.mjs", [cases, "--emit-acquisition-question", acquisitionEvidence]);
 const answers = path.join(workspace, "answers.json");
-await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+await fs.writeFile(
+  answers,
+  `${JSON.stringify(
+    {
+      answers: {
+        acquisition_funding: "debt",
+        // assumption/plausibility cards surfaced at the decisions stop
+        "derived.forecast.acquisitions_net_of_cash": "default",
+        "derived.fx.effect": "default",
+        "plausibility.findings": "acknowledge",
+      },
+    },
+    null,
+    2,
+  )}\n`,
+);
 
 const runDir = path.join(workspace, "answered-run");
 const cold = JSON.parse(
@@ -795,7 +810,21 @@ for (const row of classification.classes) {
 // nothing above them. The real controller settles it.
 // ---------------------------------------------------------------------------
 const changedAnswers = path.join(workspace, "changed-answers.json");
-await fs.writeFile(changedAnswers, `${JSON.stringify({ answers: { acquisition_funding: "equity" } }, null, 2)}\n`);
+await fs.writeFile(
+  changedAnswers,
+  `${JSON.stringify(
+    {
+      answers: {
+        acquisition_funding: "equity",
+        "derived.forecast.acquisitions_net_of_cash": "default",
+        "derived.fx.effect": "default",
+        "plausibility.findings": "acknowledge",
+      },
+    },
+    null,
+    2,
+  )}\n`,
+);
 const changed = JSON.parse(
   (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", acquisitionEvidence, "--out", runDir, "--answers", changedAnswers, "--stop-after", "decisions", "--json"])).stdout,
 );

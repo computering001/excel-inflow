@@ -1292,6 +1292,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "html-table-fallback-lane",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_html_table_extraction_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "historical-normalisation",
       "phase": "evidence",
       "runtime": "node",

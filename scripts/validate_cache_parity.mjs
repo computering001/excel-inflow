@@ -1096,7 +1096,7 @@ const printBucket = (title, rows, limit = PRINT_LIMIT) => {
     console.log(
       `  ${`${m.sheet}!${m.cell}`.padEnd(24)} ${String(m.label).slice(0, 34).padEnd(36)}` +
         ` cached=${fmt(m.cached ?? 0).padStart(16)}  formula=${fmt(m.computed ?? 0).padStart(16)}` +
-        `  delta=${m.delta === null ? "n/a" : Number(m.delta.toPrecision(8))}` +
+        `  delta=${m.delta == null ? "n/a" : Number(m.delta.toPrecision(8))}` +
         `${m.cascaded ? "  [cascaded]" : m.cascaded === false ? "  [PRIMARY]" : ""}`,
     );
     console.log(`      = ${String(m.formula).slice(0, 150)}`);
