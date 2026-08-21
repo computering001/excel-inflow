@@ -404,6 +404,14 @@ const COUPON = "0.000%";
 // constant could only be one of them, and it was this one.
 const BENCHMARK = "0.00%";
 const MULTIPLE = '0.0x;(0.0x);"–"';
+// A ratio whose denominator is zero (or not numeric) is NOT MEANINGFUL rather
+// than zero. Printing `0.0x` over a zero EBITDA asserts a real multiple of
+// nothing; the solver emits `net_leverage: null` for exactly that state
+// (scripts/lib/solver.mjs:3568-3571), so the workbook degrades to a literal
+// `n/m` token instead. Text ignores the number format ladder, which is what
+// keeps n/m visibly distinct from a computed zero — the same reason the zero
+// section above renders an en-dash rather than 0.
+const NOT_MEANINGFUL = '"n/m"';
 // An FX rate is a price, not a percentage, and four decimals is the quoting
 // convention. It used to ride a raw `0.0000`, which rendered an unpopulated
 // pair as a meaningless `0.0000` — indistinguishable from a rate that really
@@ -5441,6 +5449,13 @@ function configureOperatingModel(
   // Adding, removing or reordering instruments therefore changes the reducer's
   // membership, never a manually maintained formula.
   const mandatoryRepaymentPools = Array.from({ length: 3 }, () => new Map());
+  // B4 — the mandatory-repayment pool and the lease principal waterfall are
+  // XOR lanes: an instrument's principal repayment flows through exactly one
+  // of them, never both. Lease-liability instruments belong to the lease lane
+  // (the cash flow states lease principal on its own line beneath the debt
+  // movement), so they are excluded from the pools here and recorded for the
+  // typed finding written on the lease principal line.
+  const mandatoryPoolLeaseExclusions = [];
   const instrumentTimingExpressions = (
     plan,
     instrument,
@@ -5795,9 +5810,16 @@ function configureOperatingModel(
       const baseEndingBeforePik = plan.amortisation_row
         ? `MAX(0,${openingWithMovements}-${cappedAmortisation})`
         : availableBeforeAmortisation;
+      // B6 parity: the maturity test carries the SAME ISNUMBER discipline as
+      // instrumentTimingExpressions' maturityActive above (:5456-5458). A
+      // text-typed maturity cell reads as "no maturity" in both places, so the
+      // repayment test can no longer diverge from the day-weighting that feeds
+      // interest and PIK; a naked `<=` against text silently never matures and
+      // diverges from the solver's parsed-date maturity path
+      // (scripts/lib/solver.mjs:2395-2406).
       const matures = instrument.maturity_date
         ? `IF($C$${c.debt_maturities_roll}=1,` +
-          `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0)`
+          `IF(ISNUMBER($E${plan.debt_row}),IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0),0)`
         : "0";
       const pikRateRow = rowPlan.pik_rate_rows?.[instrument.instrument_id];
       const pikRate = pikRateRow ? `$${column}$${pikRateRow}` : "0";
@@ -5808,11 +5830,41 @@ function configureOperatingModel(
         column,
         opening,
       );
+      // B6 parity (shared convention 1, scripts/lib/solver.mjs:1022-1038
+      // solvedPikAccretion, applied to the maturity year at :2395-2406): PIK
+      // accretes by the closed form weightedBase*r/(1-r*f/2), where
+      // weightedBase and the active fraction are the DAY-WEIGHTED base and
+      // fraction computed to min(periodEnd, maturityDate) by
+      // instrumentTimingExpressions — the same cap in both engines.
       const pikAccretion = plan.pik_row
         ? `IF($C$${c.circularity}=0,0,IF(1-${pikRate}*(${timing.activeFraction})/2<=0,0,` +
           `(${timing.weightedBase})*${pikRate}/(1-${pikRate}*(${timing.activeFraction})/2)))`
         : "0";
       if (plan.pik_row) {
+        // B14: the formula above degrades to zero when 1 - r*f/2 <= 0, while
+        // the solver THROWS on the identical domain ("PIK rate must be below
+        // 200% under the average-balance convention.",
+        // scripts/lib/solver.mjs:1033-1036). A silent zero misstates the
+        // liability roll-forward, so the build detects the degenerate domain
+        // from the declared PIK rate series — the active fraction is at most
+        // 1, so any declared rate >= 200% can reach it — and emits a typed
+        // degraded marker on the face and in the build log. It never fails
+        // silently, and it does not write a cell error that would cascade
+        // through every downstream sum.
+        const degenerateRates = (instrument.pik_rate ?? [])
+          .map((rate) => Number(rate ?? 0))
+          .filter((rate) => rate >= 2);
+        if (degenerateRates.length > 0) {
+          const marker = [
+            `PIK_ACCRETION_DEGENERATE: declared PIK rate(s) ${degenerateRates
+              .map((rate) => `${(rate * 100).toFixed(1)}%`)
+              .join(", ")} reach the domain where 1 - rate x active-fraction / 2 <= 0.`,
+            `The solver throws on this state (solvedPikAccretion, scripts/lib/solver.mjs:1033-1036); this workbook degrades the affected period's accretion to zero and flags the cell rather than failing silently.`,
+            `Resolution: restate the declared PIK rate below 200%.`,
+          ].join("\n");
+          addCommentOnce(workbook, sheet, `${column}${plan.pik_row}`, marker);
+          process.stderr.write(`${modelCase.case_id}: ${marker}\n`);
+        }
         applyFormula(sheet, `${column}${plan.pik_row}`, `=${pikAccretion}`);
         applyFormula(sheet, `${adjustmentColumn}${plan.pik_row}`, "=0");
         applyFormula(
@@ -5841,22 +5893,42 @@ function configureOperatingModel(
         !plan.fair_value_row &&
         !plan.other_non_cash_row;
       if (plan.has_mandatory_repayment) {
-        const poolKey = balanceCurrency;
-        const pool = mandatoryRepaymentPools[index].get(poolKey) ?? {
-          currency: poolKey,
-          averageFx,
-          openingAndMovementTerms: [],
-          closingTerms: [],
-        };
-        pool.openingAndMovementTerms.push(
-          opening,
-          ...(issuance !== "0" ? [issuance] : []),
-          ...(fairValue !== "0" ? [fairValue] : []),
-          ...(otherNonCash !== "0" ? [otherNonCash] : []),
-          ...(plan.pik_row ? [`$${column}${plan.pik_row}`] : []),
-        );
-        pool.closingTerms.push(closingNative);
-        mandatoryRepaymentPools[index].set(poolKey, pool);
+        // B4 XOR enforcement: a lease-liability instrument's principal is
+        // stated on the lease principal waterfall line; letting it into this
+        // pool as well would count the same repayment twice in cash before
+        // RCF. Exclusions are recorded, not silent — see the
+        // LEASE_PRINCIPAL_XOR finding on the waterfall line.
+        if (instrument.class === "lease_liability") {
+          mandatoryPoolLeaseExclusions.push({
+            index,
+            instrument_id: plan.instrument_id,
+            label: instrument.name ?? plan.instrument_id,
+          });
+          if (mandatoryPoolLeaseExclusions.length === 1) {
+            process.stderr.write(
+              `${modelCase.case_id}: LEASE_PRINCIPAL_XOR lease-liability instrument(s) with mandatory repayment states are excluded from the mandatory repayment pool and carried on the lease principal line only.\n`,
+            );
+          }
+        } else {
+          const poolKey = balanceCurrency;
+          const pool = mandatoryRepaymentPools[index].get(poolKey) ?? {
+            currency: poolKey,
+            averageFx,
+            openingAndMovementTerms: [],
+            closingTerms: [],
+            members: [],
+          };
+          pool.members.push(plan.instrument_id);
+          pool.openingAndMovementTerms.push(
+            opening,
+            ...(issuance !== "0" ? [issuance] : []),
+            ...(fairValue !== "0" ? [fairValue] : []),
+            ...(otherNonCash !== "0" ? [otherNonCash] : []),
+            ...(plan.pik_row ? [`$${column}${plan.pik_row}`] : []),
+          );
+          pool.closingTerms.push(closingNative);
+          mandatoryRepaymentPools[index].set(poolKey, pool);
+        }
       }
       applyFormula(
         sheet,
@@ -6447,8 +6519,8 @@ function configureOperatingModel(
           ],
           [
             debtRows.net_debt_company_reported_to_adjusted_ebitda,
-            `=IFERROR(${col}${debtRows.net_debt_company_reported}/` +
-              `${col}${debtRows.company_reported_adjusted_ebitda},0)`,
+            // B11: zero/non-numeric denominator renders n/m, never 0.0x.
+            `=IFERROR(IF(N(${col}${debtRows.company_reported_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${debtRows.net_debt_company_reported}/${col}${debtRows.company_reported_adjusted_ebitda}),${NOT_MEANINGFUL})`,
           ],
         ]
       : [];
@@ -6468,15 +6540,16 @@ function configureOperatingModel(
       ? [
           [
             debtRows.net_debt_excluding_leases_to_adjusted_ebitda,
-            `=IFERROR(${col}${debtRows.net_debt_excluding_leases}/` +
-              `${col}${debtRows.leverage_adjusted_ebitda},0)`,
+            // B11: zero/non-numeric denominator renders n/m, never 0.0x.
+            `=IFERROR(IF(N(${col}${debtRows.leverage_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${debtRows.net_debt_excluding_leases}/${col}${debtRows.leverage_adjusted_ebitda}),${NOT_MEANINGFUL})`,
           ],
         ]
       : []),
     [
       debtRows.net_debt_to_adjusted_ebitda,
-      `=IFERROR(${col}${leverageNetDebtRow}/` +
-        `${col}${debtRows.leverage_adjusted_ebitda},0)`,
+      // B11: matches the solver's net_leverage:null on zero EBITDA
+      // (scripts/lib/solver.mjs:3568-3571).
+      `=IFERROR(IF(N(${col}${debtRows.leverage_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${leverageNetDebtRow}/${col}${debtRows.leverage_adjusted_ebitda}),${NOT_MEANINGFUL})`,
     ],
     [
       debtRows.leverage_net_interest,
@@ -6486,8 +6559,9 @@ function configureOperatingModel(
     ],
     [
       debtRows.adjusted_ebitda_to_net_interest,
-      `=IFERROR(${col}${debtRows.leverage_adjusted_ebitda}/` +
-        `${col}${debtRows.leverage_net_interest},0)`,
+      // B11: coverage over a nil/absent net interest denominator is not a
+      // computable multiple; degrade to the shared n/m token.
+      `=IFERROR(IF(N(${col}${debtRows.leverage_net_interest})=0,${NOT_MEANINGFUL},${col}${debtRows.leverage_adjusted_ebitda}/${col}${debtRows.leverage_net_interest}),${NOT_MEANINGFUL})`,
     ],
   ];
   for (const column of HISTORICAL_COLUMNS) {
@@ -7324,6 +7398,28 @@ function configureOperatingModel(
       const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
       const proFormaColumn = PRO_FORMA_COLUMNS[index];
       const pools = [...mandatoryRepaymentPools[index].values()];
+      // B4 assertion — the XOR invariant is structural, not conventional: an
+      // instrument excluded to the lease principal lane must never appear as
+      // a pool member. If a future edit routes leases back into the pools,
+      // fail the build loudly rather than double-counting their principal.
+      const ambiguousPoolMembers = pools
+        .flatMap((pool) => pool.members ?? [])
+        .filter((memberId) =>
+          mandatoryPoolLeaseExclusions.some(
+            (exclusion) => exclusion.instrument_id === memberId,
+          ),
+        );
+      if (ambiguousPoolMembers.length > 0) {
+        throw new Error(
+          `B4 XOR violation in ${modelCase.case_id}: lease instrument(s) ${ambiguousPoolMembers.join(", ")} are members of the mandatory repayment pool while also carried on the lease principal lane. Principal repayment must flow through exactly one lane.`,
+        );
+      }
+      // B24 — the pool aggregates terms in NATIVE units and translates the
+      // repayment once, by pool.averageFx: opening re-enters native via
+      // /priorEndFx, component rows roll forward natively, and endFx touches
+      // only the face. This mirrors solver.mjs:2445-2457 — cash flows translate
+      // at average FX, stocks at period-end FX — with the non-cash revaluation
+      // isolated on the debt_fx_translation row instead of inside this pool.
       const expressions = pools.map((pool) => {
         const openingAndMovements = aggregateTerms(
           pool.openingAndMovementTerms,
@@ -7441,6 +7537,28 @@ function configureOperatingModel(
         `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
         `=${sumCells(blockColumn, leasePrincipalRows)}`,
       );
+      // B4 finding: the XOR lane split is surfaced, not silent. Lease
+      // instruments with mandatory repayment states are carried exclusively
+      // here and excluded from the mandatory repayment total above, so the
+      // reader of the face can see why the two lines do not overlap.
+      if (mandatoryPoolLeaseExclusions.length > 0) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
+          [
+            "LEASE_PRINCIPAL_XOR: lease-liability instruments with mandatory repayment states are carried exclusively on this line.",
+            `Excluded from the mandatory debt repayment pool: ${[
+              ...new Set(
+                mandatoryPoolLeaseExclusions.map(
+                  (exclusion) => exclusion.label,
+                ),
+              ),
+            ].join(", ")}.`,
+            "Principal repayment flows through exactly one lane — this lease principal line OR the mandatory repayment total, never both.",
+          ].join("\n"),
+        );
+      }
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.cash_before_rcf}`,
@@ -8723,7 +8841,9 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${interestRows.cash_interest_paid}`,
-        `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}`,
+        // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+        // gross build-up but is accreted, not cash — subtract it here too.
+        `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.lease_interest}-${column}${interestRows.non_cash_interest}`,
       );
     }
     const filedReceived = filedCashInterestReceivedValues[index];
@@ -8939,7 +9059,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${interestRows.cash_interest_paid}`,
-      `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.lease_interest}-${column}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(column)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -9070,7 +9192,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${proFormaColumn}${interestRows.cash_interest_paid}`,
-      `=${proFormaColumn}${interestRows.gross_interest_expense}-${proFormaColumn}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${proFormaColumn}${interestRows.gross_interest_expense}-${proFormaColumn}${interestRows.lease_interest}-${proFormaColumn}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(proFormaColumn)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -9222,7 +9346,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.cash_interest_paid}`,
-      `=${adjustmentColumn}${interestRows.gross_interest_expense}-${adjustmentColumn}${interestRows.non_cash_interest}` +
+      // B3 parity (solver.mjs:2981-2984): the lease leg rides inside the
+      // gross build-up but is accreted, not cash — subtract it here too.
+      `=${adjustmentColumn}${interestRows.gross_interest_expense}-${adjustmentColumn}${interestRows.lease_interest}-${adjustmentColumn}${interestRows.non_cash_interest}` +
         nonCashInstrumentCellsFor(adjustmentColumn)
           .map((cell) => `-${cell}`)
           .join(""),
@@ -11244,8 +11370,11 @@ function statementSolverValues(
   for (const [role, value] of [
     [
       "cash_interest_paid",
+      // B3 parity (solver.mjs:2981-2984): exclude accreted lease interest —
+      // gross_interest contains it and it settles as lease principal instead.
       -(
         result.gross_interest -
+        result.lease_interest -
         result.non_cash_interest -
         result.non_cash_instrument_interest
       ),
@@ -11915,9 +12044,15 @@ function solverFormulaCaches(
       gross_interest_expense: -result.gross_interest,
       interest_income_schedule: result.interest_income,
       net_interest_expense: -result.net_interest,
+      // B3 parity (solver.mjs:2981-2984) — accreted lease interest is NOT cash
+      // interest paid: it settles through the lease principal lane in
+      // financing. gross_interest already contains lease_interest, so the
+      // lease leg is subtracted inside the negation alongside the other
+      // non-cash legs.
       cash_interest_paid:
         -(
           result.gross_interest -
+          result.lease_interest -
           result.non_cash_interest -
           result.non_cash_instrument_interest
         ),
