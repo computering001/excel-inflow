@@ -1,0 +1,162 @@
+{
+  "certification": {
+    "approval_reason": "Genesis behavioural golden freeze for v3.7.7 over the full locally-runnable pipeline scope: both certified fixtures (standard-maximal-v2, standard-net-cash-v2) were compiled end-to-end through the pure-Node IR pipeline on this machine; no workbook-dependent path was needed or exercised.",
+    "approval_record_hash": null,
+    "approved_difference_classes": [],
+    "freeze_event": "genesis_freeze",
+    "frozen_at": "2026-08-21T13:44:37.290Z",
+    "frozen_at_commit": "64a24a861a6917a52e622e243ad36699d917b21a",
+    "frozen_by": {
+      "id": "archiepreston (owner, delegated via Hermes agent fleet, 2026-08-21)",
+      "kind": "human",
+      "role": null
+    },
+    "release": "v3.7.7",
+    "work_package": "P7.2",
+    "working_tree_state": "dirty"
+  },
+  "contracts": {
+    "economic_ir": "economic-ir/1.0",
+    "proof_projection_schema_version": 3,
+    "schedule_typed_states": "schedule-typed-states/1.0",
+    "typed_financial_value": "1.0.0"
+  },
+  "fixture_id": "standard-maximal-v2",
+  "fixture_path": "test-fixtures/cases/standard-maximal-v2.json",
+  "frozen_release": "v3.7.7",
+  "golden_kind": "economic_ir",
+  "historical_basis_histogram": {
+    "filed_face_series": 15,
+    "model_projection": 28,
+    "no_plan_row": 4,
+    "structural_header": 4
+  },
+  "identity": {
+    "case_id": "standard_maximal",
+    "case_sha256": "9e82ea47a0feac741d967946e0329f61367f3b9fd7f9c2d20dd2cccce5b0a8ba",
+    "evidence_epoch_sha256": "a0b784c69172ee5a44b3b5cd6efb202add735427014cf7cf8bf902c08918e8bc"
+  },
+  "node_count": 51,
+  "primary_economic_truth": {
+    "is_workbook": false,
+    "note": "The workbook is NOT pinned. See goldens/README.md for what is and is not frozen.",
+    "source": "scripts/lib/economic_ir.mjs::compileEconomicIr (shadow-attached by compileModelIrV3)"
+  },
+  "schedules": {
+    "families": {
+      "acquisition": {
+        "bare_number_slots": 0,
+        "by_state": {
+          "captured": 0,
+          "derived_number": 0,
+          "missing": 0,
+          "nil": 0,
+          "not_applicable": 0,
+          "parse_failure": 0,
+          "period_support_required": 0,
+          "prior_filing_support": 0,
+          "reported_blank": 0,
+          "reported_number": 0,
+          "reported_zero": 0,
+          "unresolved": 15
+        },
+        "not_applicable_pattern": "not_applicable_in_no_period",
+        "not_applicable_slots": 0,
+        "slot_count": 15,
+        "slots_per_period": 5,
+        "value_bearing_slots": 0
+      },
+      "cash": {
+        "bare_number_slots": 0,
+        "by_state": {
+          "captured": 0,
+          "derived_number": 0,
+          "missing": 0,
+          "nil": 0,
+          "not_applicable": 0,
+          "parse_failure": 0,
+          "period_support_required": 0,
+          "prior_filing_support": 0,
+          "reported_blank": 0,
+          "reported_number": 0,
+          "reported_zero": 0,
+          "unresolved": 18
+        },
+        "not_applicable_pattern": "not_applicable_in_no_period",
+        "not_applicable_slots": 0,
+        "slot_count": 18,
+        "slots_per_period": 6,
+        "value_bearing_slots": 0
+      },
+      "rcf": {
+        "bare_number_slots": 0,
+        "by_state": {
+          "captured": 0,
+          "derived_number": 0,
+          "missing": 0,
+          "nil": 0,
+          "not_applicable": 0,
+          "parse_failure": 0,
+          "period_support_required": 0,
+          "prior_filing_support": 0,
+          "reported_blank": 0,
+          "reported_number": 0,
+          "reported_zero": 0,
+          "unresolved": 12
+        },
+        "not_applicable_pattern": "not_applicable_in_no_period",
+        "not_applicable_slots": 0,
+        "slot_count": 12,
+        "slots_per_period": 4,
+        "value_bearing_slots": 0
+      }
+    },
+    "forecast_period_count": 3,
+    "historical_period_count": 3,
+    "period_count": 3,
+    "period_ids": [
+      "2026-12-31",
+      "2027-12-31",
+      "2028-12-31"
+    ]
+  },
+  "schema_version": "excel-inflow-behavioural-golden/1.0",
+  "seal": {
+    "content_sha256": "284a00d3d6ad39b6da501637f70f4516b847886d50bac822f2a9eb71785bdfe1",
+    "sealed_slots": 336
+  },
+  "shadow_boundary": {
+    "attached_enumerably": false,
+    "attachment_property": "economic_ir_shadow",
+    "ir_gates_delivery": false,
+    "ir_mode": "shadow",
+    "present_in_serialised_projection": false,
+    "shadow_gates_delivery": false,
+    "shadow_mode": "shadow",
+    "shadow_status": "sealed"
+  },
+  "slot_shape": {
+    "bare_number_slots": 0,
+    "forecast_slots": 138,
+    "historical_slots": 153,
+    "never_zero_slots": 267,
+    "schedule_slots": 45,
+    "typed_slots": 336,
+    "value_bearing_slots": 69
+  },
+  "twelve_state_census": {
+    "captured": 12,
+    "derived_number": 24,
+    "missing": 12,
+    "nil": 0,
+    "not_applicable": 12,
+    "parse_failure": 0,
+    "period_support_required": 0,
+    "prior_filing_support": 0,
+    "reported_blank": 0,
+    "reported_number": 45,
+    "reported_zero": 0,
+    "unresolved": 231
+  },
+  "record_sha256": "b465e813df9e45e0663666bb7166a6e4112f71ade1e5196b46d65f0dbfe15529"
+}
