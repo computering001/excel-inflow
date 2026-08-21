@@ -47,7 +47,8 @@ import {
   normaliseUserFlowResult,
 } from "./lib/workflow_state.mjs";
 import {
-  COMPANY_SCREEN,
+  COMPANY_SCREEN_SESSION_CONTRACT_SHA256,
+  renderCompanyScreen,
   renderBrokerIntakeScreen,
   renderBrokerPreviewScreen,
   renderEvidenceReviewProgress,
@@ -57,6 +58,8 @@ import {
   renderStageStatus,
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
+import { deriveRuntimeMode } from "./lib/runtime_mode.mjs";
+import { verifyScreenSession } from "./lib/screen_session.mjs";
 import {
   bindStageRecipes,
   deriveStageRuntimeClosure,
@@ -120,6 +123,7 @@ import {
 } from "./lib/broker_preview.mjs";
 import { assertBrokerFailureDegrades } from "./lib/delivery_constitution.mjs";
 import { compileCase } from "./lib/case_compiler.mjs";
+import { consumeControllerHandoff } from "./lib/controller_handoff.mjs";
 
 import {
   assertLiveDeliveryAttestation,
@@ -143,35 +147,39 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
-const COMPANY_HANDOFF_ENV = "EXCEL_INFLOW_TOP_CONTROLLER_HANDOFF";
+const CONTROLLER_FILE = fileURLToPath(import.meta.url);
+const VNEXT_CONTROLLER_FILE = path.join(HERE, "run_excel_inflow_vnext.mjs");
 
 async function assertCompanyScreenPreflight(options) {
-  const handoff = typeof options["controller-handoff"] === "string"
-    ? options["controller-handoff"]
-    : null;
-  if (
-    !handoff || handoff.length < 64 ||
-    process.env[COMPANY_HANDOFF_ENV] !== handoff
-  ) {
-    throw new Error("Company screen is a private delegate of run_excel_inflow_vnext.mjs.");
-  }
-  delete process.env[COMPANY_HANDOFF_ENV];
   const receiptPath = typeof options["host-capability-receipt"] === "string"
     ? path.resolve(options["host-capability-receipt"])
     : null;
   const reportPath = typeof options["runtime-doctor-report"] === "string"
     ? path.resolve(options["runtime-doctor-report"])
     : null;
-  if (!receiptPath || !reportPath) {
+  const screenSessionReceiptPath = typeof options["screen-session-receipt"] === "string"
+    ? path.resolve(options["screen-session-receipt"])
+    : null;
+  const screenSessionId = typeof options["screen-session-id"] === "string"
+    ? String(options["screen-session-id"])
+    : null;
+  const screenSessionSecret = typeof options["screen-session-secret"] === "string"
+    ? String(options["screen-session-secret"])
+    : null;
+  if (
+    !receiptPath || !reportPath || !screenSessionReceiptPath ||
+    !screenSessionId || !screenSessionSecret
+  ) {
     throw new Error(
-      "Company screen requires the top-level controller's current host-capability receipt; " +
-      "invoke run_excel_inflow_vnext.mjs --screen company.",
+      "Company screen requires the top-level controller's current host capability and " +
+      "explicit screen-session receipt/id/secret; " +
+      "invoke run_excel_inflow_bootstrap.mjs --screen company.",
     );
   }
   const [receiptBytes, reportBytes, receiptSchema, reportSchema] = await Promise.all([
     fs.readFile(receiptPath),
     fs.readFile(reportPath),
-    fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8")
+    fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.3.schema.json"), "utf8")
       .then(JSON.parse),
     fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8")
       .then(JSON.parse),
@@ -215,7 +223,16 @@ async function assertCompanyScreenPreflight(options) {
   ) {
     throw new Error("Company-screen capability receipt belongs to different Node or Python bytes.");
   }
-  const active = await resolveActiveSourceIdentity({ skillRoot: ROOT });
+  const runtimeMode = await deriveRuntimeMode({
+    skillRoot: ROOT,
+    installStateRoot: process.env.EXCEL_INFLOW_INSTALL_STATE_ROOT ?? null,
+    capabilityReceipt: receipt,
+    capabilityReceiptSha256: receipt.receipt_sha256,
+  });
+  const active = await resolveActiveSourceIdentity({
+    skillRoot: ROOT,
+    overrides: runtimeMode.source_identity_overrides,
+  });
   if (
     receipt.source_identity.active_runtime_code_closure_sha256 !==
       active.active_runtime_code_closure_check.active_runtime_code_closure_sha256 ||
@@ -224,6 +241,31 @@ async function assertCompanyScreenPreflight(options) {
   ) {
     throw new Error("Company-screen capability receipt belongs to different active package bytes.");
   }
+  const verifiedSession = await verifyScreenSession({
+    skillRoot: ROOT,
+    sessionRoot: path.dirname(screenSessionReceiptPath),
+    receiptPath: screenSessionReceiptPath,
+    sessionId: screenSessionId,
+    sessionSecret: screenSessionSecret,
+    expected: {
+      runtime_mode: runtimeMode.runtime_mode,
+      source_commit: runtimeMode.source_identity_overrides.source_commit,
+      source_tree: runtimeMode.source_identity_overrides.source_tree,
+      runtime_closure_sha256:
+        runtimeMode.source_identity_overrides.runtime_code_closure_sha256,
+      package_inventory_sha256:
+        runtimeMode.source_identity_overrides.complete_package_inventory_sha256,
+      installation_identity:
+        runtimeMode.source_identity_overrides.installation_identity,
+      active_pointer_sha256:
+        runtimeMode.installed_placement.active_pointer_sha256,
+      capability_receipt_sha256:
+        createHash("sha256").update(receiptBytes).digest("hex"),
+      runtime_doctor_report_sha256: reportSha256,
+      screen_contract_sha256: COMPANY_SCREEN_SESSION_CONTRACT_SHA256,
+    },
+  });
+  return Object.freeze({ runtimeMode, screenSession: verifiedSession.receipt });
 }
 let ACTIVE_RUN_GUARD = null;
 // P6.4 — the evidence work graph and its attempt ledger, held at module scope
@@ -270,11 +312,17 @@ const COMPLETION_SUMMARIES = Object.freeze({
     "The workbook cleared the automated build and validation gates. Delivery can now be prepared.",
 });
 
-function renderPresentationScreen(stageId) {
+function renderPresentationScreen(stageId, companyPreflight = null) {
   // "company" is the v3 entry screen (constitution S1): company only, the
   // rest of the pack is collected at its own stage. "inputs" remains the
   // fast-path pack screen and the id older transcripts reference.
-  if (stageId === "company") return COMPANY_SCREEN;
+  if (stageId === "company") {
+    if (!companyPreflight) throw new Error("Company screen has no verified screen session.");
+    return renderCompanyScreen({
+      runtimeMode: companyPreflight.runtimeMode.runtime_mode,
+      screenNonce: companyPreflight.screenSession.screen_nonce,
+    });
+  }
   if (stageId === "brokers") return renderBrokerIntakeScreen("the selected company");
   if (stageId === "inputs") return WELCOME_SCREEN;
   const declaration = PRESENTATION_SCREENS[stageId];
@@ -580,14 +628,33 @@ async function finish({ runDir, result, screen = null, machine = false }) {
 }
 
 async function main() {
-  const { positional, options } = parseArgs(process.argv.slice(2));
+  const rawArgs = process.argv.slice(2);
+  const { positional, options } = parseArgs(rawArgs);
+  if (options["controller-diagnostic"] === true) {
+    const diagnostic = {
+      schema_version: "excel-inflow-private-controller-diagnostic/1.0",
+      controller: "run_user_flow",
+      status: "SCREEN",
+      product_route_executed: false,
+    };
+    process.stdout.write(`${JSON.stringify(diagnostic)}\n`);
+    return diagnostic;
+  }
+  await consumeControllerHandoff({
+    packageRoot: ROOT,
+    parentController: VNEXT_CONTROLLER_FILE,
+    childController: CONTROLLER_FILE,
+    childArgs: rawArgs,
+  });
   if (options.screen) {
     if (options.screen === true) {
       throw new Error("--screen requires a stage id");
     }
     const stage = String(options.screen);
-    if (stage === "company") await assertCompanyScreenPreflight(options);
-    process.stdout.write(`${renderPresentationScreen(stage)}\n`);
+    const companyPreflight = stage === "company"
+      ? await assertCompanyScreenPreflight(options)
+      : null;
+    process.stdout.write(`${renderPresentationScreen(stage, companyPreflight)}\n`);
     return normaliseUserFlowResult({ status: "SCREEN", stage });
   }
   if ((!positional[0] && !options.carrier) || !options.out) {
@@ -2617,7 +2684,7 @@ guardedMain()
     // the registry's payload fields so the run is diagnosable and resumable —
     // a bare stack print is not a terminal state.
     try {
-      const outDir = process.argv.includes("--out")
+      const outDir = !error?.controller_handoff_refusal && process.argv.includes("--out")
         ? process.argv[process.argv.indexOf("--out") + 1]
         : null;
       if (outDir) {

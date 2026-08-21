@@ -236,7 +236,7 @@ mutate("quarantine owner off the declared roster", (state) => {
 
 // 11. An authoritative capability can never be quarantined.
 mutate("quarantine targeting an authoritative job", (state) => {
-  firstQuarantine(state).target = "aggregate-and-compare";
+  firstQuarantine(state).target = "final-aggregate";
   return state;
 }, "targets a job covering authoritative capability");
 
@@ -298,13 +298,18 @@ mutate("capability covered by no tier", (state) => {
 // 20. The merge gate may not hand an authoritative capability to a slower tier.
 mutate("authoritative capability moved off the merge gate", (state) => {
   const pr = tierOf(state, "pr");
-  pr.covers = pr.covers.filter((capability) => capability !== "custody_enumeration_pass_or_explicit_blocked");
+  const capability = "archive_only_capability_custody";
+  pr.covers = pr.covers.filter((value) => value !== capability);
+  pr.jobs.find((job) => job.id === "archive-only-capability").covers = [];
   pr.defers.push({
-    capability: "custody_enumeration_pass_or_explicit_blocked",
+    capability,
     to_tier: "nightly",
     reason: "A deliberately illegitimate deferral of an authoritative capability, used as a mutation.",
   });
-  tierOf(state, "nightly").covers.push("custody_enumeration_pass_or_explicit_blocked");
+  const nightly = tierOf(state, "nightly");
+  nightly.defers = nightly.defers.filter((entry) => entry.capability !== capability);
+  nightly.covers.push(capability);
+  nightly.jobs[0].covers.push(capability);
   return state;
 }, "must be covered by the merge gate tier");
 

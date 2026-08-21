@@ -6,8 +6,10 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 
 ### Non-bypassable end-user route
 
-An end-user company workbook has exactly one top-level producer. The vNext
-candidate uses `scripts/run_excel_inflow_vnext.mjs`; it owns raw evidence,
+An end-user company workbook has exactly one public producer. The standard-
+library bootstrap `scripts/run_excel_inflow_bootstrap.mjs` verifies the
+installed package before invoking the private vNext controller
+`scripts/run_excel_inflow_vnext.mjs`; vNext owns raw evidence,
 authority resolution and quality classification, then delegates the unchanged
 workbook stage internally to `scripts/run_user_flow.mjs`. That workbook-stage
 controller is a package-retained internal delegate, not a second end-user entry
@@ -44,7 +46,7 @@ Run one deterministic graph:
 
 ### vNext model-first control plane
 
-`scripts/run_excel_inflow_vnext.mjs` is the candidate end-to-end owner above
+`scripts/run_excel_inflow_vnext.mjs` is the private end-to-end owner above
 that proven graph. It invokes the raw filings, broker and DCS transaction,
 pauses at the compiled model-decision boundary, seals one model-demand graph,
 one `selected-authority-contract/1.0` and one run-constitution graph, and only
@@ -74,7 +76,7 @@ debt boundary, an underdetermined economic graph, or workbook integrity.
 The ordinary candidate command is:
 
 ```text
-node scripts/run_excel_inflow_vnext.mjs \
+node scripts/run_excel_inflow_bootstrap.mjs \
   --attachment-spec <attachment-evidence-controller.json> \
   --out <run-folder> [--answers <answers.json>] \
   [--python <python>] [--soffice <soffice>] \
@@ -225,8 +227,15 @@ start a new model, invoke the canonical production controller before asking a
 question:
 
 ```text
-node scripts/run_excel_inflow_vnext.mjs --screen company
+node scripts/run_excel_inflow_bootstrap.mjs --screen company --screen-session-receipt <external-session-root>/<explicit-session>.json --screen-session-id <explicit-session-id> --screen-session-secret <cryptographically-random-secret>
 ```
+
+Create the external session root outside the immutable skill, generate a fresh
+session ID and at least 32-byte secret for this chat, and retain those exact
+three values for the next user message. Never select a newest receipt and never
+reuse another chat's session. The command persists the host-preflight evidence
+and authenticated screen receipt before stdout; it never deletes them after
+rendering.
 
 For an engineering diagnosis of the same non-bypassable preflight, run:
 
@@ -245,14 +254,20 @@ it as Markdown headings, or replace it with a conversational company/ticker
 question. If the command cannot execute, if its runtime doctor refuses, or if
 its stdout is not the complete canonical block, return the typed
 `INTERNAL_FAILURE` and no Company screen. Never reproduce a static success
-screen after executable failure. The block below is the exact presentation
-contract used to verify successful controller output; it is not a fallback:
+screen after executable failure. The block below is the presentation template,
+not fallback output: the executable renderer inserts exactly one verified mode
+marker when the mode is non-production and a fresh six-hex session nonce.
 
 ```text
 +=[ EXCEL INFLOW ]==============================[ COMPANY ]=+
 |
 |  [>]Company  [ ]Filings  [ ]Brokers
 |  [ ]Debt  [ ]Build  [ ]Deliver
+|
+|  <DEVELOPMENT SOURCE · NOT INSTALLED, or
+|   CANDIDATE SLOT · NOT ACTIVE; omitted only for verified production>
+|
+|  HOST READY · SESSION <six uppercase hex characters>
 |
 |  DEBT OVERLAY
 |  Debt, leverage and liquidity - fully formula-driven.
@@ -282,6 +297,14 @@ contract used to verify successful controller output; it is not a fallback:
 This entry rule still applies when the request already names the company or
 includes attachments; the supplied information is consumed after the canonical
 screen is shown.
+
+On the later company/attachment message, invoke the same public bootstrap with
+the exact `--screen-session-receipt`, `--screen-session-id` and
+`--screen-session-secret` used above, plus the normal evidence/out arguments.
+The controller re-derives the current runtime mode, package, installation and
+active pointer, then atomically consumes that one receipt before issuer work.
+Missing, expired, copied, replayed, cross-session or pre-promotion receipts
+refuse. A static copy of the Company screen grants no continuation authority.
 
 The entry screen asks for the COMPANY ONLY. Filings use an explicit source mode. `internal` is the production default: Rogo/runtime-library/public-filings sourcing owns the filing set. `user_supplied` is an intentional override only when the user explicitly directs the run to use supplied filings. `internal_fallback` records a user-supplied fallback plus the failed internal-source reason. Never silently merge internal and user-supplied filing sets. A company whose mandatory filings cannot be sourced under the selected mode blocks at intake. Broker research is optional, but the Brokers
 milestone is not optional: it must close through either 1-10 supplied reports
@@ -318,8 +341,13 @@ and a real extraction of the frozen two-page filing fixture. It does not process
 issuer evidence, build a test model or rerun release certification. The Company
 screen is visible only after that preflight writes a hash-bound,
 content-addressed report/receipt pair and publishes `host-preflight-current.json`
-last. The receipt has `HOST_READY`; activation eligibility remains a separate
-whole-package custody decision. Deployment certification
+last. It then persists one authenticated, short-lived screen-session receipt
+whose visible nonce is printed on the screen. `HOST_READY` proves capability,
+not production: source checkouts are visibly marked development; inactive
+installed slots are visibly marked candidate; an unqualified production screen
+is reachable only after the live installation receipt, active pointer,
+promotion receipt, certified closure and retained rollback package all join.
+Deployment certification
 still belongs to the versioned installation transaction. After the Company
 screen is visible, later milestones perform their declared issuer work and
 persist their normal receipts.
@@ -750,7 +778,9 @@ complete list, nothing serial.
 
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.
 
-An ordinary production company run invokes only `scripts/run_excel_inflow_vnext.mjs`.
+An ordinary production company run invokes only the public
+`scripts/run_excel_inflow_bootstrap.mjs`; it invokes the private vNext
+controller after package custody closes.
 The Build milestone already runs the required per-run gates and returns their hash-bound
 evidence. During an ordinary company run, do **not** run mutation suites, exact
 authority replays, double-build determinism, render self-tests or any package,

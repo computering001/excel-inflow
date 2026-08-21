@@ -649,7 +649,7 @@ await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: 
 
 const runDir = path.join(workspace, "answered-run");
 const cold = JSON.parse(
-  (await command("run_user_flow.mjs", [acquisitionEvidence, "--out", runDir, "--answers", answers, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", acquisitionEvidence, "--out", runDir, "--answers", answers, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(cold.status === "PAUSED", `the cold answered run did not pause after decisions: ${cold.status}`);
 check((cold.reused_stages ?? []).length === 0, `the cold run claimed reuse: ${JSON.stringify(cold.reused_stages)}`);
@@ -678,7 +678,7 @@ check(
 );
 
 const warm = JSON.parse(
-  (await command("run_user_flow.mjs", [acquisitionEvidence, "--out", runDir, "--answers", answers, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", acquisitionEvidence, "--out", runDir, "--answers", answers, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(warm.status === "PAUSED", `the warm answered run did not pause after decisions: ${warm.status}`);
 check(
@@ -788,7 +788,7 @@ for (const row of classification.classes) {
 const changedAnswers = path.join(workspace, "changed-answers.json");
 await fs.writeFile(changedAnswers, `${JSON.stringify({ answers: { acquisition_funding: "equity" } }, null, 2)}\n`);
 const changed = JSON.parse(
-  (await command("run_user_flow.mjs", [acquisitionEvidence, "--out", runDir, "--answers", changedAnswers, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", acquisitionEvidence, "--out", runDir, "--answers", changedAnswers, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(changed.status === "PAUSED", `the changed-answer run did not pause after decisions: ${changed.status}`);
 check(

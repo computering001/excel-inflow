@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/installed-capability-receipt-v1.3.schema.json",
+  "title": "Excel Inflow installed capability receipt 1.3",
+  "description": "Frozen activation-transaction receipt. Version 1.2 remains historical audit evidence but is never activation eligible under this contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "readiness_scope", "candidate_slot_ready", "candidate_slot_refusal_reason",
+    "production_promotion_eligible", "production_promotion_refusal_reason", "generated_at", "requested_lanes", "host",
+    "source_identity", "node", "python", "workbook", "runtime_compatibility", "mandatory_filings_probe",
+    "inline_xbrl", "filesystem", "freshness", "process_spawn", "runtime_doctor_sha256", "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-installed-capability-receipt/1.3" },
+    "status": { "enum": ["HOST_READY", "REFUSED"] },
+    "readiness_scope": { "const": "inactive_candidate_slot_only" },
+    "candidate_slot_ready": { "type": "boolean" },
+    "candidate_slot_refusal_reason": { "type": ["string", "null"] },
+    "production_promotion_eligible": { "const": false },
+    "production_promotion_refusal_reason": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "requested_lanes": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "enum": ["evidence", "workbook"] }
+    },
+    "host": { "type": "object" },
+    "source_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "repository", "source_commit", "source_tree", "source_worktree_dirty", "skill_version", "package_mode",
+        "deployment_status", "closure_check_status", "active_runtime_code_closure_sha256",
+        "declared_runtime_code_closure_sha256", "complete_package_inventory_sha256", "archive_sha256",
+        "release_package_attestation_sha256", "installation_identity"
+      ],
+      "properties": {
+        "repository": { "type": ["string", "null"] },
+        "source_commit": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+        "source_worktree_dirty": { "type": ["boolean", "null"] },
+        "skill_version": { "type": ["string", "null"] },
+        "package_mode": { "type": ["string", "null"] },
+        "deployment_status": { "type": ["string", "null"] },
+        "closure_check_status": { "type": ["string", "null"] },
+        "active_runtime_code_closure_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "declared_runtime_code_closure_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "complete_package_inventory_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "archive_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "release_package_attestation_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "installation_identity": { "type": ["string", "null"] }
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executable", "executable_sha256", "version"],
+      "properties": {
+        "executable": { "type": ["string", "null"] },
+        "executable_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "version": { "type": "string" }
+      }
+    },
+    "python": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executable", "executable_sha256", "version", "required_modules", "per_module", "module_versions"],
+      "properties": {
+        "executable": { "type": ["string", "null"] },
+        "executable_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "version": { "type": ["array", "null"], "items": { "type": "integer" } },
+        "required_modules": { "type": "array", "items": { "type": "string" } },
+        "per_module": { "type": "object", "additionalProperties": { "type": "boolean" } },
+        "module_versions": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+      }
+    },
+    "workbook": {
+      "type": "object", "additionalProperties": false,
+      "required": ["soffice_executable", "soffice_executable_sha256", "soffice_version", "functional_capability"],
+      "properties": {
+        "soffice_executable": { "type": ["string", "null"] },
+        "soffice_executable_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "soffice_version": { "type": ["string", "null"] },
+        "functional_capability": { "type": ["object", "null"] }
+      }
+    },
+    "runtime_compatibility": { "type": ["object", "null"] },
+    "process_spawn": { "enum": ["PASS", "FAIL"] },
+    "mandatory_filings_probe": { "type": ["object", "null"] },
+    "inline_xbrl": { "type": ["object", "null"] },
+    "filesystem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["work_root", "temp_root", "disk_space_evaluation"],
+      "properties": {
+        "work_root": { "$ref": "#/$defs/filesystemLane" },
+        "temp_root": { "$ref": "#/$defs/filesystemLane" },
+        "disk_space_evaluation": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/diskSpaceEvaluation" }] }
+      }
+    },
+    "freshness": { "$ref": "#/$defs/freshness" },
+    "runtime_doctor_sha256": { "$ref": "#/$defs/sha256" },
+    "receipt_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "HOST_READY" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "requested_lanes": {
+            "allOf": [
+              { "contains": { "const": "evidence" } },
+              { "contains": { "const": "workbook" } }
+            ]
+          },
+          "process_spawn": { "const": "PASS" },
+          "workbook": {
+            "properties": {
+              "soffice_executable": { "type": "string", "minLength": 1 },
+              "soffice_executable_sha256": { "$ref": "#/$defs/sha256" },
+              "soffice_version": { "type": "string", "minLength": 1 },
+              "functional_capability": { "$ref": "#/$defs/libreOfficeCapability" }
+            }
+          },
+          "runtime_compatibility": { "$ref": "#/$defs/runtimeCompatibility" },
+          "mandatory_filings_probe": { "$ref": "#/$defs/filingsProbe" },
+          "inline_xbrl": { "$ref": "#/$defs/inlineXbrlProbe" },
+          "filesystem": {
+            "properties": {
+              "work_root": { "$ref": "#/$defs/satisfiedFilesystemLane" },
+              "temp_root": { "$ref": "#/$defs/satisfiedFilesystemLane" },
+              "disk_space_evaluation": { "$ref": "#/$defs/passingDiskSpaceEvaluation" }
+            }
+          },
+          "freshness": {
+            "properties": { "status": { "const": "FRESH" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "candidate_slot_ready": { "const": true } }, "required": ["candidate_slot_ready"] },
+      "then": {
+        "properties": {
+          "status": { "const": "HOST_READY" },
+          "candidate_slot_refusal_reason": { "type": "null" },
+          "source_identity": {
+            "properties": {
+              "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "source_worktree_dirty": { "const": false },
+              "closure_check_status": { "const": "match" },
+              "deployment_status": { "const": "installed_candidate" },
+              "active_runtime_code_closure_sha256": { "$ref": "#/$defs/sha256" },
+              "declared_runtime_code_closure_sha256": { "$ref": "#/$defs/sha256" },
+              "complete_package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+              "archive_sha256": { "$ref": "#/$defs/sha256" },
+              "release_package_attestation_sha256": { "$ref": "#/$defs/sha256" },
+              "installation_identity": { "type": "string", "minLength": 1 }
+            }
+          },
+          "freshness": { "properties": { "status": { "const": "FRESH" } } },
+          "filesystem": {
+            "properties": {
+              "disk_space_evaluation": {
+                "properties": {
+                  "mode": { "const": "candidate" },
+                  "policy_evidence": {
+                    "properties": { "policy_sealed": { "const": true } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "candidate_slot_refusal_reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "volumeIdentity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["device_id", "filesystem_type", "block_size_bytes"],
+      "properties": {
+        "device_id": { "type": "string", "minLength": 1 },
+        "filesystem_type": { "type": "string", "minLength": 1 },
+        "block_size_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "filesystemFacts": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "purpose", "requested_root", "requested_run_root", "requested_temp_root", "temp_root",
+        "canonical_requested_root", "nearest_existing_ancestor", "canonical_probe_parent", "probe_parent",
+        "immutable_skill_root", "outside_immutable_skill_root", "requested_root_existed_before",
+        "requested_root_existed_after", "real_run_directory_created", "volume_identity", "created", "written",
+        "flushed", "closed", "read_back", "bytes_match", "renamed", "statted", "deleted", "cleanup_verified",
+        "probe_payload_bytes", "probe_payload_sha256", "error"
+      ],
+      "properties": {
+        "purpose": { "enum": ["run_root", "temp_root"] },
+        "requested_root": { "type": "string", "minLength": 1 },
+        "requested_run_root": { "type": ["string", "null"] },
+        "requested_temp_root": { "type": ["string", "null"] },
+        "temp_root": { "type": ["string", "null"] },
+        "canonical_requested_root": { "type": ["string", "null"] },
+        "nearest_existing_ancestor": { "type": ["string", "null"] },
+        "canonical_probe_parent": { "type": ["string", "null"] },
+        "probe_parent": { "type": ["string", "null"] },
+        "immutable_skill_root": { "type": ["string", "null"] },
+        "outside_immutable_skill_root": { "type": "boolean" },
+        "requested_root_existed_before": { "type": "boolean" },
+        "requested_root_existed_after": { "type": ["boolean", "null"] },
+        "real_run_directory_created": { "type": "boolean" },
+        "volume_identity": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/volumeIdentity" }] },
+        "created": { "type": "boolean" },
+        "written": { "type": "boolean" },
+        "flushed": { "type": "boolean" },
+        "closed": { "type": "boolean" },
+        "read_back": { "type": "boolean" },
+        "bytes_match": { "type": "boolean" },
+        "renamed": { "type": "boolean" },
+        "statted": { "type": "boolean" },
+        "deleted": { "type": "boolean" },
+        "cleanup_verified": { "type": "boolean" },
+        "probe_payload_bytes": { "type": "integer", "minimum": 0 },
+        "probe_payload_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "filesystemLane": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result", "facts"],
+      "properties": {
+        "result": { "enum": ["satisfied", "unsatisfied", "unknown", "not_applicable"] },
+        "facts": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/filesystemFacts" }] }
+      }
+    },
+    "satisfiedFilesystemLane": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result", "facts"],
+      "properties": {
+        "result": { "const": "satisfied" },
+        "facts": {
+          "allOf": [
+            { "$ref": "#/$defs/filesystemFacts" },
+            {
+              "properties": {
+                "canonical_requested_root": { "type": "string", "minLength": 1 },
+                "volume_identity": { "$ref": "#/$defs/volumeIdentity" },
+                "outside_immutable_skill_root": { "const": true },
+                "real_run_directory_created": { "const": false },
+                "created": { "const": true }, "written": { "const": true }, "flushed": { "const": true },
+                "closed": { "const": true }, "read_back": { "const": true }, "bytes_match": { "const": true },
+                "renamed": { "const": true }, "statted": { "const": true }, "deleted": { "const": true },
+                "cleanup_verified": { "const": true }, "probe_payload_bytes": { "minimum": 1 },
+                "probe_payload_sha256": { "$ref": "#/$defs/sha256" }, "error": { "type": "null" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "diskSpaceRequirements": {
+      "type": "object", "additionalProperties": false,
+      "required": ["distinct_volumes", "shared_volume"],
+      "properties": {
+        "distinct_volumes": {
+          "type": "object", "additionalProperties": false,
+          "required": ["work_root", "temp_root"],
+          "properties": {
+            "work_root": { "type": ["integer", "null"], "minimum": 1 },
+            "temp_root": { "type": ["integer", "null"], "minimum": 1 }
+          }
+        },
+        "shared_volume": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "diskSpaceRoot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["available_bytes", "required_bytes", "headroom_bytes", "status", "volume_identity"],
+      "properties": {
+        "available_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "required_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "headroom_bytes": { "type": ["integer", "null"] },
+        "status": { "enum": ["PASS", "REFUSED", "UNKNOWN"] },
+        "volume_identity": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/volumeIdentity" }] }
+      }
+    },
+    "diskSpaceEvaluation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "status", "mode", "requested_lanes", "selected_lane",
+        "selected_volume_topology", "observed_at", "policy_floor_bytes", "override_min_free_bytes",
+        "required_free_bytes", "roots", "policy_evidence", "total_violations", "findings"
+      ],
+      "properties": {
+        "schema_version": { "const": "excel-inflow-disk-space-evaluation/1.1" },
+        "status": { "enum": ["PASS", "REFUSED"] },
+        "mode": { "enum": ["development", "candidate"] },
+        "requested_lanes": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "enum": ["evidence", "workbook"] }
+        },
+        "selected_lane": { "enum": ["evidence", "workbook", "combined", null] },
+        "selected_volume_topology": { "enum": ["distinct_volumes", "shared_volume"] },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "policy_floor_bytes": { "$ref": "#/$defs/diskSpaceRequirements" },
+        "override_min_free_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "required_free_bytes": { "$ref": "#/$defs/diskSpaceRequirements" },
+        "roots": {
+          "type": "object", "additionalProperties": false,
+          "required": ["work_root", "temp_root"],
+          "properties": {
+            "work_root": { "$ref": "#/$defs/diskSpaceRoot" },
+            "temp_root": { "$ref": "#/$defs/diskSpaceRoot" }
+          }
+        },
+        "policy_evidence": {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "policy_schema_version", "policy_schema_sha256", "policy_sha256", "policy_sealed",
+            "measurement_evidence_sha256", "measurement_schema_version", "measurement_schema_sha256",
+            "raw_manifest_sha256"
+          ],
+          "properties": {
+            "policy_schema_version": { "const": "excel-inflow-disk-space-policy/1.1" },
+            "policy_schema_sha256": { "$ref": "#/$defs/sha256" },
+            "policy_sha256": { "$ref": "#/$defs/sha256" },
+            "policy_sealed": { "type": "boolean" },
+            "measurement_evidence_sha256": { "$ref": "#/$defs/sha256" },
+            "measurement_schema_version": { "const": "excel-inflow-disk-space-measurement/1.1" },
+            "measurement_schema_sha256": { "$ref": "#/$defs/sha256" },
+            "raw_manifest_sha256": {
+              "type": "object", "additionalProperties": false,
+              "required": ["sample_receipts", "filings", "brokers", "workbook"],
+              "properties": {
+                "sample_receipts": { "$ref": "#/$defs/sha256" },
+                "filings": { "$ref": "#/$defs/sha256" },
+                "brokers": { "$ref": "#/$defs/sha256" },
+                "workbook": { "$ref": "#/$defs/sha256" }
+              }
+            }
+          }
+        },
+        "total_violations": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "array" }
+      }
+    },
+    "passingDiskSpaceEvaluation": {
+      "allOf": [
+        { "$ref": "#/$defs/diskSpaceEvaluation" },
+        {
+          "properties": {
+            "status": { "const": "PASS" },
+            "total_violations": { "const": 0 },
+            "findings": { "maxItems": 0 },
+            "roots": {
+              "properties": {
+                "work_root": { "properties": { "status": { "const": "PASS" }, "headroom_bytes": { "minimum": 0 } } },
+                "temp_root": { "properties": { "status": { "const": "PASS" }, "headroom_bytes": { "minimum": 0 } } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "libreOfficeCapability": {
+      "type": "object",
+      "required": ["schema_version", "status", "fixture", "output", "cleanup"],
+      "properties": {
+        "schema_version": { "const": "libreoffice-workbook-capability/1.0" },
+        "status": { "const": "PASS" },
+        "fixture": {
+          "type": "object", "required": ["sha256"],
+          "properties": { "sha256": { "$ref": "#/$defs/sha256" } }
+        },
+        "output": {
+          "type": "object", "required": ["sha256", "cached_result"],
+          "properties": { "sha256": { "$ref": "#/$defs/sha256" }, "cached_result": { "const": 12.5 } }
+        },
+        "cleanup": {
+          "type": "object",
+          "required": ["profile_removed", "fixture_removed", "output_removed", "workspace_removed", "residue_paths"],
+          "properties": {
+            "profile_removed": { "const": true }, "fixture_removed": { "const": true },
+            "output_removed": { "const": true }, "workspace_removed": { "const": true },
+            "residue_paths": { "type": "array", "maxItems": 0 }
+          }
+        }
+      }
+    },
+    "runtimeCompatibility": {
+      "type": "object",
+      "required": ["contract_schema_version", "contract_sha256", "status", "total_violations", "evaluated_runtime_names", "observations", "findings"],
+      "properties": {
+        "contract_schema_version": { "const": "excel-inflow-runtime-compatibility/1.0" },
+        "contract_sha256": { "$ref": "#/$defs/sha256" },
+        "status": { "const": "PASS" },
+        "total_violations": { "const": 0 },
+        "evaluated_runtime_names": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "observations": { "type": "object" },
+        "findings": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "filingsProbe": {
+      "type": "object",
+      "required": [
+        "fixture_sha256", "pdf_sha256", "extractor_sha256", "request_sha256", "response_sha256",
+        "response_schema_sha256", "semantic_projection_sha256", "filings_controller_sha256",
+        "filings_state_sha256", "filings_bundle_sha256", "runtime_closure_sha256", "scratch_removed"
+      ],
+      "properties": {
+        "fixture_sha256": { "$ref": "#/$defs/sha256" }, "pdf_sha256": { "$ref": "#/$defs/sha256" },
+        "extractor_sha256": { "$ref": "#/$defs/sha256" }, "request_sha256": { "$ref": "#/$defs/sha256" },
+        "response_sha256": { "$ref": "#/$defs/sha256" }, "response_schema_sha256": { "$ref": "#/$defs/sha256" },
+        "semantic_projection_sha256": { "$ref": "#/$defs/sha256" },
+        "filings_controller_sha256": { "$ref": "#/$defs/sha256" },
+        "filings_state_sha256": { "$ref": "#/$defs/sha256" }, "filings_bundle_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_closure_sha256": { "$ref": "#/$defs/sha256" }, "scratch_removed": { "const": true }
+      }
+    },
+    "authorityFact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_ref", "period_end", "unit_ref", "value"],
+      "properties": {
+        "context_ref": { "type": "string", "minLength": 1 },
+        "period_end": { "type": "string", "format": "date" },
+        "unit_ref": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" }
+      }
+    },
+    "inlineXbrlProbe": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "status", "reason_code", "selected_python", "lxml_worker_execution", "timeout_ms", "duration_ms",
+        "fixture_sha256", "html_sha256", "worker_sha256", "result_schema_sha256", "selected_python_sha256", "result_sha256",
+        "fact_count", "context_count", "unit_count", "selected_non_dimensioned_authority",
+        "quarantined_dimensioned_fact", "scratch_removed"
+      ],
+      "properties": {
+        "schema_version": { "const": "excel-inflow-installed-inline-xbrl-probe/1.0" },
+        "status": { "const": "PASS" }, "reason_code": { "type": "null" },
+        "selected_python": { "type": "string", "minLength": 1 }, "lxml_worker_execution": { "const": "PASS" },
+        "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 30000 }, "duration_ms": { "type": "integer", "minimum": 0 },
+        "fixture_sha256": { "$ref": "#/$defs/sha256" }, "html_sha256": { "$ref": "#/$defs/sha256" },
+        "worker_sha256": { "$ref": "#/$defs/sha256" }, "result_schema_sha256": { "$ref": "#/$defs/sha256" },
+        "selected_python_sha256": { "$ref": "#/$defs/sha256" }, "result_sha256": { "$ref": "#/$defs/sha256" },
+        "fact_count": { "const": 7 }, "context_count": { "const": 4 }, "unit_count": { "const": 1 },
+        "selected_non_dimensioned_authority": {
+          "type": "object", "minProperties": 2, "maxProperties": 2,
+          "additionalProperties": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/authorityFact" } }
+        },
+        "quarantined_dimensioned_fact": {
+          "type": "object", "additionalProperties": false,
+          "required": ["concept", "context_ref", "dimensions", "value"],
+          "properties": {
+            "concept": { "type": "string", "minLength": 1 }, "context_ref": { "type": "string", "minLength": 1 },
+            "dimensions": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string", "minLength": 1 } },
+            "value": { "type": "number" }
+          }
+        },
+        "scratch_removed": { "const": true }
+      }
+    },
+    "freshness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "max_age_seconds", "generated_at", "expires_at", "evaluated_at", "status"],
+      "properties": {
+        "policy": { "const": "activation_transaction" },
+        "max_age_seconds": { "const": 3600 },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "evaluated_at": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["FRESH", "EXPIRED"] }
+      }
+    }
+  }
+}

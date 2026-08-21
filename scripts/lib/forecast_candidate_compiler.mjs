@@ -210,11 +210,16 @@ function producerAndRender(method) {
 }
 
 function historicalValues(row) {
-  const values = (row?.values ?? []).slice(0, 3);
-  const printedFaceSeries =
-    row?.historical_authority === "source_input" && values.length === 3;
-  return values.map((value) =>
-    finite(value) ? Number(value) : printedFaceSeries ? 0 : null,
+  // A reconciled filed total is stored separately from calculated/display
+  // values.  It is still the row's historical authority and must remain
+  // available to the forecast waterfall when children are incomplete.  No
+  // missing, blank or dash observation is converted to zero here: zero is a
+  // value only when the sealed historical source actually reports zero.
+  const source = row?.historical_authority === "reported_total_reconciled"
+    ? row?.reported_historical_values
+    : row?.values;
+  return [0, 1, 2].map((index) =>
+    finite(source?.[index]) ? Number(source[index]) : null,
   );
 }
 
@@ -242,11 +247,7 @@ function evaluatedHistoricalValues(
     ) {
       return finite(literal)
         ? Number(literal)
-        : candidate?.historical_authority === "source_input" &&
-            Array.isArray(candidate?.values) &&
-            candidate.values.length >= 3
-          ? 0
-          : null;
+        : null;
     }
     const nextVisiting = new Set(visiting).add(candidate.row_id);
     const operands = (candidate.calculation.refs ?? []).map((rowId) =>
@@ -595,9 +596,16 @@ function formulaCandidate(row, behavior, forecastIndex, rows = []) {
   // inference over the parent's own derived history.
   if (
     (calculation.refs ?? []).some(
-      (reference) =>
-        rows.find((candidate) => candidate.row_id === reference)
-          ?.forecast_capture_parent_id === row.row_id,
+      (reference) => {
+        const dependency = rows.find(
+          (candidate) => candidate.row_id === reference,
+        );
+        const authority = dependency?.forecast_period_authorities?.[forecastIndex];
+        return dependency?.forecast_capture_parent_id === row.row_id &&
+          ["not_separately_forecast", "not_applicable"].includes(
+            authority?.method,
+          );
+      },
     )
   ) {
     return null;
@@ -608,7 +616,6 @@ function formulaCandidate(row, behavior, forecastIndex, rows = []) {
       const dependency = rows.find((candidate) => candidate.row_id === reference);
       const authority = dependency?.forecast_period_authorities?.[forecastIndex];
       return Boolean(
-        dependency?.forecast_capture_parent_id ||
         ["not_separately_forecast", "not_applicable"].includes(authority?.method),
       );
     })
@@ -665,7 +672,50 @@ function derivedDisplayCandidate(row) {
 
 function declaredCandidate(row, forecastIndex) {
   const authority = row?.forecast_period_authorities?.[forecastIndex];
-  return authority ? { ...structuredClone(authority), origin: "declared_period_authority" } : null;
+  if (!authority) return null;
+  const candidate = {
+    ...structuredClone(authority),
+    origin: "declared_period_authority",
+  };
+  const comparableHistory = historicalValues(row);
+  const completeComparableHistory = comparableHistory.every(finite);
+  // Ownership preflight can preserve an already selected historical fallback
+  // across a mixed parent/children family.  The method name and finite value
+  // are not enough to make it an executable formula: reattach the one visible
+  // row-history operator so the producer contract and workbook writer consume
+  // the same authority.  This never fabricates history or a value.
+  if (
+    !candidate.formula_spec
+    && candidate.method === "historical_average"
+    && completeComparableHistory
+  ) {
+    candidate.formula_spec = {
+      operator: "historical_average",
+      row_id: row.row_id,
+      historical_period_count: 3,
+    };
+  } else if (
+    !candidate.formula_spec
+    && candidate.method === "historical_trend"
+    && completeComparableHistory
+  ) {
+    candidate.formula_spec = {
+      operator: "linear_historical_trend",
+      row_id: row.row_id,
+      historical_period_count: 3,
+      forecast_index: forecastIndex,
+    };
+  } else if (
+    !candidate.formula_spec
+    && candidate.method === "carry_forward"
+    && finite(comparableHistory.at(-1))
+  ) {
+    candidate.formula_spec = {
+      operator: "prior_period",
+      refs: [row.row_id],
+    };
+  }
+  return candidate;
 }
 
 function brokerCandidateResolution(modelCase, row, forecastIndex) {
@@ -1202,6 +1252,15 @@ export function compileForecastPlan(
           anchorSelection.supported &&
           row.semantic_role === anchorSelection.derived;
         let declared = declaredCandidate(row, forecastIndex);
+        // Capture lineage is row-global because it also drives presentation,
+        // but ownership is period-specific.  The resolver pins every live
+        // sibling period explicitly.  Permit exactly that declared period's
+        // authority through the behavior gate; do not let a capture in FY2 or
+        // FY3 erase a lawful FY1 formula/inference, and do not reopen generic
+        // historical candidates in periods that are actually captured.
+        if (row.forecast_capture_parent_id && declared?.method) {
+          allowedMethods.add(declared.method);
+        }
         if (derivedBrokerHeadline && declared?.method === "broker_consensus") {
           declared = null;
         }
@@ -1632,8 +1691,8 @@ function evaluateMaterializedForecastCalculation(calculation, row) {
   ) {
     return null;
   }
-  const history = (row.values ?? []).slice(0, 3).map(Number);
-  if (history.length !== 3 || history.some((value) => !Number.isFinite(value))) {
+  const history = historicalValues(row);
+  if (history.some((value) => !finite(value))) {
     return null;
   }
   if (calculation.operator === "historical_average") {
@@ -1649,6 +1708,18 @@ function evaluateMaterializedForecastCalculation(calculation, row) {
  * semantic period authorities and typed formula rules, never workbook cells.
  */
 export function materializeForecastPlan(modelCase, plan) {
+  const unresolvedMaterialCount = plan?.unresolved_material_count;
+  if (
+    plan?.status !== "PASS"
+    || !Number.isSafeInteger(unresolvedMaterialCount)
+    || unresolvedMaterialCount !== 0
+    || !Array.isArray(plan?.states)
+    || plan.states.some((state) => state?.status === "BLOCKED")
+  ) {
+    throw new Error(
+      "A blocked forecast plan cannot be materialized into economic model state.",
+    );
+  }
   const next = structuredClone(modelCase);
   next.statement_structure_compiled_version = "semantic-statements/1.0";
   const rowsByKey = new Map();

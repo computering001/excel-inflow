@@ -52,6 +52,7 @@ function usage() {
   return [
     "Usage: run_development_gate.mjs [--phase all|workflow,evidence,graph,economic,economics,forecast,proof,real_corpus,cohort,performance]",
     "  [--profile all|portable|custody]",
+    "  [--only <comma-separated exact registry test IDs>]",
     "  [--cases <case-directory>] [--representative <compiled-case.json>]",
     "  [--broker-corpus <external-corpus.json>]",
     "  [--broker-real-pack-manifest <external-reviewed-pack-manifest.json>]",
@@ -177,13 +178,18 @@ function redactedExecutionResult(result, metadata) {
     status: result.status,
     exit_code: result.exit_code ?? null,
     signal: result.signal ?? null,
+    started_at: result.started_at,
+    completed_at: result.completed_at,
     duration_ms: result.duration_ms,
     timeout_ms: result.timeout_ms ?? null,
+    timed_out: result.timed_out === true,
     missing: result.missing ?? [],
     stdout_bytes: Buffer.byteLength(stdout),
     stdout_sha256: sha256Bytes(stdout),
     stderr_bytes: Buffer.byteLength(stderr),
     stderr_sha256: sha256Bytes(stderr),
+    stdout_log: result.stdout_log ?? null,
+    stderr_log: result.stderr_log ?? null,
     output_custody: result.output_custody ?? {
       status: "missing",
       kind: null,
@@ -215,6 +221,7 @@ function phases(raw, known) {
 }
 
 async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
+  const wallStartedAt = new Date().toISOString();
   const timeoutMs = effectiveTestTimeoutMs(test, timeoutOverrideMs);
   const testOut = path.join(out, test.id);
   const missing = [];
@@ -229,8 +236,11 @@ async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
       phase: test.phase,
       status: "BLOCKED",
       exit_code: null,
+      started_at: wallStartedAt,
+      completed_at: new Date().toISOString(),
       duration_ms: 0,
       timeout_ms: timeoutMs,
+      timed_out: false,
       missing,
       stdout: "",
       stderr: `Missing required test custody input(s): ${missing.join(", ")}`,
@@ -256,7 +266,9 @@ async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
         // custody inputs selected for this development-gate invocation rather
         // than silently falling back to machine-local Codex fixtures/runtimes.
         EXCEL_INFLOW_TEST_PYTHON: python,
+        EXCEL_INFLOW_PYTHON: python,
         DEBT_OVERLAY_PYTHON: python,
+        PYTHON: python,
         ...(inputs.CASES ? { DEBT_OVERLAY_CASES_DIR: inputs.CASES } : {}),
         ...(inputs.SOFFICE ? { SOFFICE_BIN: inputs.SOFFICE } : {}),
       },
@@ -268,6 +280,9 @@ async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
       exit_code: 0,
       duration_ms: Number(process.hrtime.bigint() - started) / 1e6,
       timeout_ms: timeoutMs,
+      started_at: wallStartedAt,
+      completed_at: new Date().toISOString(),
+      timed_out: false,
       command: [command, ...args],
       stdout: result.stdout,
       stderr: result.stderr,
@@ -281,6 +296,9 @@ async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
       signal: error.signal ?? null,
       duration_ms: Number(process.hrtime.bigint() - started) / 1e6,
       timeout_ms: timeoutMs,
+      started_at: wallStartedAt,
+      completed_at: new Date().toISOString(),
+      timed_out: error.killed === true,
       command: [command, ...args],
       stdout: error.stdout ?? "",
       stderr: error.stderr ?? error.message,
@@ -300,12 +318,33 @@ async function runTest(test, { inputs, python, timeoutOverrideMs, out }) {
 
 async function runPool(tests, concurrency, context) {
   const results = new Array(tests.length);
+  const started = new Array(tests.length);
   let cursor = 0;
   async function worker() {
     while (cursor < tests.length) {
       const index = cursor;
       cursor += 1;
-      results[index] = await runTest(tests[index], context);
+      const test = tests[index];
+      started[index] = test;
+      try {
+        results[index] = await runTest(test, context);
+      } catch (error) {
+        results[index] = {
+          id: test.id,
+          phase: test.phase,
+          status: "FAIL",
+          exit_code: null,
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          duration_ms: 0,
+          timeout_ms: effectiveTestTimeoutMs(test, context.timeoutOverrideMs),
+          timed_out: false,
+          missing: [],
+          stdout: "",
+          stderr: `Unreported worker exception converted to a terminal result: ${error?.message ?? String(error)}`,
+          output_custody: { status: "invalid", kind: null, sha256: null },
+        };
+      }
       const result = results[index];
       console.log(`${result.status.padEnd(7)} ${result.id} (${Math.round(result.duration_ms)} ms)`);
     }
@@ -313,7 +352,7 @@ async function runPool(tests, concurrency, context) {
   await Promise.all(
     Array.from({ length: Math.min(Math.max(1, concurrency), tests.length) }, worker),
   );
-  return results;
+  return { results, started };
 }
 
 const options = parseArgs(process.argv.slice(2));
@@ -332,7 +371,20 @@ const profile = String(options.profile ?? "all");
 if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {
   throw new Error(`Unknown development-gate profile ${profile}.\n${usage()}`);
 }
-const selectedTests = selectRegistryTests(registry, { profile, phases: selectedPhases });
+const profileTests = selectRegistryTests(registry, { profile, phases: selectedPhases });
+const requestedIds = options.only
+  ? [...new Set(String(options.only).split(",").map((item) => item.trim()).filter(Boolean))]
+  : null;
+const selectedTests = requestedIds
+  ? profileTests.filter((test) => requestedIds.includes(test.id))
+  : profileTests;
+if (requestedIds) {
+  const selectedIds = new Set(selectedTests.map((test) => test.id));
+  const missingIds = requestedIds.filter((id) => !selectedIds.has(id));
+  if (missingIds.length > 0) {
+    throw new Error(`Requested registry test IDs are absent from the ${profile} selection: ${missingIds.join(", ")}.`);
+  }
+}
 const inputs = substitutions(options);
 const invocationErrors = validateRegistryInvocationContract(
   selectedTests,
@@ -358,13 +410,25 @@ const inputCustody = Object.fromEntries(await Promise.all(
 const source = await sourceIdentity();
 
 const startedAt = new Date().toISOString();
-const rawResults = await runPool(selectedTests, concurrency, {
+const pool = await runPool(selectedTests, concurrency, {
   inputs,
   python: options.python ?? "python3",
   timeoutOverrideMs,
   out,
 });
-const results = rawResults.map((result, index) => redactedExecutionResult(
+const logsRoot = path.join(out, "test-logs");
+await fs.mkdir(logsRoot, { recursive: true });
+await Promise.all(pool.results.map(async (result) => {
+  const stdoutLog = path.join(logsRoot, `${result.id}.stdout.log`);
+  const stderrLog = path.join(logsRoot, `${result.id}.stderr.log`);
+  await Promise.all([
+    fs.writeFile(stdoutLog, String(result.stdout ?? ""), "utf8"),
+    fs.writeFile(stderrLog, String(result.stderr ?? ""), "utf8"),
+  ]);
+  result.stdout_log = path.relative(out, stdoutLog).split(path.sep).join("/");
+  result.stderr_log = path.relative(out, stderrLog).split(path.sep).join("/");
+}));
+const results = pool.results.map((result, index) => redactedExecutionResult(
   result,
   effectiveTestMetadata(registry, selectedTests[index]),
 ));
@@ -389,7 +453,22 @@ const report = canonical({
   selection: {
     profile,
     selected_test_count: selectedTests.length,
+    selected_test_ids: selectedTests.map((test) => test.id).sort(),
     selected_test_ids_sha256: testIdSetSha256(selectedTests),
+  },
+  lifecycle: {
+    selected: {
+      count: selectedTests.length,
+      test_ids_sha256: testIdSetSha256(selectedTests),
+    },
+    started: {
+      count: pool.started.filter(Boolean).length,
+      test_ids_sha256: testIdSetSha256(pool.started.filter(Boolean)),
+    },
+    terminally_reported: {
+      count: results.length,
+      test_ids_sha256: testIdSetSha256(results),
+    },
   },
   release_actions_performed: false,
   native_excel_actions_performed: false,

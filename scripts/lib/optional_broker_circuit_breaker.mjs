@@ -25,10 +25,11 @@
  */
 import { assertBrokerFailureDegrades } from "./delivery_constitution.mjs";
 import { STAGE_FLOOR_MS } from "./run_deadline.mjs";
+import { hashValue } from "./run_store.mjs";
 
 const CLOSED = new Set(["PASS", "PASS_DEGRADED"]);
 
-export const BROKER_BREAKER_RECEIPT_SCHEMA = "optional-broker-breaker-receipt/1.0";
+export const BROKER_BREAKER_RECEIPT_SCHEMA = "optional-broker-breaker-receipt/1.1";
 
 /**
  * The declared breaker policy. `minimum_budget_ms` is P6.1's stage floor: an
@@ -51,6 +52,27 @@ export const BROKER_DEGRADE_REGISTRY_REASON = "DEGRADED.broker_evidence_unavaila
 
 export const BREAKER_STATES = Object.freeze(["closed", "open", "half_open"]);
 export const BREAKER_OPEN_REASONS = Object.freeze(["failure_threshold", "budget_starved"]);
+
+function stateSha256(state) {
+  return state && typeof state === "object" && !Array.isArray(state)
+    ? hashValue(state)
+    : null;
+}
+
+function mandatoryLaneBindings(state) {
+  return Object.entries(state?.lane_states ?? {})
+    .filter(([lane]) => lane !== "broker")
+    .sort(([left], [right]) => Buffer.compare(Buffer.from(left), Buffer.from(right)))
+    .map(([lane, laneState]) => ({
+      lane,
+      pipeline_status: laneState?.pipeline_status ?? null,
+      state_sha256: stateSha256(laneState),
+    }));
+}
+
+function sealReceipt(body) {
+  return { ...body, receipt_sha256: hashValue(body) };
+}
 
 export function optionalBrokerFailureReason({ error = null, state = null } = {}) {
   const message = String(
@@ -141,6 +163,42 @@ export function validateBrokerBreakerReceipt(receipt) {
   if (receipt.reason_code !== null && receipt.registry_reason_code !== BROKER_DEGRADE_REGISTRY_REASON) {
     violations.push("a breaker that fired must crosswalk to the registered terminal reason code");
   }
+  if (![0, 1].includes(receipt.zero_authority_retry_count)) {
+    violations.push("zero_authority_retry_count must be zero or one");
+  }
+  if (receipt.zero_authority_executed !== (receipt.zero_authority_retry_count === 1)) {
+    violations.push("zero_authority execution and retry count disagree");
+  }
+  if (!/^[a-f0-9]{64}$/.test(String(receipt.final_state_sha256 ?? ""))) {
+    violations.push("final_state_sha256 is not a SHA-256 digest");
+  }
+  if (!Array.isArray(receipt.mandatory_lane_bindings)) {
+    violations.push("mandatory_lane_bindings must be an array");
+  } else {
+    for (const binding of receipt.mandatory_lane_bindings) {
+      if (!binding?.lane || binding.lane === "broker") violations.push("mandatory lane binding is invalid");
+      if (receipt.zero_authority_executed && !CLOSED.has(binding?.pipeline_status)) {
+        violations.push("a zero-authority retry left a mandatory lane open");
+      }
+      if (!/^[a-f0-9]{64}$/.test(String(binding?.state_sha256 ?? ""))) {
+        violations.push("mandatory lane binding hash is invalid");
+      }
+    }
+  }
+  if (!Array.isArray(receipt.trigger_mandatory_lane_bindings)) {
+    violations.push("trigger_mandatory_lane_bindings must be an array");
+  } else if (
+    receipt.zero_authority_executed
+    && receipt.trigger_mandatory_lane_bindings.length > 0
+    && hashValue(receipt.trigger_mandatory_lane_bindings)
+      !== hashValue(receipt.mandatory_lane_bindings)
+  ) {
+    violations.push("a zero-authority retry changed mandatory lane state");
+  }
+  const { receipt_sha256: declaredReceiptSha256, ...receiptBody } = receipt;
+  if (declaredReceiptSha256 !== hashValue(receiptBody)) {
+    violations.push("receipt_sha256 does not bind the breaker receipt body");
+  }
   return violations;
 }
 
@@ -188,8 +246,9 @@ export async function executeOptionalBrokerCircuitBreaker({
   let breakerState = decision.breaker_state;
   let openReason = decision.open_reason;
 
-  const receipt = (extra) => ({
+  const receipt = (extra, finalState = state, triggerState = state) => sealReceipt({
     schema_version: BROKER_BREAKER_RECEIPT_SCHEMA,
+    run_id: finalState?.run_id ?? triggerState?.run_id ?? null,
     breaker_state: breakerState,
     failure_count: failureCount,
     failure_threshold: threshold,
@@ -202,6 +261,10 @@ export async function executeOptionalBrokerCircuitBreaker({
       ? priorReceipt.breaker_state
       : null,
     open_reason: openReason,
+    trigger_state_sha256: stateSha256(triggerState),
+    final_state_sha256: stateSha256(finalState),
+    trigger_mandatory_lane_bindings: mandatoryLaneBindings(triggerState),
+    mandatory_lane_bindings: mandatoryLaneBindings(finalState),
     ...extra,
   });
 
@@ -234,18 +297,36 @@ export async function executeOptionalBrokerCircuitBreaker({
       const stateIsFresh = !fingerprintState || (
         afterFingerprint !== null && afterFingerprint !== beforeFingerprint
       );
+      const laneEntries = Object.entries(state?.lane_states ?? {});
+      const brokerLanePresent = laneEntries.some(([lane]) => lane === "broker");
+      const mandatoryLanesClosed = laneEntries.every(
+        ([lane, laneState]) => lane === "broker" || CLOSED.has(laneState?.pipeline_status),
+      );
       const nonClosedBrokerOnly = Boolean(
         state
-        && Object.entries(state.lane_states ?? {}).some(
+        && laneEntries.some(
           ([lane, laneState]) => lane === "broker"
             && !CLOSED.has(laneState?.pipeline_status)
             && laneState?.blocker_class === "INTERNAL_WORK",
         )
-        && Object.entries(state.lane_states ?? {}).every(
-          ([lane, laneState]) => lane === "broker" || CLOSED.has(laneState?.pipeline_status),
-        ),
+        && mandatoryLanesClosed,
       );
-      if (state && stateIsFresh && !nonClosedBrokerOnly) {
+      // A broker lane can close successfully and still poison the later
+      // semantic/declaration/ingress join.  That exact post-close state is an
+      // optional broker failure only when every mandatory lane is already
+      // closed and the aggregate controller owns it as non-user internal
+      // work.  The zero-authority run is the bounded counterfactual that
+      // proves attribution; exception wording is never consulted.
+      const postCloseBrokerFailure = Boolean(
+        state
+        && brokerLanePresent
+        && mandatoryLanesClosed
+        && state.pipeline_status !== "PASS"
+        && state.blocker_class === "INTERNAL_WORK"
+        && state.user_blocking !== true,
+      );
+      const retryableBrokerFailure = nonClosedBrokerOnly || postCloseBrokerFailure;
+      if (state && stateIsFresh && state.pipeline_status === "PASS") {
         // A healthy attempt closes the breaker, whatever it carried in.
         breakerState = "closed";
         openReason = null;
@@ -257,6 +338,23 @@ export async function executeOptionalBrokerCircuitBreaker({
             reason_code: null,
             registry_reason_code: null,
             zero_authority_executed: false,
+            zero_authority_retry_count: 0,
+          }),
+        };
+      }
+      if (state && stateIsFresh && !retryableBrokerFailure) {
+        // A fresh mandatory/user-owned failure is not broker evidence.  Return
+        // it untouched so the top-level delivery constitution owns the stop;
+        // never use zero broker authority to hide an unrelated defect.
+        return {
+          state,
+          circuit_breaker_used: false,
+          reason_code: null,
+          breaker_receipt: receipt({
+            reason_code: null,
+            registry_reason_code: null,
+            zero_authority_executed: false,
+            zero_authority_retry_count: 0,
           }),
         };
       }
@@ -272,6 +370,10 @@ export async function executeOptionalBrokerCircuitBreaker({
     // No attempt was made: the optional lane ran out of clock before it began.
     : "broker_timeout";
   assertBrokerFailureDegrades(reasonCode);
+  const triggerState = state;
+  const beforeZeroAuthorityFingerprint = fingerprintState
+    ? await fingerprintState()
+    : null;
   const zeroExecution = await runZeroAuthority(reasonCode);
   if (zeroExecution && Number(zeroExecution.code) !== 0) {
     throw new Error(
@@ -280,6 +382,36 @@ export async function executeOptionalBrokerCircuitBreaker({
     );
   }
   state = await readState();
+  const afterZeroAuthorityFingerprint = fingerprintState
+    ? await fingerprintState()
+    : null;
+  const zeroAuthorityStateFresh = !fingerprintState || (
+    afterZeroAuthorityFingerprint !== null
+    && afterZeroAuthorityFingerprint !== beforeZeroAuthorityFingerprint
+  );
+  const finalLaneEntries = Object.entries(state?.lane_states ?? {});
+  const finalBrokerLane = state?.lane_states?.broker ?? null;
+  const zeroAuthorityBrokerClosed = Boolean(
+    finalBrokerLane
+    && finalBrokerLane.pipeline_status === "PASS_DEGRADED"
+    && finalBrokerLane.summary?.fault_contained_to_zero_authority === true,
+  );
+  const finalMandatoryLanesClosed = finalLaneEntries.every(
+    ([lane, laneState]) => lane === "broker" || CLOSED.has(laneState?.pipeline_status),
+  );
+  if (
+    !zeroAuthorityStateFresh
+    || state?.pipeline_status !== "PASS"
+    || !zeroAuthorityBrokerClosed
+    || !finalMandatoryLanesClosed
+  ) {
+    throw new Error(
+      "The zero-broker circuit-breaker process returned without one fresh PASS "
+      + "state, closed mandatory lanes and an explicit fault-contained "
+      + "PASS_DEGRADED broker lane. Delivery cannot infer zero authority from "
+      + "a successful process exit alone.",
+    );
+  }
   return {
     state,
     circuit_breaker_used: true,
@@ -288,6 +420,7 @@ export async function executeOptionalBrokerCircuitBreaker({
       reason_code: reasonCode,
       registry_reason_code: BROKER_DEGRADE_REGISTRY_REASON,
       zero_authority_executed: true,
-    }),
+      zero_authority_retry_count: 1,
+    }, state, triggerState),
   };
 }

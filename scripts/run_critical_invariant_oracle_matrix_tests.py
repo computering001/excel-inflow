@@ -45,6 +45,26 @@ def detected(mutation_id: str) -> bool:
     raise AssertionError(f"unknown mutation {mutation_id}")
 
 
+# The matrix is curated authority, but its two byte bindings are generated.
+# This explicit writer is the only supported way to rebind them after the
+# oracle or test registry changes; ordinary test execution remains read-only.
+if "--record-bindings" in sys.argv:
+    recorded = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
+    recorded["bindings"]["oracle_sha256"] = sha256(Path(__file__))
+    recorded["bindings"]["registry_sha256"] = sha256(REGISTRY_PATH)
+    MATRIX_PATH.write_text(
+        json.dumps(recorded, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps({
+        "status": "PASS",
+        "mode": "record_bindings",
+        "oracle_sha256": recorded["bindings"]["oracle_sha256"],
+        "registry_sha256": recorded["bindings"]["registry_sha256"],
+    }, sort_keys=True))
+    raise SystemExit(0)
+
+
 matrix = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
 registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 tests = {test["id"]: test for test in registry["tests"]}

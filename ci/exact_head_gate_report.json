@@ -1,9 +1,9 @@
 {
-  "schema_version": "excel-inflow-exact-head-gate-report/1.0",
-  "role": "exact_head (working tree = source head; no synthetic merge)",
+  "schema_version": "excel-inflow-historical-parent-gate-report/1.0",
+  "role": "HISTORICAL_PARENT_ONLY_NOT_EXACT_HEAD_EVIDENCE",
   "head_commit_at_generation": "431ef3ec3e9cfc69e8bd49e0cb8b48590ce34799",
   "head_tree_at_generation": "fb0a312b72a44ec4f09ed671a2c3e6cce9671715",
-  "note": "generated pre-commit; the sealing commit binds this report, its inputs and the census in one tree",
+  "note": "Generated before the commit that first contained these bytes. It describes only head_commit_at_generation and must never be presented as exact-head evidence for the containing or any later commit. Exact-head evidence is retained externally by GitHub Actions.",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",

@@ -11,10 +11,12 @@
  * rollback, supersede) as an append-only hash-chained record; and a validator
  * proves the policy is complete and the journal well-formed and append-only.
  *
- * The INSTALLED half (Rogo active-pointer re-point, installed identity
- * read-back, post-rollback installed parity) is permanently excluded — the
- * policy must say so in the asset, and this suite proves the exclusion is
- * code-declared so the asset can never quietly claim it is satisfied.
+ * Installed-host MUTATIONS (Rogo active-pointer write/re-point, promotion and
+ * rollback transactions, post-rollback installed parity) remain permanently
+ * excluded. Read-only verification of already-present installation, pointer,
+ * promotion and rollback identity is permitted and mandatory before runtime
+ * derives PRODUCTION_ACTIVE. This suite proves both halves without presenting
+ * runtime readback as portable promotion evidence.
  *
  * Nothing here mutates a live install; every write lands in a temporary
  * directory. This is a policy/journal/validator proof, not deployment
@@ -69,6 +71,21 @@ function refuses(findings, fragment, message) {
   );
 }
 
+function declaresReadOnlyProductionVerification(value) {
+  const scope = String(value?.scope?.installed_host_tier ?? "");
+  const readback = value?.clauses?.installed_identity_readback ?? {};
+  return (
+    scope.includes("MUTATES") &&
+    scope.includes("Read-only verification") &&
+    scope.includes("mandatory") &&
+    scope.includes("PRODUCTION_ACTIVE") &&
+    scope.includes("does not mutate") &&
+    String(readback.statement ?? "").includes("non-mutating verification") &&
+    String(readback.exclusion_reason ?? "").includes("Runtime read-only identity verification") &&
+    String(readback.exclusion_reason ?? "").includes("not reported as this clause passing")
+  );
+}
+
 const hex40 = (seed) => identitySha256({ seed }).slice(0, 40);
 const hex64 = (seed) => identitySha256({ seed });
 
@@ -112,6 +129,59 @@ for (const id of requiredIds.filter((candidate) => !excludedIds.includes(candida
   check(clause.exclusion_reason === null, `portable clause ${id} must not carry an exclusion reason`);
   check(clause.excluded_from_portable_gate === false, `portable clause ${id} is inside the portable gate`);
 }
+
+// The installed-host boundary is split by action, not by filesystem. Reading
+// and joining already-present identity records is a mandatory runtime gate;
+// writing/re-pointing the route and performing promotion/rollback remain the
+// excluded transaction. Neither side may silently swallow the other.
+check(
+  declaresReadOnlyProductionVerification(policy),
+  "policy must permit and require read-only installed identity verification before PRODUCTION_ACTIVE",
+);
+check(
+  policy.scope.installed_host_tier.includes("writing or re-pointing the active pointer") &&
+    policy.scope.installed_host_tier.includes("promotion and rollback transactions"),
+  "policy must keep active-pointer writes/repoint and promotion/rollback transactions excluded",
+);
+check(
+  policy.clauses.active_pointer_repoint.satisfiability === EXCLUDED_INSTALLED_HOST &&
+    policy.clauses.active_pointer_repoint.procedure_steps.length === 0,
+  "read-only verification must not make active-pointer mutation portable",
+);
+check(
+  policy.clauses.installed_identity_readback.satisfiability === EXCLUDED_INSTALLED_HOST &&
+    policy.clauses.installed_identity_readback.excluded_from_portable_gate === true,
+  "runtime verification must not be misreported as post-rollback installed transaction proof",
+);
+
+const installedVerifierSource = await fs.readFile(
+  path.join(ROOT, "scripts", "lib", "installed_runtime_identity.mjs"),
+  "utf8",
+);
+const runtimeModeSource = await fs.readFile(
+  path.join(ROOT, "scripts", "lib", "runtime_mode.mjs"),
+  "utf8",
+);
+check(
+  [
+    "installation-receipt.json",
+    "active-install-pointer.json",
+    "production-promotion-receipt.json",
+    "rollback-package.tar",
+  ].every((name) => installedVerifierSource.includes(name)),
+  "PRODUCTION_ACTIVE verifier must read the installation, pointer, promotion and rollback identities",
+);
+check(
+  !/fs\.(?:writeFile|appendFile|rename|rm|unlink|mkdir|symlink|link|truncate|copyFile)\s*\(/.test(
+    installedVerifierSource,
+  ),
+  "installed runtime identity verifier must remain read-only",
+);
+check(
+  runtimeModeSource.includes('PRODUCTION_ACTIVE: "PRODUCTION_ACTIVE"') &&
+    runtimeModeSource.includes("assertCapability(verified, capabilityReceipt, capabilityReceiptSha256)"),
+  "PRODUCTION_ACTIVE derivation must consume verified placement plus hash-bound host capability",
+);
 
 // The policy binds the EXISTING identity vocabulary — it never mints a second one.
 const transitions = policy.clauses.deployment_status_transitions.binding;
@@ -172,6 +242,15 @@ check(policy.clauses.rollback_is_not_run_resume.binding.distinguished_from
   claimsInstalled.clauses.active_pointer_repoint.excluded_from_portable_gate = false;
   refuses(validateReleaseRollbackPolicy(claimsInstalled), "active_pointer_repoint",
     "an installed-host clause claiming to be portable MUST be caught");
+}
+{
+  const makesReadbackOptional = structuredClone(policy);
+  makesReadbackOptional.scope.installed_host_tier =
+    makesReadbackOptional.scope.installed_host_tier.replace("mandatory", "optional");
+  check(
+    declaresReadOnlyProductionVerification(makesReadbackOptional) === false,
+    "a policy making read-only PRODUCTION_ACTIVE verification optional MUST be caught",
+  );
 }
 {
   const bogusStatus = structuredClone(policy);

@@ -112,8 +112,8 @@ for (const outcome of ["decision_replay_blocked", "decision_graph_blocked"]) {
   );
 }
 
-// 4. END-TO-END: the OUTER controller's terminal catch. Drive
-// run_excel_inflow_vnext into a real early internal failure (an unreadable
+// 4. END-TO-END: the OUTER controller's terminal catch. Drive the sole public
+// bootstrap into run_excel_inflow_vnext and a real early internal failure (an unreadable
 // evidence-run) and read the serialised artifact: exit 1, all five registry
 // payload fields, the stack preserved in the artifact, and ONE typed summary
 // line — no stack frames — on the public stderr.
@@ -122,7 +122,7 @@ for (const outcome of ["decision_replay_blocked", "decision_graph_blocked"]) {
   const runDir = path.join(out, "run");
   const missingEvidence = path.join(out, "does-not-exist.json");
   const execution = await exec(process.execPath, [
-    path.join(HERE, "run_excel_inflow_vnext.mjs"),
+    path.join(HERE, "run_excel_inflow_bootstrap.mjs"),
     "--evidence-run",
     missingEvidence,
     "--out",

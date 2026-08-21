@@ -24,12 +24,19 @@
     "verdict": { "const": "REFUSED" },
     "terminal_state": { "const": "INTERNAL_FAILURE" },
     "owner": { "const": "BLOCK" },
-    "reason_code": { "const": "INTERNAL.host_precondition_unsatisfied" },
-    "earliest_responsible_layer": { "const": "runtime_governance" },
+    "reason_code": {
+      "enum": [
+        "INTERNAL.runtime_bootstrap_failed",
+        "INTERNAL.host_precondition_unsatisfied"
+      ]
+    },
+    "earliest_responsible_layer": {
+      "enum": ["runtime_bootstrap", "runtime_governance"]
+    },
     "downstream_invalidation_scope": { "const": "all_runtime_lanes" },
     "resumable_checkpoint_path": { "type": ["string", "null"] },
     "preserved_source_hashes": { "type": "object" },
-    "subordinate_execution_attempted": { "const": false },
+    "subordinate_execution_attempted": { "type": "boolean" },
     "package_root": { "type": "string", "minLength": 1 },
     "findings": {
       "type": "array",
@@ -46,5 +53,25 @@
         "additionalProperties": false
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "reason_code": { "const": "INTERNAL.runtime_bootstrap_failed" }
+        }
+      },
+      "then": {
+        "properties": {
+          "earliest_responsible_layer": { "const": "runtime_bootstrap" }
+        }
+      },
+      "else": {
+        "properties": {
+          "earliest_responsible_layer": { "const": "runtime_governance" },
+          "subordinate_execution_attempted": { "const": false }
+        }
+      }
+    }
+  ]
 }

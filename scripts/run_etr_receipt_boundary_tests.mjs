@@ -155,7 +155,12 @@ function preEmbeddedCase(ledgers) {
     },
   };
 }
-const EMPTY_PLAN = { states: [], candidate_ledger: [] };
+const EMPTY_PLAN = {
+  status: "PASS",
+  unresolved_material_count: 0,
+  states: [],
+  candidate_ledger: [],
+};
 
 // ---------------------------------------------------------------------------
 // 1. Receipt sealing through the REAL compile -> materialize pipeline.

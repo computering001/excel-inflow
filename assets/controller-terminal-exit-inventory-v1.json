@@ -1,14 +1,26 @@
 {
   "schema_version": "controller-terminal-exit-inventory/1.0",
   "frozen_at_phase": "phase-0",
-  "public_controller": "scripts/run_excel_inflow_vnext.mjs",
+  "public_controller": "scripts/run_excel_inflow_bootstrap.mjs",
+  "internal_controller": "scripts/run_excel_inflow_vnext.mjs",
   "internal_delegate": "scripts/run_user_flow.mjs",
   "constitution": "assets/delivery-constitution-v1.json",
   "source_exit_counts": {
+    "scripts/run_excel_inflow_bootstrap.mjs": 8,
     "scripts/run_excel_inflow_vnext.mjs": 12,
     "scripts/run_user_flow.mjs": 20
   },
   "source_exit_kinds": {
+    "scripts/run_excel_inflow_bootstrap.mjs": {
+      "artifact_boundary_refusal": 1,
+      "inventory_integrity_refusal": 1,
+      "screen_success": 1,
+      "screen_refusal": 1,
+      "child_success_passthrough": 1,
+      "child_failure_passthrough": 1,
+      "generated_child_failure_refusal": 1,
+      "outer_refusal": 1
+    },
     "scripts/run_excel_inflow_vnext.mjs": { "model_finish": 9, "presentation": 2, "outer_internal_failure": 1 },
     "scripts/run_user_flow.mjs": { "model_finish": 18, "presentation": 1, "outer_internal_failure": 1 }
   },
@@ -17,7 +29,16 @@
     "scripts/run_user_flow.mjs": 18
   },
   "exits": [
-    { "id": "vnext.company_screen", "controller": "vnext", "signature": "const controllerHandoff = `${randomUUID()}${randomUUID()}`", "owner": "LOG", "broker_safe": true },
+    { "id": "bootstrap.artifact_boundary_refusal", "controller": "bootstrap", "signature": "bootstrap artifact directory resolves inside the immutable package", "owner": "BLOCK", "broker_safe": true },
+    { "id": "bootstrap.inventory_integrity_refusal", "controller": "bootstrap", "signature": "if (verification.findings.length > 0)", "owner": "BLOCK", "broker_safe": true },
+    { "id": "bootstrap.company_screen", "controller": "bootstrap", "signature": "if (companyScreenComplete(result.stdout, result.stderr, result.code, result.overflowed))", "owner": "LOG", "broker_safe": true },
+    { "id": "bootstrap.company_screen_refusal", "controller": "bootstrap", "signature": "company_screen_child_failed_or_incomplete", "owner": "BLOCK", "broker_safe": true },
+    { "id": "bootstrap.child_success_passthrough", "controller": "bootstrap", "signature": "if (result.code === 0) return 0", "owner": "LOG", "broker_safe": true },
+    { "id": "bootstrap.child_failure_passthrough", "controller": "bootstrap", "signature": "return Number.isInteger(result.code) ? result.code : 1", "owner": "BLOCK", "broker_safe": true },
+    { "id": "bootstrap.generated_child_failure_refusal", "controller": "bootstrap", "signature": "child_exited_nonzero:exit=${result.code}", "owner": "BLOCK", "broker_safe": true },
+    { "id": "bootstrap.outer_refusal", "controller": "bootstrap", "signature": "process.exitCode = 1", "owner": "BLOCK", "broker_safe": true },
+
+    { "id": "vnext.company_screen", "controller": "vnext", "signature": "const screen = await runUserFlow(screenArgs", "owner": "LOG", "broker_safe": true },
     { "id": "vnext.presentation_screen", "controller": "vnext", "signature": "Unable to render ${options.screen} screen.", "owner": "LOG", "broker_safe": true },
     { "id": "vnext.outer_internal_failure", "controller": "vnext", "signature": "INTERNAL_FAILURE ${reasonCode}: ${summaryLine}", "owner": "BLOCK", "broker_safe": true },
     { "id": "vnext.raw_evidence_not_closed", "controller": "vnext", "signature": "A fatal raw-source boundary remains.", "owner": "BLOCK", "broker_safe": true },

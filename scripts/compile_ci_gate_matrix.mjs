@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import process from "node:process";
 import { testProfile } from "./lib/development_gate_contract.mjs";
 
@@ -10,7 +11,7 @@ function arg(flag) {
   if (index < 0 || !process.argv[index + 1]) throw new Error(`Missing ${flag}.`);
   return path.resolve(process.argv[index + 1]);
 }
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const registryBytes = fs.readFileSync(path.join(root, "assets", "development-test-registry.json"));
 const registry = JSON.parse(registryBytes);
 const custody = JSON.parse(fs.readFileSync(arg("--custody-report"), "utf8"));

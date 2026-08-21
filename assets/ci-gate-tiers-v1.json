@@ -39,14 +39,14 @@
   ],
   "capabilities": [
     {
-      "id": "portable_registry_exact_once_matrix",
+      "id": "exact_head_portable_lifecycle",
       "authoritative": true,
-      "statement": "Every portable registry test executes EXACTLY ONCE across the seven phase lanes, with duplicate and missing detection, and the result is compiled into one complete matrix."
+      "statement": "Every selected portable registry test is started and terminally reported exactly once on the exact candidate head, with immutable per-test logs and no missing or duplicate test identity."
     },
     {
-      "id": "custody_enumeration_pass_or_explicit_blocked",
+      "id": "archive_only_capability_custody",
       "authoritative": true,
-      "statement": "Every custody-profile test is enumerated and must be PASS or an EXPLICIT typed BLOCKED naming its missing custody; nothing is silently excluded."
+      "statement": "The actual independently built archive is downloaded without a source checkout and its public bootstrap, real installed capability receipt and independent oracle evidence are retained together."
     },
     {
       "id": "merge_vs_package_identity_separation",
@@ -54,19 +54,29 @@
       "statement": "The merge-compatibility checkout role and the package/source compile identity are recorded and bound SEPARATELY into the complete matrix, so a merge-test result can never be read as a package claim."
     },
     {
-      "id": "serial_parallel_equivalence",
+      "id": "independent_package_reproducibility",
       "authoritative": true,
-      "statement": "The complete serial portable registry run at the current SHA is compared against the sharded phase-lane runs of the same SHA."
+      "statement": "Two independent clean candidate-head jobs build package A and B with the same explicit SOURCE_DATE_EPOCH, and every path, type, mode, size, file byte and archive byte must agree."
     },
     {
       "id": "ci_governance_workflow_pins",
       "authoritative": true,
-      "statement": "Every workflow file is linted read-only: no write permission, no authoring command, pinned action SHAs, declared role, and every continue-on-error paired with an authoritative verdict step."
+      "statement": "Every workflow file is linted read-only with pinned action SHAs, while every required exact-head multiline shell uses pipefail and no required job masks failure through continue-on-error."
     },
     {
       "id": "tier_declaration_and_quarantine_health",
       "authoritative": true,
       "statement": "This register is validated on every pull request: complete capability coverage, every deferral declared and resolvable, and no quarantine without an owner, without an expiry, or past its expiry."
+    },
+    {
+      "id": "mutation_measurement_custody",
+      "authoritative": true,
+      "statement": "The exact candidate head runs the registered mutation compiler, reports measured and unmeasured suite counts honestly, refuses measured survivors, and requires the P0 mutation set to be fully measured and PASS."
+    },
+    {
+      "id": "exact_head_external_attestation",
+      "authoritative": true,
+      "statement": "An always-run final job consumes all ten independently retained prerequisite receipts and can mint only a non-promotional exact-head development attestation with exact source and artifact joins."
     },
     {
       "id": "generated_cohort_volume_300",
@@ -107,73 +117,92 @@
       "trigger": {
         "kind": "event",
         "events": [
-          "pull_request",
-          "push"
+          "pull_request"
         ]
       },
-      "wall_clock_budget_minutes": 90,
-      "speed_contract": "This tier gates every merge, so its content is frozen: seven phase lanes plus the complete serial registry over the two synthetic fixture cases and the one representative case, custody enumeration, both identity checks and the exact-once matrix. Deeper case volumes are DEFERRED, never added here.",
+      "wall_clock_budget_minutes": 180,
+      "speed_contract": "This tier gates each pull-request candidate head through eleven separately owned jobs; independent packages and mutation measurement run in parallel while the final always-run aggregate consumes their immutable evidence.",
       "jobs": [
         {
-          "id": "phase-gates",
-          "timeout_minutes": 35,
+          "id": "source-identity",
+          "timeout_minutes": 15,
+          "covers": []
+        },
+        {
+          "id": "registry-census",
+          "timeout_minutes": 15,
+          "covers": []
+        },
+        {
+          "id": "targeted-bootstrap-runtime",
+          "timeout_minutes": 90,
+          "covers": []
+        },
+        {
+          "id": "full-portable",
+          "timeout_minutes": 150,
           "covers": [
-            "portable_registry_exact_once_matrix",
+            "exact_head_portable_lifecycle",
+            "ci_governance_workflow_pins",
+            "tier_declaration_and_quarantine_health",
             "generated_cohort_volume_300"
           ]
         },
         {
-          "id": "portable-serial",
-          "timeout_minutes": 40,
+          "id": "package-a",
+          "timeout_minutes": 120,
+          "covers": []
+        },
+        {
+          "id": "package-b",
+          "timeout_minutes": 120,
+          "covers": []
+        },
+        {
+          "id": "package-reproducibility",
+          "timeout_minutes": 20,
           "covers": [
-            "serial_parallel_equivalence"
+            "independent_package_reproducibility"
           ]
         },
         {
-          "id": "custody-inventory",
-          "timeout_minutes": 10,
+          "id": "archive-only-capability",
+          "timeout_minutes": 120,
           "covers": [
-            "custody_enumeration_pass_or_explicit_blocked"
+            "archive_only_capability_custody"
           ]
         },
         {
-          "id": "merge-compatibility-identity",
-          "timeout_minutes": 5,
+          "id": "mutation-measurement",
+          "timeout_minutes": 180,
+          "covers": [
+            "mutation_measurement_custody"
+          ]
+        },
+        {
+          "id": "synthetic-merge",
+          "timeout_minutes": 15,
           "covers": [
             "merge_vs_package_identity_separation"
           ]
         },
         {
-          "id": "package-source-identity",
-          "timeout_minutes": 90,
+          "id": "final-aggregate",
+          "timeout_minutes": 30,
           "covers": [
-            "merge_vs_package_identity_separation"
-          ]
-        },
-        {
-          "id": "aggregate-and-compare",
-          "timeout_minutes": 10,
-          "covers": [
-            "portable_registry_exact_once_matrix",
-            "serial_parallel_equivalence"
-          ]
-        },
-        {
-          "id": "gate-tier-declaration",
-          "timeout_minutes": 5,
-          "covers": [
-            "ci_governance_workflow_pins",
-            "tier_declaration_and_quarantine_health"
+            "exact_head_external_attestation"
           ]
         }
       ],
       "covers": [
-        "portable_registry_exact_once_matrix",
-        "custody_enumeration_pass_or_explicit_blocked",
+        "exact_head_portable_lifecycle",
+        "archive_only_capability_custody",
         "merge_vs_package_identity_separation",
-        "serial_parallel_equivalence",
+        "independent_package_reproducibility",
         "ci_governance_workflow_pins",
         "tier_declaration_and_quarantine_health",
+        "mutation_measurement_custody",
+        "exact_head_external_attestation",
         "generated_cohort_volume_300"
       ],
       "defers": [
@@ -249,12 +278,12 @@
       ],
       "defers": [
         {
-          "capability": "portable_registry_exact_once_matrix",
+          "capability": "exact_head_portable_lifecycle",
           "to_tier": "pr",
           "reason": "The exact-once matrix gates every merge; re-running it nightly would duplicate the merge gate without adding a fact this tier is here to find."
         },
         {
-          "capability": "custody_enumeration_pass_or_explicit_blocked",
+          "capability": "archive_only_capability_custody",
           "to_tier": "pr",
           "reason": "Custody enumeration is a per-SHA statement and is already authoritative on every merge."
         },
@@ -264,7 +293,7 @@
           "reason": "There is no merge candidate on a schedule; the merge-versus-package distinction only has meaning on a pull request."
         },
         {
-          "capability": "serial_parallel_equivalence",
+          "capability": "independent_package_reproducibility",
           "to_tier": "pr",
           "reason": "Sharding equivalence is a property of the pull-request tier's own lane split, which this tier does not use."
         },
@@ -277,6 +306,16 @@
           "capability": "tier_declaration_and_quarantine_health",
           "to_tier": "pr",
           "reason": "This register must be healthy before a merge lands, so its check belongs to the merge gate; the scheduled tiers consume the register they were merged with."
+        },
+        {
+          "capability": "mutation_measurement_custody",
+          "to_tier": "pr",
+          "reason": "Mutation measurement is source-bound exact-head evidence and is retained on every pull request; scheduled volume tiers do not alter that measurement claim."
+        },
+        {
+          "capability": "exact_head_external_attestation",
+          "to_tier": "pr",
+          "reason": "The all-needs external attestation binds one pull-request candidate head, so a scheduled cohort run cannot reproduce or replace that event-specific evidence."
         },
         {
           "capability": "generated_cohort_volume_300",
@@ -325,12 +364,12 @@
       ],
       "defers": [
         {
-          "capability": "portable_registry_exact_once_matrix",
+          "capability": "exact_head_portable_lifecycle",
           "to_tier": "pr",
           "reason": "Gated on every merge; a weekly repeat adds no new fact."
         },
         {
-          "capability": "custody_enumeration_pass_or_explicit_blocked",
+          "capability": "archive_only_capability_custody",
           "to_tier": "pr",
           "reason": "Per-SHA statement, authoritative on every merge."
         },
@@ -340,7 +379,7 @@
           "reason": "No merge candidate exists on a schedule."
         },
         {
-          "capability": "serial_parallel_equivalence",
+          "capability": "independent_package_reproducibility",
           "to_tier": "pr",
           "reason": "A property of the pull-request tier's lane split, which this tier does not use."
         },
@@ -353,6 +392,16 @@
           "capability": "tier_declaration_and_quarantine_health",
           "to_tier": "pr",
           "reason": "Must be healthy before the merge lands, so it is checked at the merge gate."
+        },
+        {
+          "capability": "mutation_measurement_custody",
+          "to_tier": "pr",
+          "reason": "Mutation measurement belongs to the exact pull-request source identity; the weekly volume tier neither widens nor substitutes for its measured mutation corpus."
+        },
+        {
+          "capability": "exact_head_external_attestation",
+          "to_tier": "pr",
+          "reason": "The final external attestation joins ten artifacts from one pull-request event and cannot be recreated by a weekly source-volume execution."
         },
         {
           "capability": "generated_cohort_volume_300",

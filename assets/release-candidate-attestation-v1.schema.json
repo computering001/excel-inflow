@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/release-candidate-attestation-v1.schema.json",
+  "title": "Externally retained exact-head release candidate attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "scope", "production_promotion_eligible",
+    "full_release_certification", "candidate_version", "source_commit", "source_tree",
+    "runtime_closure_sha256", "complete_package_inventory_sha256", "archive_sha256",
+    "exact_head_ci_run", "registry_selection_sha256", "test_results_sha256",
+    "mutation_report_sha256", "package_reproducibility_sha256",
+    "installed_capability_archive_test_sha256", "created_at", "source_binding", "source_identity_sha256",
+    "toolchain_sha256", "selected_test_ids_sha256", "package",
+    "mutation", "prerequisites", "attestation_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-release-candidate-attestation/1.0" },
+    "status": { "const": "PASS" },
+    "scope": { "const": "EXACT_HEAD_DEVELOPMENT_EVIDENCE_ONLY" },
+    "production_promotion_eligible": { "const": false },
+    "full_release_certification": { "const": false },
+    "candidate_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "source_commit": { "$ref": "#/$defs/sha1" },
+    "source_tree": { "$ref": "#/$defs/sha1" },
+    "runtime_closure_sha256": { "$ref": "#/$defs/sha256" },
+    "complete_package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+    "archive_sha256": { "$ref": "#/$defs/sha256" },
+    "exact_head_ci_run": { "type": "string", "pattern": "^github-actions:[^:]+:[^:]+:[1-9][0-9]*$" },
+    "test_results_sha256": { "$ref": "#/$defs/sha256" },
+    "mutation_report_sha256": { "$ref": "#/$defs/sha256" },
+    "package_reproducibility_sha256": { "$ref": "#/$defs/sha256" },
+    "installed_capability_archive_test_sha256": { "$ref": "#/$defs/sha256" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source_binding": { "$ref": "#/$defs/source_binding" },
+    "source_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "toolchain_sha256": { "$ref": "#/$defs/sha256" },
+    "registry_selection_sha256": { "$ref": "#/$defs/sha256" },
+    "selected_test_ids_sha256": { "$ref": "#/$defs/sha256" },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_version", "package_mode", "deployment_status", "build_timestamp_policy", "inventory_sha256", "archive_sha256", "runtime_closure_sha256"],
+      "properties": {
+        "candidate_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+        "package_mode": { "const": "development" },
+        "deployment_status": { "const": "not_installed" },
+        "build_timestamp_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source_date_epoch", "generated_at"],
+          "properties": {
+            "kind": { "const": "SOURCE_DATE_EPOCH" },
+            "source_date_epoch": { "type": "integer", "minimum": 0 },
+            "generated_at": { "type": "string", "format": "date-time" }
+          }
+        },
+        "inventory_sha256": { "$ref": "#/$defs/sha256" },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_closure_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_suites", "measured_suites", "unmeasured_suites", "measurement_coverage",
+        "measured_applied", "measured_caught", "measured_survived",
+        "p0_fully_measured", "p0_status"
+      ],
+      "properties": {
+        "total_suites": { "type": "integer", "minimum": 1 },
+        "measured_suites": { "type": "integer", "minimum": 1 },
+        "unmeasured_suites": { "type": "integer", "minimum": 0 },
+        "measurement_coverage": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "measured_applied": { "type": "integer", "minimum": 1 },
+        "measured_caught": { "type": "integer", "minimum": 0 },
+        "measured_survived": { "const": 0 },
+        "p0_fully_measured": { "const": true },
+        "p0_status": { "const": "PASS" }
+      }
+    },
+    "prerequisites": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_identity", "registry_selection", "targeted_runtime", "portable_gate",
+        "package_a", "package_b", "package_reproducibility", "archive_capability",
+        "mutation_measurement", "synthetic_merge"
+      ],
+      "properties": {
+        "source_identity": { "$ref": "#/$defs/prerequisite" },
+        "registry_selection": { "$ref": "#/$defs/prerequisite" },
+        "targeted_runtime": { "$ref": "#/$defs/prerequisite" },
+        "portable_gate": { "$ref": "#/$defs/prerequisite" },
+        "package_a": { "$ref": "#/$defs/prerequisite" },
+        "package_b": { "$ref": "#/$defs/prerequisite" },
+        "package_reproducibility": { "$ref": "#/$defs/prerequisite" },
+        "archive_capability": { "$ref": "#/$defs/prerequisite" },
+        "mutation_measurement": { "$ref": "#/$defs/prerequisite" },
+        "synthetic_merge": { "$ref": "#/$defs/prerequisite" }
+      }
+    },
+    "attestation_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_sha", "source_tree", "ref", "event_name", "run_id", "run_attempt"],
+      "properties": {
+        "github_sha": { "$ref": "#/$defs/sha1" }, "source_tree": { "$ref": "#/$defs/sha1" },
+        "ref": { "type": "string", "minLength": 1 }, "event_name": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 }, "run_attempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "prerequisite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "sha256"],
+      "properties": {
+        "schema_version": { "type": "string", "minLength": 1 },
+        "status": { "const": "PASS" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

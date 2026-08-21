@@ -39,7 +39,13 @@ import {
 } from "./lib/mutation_adequacy.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ARTIFACT_PATH = path.join(ROOT, "ci", "mutation_survivors.json");
+const reportIndex = process.argv.indexOf("--report");
+if (reportIndex >= 0 && (!process.argv[reportIndex + 1] || process.argv[reportIndex + 1].startsWith("--"))) {
+  throw new Error("--report requires an exact mutation-report path.");
+}
+const ARTIFACT_PATH = reportIndex >= 0
+  ? path.resolve(process.argv[reportIndex + 1])
+  : path.join(ROOT, "ci", "mutation_survivors.json");
 const SCHEMA_PATH = path.join(ROOT, "assets", "mutation-adequacy-v1.schema.json");
 const REGISTRY_PATH = path.join(ROOT, "assets", "development-test-registry.json");
 const MATRIX_PATH = path.join(ROOT, "assets", "critical-invariant-oracle-matrix-v1.json");

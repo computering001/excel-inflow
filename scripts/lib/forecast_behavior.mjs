@@ -181,9 +181,22 @@ function calculationRules(row) {
 }
 
 function hasLiveParentCapture(row) {
-  return Boolean(row?.forecast_capture_parent_id) &&
-    ["uncalculated", "not_separately_forecast", "captured_detail"]
-      .includes(normalise(row?.forecast_treatment).replaceAll(" ", "_"));
+  if (!row?.forecast_capture_parent_id) return false;
+  const periodMethods = (row?.forecast_period_authorities ?? [])
+    .map((authority) => authority?.method)
+    .filter(Boolean);
+  if (periodMethods.length > 0) {
+    // A row-level capture marker is lineage/presentation metadata.  It is a
+    // global captured-detail behavior only when every explicitly adjudicated
+    // forecast period is absent.  Mixed-period ownership must retain the live
+    // period's ordinary driver/flow behavior and let the period authority
+    // decide capture inside the candidate compiler.
+    return periodMethods.every((method) =>
+      ["not_separately_forecast", "not_applicable"].includes(method),
+    );
+  }
+  return ["uncalculated", "not_separately_forecast", "captured_detail"]
+    .includes(normalise(row?.forecast_treatment).replaceAll(" ", "_"));
 }
 
 function feature(channel, name, supports, weight) {

@@ -5,7 +5,7 @@
   "invariant": "A release rollback is a DECLARED, executable, evidence-preserving procedure: the trigger conditions, the human authorisation, the exact package identity rolled back TO, the in-flight-run package-pinning rule and the evidence that must survive are all declared here; every release-affecting event is an append-only hash-chained release-journal record; and a rollback target that is not attestable is refused rather than assumed.",
   "scope": {
     "portable_tier": "This repository and the artefacts it produces: a compiled package, its complete-package inventory, its deterministic archive, its external release-package attestation, the release journal and the preserved evidence. Everything in this policy marked portable is satisfiable here with no installed host.",
-    "installed_host_tier": "Anything that changes what a live Rogo install resolves to — the versioned install destination, the active pointer, the installed identity read-back and post-rollback installed behaviour parity. PERMANENTLY EXCLUDED from this programme, not deferred. The three EXCLUDED_INSTALLED_HOST clauses below are declared exclusions, never waivers: no portable gate may report them as passed, and no script in this repository may attempt them."
+    "installed_host_tier": "Anything that MUTATES what a live Rogo install resolves to — writing the versioned install destination, writing or re-pointing the active pointer, promotion and rollback transactions, and post-rollback installed behaviour parity. PERMANENTLY EXCLUDED from the portable programme, not deferred. Read-only verification of an already installed package's installation receipt, active-pointer bytes, promotion receipt and rollback identity is permitted and is mandatory before runtime may derive PRODUCTION_ACTIVE; that verification does not mutate the host and is not portable evidence that a promotion transaction was performed. The EXCLUDED_INSTALLED_HOST clauses below remain declared exclusions for mutation and live-transaction proof, never waivers."
   },
   "clauses": {
     "trigger_conditions": {
@@ -375,10 +375,10 @@
       "clause_id": "installed_identity_readback",
       "title": "Fresh-session installed identity read-back after a rollback",
       "satisfiability": "EXCLUDED_INSTALLED_HOST",
-      "statement": "On an installed host, the rollback target's identity is read back from a fresh session — installed package digest, active pointer and runtime-code closure — before the rollback is considered complete. Not performed here.",
+      "statement": "On an installed host, the rollback target's identity is read back from a fresh session — installed package digest, active pointer and runtime-code closure — before the rollback transaction is considered complete. That post-rollback transaction proof is not performed here. This exclusion does not prohibit the runtime's non-mutating verification of already-present installation, pointer, promotion and rollback records before it derives PRODUCTION_ACTIVE.",
       "procedure_steps": [],
       "evidence": [],
-      "exclusion_reason": "Requires a fresh session on an installed host to read the installed package and active pointer. Portable verification stops at the retained package's own attestation, which is what verifyRollbackTargetAttestation proves; an installed read-back cannot be simulated and is not asserted.",
+      "exclusion_reason": "Requires a fresh installed-host transaction after a rollback. Portable verification stops at the retained package's own attestation and cannot assert that installed transaction occurred. Runtime read-only identity verification is permitted but is not reported as this clause passing.",
       "excluded_from_portable_gate": true,
       "binding": null
     },

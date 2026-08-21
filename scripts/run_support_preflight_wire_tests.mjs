@@ -42,7 +42,8 @@ async function runVnext(evidence, label) {
   await fs.writeFile(evidencePath, JSON.stringify(evidence), "utf8");
   const runDir = path.join(out, label);
   await exec(process.execPath, [
-    path.join(HERE, "run_excel_inflow_vnext.mjs"),
+    path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+    "vnext",
     "--evidence-run", evidencePath,
     "--out", runDir,
   ], { cwd: ROOT, timeout: 120000, maxBuffer: 64 * 1024 * 1024 }).catch(() => {});
@@ -76,15 +77,20 @@ async function runVnext(evidence, label) {
     "an absent cash flow must stop early with its typed reason");
 }
 
-// 3. The donor itself (supported) passes the preflight checkpoint — proven
-// cheaply by asserting the preflight would classify it PASS: run vnext but
-// only inspect the checkpoint list ordering; the full delivery proof is the
-// registered canary. We stop the run early by withholding python (the model
-// stage fails later), and assert the preflight checkpoint is PASS.
+// 3. The supported branch is wired before delegation.  The registered raw
+// canary owns the real positive delivery proof; this focused wire test must
+// not launch a second full workbook build merely to inspect one checkpoint.
+// The two negatives above execute the classifier through vNext, while this
+// source-order assertion proves the PASS checkpoint precedes user-flow work.
 {
-  const state = await runVnext(structuredClone(donor), "supported-preflight");
-  const preflight = state.checkpoints.find((c) => c.checkpoint_id === "support_envelope_preflight");
-  check(preflight?.status === "PASS", "a supported case must pass the preflight");
+  const controller = await fs.readFile(path.join(HERE, "run_excel_inflow_vnext.mjs"), "utf8");
+  const classifyAt = controller.indexOf("const supportVerdict =");
+  const passAt = controller.indexOf('checkpoint("support_envelope_preflight", "PASS"');
+  const delegateAt = controller.indexOf("const userFlowOut =", passAt);
+  check(
+    classifyAt >= 0 && passAt > classifyAt && delegateAt > passAt,
+    "the supported preflight PASS must be recorded after classification and before user-flow delegation",
+  );
 }
 
 await fs.rm(out, { recursive: true, force: true });

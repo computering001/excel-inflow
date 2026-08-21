@@ -1,0 +1,175 @@
+{
+  "schema_version": "excel-inflow-runtime-compatibility/1.0",
+  "status": "LOCAL_AND_PORTABLE_CI_EXERCISED_ROGO_PENDING",
+  "range_semantics": {
+    "minimum": "inclusive",
+    "maximum": "exclusive",
+    "unversioned_ci_policy": "An install in portable CI proves API execution but does not justify widening an exact distribution range unless that run also records the resolved distribution version.",
+    "range_expansion_policy": "A dependency range is widened only after the candidate executes the relevant API probes at the new boundary. Exact-patch intervals below are deliberate where only one exact version is currently captured."
+  },
+  "selection_contract": {
+    "python_interpreter_count": 1,
+    "distribution_query": "importlib.metadata through the selected interpreter",
+    "mapping_rule": "Every Python import and distribution version must be resolved by the same selected interpreter; import-module and distribution names are distinct typed fields and may not be inferred from one another."
+  },
+  "rogo_host_validation": {
+    "status": "PENDING",
+    "promotion_blocking": true,
+    "reason": "No version receipt from the current Rogo installed host is present in this repository. These ranges are a local/portable-CI candidate contract, not a claim that Rogo is already compatible.",
+    "required_capture": [
+      "Node",
+      "Python",
+      "PyMuPDF",
+      "lxml",
+      "openpyxl",
+      "Pillow",
+      "NumPy",
+      "LibreOffice"
+    ]
+  },
+  "runtimes": [
+    {
+      "runtime_name": "Node",
+      "runtime_kind": "node_runtime",
+      "import_name": null,
+      "distribution_name": "Node.js",
+      "minimum_version": "22.0.0",
+      "maximum_exclusive_version": "23.0.0",
+      "version_parser": "node_semver",
+      "required_by_lanes": ["always"],
+      "reason": "All JavaScript controllers and compilers execute under Node. The authoring host is 22.23.2 and every portable workflow explicitly selects Node 22; no Node 23 execution evidence exists.",
+      "version_source": "process.version from the selected Node executable",
+      "api_evidence": ["node:fs/promises", "node:child_process", "node:crypto", "ES modules and top-level await"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "22.23.2", "precision": "exact", "evidence_pointer": "local Phase-2 capability run on 2026-08-21" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "22", "precision": "major", "evidence_pointer": ".github/workflows/read-only-development-gate.yml node-version: 22" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "Python",
+      "runtime_kind": "python_runtime",
+      "import_name": null,
+      "distribution_name": "CPython",
+      "minimum_version": "3.9.0",
+      "maximum_exclusive_version": "3.13.0",
+      "version_parser": "python_tuple",
+      "required_by_lanes": ["evidence", "broker", "workbook"],
+      "reason": "The authoring capability interpreter is CPython 3.9.6 and portable CI selects Python 3.12. The contract spans only those exercised minor lines; 3.13 is not yet exercised.",
+      "version_source": "sys.version_info from the one selected interpreter",
+      "api_evidence": ["subprocess", "importlib.metadata", "pathlib", "zone-independent deterministic JSON"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "3.9.6", "precision": "exact", "evidence_pointer": "selected authoring-host Python capability run" },
+        { "environment": "portable_ci", "status": "EXERCISED", "observed_version": "3.12", "precision": "major_minor", "evidence_pointer": ".github/workflows/read-only-development-gate.yml python-version: 3.12" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "PyMuPDF",
+      "runtime_kind": "python_distribution",
+      "import_name": "fitz",
+      "distribution_name": "PyMuPDF",
+      "minimum_version": "1.26.5",
+      "maximum_exclusive_version": "1.26.6",
+      "version_parser": "python_distribution",
+      "required_by_lanes": ["evidence", "broker", "workbook"],
+      "reason": "1.26.5 is the exact version that passed PDF extraction, selected-cell rendering and workbook PDF inspection locally. Portable CI installs PyMuPDF without pinning its resolved version, so that execution does not justify a wider numerical range.",
+      "version_source": "importlib.metadata.version('PyMuPDF') through the selected interpreter; the runtime import remains fitz",
+      "api_evidence": ["fitz.open", "fitz.Rect", "fitz.Matrix", "Page.get_pixmap", "Page.get_texttrace"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "1.26.5", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and Phase-2 installed filing probe" },
+        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs pymupdf without a version receipt" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "lxml",
+      "runtime_kind": "python_distribution",
+      "import_name": "lxml",
+      "distribution_name": "lxml",
+      "minimum_version": "6.1.1",
+      "maximum_exclusive_version": "6.1.2",
+      "version_parser": "python_distribution",
+      "required_by_lanes": ["evidence"],
+      "reason": "6.1.1 is the exact local version that passed the Inline XBRL parser. Portable CI installs lxml unpinned and therefore supplies API execution evidence but no additional numeric boundary.",
+      "version_source": "importlib.metadata.version('lxml') through the selected interpreter",
+      "api_evidence": ["lxml.etree.HTMLParser", "lxml.etree.fromstring", "namespace-aware fact and context traversal"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "6.1.1", "precision": "exact", "evidence_pointer": "Phase-2 selected-interpreter probe and installed Inline XBRL capability" },
+        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs lxml without a version receipt" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "openpyxl",
+      "runtime_kind": "python_distribution",
+      "import_name": "openpyxl",
+      "distribution_name": "openpyxl",
+      "minimum_version": "3.1.5",
+      "maximum_exclusive_version": "3.1.6",
+      "version_parser": "python_distribution",
+      "required_by_lanes": ["evidence", "broker", "workbook"],
+      "reason": "3.1.5 is explicitly exercised by the workbook emitter, broker workbook extraction and independent readers. The model documents behavioural dependencies on this exact writer version.",
+      "version_source": "importlib.metadata.version('openpyxl') through the selected interpreter",
+      "api_evidence": ["openpyxl.load_workbook", "Workbook save", "formula/data_only dual read", "style and number-format preservation"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "3.1.5", "precision": "exact", "evidence_pointer": "references/validation.md and local Phase-2 capability run" },
+        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs openpyxl without a version receipt" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "Pillow",
+      "runtime_kind": "python_distribution",
+      "import_name": "PIL",
+      "distribution_name": "Pillow",
+      "minimum_version": "11.3.0",
+      "maximum_exclusive_version": "11.3.1",
+      "version_parser": "python_distribution",
+      "required_by_lanes": ["workbook"],
+      "reason": "11.3.0 is the exact local version that passed render-image loading and pixel comparison. CI installs Pillow unpinned, so a wider range would be invented rather than observed.",
+      "version_source": "importlib.metadata.version('Pillow') through the selected interpreter; the import is PIL",
+      "api_evidence": ["PIL.Image.open", "image conversion", "pixel array preparation"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "11.3.0", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and local Phase-2 capability run" },
+        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs pillow without a version receipt" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "NumPy",
+      "runtime_kind": "python_distribution",
+      "import_name": "numpy",
+      "distribution_name": "numpy",
+      "minimum_version": "2.0.2",
+      "maximum_exclusive_version": "2.0.3",
+      "version_parser": "python_distribution",
+      "required_by_lanes": ["workbook"],
+      "reason": "2.0.2 is the exact local version exercised by the render pixel and baseline checks. CI installs NumPy without recording its version, so only the captured patch is admitted today.",
+      "version_source": "importlib.metadata.version('numpy') through the selected interpreter",
+      "api_evidence": ["numpy.asarray", "absolute pixel difference", "mask and percentile operations"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "2.0.2", "precision": "exact", "evidence_pointer": "programme/P5.8_issue_card.md and local Phase-2 capability run" },
+        { "environment": "portable_ci", "status": "EXERCISED_UNVERSIONED", "observed_version": null, "precision": "unversioned", "evidence_pointer": ".github/workflows/read-only-development-gate.yml installs numpy without a version receipt" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    },
+    {
+      "runtime_name": "LibreOffice",
+      "runtime_kind": "external_binary",
+      "import_name": null,
+      "distribution_name": "LibreOffice",
+      "minimum_version": "26.2.5.2",
+      "maximum_exclusive_version": "26.2.6.0",
+      "version_parser": "libreoffice_banner",
+      "required_by_lanes": ["workbook"],
+      "reason": "26.2.5.2 is the exact authoring-host build that passed headless workbook recalculation and rendering. No current Rogo version receipt exists, so broader or different builds are not pre-approved.",
+      "version_source": "first numeric version in the selected soffice --version banner",
+      "api_evidence": ["--headless isolated user profile", "xlsx open and recalculate", "xlsx save", "PDF conversion"],
+      "exercise_evidence": [
+        { "environment": "authoring_host", "status": "EXERCISED", "observed_version": "26.2.5.2", "precision": "exact", "evidence_pointer": "local Phase-2 capability run using /opt/homebrew/bin/soffice" },
+        { "environment": "rogo_installed_host", "status": "PENDING", "observed_version": null, "precision": "unknown", "evidence_pointer": "fresh installed-host capability receipt required" }
+      ]
+    }
+  ]
+}

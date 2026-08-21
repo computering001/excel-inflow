@@ -280,6 +280,24 @@ check(
   "a receipt with a negative consumption is refused",
 );
 check(
+  validateLaneResourceReceipt({
+    ...goodReceipt,
+    consumed_wall_ms: goodReceipt.granted_budget_ms + 1,
+    budget_headroom_ms: -1,
+  }).some((violation) => violation.includes("cannot exceed")),
+  "MUTATION: a lane may not consume beyond its grant",
+);
+check(
+  validateLaneResourceReceipt({ ...goodReceipt, budget_headroom_ms: -1 })
+    .some((violation) => violation.includes("cannot be negative")),
+  "MUTATION: negative budget headroom is a refusal",
+);
+check(
+  validateLaneResourceReceipt({ ...goodReceipt, budget_headroom_ms: 1 })
+    .some((violation) => violation.includes("must reconcile")),
+  "MUTATION: headroom must equal grant less consumption",
+);
+check(
   validateLaneResourceReceipt({ ...goodReceipt, cpu_attribution: "guessed" }).length > 0,
   "a receipt with an undeclared cpu attribution is refused",
 );
@@ -457,6 +475,105 @@ out["over_granted_timeout_seconds"] = recorded[-1]
 pipeline.ACTIVE_LANE_BUDGET_MS.pop("dcs", None)
 pipeline.run = real_run
 
+# Drive the REAL broker lane under a fake monotonic clock. Ten documents request
+# the full 720s envelope. Primary consumes 710s, so close may receive only 10s.
+broker_request = scratch / "broker-request.json"
+broker_request.write_text(json.dumps({
+    "documents": [
+        {"document_id": f"d{index}", "path": "x"}
+        for index in range(10)
+    ]
+}))
+broker_state_path = scratch / "broker" / "broker-run-state.json"
+broker_state_path.parent.mkdir(parents=True, exist_ok=True)
+broker_recorded = []
+clock_ms = [10_000.0]
+real_monotonic = pipeline.time.monotonic
+
+def fake_monotonic():
+    return clock_ms[0] / 1000
+
+def fake_broker_run(command, *, timeout_seconds=None):
+    broker_recorded.append(timeout_seconds)
+    closing = "--close-optional" in command
+    clock_ms[0] += 10_000 if closing else 710_000
+    state = {
+        "schema_version": "broker-run-state/1.0",
+        "pipeline_status": "PASS_DEGRADED" if closing else "BLOCKED_INTERNAL",
+        "user_blocking": False,
+        "blocker_class": None if closing else "INTERNAL_WORK",
+        "tasks": [],
+        "artifacts": {},
+        "artifact_sha256": {},
+        "summary": {"degraded": closing},
+    }
+    broker_state_path.write_text(json.dumps(state))
+    return subprocess.CompletedProcess(command, 2, "", "")
+
+pipeline.time.monotonic = fake_monotonic
+pipeline.run = fake_broker_run
+pipeline.ACTIVE_LANE_BUDGET_MS["broker"] = 720_000
+broker_result = pipeline.run_lane(
+    "broker", {"request_path": str(broker_request)}, scratch, scratch
+)
+third = pipeline.begin_broker_wall_segment(
+    scratch,
+    "broker_third_attempt",
+    requested_ms=720_000,
+    limit_ms=720_000,
+    now_wall_epoch_ms=50_000,
+    now_monotonic_ms=720_000,
+)
+broker_ledger = json.loads((scratch / pipeline.BROKER_WALL_BUDGET_FILE).read_text())
+out["broker_residual_close"] = {
+    "timeouts": broker_recorded,
+    "result_status": broker_result["pipeline_status"],
+    "consumed_ms": broker_ledger["consumed_ms"],
+    "third_started": third["started"],
+    "segment_operations": [segment["operation"] for segment in broker_ledger["segments"]],
+}
+pipeline.ACTIVE_LANE_BUDGET_MS.pop("broker", None)
+pipeline.time.monotonic = real_monotonic
+pipeline.run = real_run
+
+# Persisted resume: eight minutes spent leaves four. Corrupt bytes fail closed
+# to zero remaining instead of minting another twelve-minute envelope.
+resume_root = scratch / "resume-budget"
+resume_token = pipeline.begin_broker_wall_segment(
+    resume_root, "broker_primary", requested_ms=720_000, limit_ms=720_000,
+    now_wall_epoch_ms=1_000, now_monotonic_ms=1_000,
+)
+pipeline.end_broker_wall_segment(
+    resume_root, resume_token, outcome="PASS",
+    now_wall_epoch_ms=481_000, now_monotonic_ms=481_000,
+)
+resumed = pipeline.begin_broker_wall_segment(
+    resume_root, "broker_resumed", requested_ms=720_000, limit_ms=720_000,
+    now_wall_epoch_ms=500_000, now_monotonic_ms=500_000,
+)
+out["broker_resume_allowance_ms"] = resumed["allowance_ms"]
+pipeline.end_broker_wall_segment(
+    resume_root, resumed, outcome="PASS",
+    now_wall_epoch_ms=500_000, now_monotonic_ms=500_000,
+)
+(resume_root / pipeline.BROKER_WALL_BUDGET_FILE).write_text("{broken")
+corrupt = pipeline.begin_broker_wall_segment(
+    resume_root, "broker_after_corruption", requested_ms=720_000, limit_ms=720_000,
+    now_wall_epoch_ms=600_000, now_monotonic_ms=600_000,
+)
+out["broker_corrupt_started"] = corrupt["started"]
+out["broker_corrupt_remaining_ms"] = corrupt["remaining_ms"]
+
+try:
+    pipeline.assert_lane_resource_receipts_complete(["broker"], [{
+        **receipt,
+        "consumed_wall_ms": 720_001,
+        "budget_headroom_ms": -1,
+    }])
+    out["python_negative_headroom_refused"] = False
+except ValueError:
+    out["python_negative_headroom_refused"] = True
+
 # run_lane's four-argument boundary is what the lane test doubles stand on.
 import inspect
 out["run_lane_arity"] = len(inspect.signature(pipeline.run_lane).parameters)
@@ -548,6 +665,29 @@ check(
   "a grant can shorten a lane's watchdog but never lengthen it",
 );
 check(
+  JSON.stringify(drive.broker_residual_close.timeouts) === JSON.stringify([720, 10]),
+  `the real broker lane did not subtract primary wall time from close: ${JSON.stringify(drive.broker_residual_close)}`,
+);
+check(
+  drive.broker_residual_close.consumed_ms === 720_000
+    && drive.broker_residual_close.third_started === false,
+  "the persisted broker ledger did not exhaust exactly once at 720 seconds",
+);
+check(
+  JSON.stringify(drive.broker_residual_close.segment_operations)
+    === JSON.stringify(["broker_primary", "broker_optional_close"]),
+  "primary and optional close are not charged to the same persisted envelope",
+);
+check(
+  drive.broker_resume_allowance_ms === 240_000,
+  "a resumed broker lane received a fresh envelope instead of the four minutes remaining",
+);
+check(
+  drive.broker_corrupt_started === false && drive.broker_corrupt_remaining_ms === 0,
+  "a corrupt broker wall ledger restored optional work instead of failing closed",
+);
+check(drive.python_negative_headroom_refused === true, "the production Python receipt gate accepts negative headroom");
+check(
   drive.run_lane_arity === 4,
   "run_lane keeps the four-argument boundary the lane test doubles stand on",
 );
@@ -604,7 +744,15 @@ function breakerHarness({ failures = 0, ...options } = {}) {
     readState: async () => state,
     runZeroAuthority: async () => {
       fallbackRuns += 1;
-      state = { pipeline_status: "PASS", lane_states: { broker: { pipeline_status: "PASS_DEGRADED" } } };
+      state = {
+        pipeline_status: "PASS",
+        lane_states: {
+          broker: {
+            pipeline_status: "PASS_DEGRADED",
+            summary: { fault_contained_to_zero_authority: true },
+          },
+        },
+      };
     },
     ...options,
   });
@@ -617,6 +765,98 @@ check(oneShot.primaryRuns === 1, "the default breaker attempts the primary exact
 check(oneShot.fallbackRuns === 1, "the default breaker falls back exactly once");
 check(oneShot.result.circuit_breaker_used === true, "the default breaker reports that it fired");
 check(oneShot.result.reason_code === "broker_controller_exception", "the reason code is unchanged");
+
+// A broker lane can close before its final semantic/declaration bytes are
+// joined into attachment ingress. The aggregate state is then internal-failed
+// even though broker itself says PASS. That is still a broker counterfactual
+// only when every mandatory lane is already closed.
+async function statefulBreaker(initialState) {
+  let fallbackRuns = 0;
+  let state = structuredClone(initialState);
+  const result = await executeOptionalBrokerCircuitBreaker({
+    runPrimary: async () => ({ code: 2, stderr: "attachment ingress failed" }),
+    readState: async () => state,
+    runZeroAuthority: async () => {
+      fallbackRuns += 1;
+      state = {
+        pipeline_status: "PASS",
+        lane_states: {
+          filings: { pipeline_status: "PASS" },
+          broker: {
+            pipeline_status: "PASS_DEGRADED",
+            summary: { fault_contained_to_zero_authority: true },
+          },
+          dcs: { pipeline_status: "PASS" },
+        },
+      };
+      return { code: 0 };
+    },
+  });
+  return { result, fallbackRuns };
+}
+
+const postClose = await statefulBreaker({
+  pipeline_status: "BLOCKED_INTERNAL",
+  blocker_class: "INTERNAL_WORK",
+  user_blocking: false,
+  summary: { terminal_reason: "attachment_ingress_failed" },
+  lane_states: {
+    filings: { pipeline_status: "PASS" },
+    broker: { pipeline_status: "PASS" },
+    dcs: { pipeline_status: "PASS" },
+  },
+});
+check(postClose.fallbackRuns === 1, "a broker post-close ingress failure did not run the zero-authority counterfactual");
+check(postClose.result.circuit_breaker_used === true, "the post-close circuit-breaker outcome was not disclosed");
+check(postClose.result.state.pipeline_status === "PASS", "a successful zero-authority counterfactual did not continue delivery");
+check(postClose.result.breaker_receipt.zero_authority_executed === true, "the post-close receipt omitted zero-authority execution");
+
+const mandatoryOnly = await statefulBreaker({
+  pipeline_status: "BLOCKED_INTERNAL",
+  blocker_class: "INTERNAL_WORK",
+  user_blocking: false,
+  lane_states: {
+    filings: { pipeline_status: "BLOCKED_INTERNAL", blocker_class: "INTERNAL_WORK" },
+    dcs: { pipeline_status: "PASS" },
+  },
+});
+check(mandatoryOnly.fallbackRuns === 0, "a mandatory failure with no broker lane was hidden by zero authority");
+check(mandatoryOnly.result.circuit_breaker_used === false, "a mandatory failure was mislabeled as broker degradation");
+check(mandatoryOnly.result.state.pipeline_status === "BLOCKED_INTERNAL", "the mandatory state was not preserved");
+
+const mandatoryOpen = await statefulBreaker({
+  pipeline_status: "BLOCKED_INTERNAL",
+  blocker_class: "INTERNAL_WORK",
+  user_blocking: false,
+  lane_states: {
+    filings: { pipeline_status: "BLOCKED_INTERNAL", blocker_class: "INTERNAL_WORK" },
+    broker: { pipeline_status: "PASS" },
+    dcs: { pipeline_status: "PASS" },
+  },
+});
+check(mandatoryOpen.fallbackRuns === 0, "a broker lane hid an unclosed mandatory failure");
+check(mandatoryOpen.result.state.lane_states.filings.pipeline_status === "BLOCKED_INTERNAL", "the unclosed mandatory lane was not preserved");
+
+let unchangedState = {
+  pipeline_status: "BLOCKED_INTERNAL",
+  blocker_class: "INTERNAL_WORK",
+  user_blocking: false,
+  lane_states: {
+    filings: { pipeline_status: "PASS" },
+    broker: { pipeline_status: "PASS" },
+    dcs: { pipeline_status: "PASS" },
+  },
+};
+await assert.rejects(
+  executeOptionalBrokerCircuitBreaker({
+    runPrimary: async () => ({ code: 2, stderr: "post-close failure" }),
+    readState: async () => unchangedState,
+    runZeroAuthority: async () => ({ code: 0 }),
+  }),
+  /cannot infer zero authority from a successful process exit alone/,
+  "a zero-authority process exit without a fresh zero-authority state was accepted",
+);
+checks += 1;
 
 // (b) The healthy path never opens.
 const healthy = await breakerHarness({ failures: 0 });
@@ -687,6 +927,34 @@ checks += 1;
 refuses(
   () => assertBreakerReceiptCarried({ state: {}, circuit_breaker_used: true, reason_code: "broker_timeout" }),
   "MUTATION: a call site that keeps only .state and drops the breaker receipt must be refused",
+);
+const publicControllerSource = fs.readFileSync(
+  path.join(ROOT, "scripts", "run_excel_inflow_vnext.mjs"),
+  "utf8",
+);
+check(
+  publicControllerSource.includes("assertBreakerReceiptCarried(brokerCircuitBreaker)"),
+  "the public controller does not validate the breaker receipt it consumes",
+);
+check(
+  publicControllerSource.includes('artifacts.optional_broker_breaker_receipt = brokerBreakerReceiptPath'),
+  "the public controller silently drops the breaker receipt instead of preserving it",
+);
+check(
+  publicControllerSource.includes('"optional_broker_circuit_breaker"'),
+  "the public controller does not hash-bind the breaker receipt into its checkpoint chain",
+);
+check(
+  publicControllerSource.includes("remainingBudgetMs: remainingRunBudgetMs")
+    && publicControllerSource.includes("budgetSliceMs: brokerBudgetSliceMs")
+    && publicControllerSource.includes("priorReceipt: usablePriorBrokerBreakerReceipt"),
+  "the production breaker call does not receive its real remaining budget, optional slice and prior receipt",
+);
+check(
+  publicControllerSource.includes('stage: "optional_broker_zero_authority_close"')
+    && publicControllerSource.includes("requestedMs: STAGE_FLOOR_MS")
+    && !/runZeroAuthority:[\s\S]{0,900}timeout:\s*ACTIVE_RUNTIME_BUDGET\.budgets_ms\.broker_global/.test(publicControllerSource),
+  "force-zero closure still receives a fresh 720-second broker-processing allowance",
 );
 check(
   OPTIONAL_BROKER_BREAKER_POLICY.minimum_budget_ms === STAGE_FLOOR_MS,

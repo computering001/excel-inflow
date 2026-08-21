@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/ci-test-lifecycle-receipt-v1.schema.json",
+  "title": "CI selected-started-terminal test lifecycle receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "job_id", "status", "source_binding", "registry_selection_sha256",
+    "selection_scope", "selected_test_ids", "selected_test_ids_sha256", "counts",
+    "starts", "terminals", "errors", "recorded_at", "evidence_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-ci-test-lifecycle-receipt/1.0" },
+    "job_id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["PASS", "FAIL"] },
+    "source_binding": { "$ref": "#/$defs/source_binding" },
+    "registry_selection_sha256": { "$ref": "#/$defs/sha256" },
+    "selection_scope": { "enum": ["TARGETED", "PORTABLE_ALL"] },
+    "selected_test_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "selected_test_ids_sha256": { "$ref": "#/$defs/sha256" },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "started", "terminal", "pass"],
+      "properties": {
+        "selected": { "type": "integer", "minimum": 1 },
+        "started": { "type": "integer", "minimum": 0 },
+        "terminal": { "type": "integer", "minimum": 0 },
+        "pass": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "starts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "started_at"],
+        "properties": { "id": { "$ref": "#/$defs/id" }, "started_at": { "type": "string", "minLength": 20 } }
+      }
+    },
+    "terminals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "status", "exit_code", "signal", "started_at", "completed_at",
+          "duration_ms", "timeout_ms", "timed_out", "stdout_log", "stderr_log"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "status": { "enum": ["PASS", "FAIL", "BLOCKED", "TIMEOUT"] },
+          "exit_code": { "type": ["integer", "null"] },
+          "signal": { "type": ["string", "null"] },
+          "started_at": { "type": "string", "minLength": 20 },
+          "completed_at": { "type": "string", "minLength": 20 },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "timeout_ms": { "type": "integer", "minimum": 1 },
+          "timed_out": { "type": "boolean" },
+          "stdout_log": { "$ref": "#/$defs/log" },
+          "stderr_log": { "$ref": "#/$defs/log" }
+        }
+      }
+    },
+    "errors": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "recorded_at": { "type": "string", "minLength": 20 },
+    "evidence_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_sha", "source_tree", "ref", "event_name", "run_id", "run_attempt"],
+      "properties": {
+        "github_sha": { "$ref": "#/$defs/sha1" }, "source_tree": { "$ref": "#/$defs/sha1" },
+        "ref": { "type": "string", "minLength": 1 }, "event_name": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 }, "run_attempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

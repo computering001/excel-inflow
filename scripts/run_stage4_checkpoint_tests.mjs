@@ -85,7 +85,8 @@ async function resolveSoffice(explicit) {
 
 async function flow(evidence, runDir, args = [], options = {}) {
   const result = await run(process.execPath, [
-    path.join(HERE, "run_user_flow.mjs"),
+    path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+    "user_flow",
     evidence,
     "--out", runDir,
     ...args,

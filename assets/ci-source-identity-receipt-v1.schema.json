@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/ci-source-identity-receipt-v1.schema.json",
+  "title": "Externally retained exact-head CI source identity receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "github_sha", "source_commit", "source_tree",
+    "repository", "ref", "event_name", "run", "runner", "toolchain",
+    "toolchain_sha256", "worktree", "recorded_at", "evidence_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-ci-source-identity-receipt/1.0" },
+    "status": { "const": "PASS" },
+    "github_sha": { "$ref": "#/$defs/sha1" },
+    "source_commit": { "$ref": "#/$defs/sha1" },
+    "source_tree": { "$ref": "#/$defs/sha1" },
+    "repository": { "type": "string", "minLength": 1 },
+    "ref": { "type": "string", "pattern": "^refs/(heads|tags|pull)/.+" },
+    "event_name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "attempt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch", "image"],
+      "properties": {
+        "os": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "image": { "type": "string", "minLength": 1 }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "python", "soffice"],
+      "properties": {
+        "node": { "type": "string", "minLength": 1 },
+        "python": { "type": "string", "minLength": 1 },
+        "soffice": { "type": "string", "minLength": 1 }
+      }
+    },
+    "toolchain_sha256": { "$ref": "#/$defs/sha256" },
+    "worktree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clean", "status_sha256"],
+      "properties": {
+        "clean": { "const": true },
+        "status_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "recorded_at": { "type": "string", "minLength": 20 },
+    "evidence_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

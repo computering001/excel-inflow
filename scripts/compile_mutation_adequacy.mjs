@@ -15,6 +15,7 @@
  * Usage:
  *   node scripts/compile_mutation_adequacy.mjs --out ci/mutation_survivors.json
  *   node scripts/compile_mutation_adequacy.mjs --profile portable --concurrency 8
+ *   node scripts/compile_mutation_adequacy.mjs --profile all --raw-canary-evidence <evidence-run.json>
  *   node scripts/compile_mutation_adequacy.mjs --only source-arithmetic-precision,formula-ast
  *   node scripts/compile_mutation_adequacy.mjs --dry-run       (classify only; execute nothing)
  *
@@ -65,6 +66,9 @@ const python = option("python", "python3");
 const pythonInput = path.isAbsolute(python) || python.includes(path.sep) ? path.resolve(python) : python;
 const representative = option("representative") ? path.resolve(option("representative")) : null;
 const soffice = option("soffice") ? path.resolve(option("soffice")) : null;
+const rawCanaryEvidence = option("raw-canary-evidence")
+  ? path.resolve(option("raw-canary-evidence"))
+  : null;
 const only = option("only") ? new Set(option("only").split(",").map((item) => item.trim()).filter(Boolean)) : null;
 const dryRun = flag("dry-run");
 // A SURVIVOR CLAIM MUST REPRODUCE. Every pool failure is re-run alone this many
@@ -131,6 +135,7 @@ for (const test of corpus) {
 // have parked a measurable suite in BLOCKED and understated the corpus.
 const OUTPUT_ARGUMENT_SOURCES = new Set(["OUT_DIR", "TEST_OUT", "OUT"]);
 const PORTABLE_INPUTS = Object.freeze({
+  RAW_CANARY_EVIDENCE: rawCanaryEvidence,
   REPRESENTATIVE: representative,
   PYTHON: pythonInput,
   SOFFICE: soffice,

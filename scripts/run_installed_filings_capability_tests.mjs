@@ -7,7 +7,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { resolvePythonExecutable } from "./lib/process_tree.mjs";
@@ -15,6 +15,8 @@ import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { installedCapabilityReceiptDigest } from "./lib/runtime_doctor.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
 import { assertRawCanaryEvidenceDigest } from "./lib/raw_canary_fixture.mjs";
+import { identitySha256 } from "./lib/identity_vocabulary.mjs";
+import { completePackageInventoryIdentity } from "./lib/release_package_attestation.mjs";
 
 const execFileAsync = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +38,11 @@ const mutations = [];
 let doctorInvocation = 0;
 const EXPECTED_MUTATIONS_BASE = Object.freeze([
   "extractor-permission",
+  "functional-libreoffice-profile-residue",
+  "installed-inline-xbrl-cleanup-failure",
+  "installed-inline-xbrl-fixture-tamper",
+  "installed-inline-xbrl-missing-worker",
+  "installed-inline-xbrl-timeout",
   "installed-extractor-byte-drift",
   "invalid-temp-root",
   "invalid-work-root",
@@ -48,6 +55,7 @@ const EXPECTED_MUTATIONS_BASE = Object.freeze([
   "poisoned-path",
   "relocated-extractor",
   "run-root-symlink-into-skill",
+  "runtime-compatibility-violation",
   "selected-python-missing-fitz",
   "selected-python-missing-lxml",
   "selected-python-missing-openpyxl",
@@ -76,6 +84,77 @@ async function execute(command, args, options = {}) {
       stderr: String(error.stderr ?? error.message ?? ""),
     };
   }
+}
+
+async function writeIdentityRecord(target, body, hashField) {
+  const record = { ...body, [hashField]: identitySha256(body) };
+  const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8");
+  await fs.writeFile(target, bytes);
+  return { record, rawSha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+async function authorCandidateInstallState(packageRoot, archivePath, name) {
+  const stateRoot = path.join(scratch, name);
+  await fs.mkdir(stateRoot);
+  const [manifest, inventory, archiveBytes] = await Promise.all([
+    fs.readFile(path.join(packageRoot, "release-manifest.json"), "utf8").then(JSON.parse),
+    completePackageInventoryIdentity(packageRoot),
+    fs.readFile(archivePath),
+  ]);
+  const source = manifest.identity.source;
+  const packageIdentity = manifest.identity.package;
+  const closure = packageIdentity.runtime_code_closure;
+  const archiveSha256 = createHash("sha256").update(archiveBytes).digest("hex");
+  await fs.writeFile(path.join(stateRoot, "package-archive.tar"), archiveBytes);
+  const installation = await writeIdentityRecord(
+    path.join(stateRoot, "installation-receipt.json"),
+    {
+      schema_version: "excel-inflow-installation-receipt/1.0",
+      installation_identity: "installed-filings-clean-candidate",
+      installation_generation: 1,
+      slot_id: "candidate-under-test",
+      installed_at: new Date(Date.now() - 120_000).toISOString(),
+      package: {
+        source_commit: source.commit_sha,
+        source_tree: source.tree_sha,
+        package_mode: packageIdentity.mode,
+        package_inventory_sha256: inventory.sha256,
+        archive_sha256: archiveSha256,
+        runtime_closure_sha256: closure.sha256,
+        certified_runtime_closure_sha256: closure.certified_sha256 ?? null,
+        installed_package_sha256: inventory.sha256,
+      },
+    },
+    "receipt_sha256",
+  );
+  await writeIdentityRecord(
+    path.join(stateRoot, "active-install-pointer.json"),
+    {
+      schema_version: "excel-inflow-active-install-pointer/1.0",
+      generation: 1,
+      slot_id: "already-active-production-slot",
+      installation_identity: "already-active-production-installation",
+      installation_receipt_sha256: "1".repeat(64),
+      package_inventory_sha256: "2".repeat(64),
+      archive_sha256: "3".repeat(64),
+      runtime_closure_sha256: "4".repeat(64),
+      promotion_receipt_sha256: "5".repeat(64),
+      previous_slot_id: "previous-production-slot",
+      rollback_package_sha256: "6".repeat(64),
+      activated_at: new Date(Date.now() - 60_000).toISOString(),
+    },
+    "pointer_sha256",
+  );
+  return { stateRoot, installation };
+}
+
+function companySessionArgs(label) {
+  const root = path.join(scratch, `company-session-${label}`);
+  return [
+    "--screen-session-receipt", path.join(root, "screen-session.json"),
+    "--screen-session-id", `installed-filings-${label}`,
+    "--screen-session-secret", `installed-filings-${label}-0123456789-abcdef-0123456789`,
+  ];
 }
 
 async function runDoctor(packageRoot, {
@@ -255,10 +334,33 @@ try {
     "source-owned clean-evidence fixture is not the bound neutral donor contract",
   );
 
+  // Candidate-mode black-box testing must not pretend a dirty source package
+  // is activation-ready. Build the exact current bytes from an isolated clean
+  // Git snapshot so the later installed-slot proof is truthful.
+  const cleanSource = path.join(scratch, "clean-source-snapshot");
+  await fs.cp(ROOT, cleanSource, {
+    recursive: true,
+    filter: (source) => path.basename(source) !== ".git",
+  });
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "Excel Inflow Test",
+    GIT_AUTHOR_EMAIL: "excel-inflow-test@local.invalid",
+    GIT_COMMITTER_NAME: "Excel Inflow Test",
+    GIT_COMMITTER_EMAIL: "excel-inflow-test@local.invalid",
+  };
+  for (const args of [
+    ["init", "-q"],
+    ["add", "-A"],
+    ["commit", "-q", "-m", "sealed installed capability fixture"],
+  ]) {
+    const git = await execute("git", args, { cwd: cleanSource, env: gitEnv });
+    check(git.code === 0, `clean source snapshot failed: git ${args[0]}: ${git.stderr}`);
+  }
   const packageRoot = path.join(scratch, "compiled-package");
   const compiled = await execute(process.execPath, [
-    path.join(HERE, "compile_skill_release.mjs"),
-    "--skill", ROOT,
+    path.join(cleanSource, "scripts", "compile_skill_release.mjs"),
+    "--skill", cleanSource,
     "--out", packageRoot,
     "--development",
   ], {
@@ -278,9 +380,14 @@ try {
   const packageMembersBeforeDoctor = await packageMemberSet(packageRoot);
 
   const baseline = await runDoctor(packageRoot);
-  check(baseline.code === 0 && baseline.report?.verdict === "HOST_READY", "archive-only mandatory filing capability did not close");
+  check(
+    baseline.code === 0 && baseline.report?.verdict === "HOST_READY",
+    `archive-only mandatory filing capability did not close: code=${baseline.code}; ` +
+      `blocking=${JSON.stringify(baseline.report?.refusal?.unsatisfied_preconditions ?? null)}; ` +
+      `stderr=${baseline.stderr.slice(-2000)}`,
+  );
   const capabilitySchema = JSON.parse(
-    await fs.readFile(path.join(packageRoot, "assets", "installed-capability-receipt-v1.schema.json"), "utf8"),
+    await fs.readFile(path.join(packageRoot, "assets", "installed-capability-receipt-v1.3.schema.json"), "utf8"),
   );
   const bootstrapRefusalSchema = JSON.parse(
     await fs.readFile(path.join(packageRoot, "assets", "runtime-bootstrap-refusal-v1.schema.json"), "utf8"),
@@ -301,6 +408,7 @@ try {
     (memberPath === null || result.report.findings.some((finding) => finding.path === memberPath));
   check(
     baseline.receipt?.status === "HOST_READY" &&
+      baseline.receipt?.schema_version === "excel-inflow-installed-capability-receipt/1.3" &&
       validateJsonSchema(baseline.receipt, capabilitySchema).length === 0,
     "archive-only full-lane capability receipt was not schema-valid HOST_READY",
   );
@@ -328,11 +436,15 @@ try {
       baseline.receipt.source_identity.deployment_status === "not_installed",
     "an uninstalled package falsely claimed candidate-slot readiness or production promotion",
   );
+  const compiledCandidateInstall = await authorCandidateInstallState(
+    packageRoot,
+    `${packageRoot}.tar`,
+    "compiled-candidate-install-state",
+  );
   const inactiveCandidate = await runDoctor(packageRoot, {
     env: {
       ...process.env,
-      EXCEL_INFLOW_DEPLOYMENT_STATUS: "installed_candidate",
-      EXCEL_INFLOW_INSTALLATION_IDENTITY: "installed-candidate:capability-test",
+      EXCEL_INFLOW_INSTALL_STATE_ROOT: compiledCandidateInstall.stateRoot,
     },
   });
   check(
@@ -364,11 +476,63 @@ try {
       baseline.receipt.python.executable_sha256 &&
       baseline.receipt.workbook.soffice_executable &&
       baseline.receipt.workbook.soffice_executable_sha256 &&
+      baseline.receipt.workbook.functional_capability?.status === "PASS" &&
+      baseline.receipt.workbook.functional_capability?.output?.cached_result === 12.5 &&
+      baseline.receipt.workbook.functional_capability?.cleanup?.profile_removed === true &&
+      baseline.receipt.workbook.functional_capability?.cleanup?.workspace_removed === true &&
+      baseline.receipt.workbook.functional_capability?.cleanup?.residue_paths?.length === 0 &&
+      baseline.receipt.runtime_compatibility?.status === "PASS" &&
+      baseline.receipt.runtime_compatibility?.total_violations === 0 &&
+      baseline.receipt.runtime_compatibility?.findings?.length === 0 &&
+      baseline.receipt.inline_xbrl?.status === "PASS" &&
+      baseline.receipt.inline_xbrl?.lxml_worker_execution === "PASS" &&
+      baseline.receipt.inline_xbrl?.scratch_removed === true &&
+      baseline.receipt.inline_xbrl?.selected_python === python &&
+      baseline.receipt.inline_xbrl?.selected_python_sha256 ===
+        baseline.receipt.python.executable_sha256 &&
+      [
+        "fixture_sha256", "html_sha256", "worker_sha256", "result_schema_sha256",
+        "result_sha256", "selected_python_sha256",
+      ].every((field) => /^[a-f0-9]{64}$/.test(
+        baseline.receipt.inline_xbrl?.[field] ?? "",
+      )) &&
+      Object.keys(
+        baseline.receipt.inline_xbrl?.selected_non_dimensioned_authority ?? {},
+      ).length === 2 &&
+      Object.keys(
+        baseline.receipt.inline_xbrl?.quarantined_dimensioned_fact?.dimensions ?? {},
+      ).length === 1 &&
       ["fitz", "lxml", "openpyxl", "PIL", "numpy"].every(
         (moduleName) => baseline.receipt.python.per_module[moduleName] === true,
       ) &&
       baseline.receipt.process_spawn === "PASS",
     "capability receipt omitted package identity or one-interpreter full-lane closure",
+  );
+  const invalidFunctionalCapability = structuredClone(baseline.receipt);
+  invalidFunctionalCapability.workbook.functional_capability.cleanup.profile_removed = false;
+  check(
+    validateJsonSchema(invalidFunctionalCapability, capabilitySchema).some(
+      (error) => error.includes("profile_removed"),
+    ),
+    "the installed receipt schema admitted functional LibreOffice profile residue",
+  );
+  mutations.push("functional-libreoffice-profile-residue");
+  const invalidRuntimeCompatibility = structuredClone(baseline.receipt);
+  invalidRuntimeCompatibility.runtime_compatibility.total_violations = 1;
+  check(
+    validateJsonSchema(invalidRuntimeCompatibility, capabilitySchema).some(
+      (error) => error.includes("total_violations"),
+    ),
+    "the installed receipt schema admitted a nonzero runtime compatibility violation",
+  );
+  mutations.push("runtime-compatibility-violation");
+  const invalidInlineXbrlReceipt = structuredClone(baseline.receipt);
+  delete invalidInlineXbrlReceipt.inline_xbrl.selected_non_dimensioned_authority;
+  check(
+    validateJsonSchema(invalidInlineXbrlReceipt, capabilitySchema).some(
+      (error) => error.includes("selected_non_dimensioned_authority"),
+    ),
+    "the installed receipt schema admitted an Inline XBRL result without selected authority",
   );
   const folderOnly = await clonePackage(packageRoot, "folder-only-package");
   const folderOnlyResult = await runDoctor(folderOnly);
@@ -404,11 +568,136 @@ try {
       unpackedDoctor.receipt.source_identity.complete_package_inventory_sha256,
     "freshly unpacked actual archive did not retain whole-package capability custody",
   );
+
+  // Execute the capability module from the actual unpacked archive, then
+  // mutate only its bounded external probe inputs. This keeps package custody
+  // intact while proving that the installed module itself catches byte drift,
+  // a missing worker, a killed lease and incomplete cleanup.
+  const installedInlineXbrlModuleUrl = pathToFileURL(path.join(
+    unpackedPackage,
+    "scripts",
+    "lib",
+    "installed_inline_xbrl_probe.mjs",
+  )).href;
+  const { runInstalledInlineXbrlProbe: runPackagedInlineXbrlProbe } = await import(
+    `${installedInlineXbrlModuleUrl}?installed-capability-test=${Date.now()}`
+  );
+  const installedInlineXbrlScratch = path.join(scratch, "installed-inline-xbrl-probe");
+  await fs.mkdir(installedInlineXbrlScratch);
+  const installedInlineXbrlPositive = await runPackagedInlineXbrlProbe({
+    skillRoot: unpackedPackage,
+    selectedPython: python,
+    tempRoot: installedInlineXbrlScratch,
+  });
+  check(
+    installedInlineXbrlPositive.status === "PASS" &&
+      installedInlineXbrlPositive.result_sha256 ===
+        unpackedDoctor.receipt.inline_xbrl.result_sha256 &&
+      installedInlineXbrlPositive.fixture_sha256 ===
+        unpackedDoctor.receipt.inline_xbrl.fixture_sha256 &&
+      installedInlineXbrlPositive.worker_sha256 ===
+        unpackedDoctor.receipt.inline_xbrl.worker_sha256 &&
+      installedInlineXbrlPositive.selected_python_sha256 ===
+        unpackedDoctor.receipt.python.executable_sha256 &&
+      installedInlineXbrlPositive.scratch_removed === true,
+    "the installed archive's real Inline XBRL capability disagreed with the doctor receipt",
+  );
+
+  const packagedInlineFixturePath = path.join(
+    unpackedPackage,
+    "assets",
+    "installed-inline-xbrl-capability-probe-v1.json",
+  );
+  const tamperedInlineFixture = JSON.parse(
+    await fs.readFile(packagedInlineFixturePath, "utf8"),
+  );
+  tamperedInlineFixture.html = tamperedInlineFixture.html.replace(
+    ">120</ix:nonFraction>",
+    ">121</ix:nonFraction>",
+  );
+  const tamperedInlineFixturePath = path.join(
+    installedInlineXbrlScratch,
+    "tampered-inline-xbrl-fixture.json",
+  );
+  await fs.writeFile(
+    tamperedInlineFixturePath,
+    `${JSON.stringify(tamperedInlineFixture, null, 2)}\n`,
+  );
+  const installedInlineXbrlTamper = await runPackagedInlineXbrlProbe({
+    skillRoot: unpackedPackage,
+    selectedPython: python,
+    tempRoot: installedInlineXbrlScratch,
+    fixturePath: tamperedInlineFixturePath,
+  });
+  check(
+    installedInlineXbrlTamper.status === "REFUSED" &&
+      installedInlineXbrlTamper.reason_code === "INLINE_XBRL_PROBE_FIXTURE_HASH_MISMATCH" &&
+      installedInlineXbrlTamper.scratch_removed === true,
+    "the installed Inline XBRL probe admitted tampered frozen fixture bytes",
+  );
+  mutations.push("installed-inline-xbrl-fixture-tamper");
+
+  const installedInlineXbrlMissing = await runPackagedInlineXbrlProbe({
+    skillRoot: unpackedPackage,
+    selectedPython: python,
+    tempRoot: installedInlineXbrlScratch,
+    workerPath: path.join(installedInlineXbrlScratch, "missing-inline-xbrl-worker.py"),
+  });
+  check(
+    installedInlineXbrlMissing.status === "REFUSED" &&
+      installedInlineXbrlMissing.reason_code === "INLINE_XBRL_PROBE_COMPONENT_MISSING" &&
+      installedInlineXbrlMissing.scratch_removed === true,
+    "the installed Inline XBRL probe admitted an absent worker",
+  );
+  mutations.push("installed-inline-xbrl-missing-worker");
+
+  const sleepingInlineWorker = path.join(installedInlineXbrlScratch, "sleeping-worker.py");
+  await fs.writeFile(sleepingInlineWorker, "import time\ntime.sleep(30)\n", "utf8");
+  const installedInlineXbrlTimeout = await runPackagedInlineXbrlProbe({
+    skillRoot: unpackedPackage,
+    selectedPython: python,
+    tempRoot: installedInlineXbrlScratch,
+    workerPath: sleepingInlineWorker,
+    timeoutMs: 50,
+  });
+  check(
+    installedInlineXbrlTimeout.status === "REFUSED" &&
+      installedInlineXbrlTimeout.reason_code === "INLINE_XBRL_PROBE_TIMEOUT" &&
+      installedInlineXbrlTimeout.detail?.termination_verified === true &&
+      installedInlineXbrlTimeout.detail?.survivor_pids?.length === 0 &&
+      installedInlineXbrlTimeout.scratch_removed === true,
+    "the installed Inline XBRL timeout was not killed, typed and cleaned",
+  );
+  mutations.push("installed-inline-xbrl-timeout");
+
+  const installedInlineXbrlCleanup = await runPackagedInlineXbrlProbe({
+    skillRoot: unpackedPackage,
+    selectedPython: python,
+    tempRoot: installedInlineXbrlScratch,
+    removeScratch: async () => { throw new Error("injected installed cleanup failure"); },
+  });
+  check(
+    installedInlineXbrlCleanup.status === "REFUSED" &&
+      installedInlineXbrlCleanup.reason_code === "INLINE_XBRL_PROBE_CLEANUP_FAILED" &&
+      installedInlineXbrlCleanup.scratch_removed === false,
+    "the installed Inline XBRL probe rounded incomplete scratch cleanup into a pass",
+  );
+  mutations.push("installed-inline-xbrl-cleanup-failure");
+  for (const entry of await fs.readdir(installedInlineXbrlScratch)) {
+    if (entry.startsWith("excel-inflow-inline-xbrl-probe-")) {
+      await fs.rm(path.join(installedInlineXbrlScratch, entry), { recursive: true, force: true });
+    }
+  }
   const emptyHome = path.join(scratch, "empty-home");
   const isolatedTemp = path.join(scratch, "archive-canary-temp");
   await fs.mkdir(emptyHome);
   await fs.mkdir(isolatedTemp);
   const soffice = unpackedDoctor.receipt.workbook.soffice_executable;
+  const candidateInstall = await authorCandidateInstallState(
+    unpackedPackage,
+    `${unpackedPackage}.tar`,
+    "unpacked-candidate-install-state",
+  );
   const archiveEnv = {
     HOME: emptyHome,
     TMPDIR: isolatedTemp,
@@ -423,6 +712,7 @@ try {
     EXCEL_INFLOW_PYTHON: python,
     PYTHON: python,
     SOFFICE_BIN: soffice,
+    EXCEL_INFLOW_INSTALL_STATE_ROOT: candidateInstall.stateRoot,
     PYTHONDONTWRITEBYTECODE: "1",
     LANG: "C.UTF-8",
   };
@@ -618,26 +908,35 @@ try {
   );
 
   const companyScreen = await execute(process.execPath, [
-    path.join(packageRoot, "scripts", "run_excel_inflow_vnext.mjs"),
+    path.join(packageRoot, "scripts", "run_excel_inflow_bootstrap.mjs"),
     "--screen", "company",
+    ...companySessionArgs("archive-company"),
     "--python", python,
     ...(process.env.SOFFICE_BIN ? ["--soffice", process.env.SOFFICE_BIN] : []),
   ], {
     cwd: packageRoot,
-    env: { ...process.env, EXCEL_INFLOW_PYTHON: python, PYTHON: python },
+    env: {
+      ...process.env,
+      EXCEL_INFLOW_INSTALL_STATE_ROOT: compiledCandidateInstall.stateRoot,
+      EXCEL_INFLOW_PYTHON: python,
+      PYTHON: python,
+    },
     timeout: 180_000,
   });
   check(
     companyScreen.code === 0 && companyScreen.stdout.includes("EXCEL INFLOW") &&
-      companyScreen.stdout.includes("COMPANY"),
+      companyScreen.stdout.includes("COMPANY") &&
+      companyScreen.stdout.includes("CANDIDATE SLOT · NOT ACTIVE") &&
+      companyScreen.stdout.includes("HOST READY · SESSION "),
     `archive-only top-level Company route did not pass: ${companyScreen.stderr}`,
   );
   const poisonedNodePath = path.join(scratch, "poison-node-path");
   await fs.mkdir(poisonedNodePath);
   await fs.writeFile(path.join(poisonedNodePath, "node"), "#!/bin/sh\nexit 98\n", { mode: 0o700 });
   const companyWithPoisonedPath = await execute(process.execPath, [
-    path.join(packageRoot, "scripts", "run_excel_inflow_vnext.mjs"),
+    path.join(packageRoot, "scripts", "run_excel_inflow_bootstrap.mjs"),
     "--screen", "company",
+    ...companySessionArgs("poisoned-path"),
     "--python", python,
     ...(process.env.SOFFICE_BIN ? ["--soffice", process.env.SOFFICE_BIN] : []),
   ], {
@@ -646,6 +945,7 @@ try {
       ...process.env,
       PATH: `${poisonedNodePath}${path.delimiter}${process.env.PATH ?? ""}`,
       EXCEL_INFLOW_NODE: process.execPath,
+      EXCEL_INFLOW_INSTALL_STATE_ROOT: compiledCandidateInstall.stateRoot,
       EXCEL_INFLOW_PYTHON: python,
       PYTHON: python,
     },
@@ -659,11 +959,15 @@ try {
     await fs.readFile(path.join(packageRoot, "assets", "deployment-profile.json"), "utf8"),
   );
   check(
-    deploymentProfile.script_entry_points.includes("run_excel_inflow_vnext.mjs") &&
+    deploymentProfile.script_entry_points.includes("run_excel_inflow_bootstrap.mjs") &&
+      !deploymentProfile.script_entry_points.includes("run_excel_inflow_vnext.mjs") &&
       !deploymentProfile.script_entry_points.includes("run_user_flow.mjs") &&
+      deploymentProfile.script_private_roots?.includes("run_excel_inflow_vnext.mjs") &&
       deploymentProfile.script_private_roots?.includes("run_user_flow.mjs") &&
       (await fs.readFile(path.join(packageRoot, "scripts", "run_user_flow.mjs"), "utf8"))
-        .includes("Company screen is a private delegate of run_excel_inflow_vnext.mjs"),
+        .includes("consumeControllerHandoff") &&
+      (await fs.readFile(path.join(packageRoot, "scripts", "run_user_flow.mjs"), "utf8"))
+        .includes("private top-controller capability handoff"),
     "the Company renderer is not bound as a private top-controller delegate",
   );
   const directScreen = await execute(process.execPath, [
@@ -925,13 +1229,17 @@ try {
   const outsideSymlink = path.join(scratch, "outside-run-root-link");
   await fs.symlink(insideSkillTarget, outsideSymlink);
   const symlinkRunRoot = await execute(process.execPath, [
-    path.join(packageRoot, "scripts", "run_excel_inflow_vnext.mjs"),
+    path.join(packageRoot, "scripts", "run_excel_inflow_bootstrap.mjs"),
     "--evidence-run", path.join(scratch, "not-read-before-root-guard.json"),
     "--out", outsideSymlink,
     "--python", python,
   ], { cwd: packageRoot, env: { ...process.env, EXCEL_INFLOW_PYTHON: python, PYTHON: python } });
+  const symlinkRunRootRefusal = JSON.parse(symlinkRunRoot.stdout);
   check(
-    symlinkRunRoot.code !== 0 && symlinkRunRoot.stderr.includes("outside the immutable skill root"),
+    symlinkRunRoot.code !== 0 &&
+      symlinkRunRootRefusal.reason_code === "INTERNAL.runtime_bootstrap_failed" &&
+      symlinkRunRootRefusal.earliest_responsible_layer === "runtime_bootstrap" &&
+      symlinkRunRootRefusal.subordinate_execution_attempted === false,
     "an outside-named run-root symlink bypassed the canonical immutable-tree guard",
   );
   check(
@@ -943,7 +1251,7 @@ try {
   const noDoctor = await clonePackage(packageRoot, "missing-doctor");
   await fs.rm(path.join(noDoctor, "scripts", "lib", "runtime_doctor.mjs"));
   const noDoctorScreen = await execute(process.execPath, [
-    path.join(noDoctor, "scripts", "run_excel_inflow_vnext.mjs"),
+    path.join(noDoctor, "scripts", "run_excel_inflow_bootstrap.mjs"),
     "--screen", "company",
     "--python", python,
   ], { cwd: noDoctor, env: { ...process.env, EXCEL_INFLOW_PYTHON: python, PYTHON: python } });

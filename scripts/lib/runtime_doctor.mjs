@@ -19,12 +19,12 @@
  *
  * VALIDATORS VALIDATE, NEVER REPAIR. This module reports and refuses. It never
  * installs anything, never mutates PATH, never creates a missing working
- * directory, and never "fixes" the host. Its only writes are to a temporary
- * probe directory it creates inside an ALREADY-EXISTING temp root and removes
- * again; that probe is declared in the report rather than performed silently.
+ * directory, and never "fixes" the host. Its only filesystem-preflight writes
+ * are self-cleaning probe directories on the proposed run-root and effective
+ * temp-root volumes; it removes them and declares every operation in the report.
  *
  * REPORT-FIRST. Every check here is a bounded capability question (a version
- * print, an import, a stat, a small write, or the frozen two-page filing
+ * print, an import, a bounded physical filesystem probe, or the frozen two-page filing
  * extraction probe). It never processes issuer evidence, renders a workbook,
  * recalculates, compiles a case or solves the model.
  *
@@ -32,25 +32,50 @@
  * binary locations come from arguments, the environment, the shipped
  * deployment profile, or PATH resolution performed at run time.
  */
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { selectedIngressPythonExecutable } from "./attachment_ingress.mjs";
+import { publishDurableJsonGeneration } from "./durable_artifact_generation.mjs";
+import { probePhysicalFilesystem } from "./filesystem_probe.mjs";
+import {
+  evaluateDiskSpacePolicy,
+  loadDiskSpacePolicy,
+} from "./disk_space_policy.mjs";
+import { runInstalledInlineXbrlProbe } from "./installed_inline_xbrl_probe.mjs";
+import { resolveInstalledRuntimeIdentity } from "./installed_runtime_identity.mjs";
+import {
+  ACTIVATION_FRESHNESS_MAX_AGE_SECONDS,
+  validateInstalledCapabilityReceiptV13Semantics,
+} from "./installed_capability_receipt_v13.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
+import { probeLibreOfficeWorkbookCapability } from "./libreoffice_workbook_capability.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./process_tree.mjs";
+import {
+  evaluateRuntimeCompatibility,
+  loadRuntimeCompatibilityContract,
+} from "./runtime_compatibility.mjs";
 import { resolveActiveSourceIdentity } from "./source_identity.mjs";
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SKILL_ROOT = path.resolve(HERE, "..", "..");
+export const RUNTIME_DOCTOR_DEFAULT_SKILL_ROOT = DEFAULT_SKILL_ROOT;
 
 export const RUNTIME_DOCTOR_SCHEMA_VERSION = "excel-inflow-runtime-doctor-report/1.0";
 export const RUNTIME_DOCTOR_WORK_PACKAGE = "P6.7";
 export const INSTALLED_CAPABILITY_RECEIPT_SCHEMA_VERSION =
-  "excel-inflow-installed-capability-receipt/1.1";
+  "excel-inflow-installed-capability-receipt/1.3";
+const INSTALLED_CAPABILITY_RECEIPT_V13_SCHEMA = JSON.parse(
+  await fs.readFile(
+    path.join(DEFAULT_SKILL_ROOT, "assets", "installed-capability-receipt-v1.3.schema.json"),
+    "utf8",
+  ),
+);
 
 /**
  * The five result types. Only "satisfied" is a pass. "unknown" exists so a
@@ -120,9 +145,9 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
     obligation: "optional",
     lane: "always",
     checked_by:
-      "assets/deployment-profile.json declares no minimum Node version and there is " +
-      "no engines field, so there is no floor to compare process.version against; the " +
-      "running version is REPORTED and the comparison is declared unavailable",
+      "process.version compared with the Node inclusive minimum in the single " +
+      "assets/runtime-compatibility-v1.json authority; the mandatory central compatibility " +
+      "check also enforces its exclusive maximum",
     exclusion_reason: null,
   }),
   node_vendored_dependency_closure: Object.freeze({
@@ -150,7 +175,8 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
     lane: "always",
     checked_by:
       "sys.version_info from the resolved interpreter compared with " +
-      "assets/deployment-profile.json python_runtime.minimum_version",
+      "the Python inclusive minimum in assets/runtime-compatibility-v1.json; the mandatory " +
+      "central compatibility check also enforces its exclusive maximum",
     exclusion_reason: null,
   }),
   python_import_time_module_closure: Object.freeze({
@@ -184,6 +210,17 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
       "and proves labels, values, explicit zero, dash, blank, periods and units",
     exclusion_reason: null,
   }),
+  inline_xbrl_host_probe: Object.freeze({
+    title: "The installed Inline XBRL route parses and selects the frozen annual facts",
+    obligation: "mandatory",
+    lane: "evidence",
+    checked_by:
+      "after the one selected Python and lxml version close through the shared compatibility " +
+      "owner, the shipped extract_inline_xbrl.py worker parses a frozen three-context fixture, " +
+      "returns a schema-valid result, selects only non-dimensioned annual authority, quarantines " +
+      "the contradictory dimensioned observation and removes its bounded scratch directory",
+    exclusion_reason: null,
+  }),
   python_optional_module_closure: Object.freeze({
     title: "Modules declared required_at=runtime_optional are present",
     obligation: "optional",
@@ -191,6 +228,16 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
     checked_by:
       "each allowed_python_third_party_imports entry with required_at=runtime_optional is " +
       "imported; absence degrades a corroboration, it does not block a run",
+    exclusion_reason: null,
+  }),
+  runtime_version_compatibility: Object.freeze({
+    title: "Every runtime required by the requested lanes is inside its exercised compatibility range",
+    obligation: "mandatory",
+    lane: "always",
+    checked_by:
+      "assets/runtime-compatibility-v1.json supplies inclusive minimum and exclusive maximum " +
+      "ranges; Node, the one selected Python, importlib.metadata distribution versions and " +
+      "the selected soffice banner are evaluated through the shared compatibility owner",
     exclusion_reason: null,
   }),
   soffice_available: Object.freeze({
@@ -202,6 +249,16 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
       "the names declared in assets/deployment-profile.json python_runtime.external_binaries " +
       "resolved through PATH; each candidate is asked for --version. No absolute host " +
       "path is hardcoded in this repository.",
+    exclusion_reason: null,
+  }),
+  libreoffice_workbook_capability: Object.freeze({
+    title: "The selected LibreOffice opens, calculates, saves and yields the known workbook result",
+    obligation: "mandatory",
+    lane: "workbook",
+    checked_by:
+      "a deterministic openpyxl fixture is opened headlessly with an isolated file-URL user " +
+      "profile, converted to xlsx, reopened through the one selected Python and required to " +
+      "retain =SUM(A1:A3)=12.5 before every profile/output artifact is removed",
     exclusion_reason: null,
   }),
   workbook_font_metrics: Object.freeze({
@@ -216,34 +273,35 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
     exclusion_reason: null,
   }),
   work_root_writable: Object.freeze({
-    title: "The requested run root (or its existing parent) is writable without the doctor creating it",
+    title: "The requested run root's real filesystem completes the required physical operations",
     obligation: "mandatory",
     lane: "always",
     checked_by:
-      "the nearest EXISTING ancestor of the requested run root is stat'ed and W_OK-checked. " +
-      "The doctor NEVER creates the missing directory — a missing writable parent is an " +
-      "unsatisfied precondition, not something to repair.",
+      "the requested path is canonicalised through its nearest existing ancestor, proven " +
+      "outside the immutable skill root, and its real volume completes random-byte " +
+      "write, flush, close, read/compare, rename, stat, delete and verified cleanup. " +
+      "Only a self-cleaning probe directory is created; the real run directory is not.",
     exclusion_reason: null,
   }),
   temp_root_writable: Object.freeze({
-    title: "The temp root is writable by this process",
+    title: "The effective temp root's real filesystem completes the required physical operations",
     obligation: "mandatory",
     lane: "always",
     checked_by:
-      "a probe directory is created inside the ALREADY-EXISTING temp root, a small file " +
-      "is written and read back, and the probe directory is removed. The probe is " +
-      "self-cleaning and is declared in the report detail.",
+      "independently of the run-root result, the effective temp volume completes the same " +
+      "random-byte write, flush, close, read/compare, rename, stat, delete and verified " +
+      "cleanup probe and records its volume identity.",
     exclusion_reason: null,
   }),
-  temp_free_space: Object.freeze({
-    title: "The temp root has free space above the requested floor",
-    obligation: "optional",
+  disk_space_policy: Object.freeze({
+    title: "Both physical roots have measured free-space headroom under the selected lane policy",
+    obligation: "mandatory",
     lane: "always",
     checked_by:
-      "fs.statfs on the temp root, compared with a floor supplied by argument or the " +
-      "EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES environment variable. Optional because no " +
-      "shipped asset declares a free-space floor, so a missing floor is reported as " +
-      "unknown rather than invented.",
+      "the versioned disk-space policy loads its hash-bound measurement evidence and raw " +
+      "manifests, selects evidence/workbook/combined demand, observes free bytes independently " +
+      "on the work and temp volumes, and refuses missing candidate custody, lower overrides or " +
+      "negative headroom. No fallback floor is invented.",
     exclusion_reason: null,
   }),
   active_source_identity: Object.freeze({
@@ -259,34 +317,30 @@ export const PRECONDITION_DECLARATIONS = Object.freeze({
   }),
   installed_package_hash_readback: Object.freeze({
     title: "The installed package hash on the live host equals the promoted package identity",
-    obligation: "excluded_installed_host",
+    obligation: "optional",
     lane: "always",
-    checked_by: null,
-    exclusion_reason:
-      "Requires reading a live Rogo install's versioned install destination. The " +
-      "installed-host tier is PERMANENTLY EXCLUDED by standing directive (see " +
-      "assets/release-rollback-policy-v1.json scope.installed_host_tier); no script in " +
-      "this repository may attempt it, so this precondition is unsatisfiable here by " +
-      "construction rather than merely unfinished. It is never reported as passed.",
+    checked_by:
+      "installed_runtime_identity.resolveInstalledRuntimeIdentity reads the immutable " +
+      "installation receipt, package archive and live package inventory without mutation.",
+    exclusion_reason: null,
   }),
   installed_active_pointer: Object.freeze({
     title: "The active install pointer resolves to the package this run believes it is",
-    obligation: "excluded_installed_host",
+    obligation: "optional",
     lane: "always",
-    checked_by: null,
-    exclusion_reason:
-      "Requires resolving a live install's active pointer from a fresh session. Same " +
-      "permanently excluded installed-host tier; declared exclusion, never a waiver.",
+    checked_by:
+      "installed_runtime_identity.resolveInstalledRuntimeIdentity reads and hash-verifies " +
+      "the active pointer; it neither writes nor repoints it.",
+    exclusion_reason: null,
   }),
   installed_rollback_package_present: Object.freeze({
     title: "A retained previous-known-good package is present to roll back to",
-    obligation: "excluded_installed_host",
+    obligation: "optional",
     lane: "always",
-    checked_by: null,
-    exclusion_reason:
-      "The retained rollback target lives in the install destination's retention area on " +
-      "the live host. Portable tier can attest a package; only the installed tier can " +
-      "confirm one is retained THERE. Same permanent exclusion.",
+    checked_by:
+      "installed_runtime_identity.resolveInstalledRuntimeIdentity reads the retained " +
+      "rollback bytes and joins their SHA only when deriving PRODUCTION_ACTIVE.",
+    exclusion_reason: null,
   }),
   installed_host_write_permissions: Object.freeze({
     title: "This process may write the install destination the release procedure needs",
@@ -319,6 +373,41 @@ function canonicalJson(value) {
   return `${JSON.stringify(canonicalise(value))}\n`;
 }
 
+export function selectDiskSpacePolicyAuthority({
+  mode,
+  skillRoot,
+  profilePolicy = null,
+  callerPolicyPath = null,
+  callerPolicySha256 = null,
+  env = {},
+}) {
+  if (!new Set(["development", "candidate"]).has(mode)) {
+    throw new Error(`Unsupported disk-space policy authority mode ${JSON.stringify(mode)}.`);
+  }
+  const callerOverridePresent = callerPolicyPath !== null || callerPolicySha256 !== null ||
+    env.EXCEL_INFLOW_DISK_SPACE_POLICY !== undefined ||
+    env.EXCEL_INFLOW_DISK_SPACE_POLICY_SHA256 !== undefined;
+  const declaredPath = mode === "candidate"
+    ? profilePolicy?.path ?? null
+    : callerPolicyPath ?? env.EXCEL_INFLOW_DISK_SPACE_POLICY ?? profilePolicy?.path ?? null;
+  const fromCaller = mode === "development" &&
+    (callerPolicyPath !== null || env.EXCEL_INFLOW_DISK_SPACE_POLICY !== undefined);
+  const policyPath = declaredPath === null
+    ? null
+    : path.isAbsolute(String(declaredPath))
+      ? path.resolve(String(declaredPath))
+      : path.resolve(fromCaller ? String(declaredPath) : path.join(skillRoot, String(declaredPath)));
+  const expectedPolicySha256 = mode === "candidate"
+    ? profilePolicy?.sha256 ?? null
+    : callerPolicySha256 ?? env.EXCEL_INFLOW_DISK_SPACE_POLICY_SHA256 ?? profilePolicy?.sha256 ?? null;
+  return Object.freeze({
+    policy_path: policyPath,
+    expected_policy_sha256: expectedPolicySha256,
+    candidate_override_refused: mode === "candidate" && callerOverridePresent,
+    authority: mode === "candidate" ? "deployment_profile_only" : fromCaller ? "development_caller" : "deployment_profile",
+  });
+}
+
 export function serializeRuntimeDoctorReport(report) {
   return canonicalJson(report);
 }
@@ -332,29 +421,6 @@ export function serializeInstalledCapabilityReceipt(receipt) {
   return canonicalJson(receipt);
 }
 
-async function publishContentAddressedFile(target, bytes) {
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
-  await fs.writeFile(temporary, bytes, { encoding: "utf8", flag: "wx" });
-  try {
-    await fs.rename(temporary, target);
-  } catch (error) {
-    if (error?.code !== "EEXIST") throw error;
-    const existing = await fs.readFile(target, "utf8");
-    if (existing !== bytes) {
-      throw new Error(`Content-addressed runtime artifact collision at ${target}.`);
-    }
-    await fs.rm(temporary, { force: true });
-  }
-}
-
-async function publishPointerLast(target, value) {
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
-  await fs.writeFile(temporary, canonicalJson(value), { encoding: "utf8", flag: "wx" });
-  await fs.rename(temporary, target);
-}
-
 /**
  * Publish the doctor report and capability receipt as one content-addressed
  * generation, then expose that generation through one pointer written last.
@@ -365,7 +431,11 @@ export async function writeInstalledCapabilityArtifactSet({
   artifactDirectory,
   report,
   pointerName = "host-preflight-current.json",
+  reportAliasName = null,
+  receiptAliasName = null,
   beforePointer = null,
+  afterStage = null,
+  durableOperations = {},
 }) {
   const directory = path.resolve(String(artifactDirectory));
   const receipt = compileInstalledCapabilityReceipt(report);
@@ -373,26 +443,64 @@ export async function writeInstalledCapabilityArtifactSet({
   const receiptBytes = serializeInstalledCapabilityReceipt(receipt);
   const reportSha256 = sha256Hex(Buffer.from(reportBytes, "utf8"));
   const receiptBytesSha256 = sha256Hex(Buffer.from(receiptBytes, "utf8"));
-  const reportPath = path.join(directory, `runtime-doctor-report-${reportSha256}.json`);
-  const receiptPath = path.join(
+  const rawAliases = [];
+  if (reportAliasName !== null) rawAliases.push({ name: reportAliasName, value: report });
+  if (receiptAliasName !== null) rawAliases.push({ name: receiptAliasName, value: receipt });
+  if (
+    rawAliases.length === 2 && rawAliases[0].name === rawAliases[1].name
+  ) {
+    throw new Error("Report and receipt aliases must use distinct filenames.");
+  }
+  const generation = await publishDurableJsonGeneration({
     directory,
-    `installed-capability-receipt-${receiptBytesSha256}.json`,
-  );
-  const pointerPath = path.join(directory, pointerName);
-  await publishContentAddressedFile(reportPath, reportBytes);
-  await publishContentAddressedFile(receiptPath, receiptBytes);
-  const pointer = {
-    schema_version: "excel-inflow-host-preflight-pointer/1.1",
-    status: receipt.status === "HOST_READY" ? "HOST_READY" : "HOST_REFUSED",
-    report_file: path.basename(reportPath),
-    report_sha256: reportSha256,
-    receipt_file: path.basename(receiptPath),
-    receipt_sha256: receiptBytesSha256,
-    receipt_self_sha256: receipt.receipt_sha256,
+    rawAliases,
+    immutableArtifacts: [
+      { key: "report", prefix: "runtime-doctor-report-", value: report },
+      { key: "receipt", prefix: "installed-capability-receipt-", value: receipt },
+    ],
+    pointerName,
+    pointerFactory: (immutable) => ({
+      schema_version: "excel-inflow-host-preflight-pointer/1.1",
+      status: receipt.status === "HOST_READY" ? "HOST_READY" : "HOST_REFUSED",
+      report_file: immutable.report.file,
+      report_sha256: immutable.report.sha256,
+      receipt_file: immutable.receipt.file,
+      receipt_sha256: immutable.receipt.sha256,
+      receipt_self_sha256: receipt.receipt_sha256,
+    }),
+    operations: durableOperations,
+    afterStage,
+    beforePointer: beforePointer === null
+      ? null
+      : ({ root, aliases, immutable, pointer }) => beforePointer({
+        reportPath: path.join(root, immutable.report.file),
+        receiptPath: path.join(root, immutable.receipt.file),
+        pointerPath: path.join(root, pointerName),
+        pointer,
+        aliases,
+      }),
+  });
+  const reportPath = path.join(directory, generation.immutable.report.file);
+  const receiptPath = path.join(directory, generation.immutable.receipt.file);
+  const pointerPath = generation.pointer.target;
+  const pointer = generation.pointer.value;
+  if (
+    generation.immutable.report.sha256 !== reportSha256 ||
+    generation.immutable.receipt.sha256 !== receiptBytesSha256
+  ) {
+    throw new Error("Durable generation hashes disagree with the runtime report/receipt serializers.");
+  }
+  return {
+    report,
+    reportBytes,
+    reportPath,
+    receipt,
+    receiptBytes,
+    receiptPath,
+    pointer,
+    pointerPath,
+    rawAliases: generation.aliases,
   };
-  if (beforePointer !== null) await beforePointer({ reportPath, receiptPath, pointerPath, pointer });
-  await publishPointerLast(pointerPath, pointer);
-  return { report, reportBytes, reportPath, receipt, receiptBytes, receiptPath, pointer, pointerPath };
 }
 
 function declarationFor(preconditionId) {
@@ -699,16 +807,17 @@ async function checkNodeInterpreter() {
   });
 }
 
-function checkNodeMinimumVersion(profile) {
-  const declared = profile?.node_runtime?.minimum_version ?? null;
+function checkNodeMinimumVersion(compatibilityContract) {
+  const declared = compatibilityContract?.runtimes
+    ?.find((entry) => entry.runtime_name === "Node")
+    ?.minimum_version?.split(".").map(Number) ?? null;
   if (!Array.isArray(declared) || declared.length === 0) {
     return typedCheck({
       precondition_id: "node_minimum_version",
       result: "unknown",
       reason:
-        "assets/deployment-profile.json declares no node_runtime.minimum_version and the " +
-        "repository has no package.json engines field, so there is no floor to compare " +
-        "against. COULD NOT CHECK — declared, not skipped. The running version is reported.",
+        "assets/runtime-compatibility-v1.json did not expose a parsable Node minimum. " +
+        "COULD NOT CHECK — declared, not skipped. The running version is reported.",
       detail: { running_version: process.version, declared_minimum_version: null },
     });
   }
@@ -792,16 +901,25 @@ export async function resolveDoctorPython({ env = process.env, explicit = null }
 }
 
 const PYTHON_PROBE = [
-  "import importlib, json, sys",
+  "import importlib, importlib.metadata, json, sys",
+  "requested = json.loads(sys.argv[1])",
   "modules = {}",
   "module_versions = {}",
-  "for name in sys.argv[1:]:",
+  "distribution_names = {}",
+  "for item in requested:",
+  "    name = item['module']",
+  "    distribution = item['distribution']",
+  "    distribution_names[name] = distribution",
   "    try:",
-  "        imported = importlib.import_module(name)",
+  "        importlib.import_module(name)",
   "        modules[name] = True",
-  "        module_versions[name] = str(getattr(imported, '__version__', getattr(imported, 'VersionBind', 'unknown')))",
   "    except Exception:",
   "        modules[name] = False",
+  "        module_versions[name] = None",
+  "        continue",
+  "    try:",
+  "        module_versions[name] = importlib.metadata.version(distribution)",
+  "    except Exception:",
   "        module_versions[name] = None",
   "print(json.dumps({",
   "    'executable': sys.executable,",
@@ -809,11 +927,20 @@ const PYTHON_PROBE = [
   "    'prefix_is_venv': sys.prefix != getattr(sys, 'base_prefix', sys.prefix),",
   "    'modules': modules,",
   "    'module_versions': module_versions,",
+  "    'distribution_names': distribution_names,",
   "}, sort_keys=True))",
 ].join("\n");
 
-async function probePython(resolved, moduleNames, { timeout = 60_000 } = {}) {
-  const probe = await runProcessTree(resolved, ["-c", PYTHON_PROBE, ...moduleNames], { timeout });
+async function probePython(resolved, moduleEntries, { timeout = 60_000 } = {}) {
+  const requested = moduleEntries.map((entry) => ({
+    module: entry.module,
+    distribution: entry.distribution,
+  }));
+  const probe = await runProcessTree(
+    resolved,
+    ["-c", PYTHON_PROBE, JSON.stringify(requested)],
+    { timeout },
+  );
   if (!probe.ok) {
     return { ok: false, error: probe.stderr || probe.error_code || `exit ${probe.code}` };
   }
@@ -838,28 +965,72 @@ export function compileInstalledCapabilityReceipt(report) {
   const filingsProbe = report.checks.find(
     (entry) => entry.precondition_id === "filings_extraction_probe",
   );
+  const inlineXbrlProbe = report.checks.find(
+    (entry) => entry.precondition_id === "inline_xbrl_host_probe",
+  );
   const sourceIdentity = report.checks.find(
     (entry) => entry.precondition_id === "active_source_identity",
+  );
+  const runtimeCompatibility = report.checks.find(
+    (entry) => entry.precondition_id === "runtime_version_compatibility",
+  );
+  const libreOfficeCapability = report.checks.find(
+    (entry) => entry.precondition_id === "libreoffice_workbook_capability",
+  );
+  const workRoot = report.checks.find(
+    (entry) => entry.precondition_id === "work_root_writable",
+  );
+  const tempRoot = report.checks.find(
+    (entry) => entry.precondition_id === "temp_root_writable",
+  );
+  const diskSpace = report.checks.find(
+    (entry) => entry.precondition_id === "disk_space_policy",
   );
   const coversActivationLanes = ["evidence", "workbook"].every(
     (lane) => report.requested_lanes.includes(lane),
   );
+  const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+  const GIT_PATTERN = /^[a-f0-9]{40}$/;
   const attestedActivePackage =
     sourceIdentity?.detail?.closure_check_status === "match" &&
     sourceIdentity?.detail?.source_worktree_dirty === false &&
-    ["installed_candidate", "production_promoted"].includes(
-      sourceIdentity?.detail?.deployment_status,
-    ) &&
+    sourceIdentity?.detail?.deployment_status === "installed_candidate" &&
+    GIT_PATTERN.test(String(sourceIdentity?.detail?.source_commit ?? "")) &&
+    GIT_PATTERN.test(String(sourceIdentity?.detail?.source_tree ?? "")) &&
     typeof sourceIdentity?.detail?.installation_identity === "string" &&
     sourceIdentity.detail.installation_identity.trim() !== "" &&
-    typeof sourceIdentity?.detail?.declared_runtime_code_closure_sha256 === "string" &&
-    typeof sourceIdentity?.detail?.complete_package_inventory_sha256 === "string" &&
-    typeof sourceIdentity?.detail?.archive_sha256 === "string" &&
-    typeof sourceIdentity?.detail?.release_package_attestation_sha256 === "string";
+    SHA256_PATTERN.test(String(sourceIdentity?.detail?.active_runtime_code_closure_sha256 ?? "")) &&
+    sourceIdentity.detail.active_runtime_code_closure_sha256 ===
+      sourceIdentity?.detail?.declared_runtime_code_closure_sha256 &&
+    SHA256_PATTERN.test(String(sourceIdentity?.detail?.complete_package_inventory_sha256 ?? "")) &&
+    SHA256_PATTERN.test(String(sourceIdentity?.detail?.archive_sha256 ?? "")) &&
+    SHA256_PATTERN.test(String(sourceIdentity?.detail?.release_package_attestation_sha256 ?? ""));
+  const generatedEpoch = Date.parse(report.generated_at);
+  const currentEpoch = Date.now();
+  // Receipt bytes are a pure projection of the immutable report. Recompiling
+  // the same report concurrently must converge on one content-addressed
+  // generation, so the transaction evaluation timestamp is the report's own
+  // generation timestamp rather than a second wall-clock read.
+  const evaluatedEpoch = generatedEpoch;
+  const expiresEpoch = generatedEpoch + ACTIVATION_FRESHNESS_MAX_AGE_SECONDS * 1000;
+  const freshnessStatus = Number.isFinite(generatedEpoch) &&
+    generatedEpoch - currentEpoch <= 300_000 && currentEpoch < expiresEpoch
+    ? "FRESH"
+    : "EXPIRED";
   const hostCapabilityReady =
     report.verdict === "HOST_READY" && coversActivationLanes &&
-    filingsProbe?.result === "satisfied";
-  const candidateSlotReady = hostCapabilityReady && attestedActivePackage;
+    filingsProbe?.result === "satisfied" && inlineXbrlProbe?.result === "satisfied" &&
+    diskSpace?.result === "satisfied" && freshnessStatus === "FRESH";
+  const candidateDiskReady =
+    diskSpace?.detail?.evaluation?.status === "PASS" &&
+    diskSpace.detail.evaluation.mode === "candidate" &&
+    diskSpace.detail.evaluation.policy_evidence?.policy_sealed === true;
+  const candidateSlotReady = hostCapabilityReady && attestedActivePackage && candidateDiskReady;
+  const inlineXbrlProjection = inlineXbrlProbe?.result === "satisfied"
+    ? Object.fromEntries(
+      Object.entries(inlineXbrlProbe.detail ?? {}).filter(([key]) => key !== "compatibility_prerequisite"),
+    )
+    : null;
   const body = {
     schema_version: INSTALLED_CAPABILITY_RECEIPT_SCHEMA_VERSION,
     status: hostCapabilityReady ? "HOST_READY" : "REFUSED",
@@ -871,11 +1042,12 @@ export function compileInstalledCapabilityReceipt(report) {
         ? "The full evidence+workbook host capability did not close."
         : sourceIdentity?.detail?.source_worktree_dirty === true
           ? "Host capability may be exercised, but activation requires a clean source snapshot; this package was compiled from a dirty worktree whose HEAD commit/tree do not identify all packaged bytes."
-          : !["installed_candidate", "production_promoted"].includes(
-              sourceIdentity?.detail?.deployment_status,
-            ) || typeof sourceIdentity?.detail?.installation_identity !== "string"
+          : sourceIdentity?.detail?.deployment_status !== "installed_candidate" ||
+              typeof sourceIdentity?.detail?.installation_identity !== "string"
             ? "Host capability may be exercised, but candidate-slot readiness requires a verified installed-candidate identity in an inactive slot."
-          : "Host capability may be exercised, but candidate-slot readiness requires a verified external package attestation binding the declared closure, complete inventory and deterministic archive.",
+          : !candidateDiskReady
+            ? "Host capability may be exercised, but candidate-slot readiness requires a sealed measured candidate-mode disk-space policy and positive headroom on both physical roots."
+            : "Host capability may be exercised, but candidate-slot readiness requires a verified external package attestation binding the declared closure, complete inventory and deterministic archive.",
     production_promotion_eligible: false,
     production_promotion_refusal_reason:
       "This receipt proves only inactive candidate-slot host readiness. Production promotion additionally requires candidate-bound fresh-session, IFRS, US-GAAP, broker-state, active-pointer read-back and post-activation receipts.",
@@ -927,14 +1099,32 @@ export function compileInstalledCapabilityReceipt(report) {
       soffice_version: report.checks.find(
         (entry) => entry.precondition_id === "soffice_available",
       )?.detail?.version ?? null,
+      functional_capability:
+        libreOfficeCapability?.result === "satisfied" ? libreOfficeCapability.detail : null,
     },
+    runtime_compatibility:
+      runtimeCompatibility?.result === "satisfied" ? runtimeCompatibility.detail : null,
     process_spawn: pythonClosure?.result === "satisfied" ? "PASS" : "FAIL",
     mandatory_filings_probe: filingsProbe?.result === "satisfied" ? filingsProbe.detail : null,
+    inline_xbrl: inlineXbrlProjection,
     filesystem: {
-      work_root: report.checks.find((entry) => entry.precondition_id === "work_root_writable")
-        ?.result ?? "unknown",
-      temp_root: report.checks.find((entry) => entry.precondition_id === "temp_root_writable")
-        ?.result ?? "unknown",
+      work_root: {
+        result: workRoot?.result ?? "unknown",
+        facts: workRoot?.detail ?? null,
+      },
+      temp_root: {
+        result: tempRoot?.result ?? "unknown",
+        facts: tempRoot?.detail ?? null,
+      },
+      disk_space_evaluation: diskSpace?.detail?.evaluation ?? null,
+    },
+    freshness: {
+      policy: "activation_transaction",
+      max_age_seconds: ACTIVATION_FRESHNESS_MAX_AGE_SECONDS,
+      generated_at: report.generated_at,
+      expires_at: Number.isFinite(expiresEpoch) ? new Date(expiresEpoch).toISOString() : report.generated_at,
+      evaluated_at: new Date(evaluatedEpoch).toISOString(),
+      status: freshnessStatus,
     },
     runtime_doctor_sha256: sha256Hex(Buffer.from(serializeRuntimeDoctorReport(report), "utf8")),
   };
@@ -943,6 +1133,18 @@ export function compileInstalledCapabilityReceipt(report) {
     receipt_sha256: "",
   };
   receipt.receipt_sha256 = installedCapabilityReceiptDigest(receipt);
+  const structural = validateJsonSchema(receipt, INSTALLED_CAPABILITY_RECEIPT_V13_SCHEMA);
+  if (structural.length > 0) {
+    throw new Error(`Installed capability receipt 1.3 failed schema compilation: ${structural.join("; ")}.`);
+  }
+  const semantic = validateInstalledCapabilityReceiptV13Semantics(receipt, {
+    now: new Date(currentEpoch),
+  });
+  if (semantic.status !== "PASS") {
+    throw new Error(
+      `Installed capability receipt 1.3 failed semantic compilation: ${semantic.findings.map((item) => item.code).join(", ")}.`,
+    );
+  }
   return Object.freeze(receipt);
 }
 
@@ -1414,23 +1616,7 @@ async function checkFontMetrics({ resolvedPython, scriptsDir, timeout }) {
   });
 }
 
-async function nearestExistingAncestor(target) {
-  let current = path.resolve(target);
-  for (let depth = 0; depth < 64; depth += 1) {
-    try {
-      const stat = await fs.stat(current);
-      return { path: current, is_directory: stat.isDirectory(), created_by_doctor: false };
-    } catch (error) {
-      if (error?.code !== "ENOENT") return { path: current, error: error?.code ?? error?.message };
-      const parent = path.dirname(current);
-      if (parent === current) return { path: current, error: "ENOENT" };
-      current = parent;
-    }
-  }
-  return { path: current, error: "ancestor search exhausted" };
-}
-
-async function checkWorkRootWritable(runRoot) {
+async function checkWorkRootWritable(runRoot, skillRoot) {
   if (!runRoot) {
     return typedCheck({
       precondition_id: "work_root_writable",
@@ -1441,144 +1627,145 @@ async function checkWorkRootWritable(runRoot) {
       detail: null,
     });
   }
-  const requested = path.resolve(runRoot);
-  const ancestor = await nearestExistingAncestor(requested);
-  if (ancestor.error) {
-    return typedCheck({
-      precondition_id: "work_root_writable",
-      result: "unsatisfied",
-      reason: `No existing ancestor of the requested run root could be stat'ed (${ancestor.error}).`,
-      detail: { requested_run_root: requested, nearest_existing: ancestor },
-    });
-  }
-  if (!ancestor.is_directory) {
-    return typedCheck({
-      precondition_id: "work_root_writable",
-      result: "unsatisfied",
-      reason: "The nearest existing ancestor of the requested run root is not a directory.",
-      detail: { requested_run_root: requested, nearest_existing: ancestor },
-    });
-  }
-  try {
-    await fs.access(ancestor.path, fsConstants.W_OK | fsConstants.X_OK);
-  } catch (error) {
-    return typedCheck({
-      precondition_id: "work_root_writable",
-      result: "unsatisfied",
-      reason:
-        `The nearest existing ancestor of the requested run root is not writable by this ` +
-        `process (${error?.code ?? error?.message}). The doctor does not create or chmod it.`,
-      detail: { requested_run_root: requested, nearest_existing: ancestor },
-    });
-  }
+  const probe = await probePhysicalFilesystem({
+    requestedRoot: runRoot,
+    skillRoot,
+    purpose: "run_root",
+  });
   return typedCheck({
     precondition_id: "work_root_writable",
-    result: "satisfied",
-    detail: {
-      requested_run_root: requested,
-      nearest_existing_ancestor: ancestor.path,
-      run_root_exists: ancestor.path === requested,
-      doctor_created_anything: false,
-    },
+    result: probe.ok ? "satisfied" : "unsatisfied",
+    reason: probe.ok
+      ? null
+      : `The proposed run root did not complete the physical filesystem probe (${probe.facts.error ?? "incomplete operation"}).`,
+    detail: probe.facts,
   });
 }
 
-async function checkTempRootWritable(tempRoot) {
-  let probeDir = null;
-  try {
-    const stat = await fs.stat(tempRoot);
-    if (!stat.isDirectory()) {
-      return typedCheck({
-        precondition_id: "temp_root_writable",
-        result: "unsatisfied",
-        reason: "The temp root is not a directory.",
-        detail: { temp_root: tempRoot },
-      });
-    }
-    probeDir = await fs.mkdtemp(path.join(tempRoot, "excel-inflow-doctor-probe-"));
-    const probeFile = path.join(probeDir, "probe");
-    const payload = "runtime-doctor-probe";
-    await fs.writeFile(probeFile, payload, "utf8");
-    const readBack = await fs.readFile(probeFile, "utf8");
-    if (readBack !== payload) {
-      return typedCheck({
-        precondition_id: "temp_root_writable",
-        result: "unsatisfied",
-        reason: "A file written into the temp root did not read back byte-identical.",
-        detail: { temp_root: tempRoot },
-      });
-    }
-    await fs.rm(probeDir, { recursive: true, force: false });
-    probeDir = null;
+async function checkTempRootWritable(tempRoot, skillRoot) {
+  const probe = await probePhysicalFilesystem({
+    requestedRoot: tempRoot,
+    skillRoot,
+    purpose: "temp_root",
+  });
+  return typedCheck({
+    precondition_id: "temp_root_writable",
+    result: probe.ok ? "satisfied" : "unsatisfied",
+    reason: probe.ok
+      ? null
+      : `The effective temp root did not complete its independent physical filesystem probe (${probe.facts.error ?? "incomplete operation"}).`,
+    detail: probe.facts,
+  });
+}
+
+async function availableBytes(target) {
+  if (typeof fs.statfs !== "function") {
+    throw new Error("This Node build exposes no fs.statfs.");
+  }
+  const stats = await fs.statfs(target);
+  const value = Number(stats.bsize) * Number(stats.bavail);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`fs.statfs returned an unsafe free-byte observation for ${target}.`);
+  }
+  return value;
+}
+
+async function checkDiskSpacePolicy({
+  requestedLanes,
+  workRootCheck,
+  tempRootCheck,
+  mode,
+  policyPath,
+  expectedPolicySha256,
+  overrideMinFreeBytes,
+  skillRoot,
+  candidateOverrideRefused = false,
+}) {
+  const baseDetail = {
+    mode,
+    policy_path: policyPath,
+    expected_policy_sha256: expectedPolicySha256,
+    override_min_free_bytes: overrideMinFreeBytes,
+    evaluation: null,
+  };
+  if (mode === "candidate" && candidateOverrideRefused) {
     return typedCheck({
-      precondition_id: "temp_root_writable",
-      result: "satisfied",
+      precondition_id: "disk_space_policy",
+      result: "unsatisfied",
+      reason: "Candidate mode refuses caller/environment disk-policy path or hash overrides; only the deployment-profile-bound path and SHA-256 are authoritative.",
+      detail: { ...baseDetail, error_code: "DISK_SPACE_CANDIDATE_OVERRIDE_REFUSED" },
+    });
+  }
+  if (!policyPath) {
+    return typedCheck({
+      precondition_id: "disk_space_policy",
+      result: mode === "candidate" ? "unsatisfied" : "unknown",
+      reason: mode === "candidate"
+        ? "Candidate mode has no declared, hash-sealed disk-space policy."
+        : "No measured disk-space policy was supplied by caller or deployment profile; development mode refuses to invent production floors.",
+      detail: baseDetail,
+    });
+  }
+  if (workRootCheck.result !== "satisfied" || tempRootCheck.result !== "satisfied") {
+    return typedCheck({
+      precondition_id: "disk_space_policy",
+      result: "unknown",
+      reason: "Free-space policy could not be evaluated because both physical filesystem probes did not close.",
+      detail: baseDetail,
+    });
+  }
+  try {
+    const loadedPolicy = await loadDiskSpacePolicy({
+      policyPath,
+      expectedPolicySha256,
+      mode,
+      schemaPath: path.join(skillRoot, "assets", "disk-space-policy-v1.schema.json"),
+    });
+    const workFacts = workRootCheck.detail;
+    const tempFacts = tempRootCheck.detail;
+    const shared = workFacts.volume_identity.device_id === tempFacts.volume_identity.device_id;
+    const workFree = await availableBytes(workFacts.canonical_probe_parent);
+    const tempFree = shared
+      ? workFree
+      : await availableBytes(tempFacts.canonical_probe_parent);
+    const evaluation = evaluateDiskSpacePolicy({
+      loadedPolicy,
+      mode,
+      requestedLanes,
+      observations: {
+        work_root: { available_bytes: workFree, volume_identity: workFacts.volume_identity },
+        temp_root: { available_bytes: tempFree, volume_identity: tempFacts.volume_identity },
+      },
+      overrideMinFreeBytes,
+    });
+    return typedCheck({
+      precondition_id: "disk_space_policy",
+      result: evaluation.status === "PASS" ? "satisfied" : "unsatisfied",
+      reason: evaluation.status === "PASS"
+        ? null
+        : `Disk-space policy refused: ${evaluation.findings.map((item) => item.code).join(", ")}.`,
+      detail: { ...baseDetail, evaluation },
+    });
+  } catch (error) {
+    return typedCheck({
+      precondition_id: "disk_space_policy",
+      result: "unsatisfied",
+      reason: `Disk-space policy custody or evaluation failed: ${error?.code ?? error?.message ?? String(error)}.`,
       detail: {
-        temp_root: tempRoot,
-        probe: "created a temporary directory inside the already-existing temp root, wrote and read back a small file, then removed it",
-        probe_removed: true,
-        created_missing_directories: false,
+        ...baseDetail,
+        error_code: error?.code ?? null,
+        error_detail: error?.detail ?? null,
       },
     });
-  } catch (error) {
-    return typedCheck({
-      precondition_id: "temp_root_writable",
-      result: "unsatisfied",
-      reason: `The temp root is not usable by this process (${error?.code ?? error?.message}).`,
-      detail: { temp_root: tempRoot },
-    });
-  } finally {
-    if (probeDir) await fs.rm(probeDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-async function checkTempFreeSpace(tempRoot, floorBytes) {
-  if (typeof fs.statfs !== "function") {
-    return typedCheck({
-      precondition_id: "temp_free_space",
-      result: "unknown",
-      reason:
-        "This Node build exposes no fs.statfs, so free space on the temp root cannot be " +
-        "measured. COULD NOT CHECK — declared, not skipped.",
-      detail: { temp_root: tempRoot },
-    });
-  }
-  let freeBytes = null;
+async function checkActiveSourceIdentity(skillRoot, verifiedPlacement) {
   try {
-    const stats = await fs.statfs(tempRoot);
-    freeBytes = Number(stats.bsize) * Number(stats.bavail);
-  } catch (error) {
-    return typedCheck({
-      precondition_id: "temp_free_space",
-      result: "unknown",
-      reason: `Free space on the temp root could not be measured (${error?.code ?? error?.message}).`,
-      detail: { temp_root: tempRoot },
+    const identity = await resolveActiveSourceIdentity({
+      skillRoot,
+      overrides: verifiedPlacement?.source_identity_overrides ?? {},
     });
-  }
-  if (!Number.isFinite(floorBytes) || floorBytes <= 0) {
-    return typedCheck({
-      precondition_id: "temp_free_space",
-      result: "unknown",
-      reason:
-        "No shipped asset declares a temp free-space floor and none was supplied via " +
-        "--min-free-bytes or EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES, so there is nothing to " +
-        "compare the measurement against. The measurement is reported; a floor is not invented.",
-      detail: { temp_root: tempRoot, free_bytes: freeBytes, floor_bytes: null },
-    });
-  }
-  return typedCheck({
-    precondition_id: "temp_free_space",
-    result: freeBytes >= floorBytes ? "satisfied" : "unsatisfied",
-    reason: freeBytes >= floorBytes
-      ? null
-      : `The temp root has ${freeBytes} free bytes, below the requested floor of ${floorBytes}.`,
-    detail: { temp_root: tempRoot, free_bytes: freeBytes, floor_bytes: floorBytes },
-  });
-}
-
-async function checkActiveSourceIdentity(skillRoot) {
-  try {
-    const identity = await resolveActiveSourceIdentity({ skillRoot });
     const check = identity.active_runtime_code_closure_check;
     if (check?.status === "match") {
       return {
@@ -1602,6 +1789,13 @@ async function checkActiveSourceIdentity(skillRoot) {
             release_package_attestation_sha256:
               identity.release_package_attestation_sha256 ?? null,
             installation_identity: identity.installation_identity ?? null,
+            verified_runtime_placement: verifiedPlacement?.placement ?? null,
+            installation_receipt_sha256:
+              verifiedPlacement?.evidence_hashes.installation_receipt_sha256 ?? null,
+            active_pointer_sha256:
+              verifiedPlacement?.evidence_hashes.active_pointer_sha256 ?? null,
+            production_promotion_receipt_sha256:
+              verifiedPlacement?.evidence_hashes.production_promotion_receipt_sha256 ?? null,
           },
         }),
         sourceHashes: {
@@ -1635,6 +1829,13 @@ async function checkActiveSourceIdentity(skillRoot) {
             release_package_attestation_sha256:
               identity.release_package_attestation_sha256 ?? null,
             installation_identity: identity.installation_identity ?? null,
+            verified_runtime_placement: verifiedPlacement?.placement ?? null,
+            installation_receipt_sha256:
+              verifiedPlacement?.evidence_hashes.installation_receipt_sha256 ?? null,
+            active_pointer_sha256:
+              verifiedPlacement?.evidence_hashes.active_pointer_sha256 ?? null,
+            production_promotion_receipt_sha256:
+              verifiedPlacement?.evidence_hashes.production_promotion_receipt_sha256 ?? null,
           },
         }),
         sourceHashes: {
@@ -1669,12 +1870,80 @@ async function checkActiveSourceIdentity(skillRoot) {
   }
 }
 
+function installedIdentityReadbackChecks(verifiedPlacement) {
+  const placement = verifiedPlacement?.placement ?? null;
+  const unavailable = (preconditionId, reason) => typedCheck({
+    precondition_id: preconditionId,
+    result: "not_applicable",
+    reason,
+    detail: { verified_runtime_placement: placement, attempted: false },
+  });
+  if (!placement || placement === "development_source") {
+    const reason =
+      "No verified installed placement was configured for this capability diagnostic; " +
+      "runtime mode derivation still refuses any installed product route without it.";
+    return [
+      unavailable("installed_package_hash_readback", reason),
+      unavailable("installed_active_pointer", reason),
+      unavailable("installed_rollback_package_present", reason),
+    ];
+  }
+  const common = {
+    verified_runtime_placement: placement,
+    installation_identity: verifiedPlacement.installation.installation_identity,
+    installation_receipt_sha256:
+      verifiedPlacement.evidence_hashes.installation_receipt_sha256,
+    package_inventory_sha256:
+      verifiedPlacement.local_package.package_inventory_sha256,
+    active_pointer_sha256:
+      verifiedPlacement.evidence_hashes.active_pointer_sha256,
+  };
+  const checks = [
+    typedCheck({
+      precondition_id: "installed_package_hash_readback",
+      result: "satisfied",
+      detail: common,
+    }),
+    typedCheck({
+      precondition_id: "installed_active_pointer",
+      result: "satisfied",
+      detail: {
+        ...common,
+        selected_slot_id: verifiedPlacement.active_pointer.slot_id,
+        installed_slot_id: verifiedPlacement.installation.slot_id,
+        pointer_selects_this_package:
+          verifiedPlacement.active_pointer.slot_id === verifiedPlacement.installation.slot_id,
+      },
+    }),
+  ];
+  if (placement === "production_active") {
+    checks.push(typedCheck({
+      precondition_id: "installed_rollback_package_present",
+      result: "satisfied",
+      detail: {
+        ...common,
+        previous_slot_id: verifiedPlacement.active_pointer.previous_slot_id,
+        rollback_package_sha256: verifiedPlacement.active_pointer.rollback_package_sha256,
+        production_promotion_receipt_sha256:
+          verifiedPlacement.evidence_hashes.production_promotion_receipt_sha256,
+      },
+    }));
+  } else {
+    checks.push(unavailable(
+      "installed_rollback_package_present",
+      "An inactive candidate proves the currently active pointer selects another slot; " +
+      "rollback-package custody becomes mandatory only before PRODUCTION_ACTIVE.",
+    ));
+  }
+  return checks;
+}
+
 /**
  * Run every declared precondition check and compile the typed report.
  *
  * Nothing here performs issuer work: version prints, module imports, hash
- * reads, one stat, one self-cleaning temp probe and the frozen two-page filing
- * extraction capability probe.
+ * reads, two independent self-cleaning physical probes and the frozen two-page
+ * filing extraction capability probe.
  */
 export async function runRuntimeDoctor({
   skillRoot = DEFAULT_SKILL_ROOT,
@@ -1684,27 +1953,99 @@ export async function runRuntimeDoctor({
   python = null,
   soffice = null,
   tempRoot = null,
+  diskSpacePolicyPath = null,
+  diskSpacePolicySha256 = null,
   minFreeBytes = null,
+  installStateRoot = null,
   probeTimeoutMs = 60_000,
 } = {}) {
+  if (!Number.isFinite(Number(probeTimeoutMs)) || Number(probeTimeoutMs) <= 0) {
+    throw new Error("probeTimeoutMs must be a positive finite aggregate host-probe lease");
+  }
+  const probeLeaseLimitMs = Number(probeTimeoutMs);
+  const probeLeaseStartedNs = process.hrtime.bigint();
+  const probeLeaseElapsedMs = () =>
+    Number(process.hrtime.bigint() - probeLeaseStartedNs) / 1_000_000;
+  const remainingProbeLeaseMs = (localCapMs) => Math.max(
+    0,
+    Math.floor(Math.min(Number(localCapMs), probeLeaseLimitMs - probeLeaseElapsedMs())),
+  );
   const requestedLanes = normaliseLanes(lanes);
   const profile = await readJsonIfPresent(path.join(skillRoot, "assets", "deployment-profile.json"));
+  let compatibilityContract = null;
+  let compatibilityContractSha256 = null;
+  let compatibilityContractError = null;
+  try {
+    const compatibilityPath = path.join(skillRoot, "assets", "runtime-compatibility-v1.json");
+    compatibilityContractSha256 = sha256Hex(await fs.readFile(compatibilityPath));
+    compatibilityContract = await loadRuntimeCompatibilityContract(compatibilityPath);
+  } catch (error) {
+    compatibilityContractError = String(error?.message ?? error);
+  }
   const scriptsDir = path.join(skillRoot, "scripts");
   const effectiveTempRoot = tempRoot ?? env.TMPDIR ?? os.tmpdir();
-  const floorBytes = Number(
-    minFreeBytes ?? env.EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES ?? Number.NaN,
-  );
+  const profileDiskPolicy = profile?.runtime_disk_space_policy ?? null;
+  const overrideMinFreeBytes = minFreeBytes === null && env.EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES === undefined
+    ? null
+    : Number(minFreeBytes ?? env.EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES);
 
   const checks = [];
   checks.push(await checkNodeInterpreter());
-  checks.push(checkNodeMinimumVersion(profile));
+  checks.push(checkNodeMinimumVersion(compatibilityContract));
   checks.push(await checkVendoredNodeDependencies(profile, skillRoot));
 
   // Prove the complete active package closure before executing any shipped
   // child entry point. A drifted extractor must never run and only then be
   // rejected by a late identity check.
-  const identity = await checkActiveSourceIdentity(skillRoot);
-  checks.push(identity.check);
+  let verifiedPlacement = null;
+  let placementFailure = null;
+  if (installStateRoot !== null && installStateRoot !== undefined) {
+    try {
+      verifiedPlacement = await resolveInstalledRuntimeIdentity({
+        skillRoot,
+        installStateRoot,
+      });
+    } catch (error) {
+      placementFailure = error;
+    }
+  }
+  let identity;
+  if (placementFailure) {
+    const check = typedCheck({
+      precondition_id: "active_source_identity",
+      result: "unsatisfied",
+      reason:
+        "The configured runtime placement, installation, active pointer, promotion or rollback " +
+        `identity could not be verified: ${placementFailure?.code ?? placementFailure?.message ?? String(placementFailure)}`,
+      detail: {
+        verified_runtime_placement: null,
+        error_code: placementFailure?.code ?? null,
+        findings: placementFailure?.findings ?? null,
+      },
+    });
+    checks.push(check);
+    identity = { check, sourceHashes: {} };
+  } else {
+    identity = await checkActiveSourceIdentity(skillRoot, verifiedPlacement);
+    checks.push(identity.check);
+  }
+  checks.push(...installedIdentityReadbackChecks(verifiedPlacement));
+  // A compiled package that is being diagnosed before installation is not a
+  // runtime candidate mode, but it must still prove the conservative
+  // candidate disk floor. Runtime mode itself remains unreachable until the
+  // external install-state reader verifies a slot and pointer.
+  const diskPolicyMode = verifiedPlacement?.disk_space_policy_mode ??
+    (identity.check?.detail?.closure_check_status === "match" ? "candidate" : "development");
+  const diskPolicyAuthority = selectDiskSpacePolicyAuthority({
+    mode: diskPolicyMode,
+    skillRoot,
+    profilePolicy: profileDiskPolicy,
+    callerPolicyPath: diskSpacePolicyPath,
+    callerPolicySha256: diskSpacePolicySha256,
+    env,
+  });
+  const resolvedDiskPolicyPath = diskPolicyAuthority.policy_path;
+  const expectedDiskPolicySha256 = diskPolicyAuthority.expected_policy_sha256;
   if (identity.check.result !== "satisfied") {
     const integrityReason =
       "The active package identity did not close, so no shipped Python entry point was executed.";
@@ -1728,7 +2069,25 @@ export async function runRuntimeDoctor({
       reason: integrityReason,
       detail: { subordinate_execution_attempted: false },
     }));
-    for (const id of ["soffice_available", "workbook_font_metrics"]) {
+    checks.push(typedCheck({
+      precondition_id: "inline_xbrl_host_probe",
+      result: requestedLanes.includes("evidence") ? "unknown" : "not_applicable",
+      reason: requestedLanes.includes("evidence")
+        ? integrityReason
+        : "The evidence lane was not requested.",
+      detail: { subordinate_execution_attempted: false },
+    }));
+    checks.push(typedCheck({
+      precondition_id: "runtime_version_compatibility",
+      result: "unknown",
+      reason: integrityReason,
+      detail: { subordinate_execution_attempted: false },
+    }));
+    for (const id of [
+      "soffice_available",
+      "libreoffice_workbook_capability",
+      "workbook_font_metrics",
+    ]) {
       checks.push(typedCheck({
         precondition_id: id,
         result: requestedLanes.includes("workbook") ? "unknown" : "not_applicable",
@@ -1738,9 +2097,20 @@ export async function runRuntimeDoctor({
         detail: { subordinate_execution_attempted: false },
       }));
     }
-    checks.push(await checkWorkRootWritable(runRoot));
-    checks.push(await checkTempRootWritable(effectiveTempRoot));
-    checks.push(await checkTempFreeSpace(effectiveTempRoot, floorBytes));
+    const workRootCheck = await checkWorkRootWritable(runRoot, skillRoot);
+    const tempRootCheck = await checkTempRootWritable(effectiveTempRoot, skillRoot);
+    checks.push(workRootCheck, tempRootCheck);
+    checks.push(await checkDiskSpacePolicy({
+      requestedLanes,
+      workRootCheck,
+      tempRootCheck,
+      mode: diskPolicyMode,
+      policyPath: resolvedDiskPolicyPath,
+      expectedPolicySha256: expectedDiskPolicySha256,
+      overrideMinFreeBytes,
+      skillRoot,
+      candidateOverrideRefused: diskPolicyAuthority.candidate_override_refused,
+    }));
     for (const [id, declaration] of Object.entries(PRECONDITION_DECLARATIONS)) {
       if (declaration.obligation !== "excluded_installed_host") continue;
       checks.push(typedCheck({
@@ -1795,12 +2165,19 @@ export async function runRuntimeDoctor({
   const laneClosure = declared ? modulesForLanes(declared, requestedLanes, ["import", "runtime"]) : [];
   const optional = declared ? modulesForLanes(declared, requestedLanes, ["runtime_optional"]) : [];
   const allModules = declared
-    ? [...new Set([...laneClosure, ...optional].map((entry) => entry.module))].sort()
+    ? [...new Map(
+      [...laneClosure, ...optional]
+        .sort((left, right) => left.module.localeCompare(right.module))
+        .map((entry) => [entry.module, entry]),
+    ).values()]
     : [];
 
   let probe = null;
   if (resolvedPython !== null && declared !== null) {
-    probe = await probePython(resolvedPython, allModules, { timeout: probeTimeoutMs });
+    const pythonProbeBudgetMs = remainingProbeLeaseMs(probeTimeoutMs);
+    probe = pythonProbeBudgetMs > 0
+      ? await probePython(resolvedPython, allModules, { timeout: pythonProbeBudgetMs })
+      : { ok: false, error: "aggregate host-probe lease exhausted before Python capability probe" };
   }
 
   const pythonUnavailableReason = resolvedPython === null
@@ -1826,14 +2203,16 @@ export async function runRuntimeDoctor({
       }));
     }
   } else {
-    const declaredMinimum = profile?.python_runtime?.minimum_version ?? null;
+    const declaredMinimum = compatibilityContract?.runtimes
+      ?.find((entry) => entry.runtime_name === "Python")
+      ?.minimum_version?.split(".").map(Number) ?? null;
     const version = probe.value.version;
     if (!Array.isArray(declaredMinimum) || declaredMinimum.length === 0) {
       checks.push(typedCheck({
         precondition_id: "python_minimum_version",
         result: "unknown",
         reason:
-          "assets/deployment-profile.json declares no python_runtime.minimum_version, so " +
+          "assets/runtime-compatibility-v1.json declares no parsable Python minimum, so " +
           "there is no floor to compare the interpreter against.",
         detail: { running_version: version, declared_minimum_version: null },
       }));
@@ -1920,12 +2299,140 @@ export async function runRuntimeDoctor({
     }));
   }
 
-  if (requestedLanes.includes("evidence")) {
+  // Resolve the selected office executable and evaluate every requested
+  // runtime range before any real filing, workbook or Inline-XBRL API probe
+  // executes. A known-incompatible runtime is evidence, never something the
+  // doctor is allowed to execute and reject afterwards.
+  let sofficeCheck = null;
+  if (requestedLanes.includes("workbook")) {
+    const sofficeBudgetMs = remainingProbeLeaseMs(30_000);
+    sofficeCheck = sofficeBudgetMs > 0
+      ? await checkSoffice({
+        profile,
+        explicit: soffice,
+        env,
+        timeout: sofficeBudgetMs,
+      })
+      : typedCheck({
+        precondition_id: "soffice_available",
+        result: "unknown",
+        reason: "The aggregate host-probe lease expired before LibreOffice identity could be checked.",
+        detail: { subordinate_execution_attempted: false },
+      });
+    checks.push(sofficeCheck);
+  }
+
+  let evidenceCompatibility = null;
+  let workbookCompatibility = null;
+  if (compatibilityContract === null) {
+    checks.push(typedCheck({
+      precondition_id: "runtime_version_compatibility",
+      result: "unsatisfied",
+      reason: `The runtime compatibility contract could not be loaded: ${compatibilityContractError}.`,
+      detail: { contract_error: compatibilityContractError },
+    }));
+  } else {
+    const observations = {
+      Node: {
+        version: process.version,
+        import_name: null,
+        distribution_name: "Node.js",
+      },
+    };
+    if (resolvedPython !== null && probe?.ok) {
+      observations.Python = {
+        version: probe.value.version,
+        executable: resolvedPython,
+        import_name: null,
+        distribution_name: "CPython",
+      };
+      for (const entry of compatibilityContract.runtimes.filter(
+        (candidate) => candidate.runtime_kind === "python_distribution",
+      )) {
+        observations[entry.runtime_name] = {
+          version: probe.value.module_versions?.[entry.import_name] ?? null,
+          import_name: entry.import_name,
+          distribution_name: entry.distribution_name,
+          python_executable: resolvedPython,
+        };
+      }
+    }
+    if (sofficeCheck?.result === "satisfied") {
+      observations.LibreOffice = {
+        version: sofficeCheck.detail.version,
+        import_name: null,
+        distribution_name: "LibreOffice",
+      };
+    }
+    const compatibility = evaluateRuntimeCompatibility({
+      contract: compatibilityContract,
+      observations,
+      requestedLanes,
+    });
+    evidenceCompatibility = requestedLanes.includes("evidence")
+      ? evaluateRuntimeCompatibility({
+        contract: compatibilityContract,
+        observations,
+        requestedLanes: ["evidence"],
+      })
+      : null;
+    workbookCompatibility = requestedLanes.includes("workbook")
+      ? evaluateRuntimeCompatibility({
+        contract: compatibilityContract,
+        observations,
+        requestedLanes: ["workbook"],
+      })
+      : null;
+    checks.push(typedCheck({
+      precondition_id: "runtime_version_compatibility",
+      result: compatibility.status === "PASS" ? "satisfied" : "unsatisfied",
+      reason: compatibility.status === "PASS"
+        ? null
+        : `Required runtime versions are absent, unparsable or outside the exercised ranges: ${
+          compatibility.findings.map((finding) => `${finding.code}:${finding.runtime_name}`).join(", ")
+        }.`,
+      detail: {
+        contract_schema_version: compatibilityContract.schema_version,
+        contract_sha256: compatibilityContractSha256,
+        status: compatibility.status,
+        total_violations: compatibility.total_violations,
+        evaluated_runtime_names: compatibility.evaluated_runtime_names,
+        observations,
+        findings: compatibility.findings,
+        probe_lease: {
+          limit_ms: probeLeaseLimitMs,
+          elapsed_ms_at_compatibility: probeLeaseElapsedMs(),
+          remaining_ms_at_compatibility: remainingProbeLeaseMs(probeLeaseLimitMs),
+          clock: "monotonic_process_hrtime",
+        },
+      },
+    }));
+  }
+
+  const filingProbeBudgetMs = remainingProbeLeaseMs(60_000);
+  if (
+    requestedLanes.includes("evidence") &&
+    evidenceCompatibility?.status === "PASS" &&
+    filingProbeBudgetMs > 0
+  ) {
     checks.push(await checkFilingsExtractionProbe({
       resolvedPython,
       skillRoot,
       tempRoot: effectiveTempRoot,
-      timeout: Math.min(probeTimeoutMs, 60_000),
+      timeout: filingProbeBudgetMs,
+    }));
+  } else if (requestedLanes.includes("evidence")) {
+    checks.push(typedCheck({
+      precondition_id: "filings_extraction_probe",
+      result: "unknown",
+      reason:
+        "The filing extraction probe was not executed because the shared evidence-lane " +
+        "runtime compatibility prerequisite did not close or the aggregate host-probe lease expired.",
+      detail: {
+        subordinate_execution_attempted: false,
+        compatibility_findings: evidenceCompatibility?.findings ?? [],
+        probe_lease_remaining_ms: filingProbeBudgetMs,
+      },
     }));
   } else {
     checks.push(typedCheck({
@@ -1938,24 +2445,70 @@ export async function runRuntimeDoctor({
 
   // --- Workbook-lane preconditions ---------------------------------------
   if (requestedLanes.includes("workbook")) {
-    checks.push(await checkSoffice({
-      profile,
-      explicit: soffice,
-      env,
-      timeout: Math.min(probeTimeoutMs, 30_000),
-    }));
-    if (resolvedPython === null) {
+    if (
+      sofficeCheck.result === "satisfied" && resolvedPython !== null &&
+      probe?.value?.modules?.openpyxl === true &&
+      workbookCompatibility?.status === "PASS" &&
+      remainingProbeLeaseMs(60_000) > 0
+    ) {
+      const workbookProbeBudgetMs = remainingProbeLeaseMs(60_000);
+      const capability = await probeLibreOfficeWorkbookCapability({
+        sofficeExecutable: sofficeCheck.detail.resolved_executable,
+        sofficeVersion: sofficeCheck.detail.version,
+        sofficeSha256: sofficeCheck.detail.executable_sha256,
+        pythonExecutable: resolvedPython,
+        scratchRoot: effectiveTempRoot,
+        timeoutMs: workbookProbeBudgetMs,
+        env: {
+          ...env,
+          EXCEL_INFLOW_PYTHON: resolvedPython,
+          PYTHON: resolvedPython,
+        },
+      });
+      checks.push(typedCheck({
+        precondition_id: "libreoffice_workbook_capability",
+        result: capability.status === "PASS" ? "satisfied" : "unsatisfied",
+        reason: capability.status === "PASS"
+          ? null
+          : `The selected LibreOffice did not close the functional workbook probe: ${capability.failure}.`,
+        detail: capability,
+      }));
+    } else {
+      checks.push(typedCheck({
+        precondition_id: "libreoffice_workbook_capability",
+        result: "unknown",
+        reason:
+          "The functional workbook probe could not run because the selected soffice or the " +
+          "one selected Python/openpyxl capability did not close.",
+        detail: {
+          soffice_result: sofficeCheck.result,
+          selected_python: resolvedPython,
+          openpyxl_importable: probe?.value?.modules?.openpyxl ?? null,
+          runtime_compatibility_status: workbookCompatibility?.status ?? null,
+          subordinate_execution_attempted: false,
+          probe_lease_remaining_ms: remainingProbeLeaseMs(60_000),
+        },
+      }));
+    }
+    const fontProbeBudgetMs = remainingProbeLeaseMs(30_000);
+    if (
+      resolvedPython === null ||
+      workbookCompatibility?.status !== "PASS" ||
+      fontProbeBudgetMs <= 0
+    ) {
       checks.push(typedCheck({
         precondition_id: "workbook_font_metrics",
         result: "unknown",
-        reason: "The font resolver could not be asked because no Python interpreter resolved.",
-        detail: null,
+        reason:
+          "The font resolver was not executed because the selected Python or workbook " +
+          "runtime compatibility prerequisite did not close.",
+        detail: { subordinate_execution_attempted: false },
       }));
     } else {
       checks.push(await checkFontMetrics({
         resolvedPython,
         scriptsDir,
-        timeout: Math.min(probeTimeoutMs, 30_000),
+        timeout: fontProbeBudgetMs,
       }));
     }
   } else {
@@ -1966,6 +2519,12 @@ export async function runRuntimeDoctor({
       detail: { requested_lanes: requestedLanes },
     }));
     checks.push(typedCheck({
+      precondition_id: "libreoffice_workbook_capability",
+      result: "not_applicable",
+      reason: "The workbook lane was not requested, so no functional LibreOffice workbook probe is needed.",
+      detail: { requested_lanes: requestedLanes },
+    }));
+    checks.push(typedCheck({
       precondition_id: "workbook_font_metrics",
       result: "not_applicable",
       reason: "The workbook lane was not requested, so no font metrics are needed.",
@@ -1973,10 +2532,81 @@ export async function runRuntimeDoctor({
     }));
   }
 
+  // Inline XBRL is an evidence-lane capability, not a workbook prerequisite.
+  // It executes only after the shared compatibility owner has proved the one
+  // selected Python and its lxml distribution in-range. The normal frozen
+  // fixture uses benign dimensional data; contradiction is injected only by
+  // the focused mutation suite.
+  if (!requestedLanes.includes("evidence")) {
+    checks.push(typedCheck({
+      precondition_id: "inline_xbrl_host_probe",
+      result: "not_applicable",
+      reason: "The evidence lane was not requested, so Inline XBRL parsing is not needed.",
+      detail: { requested_lanes: requestedLanes },
+    }));
+  } else if (evidenceCompatibility?.status !== "PASS") {
+    checks.push(typedCheck({
+      precondition_id: "inline_xbrl_host_probe",
+      result: "unknown",
+      reason:
+        "The Inline XBRL host probe was not executed because the shared evidence-lane " +
+        "Python/lxml compatibility prerequisite did not close.",
+      detail: {
+        subordinate_execution_attempted: false,
+        compatibility_findings: evidenceCompatibility?.findings ?? [],
+      },
+    }));
+  } else if (remainingProbeLeaseMs(30_000) <= 0) {
+    checks.push(typedCheck({
+      precondition_id: "inline_xbrl_host_probe",
+      result: "unknown",
+      reason: "The Inline XBRL host probe was not executed because the aggregate host-probe lease expired.",
+      detail: {
+        subordinate_execution_attempted: false,
+        probe_lease_remaining_ms: 0,
+      },
+    }));
+  } else {
+    const inlineXbrlBudgetMs = remainingProbeLeaseMs(30_000);
+    const inlineXbrl = await runInstalledInlineXbrlProbe({
+      skillRoot,
+      selectedPython: resolvedPython,
+      tempRoot: effectiveTempRoot,
+      timeoutMs: inlineXbrlBudgetMs,
+    });
+    checks.push(typedCheck({
+      precondition_id: "inline_xbrl_host_probe",
+      result: inlineXbrl.status === "PASS" ? "satisfied" : "unsatisfied",
+      reason: inlineXbrl.status === "PASS"
+        ? null
+        : `The installed Inline XBRL capability did not close: ${inlineXbrl.reason_code}: ${inlineXbrl.reason}.`,
+      detail: {
+        ...inlineXbrl,
+        compatibility_prerequisite: {
+          status: evidenceCompatibility.status,
+          total_violations: evidenceCompatibility.total_violations,
+          evaluated_runtime_names: evidenceCompatibility.evaluated_runtime_names,
+          findings: evidenceCompatibility.findings,
+        },
+      },
+    }));
+  }
+
   // --- Filesystem --------------------------------------------------------
-  checks.push(await checkWorkRootWritable(runRoot));
-  checks.push(await checkTempRootWritable(effectiveTempRoot));
-  checks.push(await checkTempFreeSpace(effectiveTempRoot, floorBytes));
+  const workRootCheck = await checkWorkRootWritable(runRoot, skillRoot);
+  const tempRootCheck = await checkTempRootWritable(effectiveTempRoot, skillRoot);
+  checks.push(workRootCheck, tempRootCheck);
+  checks.push(await checkDiskSpacePolicy({
+    requestedLanes,
+    workRootCheck,
+    tempRootCheck,
+    mode: diskPolicyMode,
+    policyPath: resolvedDiskPolicyPath,
+    expectedPolicySha256: expectedDiskPolicySha256,
+    overrideMinFreeBytes,
+    skillRoot,
+    candidateOverrideRefused: diskPolicyAuthority.candidate_override_refused,
+  }));
 
   // --- Declared installed-host exclusions --------------------------------
   for (const [id, declaration] of Object.entries(PRECONDITION_DECLARATIONS)) {
@@ -2006,6 +2636,7 @@ export default {
   RUNTIME_DOCTOR_LANES,
   RUNTIME_DOCTOR_REASON_CODE,
   RUNTIME_DOCTOR_REQUESTED_REASON_CODE,
+  RUNTIME_DOCTOR_DEFAULT_SKILL_ROOT,
   PRECONDITION_DECLARATIONS,
   PRECONDITION_IDS,
   typedCheck,

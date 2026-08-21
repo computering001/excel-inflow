@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   assertPhysicalOwnershipPreflight,
   compilePhysicalOwnershipPreflight,
@@ -9,6 +12,16 @@ import {
   verifyForecastOwnershipReceipt,
   verifySelectedForecastOwnership,
 } from "./lib/forecast_ownership_resolver.mjs";
+import { compileForecastBehaviorMap } from "./lib/forecast_behavior.mjs";
+import {
+  compileForecastPlan,
+  materializeForecastPlan,
+} from "./lib/forecast_candidate_compiler.mjs";
+import {
+  compileModelDemandGraph,
+  compileSelectedAuthorityContract,
+  validateSelectedAuthorityContract,
+} from "./lib/run_constitution_graph.mjs";
 import { sealOwnershipCensus } from "./lib/ownership_census.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import fs from "node:fs";
@@ -243,6 +256,259 @@ assert.ok(
   ),
   "rejected aggregate evidence did not preserve the canonical rank reason",
 );
+
+// Cross-layer regression: capture of the working-capital children in later
+// periods must not erase the earlier-period parent identity when the resolved
+// case is compiled into the executable forecast plan.
+const composedMixed = workingCapitalFixture();
+composedMixed.case_id = "mixed_period_working_capital_composition";
+const [wcParent, receivables, inventory, payables] =
+  composedMixed.statement_structure.cash_flow;
+wcParent.row_id = "change_in_working_capital";
+for (const child of [receivables, inventory, payables]) {
+  child.parent_row_id = wcParent.row_id;
+}
+inventory.forecast_period_authorities[0] = authority(
+  "company_guidance",
+  "guidance.inventory.fy1",
+  -4,
+);
+payables.forecast_period_authorities[0] = authority(
+  "company_guidance",
+  "guidance.payables.fy1",
+  -4,
+);
+const composedReceipt = resolveSelectedForecastOwnership(composedMixed);
+assert.deepEqual(
+  composedReceipt.resolutions.map((item) => item.selected_mode),
+  ["children_owned", "parent_owned", "parent_owned"],
+);
+assert.ok(
+  [receivables, inventory, payables].every(
+    (child) =>
+      child.forecast_period_authorities[0].method !== "not_separately_forecast" &&
+      child.forecast_period_authorities[1].method === "not_separately_forecast" &&
+      child.forecast_period_authorities[2].method === "not_separately_forecast" &&
+      child.forecast_capture_parent_id === wcParent.row_id,
+  ),
+);
+
+// Match the live filed-total shape: the reconciled parent history is retained
+// separately and one child is not reconstructible. The FY1 identity must
+// still be an executable producer, without manufacturing a zero.
+wcParent.reported_historical_values = [...wcParent.values.slice(0, 3)];
+delete wcParent.values;
+delete payables.values;
+composedMixed.source_coverage = {
+  income_statement: [],
+  cash_flow: [{
+    source_line_id: "filing.cf.20",
+    mapped_row_ids: [wcParent.row_id],
+    material: true,
+  }],
+};
+const composedBehaviors = compileForecastBehaviorMap(
+  composedMixed,
+  composedMixed.statement_structure,
+);
+const composedPlan = compileForecastPlan(
+  composedMixed,
+  composedMixed.statement_structure,
+  { behaviorMap: composedBehaviors },
+);
+const wcFy1 = composedPlan.states.find(
+  (state) => state.state_id === "cash_flow.change_in_working_capital.fy1",
+);
+assert.ok(wcFy1);
+const composedDemand = compileModelDemandGraph(composedMixed);
+const composedContract = compileSelectedAuthorityContract({
+  modelCase: composedMixed,
+  forecastPlan: composedPlan,
+  modelDemandGraph: composedDemand,
+});
+const composedValidation = validateSelectedAuthorityContract(
+  composedContract,
+  { modelDemandGraph: composedDemand, forecastPlan: composedPlan },
+);
+assert.equal(wcFy1.method, "driver_formula");
+assert.equal(wcFy1.status, "RESOLVED");
+assert.equal(wcFy1.producer_witness.executable, true);
+assert.deepEqual(wcFy1.formula_spec, wcParent.calculation);
+assert.equal(composedValidation.valid, true);
+
+// Missing, reported zero and finite history are three different economic
+// states. A blocked plan with one absent observation cannot be materialised;
+// an actual zero remains a valid observation and produces a different average.
+function singleHistoricalAverageCase(caseId, history) {
+  return {
+    case_id: caseId,
+    periods: structuredClone(periods),
+    instruments: [],
+    statement_structure: {
+      income_statement: [],
+      cash_flow: [{
+        row_id: "historical_average_probe",
+        label: "Historical average probe",
+        row_type: "input",
+        material: true,
+        historical_authority: "source_input",
+        values: [...history, null, null, null],
+        forecast_period_authorities: authorities(
+          "historical_average",
+          `fallback.${caseId}`,
+          [0, 0, 0],
+        ),
+      }],
+    },
+  };
+}
+
+const missingHistoryCase = singleHistoricalAverageCase(
+  "missing_history",
+  [1, null, 3],
+);
+const missingHistoryPlan = compileForecastPlan(
+  missingHistoryCase,
+  missingHistoryCase.statement_structure,
+  {
+    behaviorMap: compileForecastBehaviorMap(
+      missingHistoryCase,
+      missingHistoryCase.statement_structure,
+    ),
+  },
+);
+assert.equal(missingHistoryPlan.status, "BLOCKED");
+assert.equal(missingHistoryPlan.states[0].producer_witness.executable, false);
+assert.throws(
+  () => materializeForecastPlan(missingHistoryCase, missingHistoryPlan),
+  /blocked forecast plan cannot be materialized/,
+);
+
+const reportedZeroCase = singleHistoricalAverageCase(
+  "reported_zero_history",
+  [1, 0, 3],
+);
+const reportedZeroPlan = compileForecastPlan(
+  reportedZeroCase,
+  reportedZeroCase.statement_structure,
+  {
+    behaviorMap: compileForecastBehaviorMap(
+      reportedZeroCase,
+      reportedZeroCase.statement_structure,
+    ),
+  },
+);
+assert.equal(reportedZeroPlan.status, "PASS");
+const reportedZeroMaterialized = materializeForecastPlan(
+  reportedZeroCase,
+  reportedZeroPlan,
+);
+assert.equal(
+  reportedZeroMaterialized.statement_structure.cash_flow[0].values[3],
+  4 / 3,
+);
+
+const completeHistoryCase = singleHistoricalAverageCase(
+  "complete_history",
+  [1, 2, 3],
+);
+const completeHistoryPlan = compileForecastPlan(
+  completeHistoryCase,
+  completeHistoryCase.statement_structure,
+  {
+    behaviorMap: compileForecastBehaviorMap(
+      completeHistoryCase,
+      completeHistoryCase.statement_structure,
+    ),
+  },
+);
+assert.equal(completeHistoryPlan.status, "PASS");
+assert.equal(
+  materializeForecastPlan(
+    completeHistoryCase,
+    completeHistoryPlan,
+  ).statement_structure.cash_flow[0].values[3],
+  2,
+);
+
+// Non-vacuous source mutation: restore the former row-global capture predicate
+// in an isolated copy of the production compiler. The same composed case must
+// recreate the exact live selected-authority failure.
+const mutationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "wc-period-capture-mutation-"));
+const localRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const mutationLib = path.join(mutationRoot, "scripts", "lib");
+fs.mkdirSync(path.dirname(mutationLib), { recursive: true });
+fs.cpSync(path.join(localRoot, "scripts", "lib"), mutationLib, { recursive: true });
+fs.cpSync(path.join(localRoot, "assets"), path.join(mutationRoot, "assets"), { recursive: true });
+const mutationCompilerPath = path.join(mutationLib, "forecast_candidate_compiler.mjs");
+const repairedPredicate = `const authority = dependency?.forecast_period_authorities?.[forecastIndex];
+        return dependency?.forecast_capture_parent_id === row.row_id &&
+          ["not_separately_forecast", "not_applicable"].includes(
+            authority?.method,
+          );`;
+const legacyPredicate = `return dependency?.forecast_capture_parent_id === row.row_id;`;
+const compilerSource = fs.readFileSync(mutationCompilerPath, "utf8");
+assert.equal(
+  compilerSource.split(repairedPredicate).length - 1,
+  1,
+  "the cross-period source mutation no longer targets exactly one production predicate",
+);
+fs.writeFileSync(
+  mutationCompilerPath,
+  compilerSource.replace(repairedPredicate, legacyPredicate),
+  "utf8",
+);
+try {
+  const mutatedCompiler = await import(
+    `${pathToFileURL(mutationCompilerPath).href}?mutation=row-global-capture`
+  );
+  const mutationCase = structuredClone(composedMixed);
+  delete mutationCase.statement_structure.cash_flow[0].reported_historical_values;
+  const mutationBehaviors = compileForecastBehaviorMap(
+    mutationCase,
+    mutationCase.statement_structure,
+  );
+  const repairedCaptureOnlyPlan = compileForecastPlan(
+    mutationCase,
+    mutationCase.statement_structure,
+    { behaviorMap: mutationBehaviors },
+  );
+  assert.equal(
+    repairedCaptureOnlyPlan.states.find(
+      (state) => state.state_id === "cash_flow.change_in_working_capital.fy1",
+    )?.method,
+    "driver_formula",
+    "the capture-only fixture is not a positive control for the repaired predicate",
+  );
+  const mutationPlan = mutatedCompiler.compileForecastPlan(
+    mutationCase,
+    mutationCase.statement_structure,
+    { behaviorMap: mutationBehaviors },
+  );
+  const mutationState = mutationPlan.states.find(
+    (state) => state.state_id === "cash_flow.change_in_working_capital.fy1",
+  );
+  const mutationDemand = compileModelDemandGraph(mutationCase);
+  const mutationContract = compileSelectedAuthorityContract({
+    modelCase: mutationCase,
+    forecastPlan: mutationPlan,
+    modelDemandGraph: mutationDemand,
+  });
+  const mutationValidation = validateSelectedAuthorityContract(
+    mutationContract,
+    { modelDemandGraph: mutationDemand, forecastPlan: mutationPlan },
+  );
+  assert.equal(mutationState.method, "unresolved");
+  assert.equal(mutationState.producer_witness.executable, false);
+  assert.ok(
+    mutationValidation.errors.includes(
+      "cash_flow.change_in_working_capital.fy1 has no executable producer witness.",
+    ),
+    "the row-global capture mutation did not recreate the live failure",
+  );
+} finally {
+  fs.rmSync(mutationRoot, { recursive: true, force: true });
+}
 
 const downgradedChild = workingCapitalFixture();
 downgradedChild.statement_structure.cash_flow[2].forecast_period_authorities[0] =
@@ -480,7 +746,8 @@ assert.equal(compilePhysicalOwnershipPreflight(blocker, missingDestination).stat
 
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 48,
+  checks: 72,
+  mutations_rejected: 1,
   blocker_fixture: "working_capital_parent_broker_children_fallback",
   user_intervention_required: false,
   topology_elapsed_ms: Number(elapsedMs.toFixed(3)),

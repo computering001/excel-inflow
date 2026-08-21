@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import JSZip from "jszip";
 
@@ -245,7 +246,7 @@ function parseArgs(argv) {
   return options;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLPath(import.meta.url)) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const options = parseArgs(process.argv.slice(2));
   for (const required of ["before", "after", "before-map", "after-map", "out"]) {
     if (!options[required]) {
@@ -263,8 +264,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLPath(import.meta
   });
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = result.status === "PASS" ? 0 : 1;
-}
-
-function fileURLPath(url) {
-  return decodeURIComponent(new URL(url).pathname);
 }

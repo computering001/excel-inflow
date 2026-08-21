@@ -331,6 +331,24 @@ export function validateLaneResourceReceipt(receipt) {
     if (nonNegativeInteger(receipt[field]) === null) violations.push(`${field} must be a non-negative integer`);
   }
   if (!Number.isInteger(receipt.budget_headroom_ms)) violations.push("budget_headroom_ms must be an integer");
+  if (
+    Number.isInteger(receipt.consumed_wall_ms)
+    && Number.isInteger(receipt.granted_budget_ms)
+    && receipt.consumed_wall_ms > receipt.granted_budget_ms
+  ) {
+    violations.push("consumed_wall_ms cannot exceed granted_budget_ms");
+  }
+  if (Number.isInteger(receipt.budget_headroom_ms) && receipt.budget_headroom_ms < 0) {
+    violations.push("budget_headroom_ms cannot be negative");
+  }
+  if (
+    Number.isInteger(receipt.budget_headroom_ms)
+    && Number.isInteger(receipt.granted_budget_ms)
+    && Number.isInteger(receipt.consumed_wall_ms)
+    && receipt.budget_headroom_ms !== receipt.granted_budget_ms - receipt.consumed_wall_ms
+  ) {
+    violations.push("budget_headroom_ms must reconcile grant less consumption");
+  }
   for (const field of ["starved", "late_enrichment_after_seal"]) {
     if (typeof receipt[field] !== "boolean") violations.push(`${field} must be a boolean`);
   }

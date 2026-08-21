@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import { execFile } from "node:child_process";
+import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
@@ -15,6 +16,7 @@ import {
   sha256Bytes,
 } from "./lib/raw_canary_fixture.mjs";
 import { stageHashBoundTestSource } from "./lib/hash_bound_source_staging.mjs";
+import { hashValue } from "./lib/run_store.mjs";
 import { solveCase } from "./lib/solver.mjs";
 
 const exec = promisify(execFile);
@@ -40,6 +42,13 @@ for (let index = 0; index < optionTokens.length; index += 1) {
 const brokerState = String(options["broker-state"] ?? "explicit_skip");
 if (!["explicit_skip", "failed_optional_close", "usable"].includes(brokerState)) {
   throw new Error("--broker-state must be explicit_skip, failed_optional_close, or usable");
+}
+const injectPostCloseBrokerIngressFailure =
+  options["inject-post-close-broker-ingress-failure"] === true;
+if (injectPostCloseBrokerIngressFailure && brokerState !== "usable") {
+  throw new Error(
+    "--inject-post-close-broker-ingress-failure requires --broker-state usable",
+  );
 }
 const dcsBalanceBasis = String(options["dcs-balance-basis"] ?? "native_principal");
 if (!["native_principal", "reporting_currency_carrying_value"].includes(dcsBalanceBasis)) {
@@ -80,6 +89,60 @@ const commandEnv = {
   PATH: `${path.dirname(python)}${path.delimiter}${process.env.PATH ?? ""}`,
   PYTHONDONTWRITEBYTECODE: "1",
 };
+const postCloseFaultReceiptPath = path.join(out, "post-close-broker-ingress-fault.json");
+if (injectPostCloseBrokerIngressFailure) {
+  // This is a test-only process preloader in the canary's disposable run root,
+  // not a production fault flag. It interrupts only the real declared-evidence
+  // compiler child and only while broker_evidence is present. The force-zero
+  // retry therefore traverses the unmodified production controller and compiler.
+  const faultPreloaderPath = path.join(out, "post-close-broker-ingress-fault-preloader.mjs");
+  const preloaderSource = [
+    'import crypto from "node:crypto";',
+    'import fs from "node:fs";',
+    `const receiptPath = ${JSON.stringify(postCloseFaultReceiptPath)};`,
+    'const sha = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");',
+    'const entry = String(process.argv[1] ?? "");',
+    'if (entry.endsWith("compile_declared_evidence_run.mjs")) {',
+    '  const ingressPath = process.argv[2];',
+    '  const ingressBytes = fs.readFileSync(ingressPath);',
+    '  const ingress = JSON.parse(ingressBytes.toString("utf8"));',
+    '  if (ingress.broker_evidence) {',
+    '    if (fs.existsSync(receiptPath)) {',
+    '      process.stderr.write("post-close broker ingress fault attempted more than once\\n");',
+    '      process.exit(87);',
+    '    }',
+    '    const brokerStatePath = ingress.broker_evidence.run_state_path;',
+    '    const brokerStateBytes = fs.readFileSync(brokerStatePath);',
+    '    const brokerState = JSON.parse(brokerStateBytes.toString("utf8"));',
+    '    const brokerPackPath = brokerState.artifacts?.broker_pack;',
+    '    const brokerPackBytes = fs.readFileSync(brokerPackPath);',
+    '    const brokerPack = JSON.parse(brokerPackBytes.toString("utf8"));',
+    '    const selectedValueCount = (brokerPack.houses ?? []).flatMap((house) => Object.values(house.estimates ?? {})).flat().filter((value) => typeof value === "number" && Number.isFinite(value)).length;',
+    '    if (brokerState.pipeline_status !== "PASS" || selectedValueCount < 1) {',
+    '      throw new Error("post-close fault did not reach a closed broker lane with selected authority");',
+    '    }',
+    '    const receipt = {',
+    '      schema_version: "post-close-broker-ingress-fault/1.0",',
+    '      injected_exit_code: 86,',
+    '      resolved_ingress_sha256: sha(ingressBytes),',
+    '      broker_state_path: brokerStatePath,',
+    '      broker_state_sha256: sha(brokerStateBytes),',
+    '      broker_pack_path: brokerPackPath,',
+    '      broker_pack_sha256: sha(brokerPackBytes),',
+    '      selected_value_count: selectedValueCount,',
+    '    };',
+    '    fs.writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\\n`, { flag: "wx" });',
+    '    process.stderr.write("injected post-close broker ingress failure\\n");',
+    '    process.exit(86);',
+    '  }',
+    '}',
+  ].join("\n");
+  await fs.writeFile(faultPreloaderPath, `${preloaderSource}\n`, { flag: "wx" });
+  commandEnv.NODE_OPTIONS = [
+    process.env.NODE_OPTIONS,
+    `--import=${pathToFileURL(faultPreloaderPath).href}`,
+  ].filter(Boolean).join(" ");
+}
 
 // Raw annual-report bytes: the canary begins with a real PDF, not a supplied
 // extraction response. The public filings controller must discover and bind
@@ -762,10 +825,37 @@ await writeJson(specPath, {
 
 let result;
 try {
+  const screenSessionRoot = path.join(out, "screen-session");
+  const screenSessionReceipt = path.join(screenSessionRoot, "screen-session.json");
+  const screenSessionId = `raw-canary-${randomUUID()}`;
+  const screenSessionSecret = randomBytes(32).toString("hex");
+  const screen = await exec(process.execPath, [
+    path.join(here, "run_excel_inflow_bootstrap.mjs"),
+    "--screen", "company",
+    "--screen-session-receipt", screenSessionReceipt,
+    "--screen-session-id", screenSessionId,
+    "--screen-session-secret", screenSessionSecret,
+    "--python", python,
+    "--soffice", soffice,
+  ], {
+    cwd: root,
+    env: commandEnv,
+    timeout: 180_000,
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (
+    !screen.stdout.includes("HOST READY · SESSION ") ||
+    !await fs.stat(screenSessionReceipt).then((entry) => entry.isFile(), () => false)
+  ) {
+    throw new Error("Raw-input canary did not receive one durable executable Company screen session.");
+  }
   const executed = await exec(process.execPath, [
-    path.join(here, "run_excel_inflow_vnext.mjs"),
+    path.join(here, "run_excel_inflow_bootstrap.mjs"),
     "--attachment-spec", specPath,
     "--out", runRoot,
+    "--screen-session-receipt", screenSessionReceipt,
+    "--screen-session-id", screenSessionId,
+    "--screen-session-secret", screenSessionSecret,
     "--python", python,
     "--soffice", soffice,
   ], {
@@ -791,6 +881,27 @@ const state = JSON.parse(
 );
 if (state.lane_states?.filings?.pipeline_status !== "PASS" || state.lane_states?.dcs?.pipeline_status !== "PASS") {
   throw new Error("Raw-input canary did not close both mandatory evidence lanes.");
+}
+const breakerReceiptPath = path.resolve(
+  result.artifacts?.optional_broker_breaker_receipt ?? "",
+);
+const breakerReceipt = JSON.parse(await fs.readFile(breakerReceiptPath, "utf8"));
+const breakerReceiptSchema = JSON.parse(
+  await fs.readFile(
+    path.join(root, "assets", "optional-broker-breaker-receipt-v1.schema.json"),
+    "utf8",
+  ),
+);
+const breakerSchemaErrors = validateJsonSchema(breakerReceipt, breakerReceiptSchema);
+if (breakerSchemaErrors.length > 0) {
+  throw new Error(`Outer broker breaker receipt is invalid: ${breakerSchemaErrors.join("; ")}`);
+}
+const breakerCheckpoint = (result.checkpoints ?? []).find(
+  (item) => item.checkpoint_id === "optional_broker_circuit_breaker",
+);
+const breakerReceiptBytes = await fs.readFile(breakerReceiptPath);
+if (breakerCheckpoint?.sha256 !== sha256(breakerReceiptBytes)) {
+  throw new Error("Outer broker breaker checkpoint does not bind its persisted receipt bytes.");
 }
 const userFlow = JSON.parse(
   await fs.readFile(path.join(runRoot, "model", "user-flow-result.json"), "utf8"),
@@ -845,7 +956,7 @@ const brokerSelectedValueCount = Object.values(lanes.broker_pack?.metrics ?? {})
   .flatMap((metric) => Object.values(metric.brokers ?? {}))
   .flat()
   .filter((value) => typeof value === "number" && Number.isFinite(value)).length;
-if (brokerState === "usable") {
+if (brokerState === "usable" && !injectPostCloseBrokerIngressFailure) {
   if (brokerSelectedValueCount === 0 || state.lane_states?.broker?.pipeline_status !== "PASS") {
     throw new Error(
       `Usable broker input did not compile to broker authority: ${JSON.stringify({
@@ -876,7 +987,7 @@ if (
   throw new Error("Reporting-currency carrying value was changed at the DCS ingress seam.");
 }
 if (
-  brokerState === "failed_optional_close" &&
+  (brokerState === "failed_optional_close" || injectPostCloseBrokerIngressFailure) &&
   (
     state.lane_states?.broker?.pipeline_status !== "PASS_DEGRADED" ||
     state.lane_states?.broker?.summary?.fault_contained_to_zero_authority !== true ||
@@ -884,6 +995,30 @@ if (
   )
 ) {
   throw new Error("Failed optional broker close did not preserve raw custody and continue at zero authority.");
+}
+let postCloseFaultReceipt = null;
+if (injectPostCloseBrokerIngressFailure) {
+  postCloseFaultReceipt = JSON.parse(await fs.readFile(postCloseFaultReceiptPath, "utf8"));
+  const archivedRaw = lanes.broker_archive?.raw_documents ?? [];
+  if (
+    postCloseFaultReceipt.selected_value_count < 1
+    || breakerReceipt.zero_authority_executed !== true
+    || breakerReceipt.zero_authority_retry_count !== 1
+    || breakerReceipt.attempts !== 1
+    || breakerReceipt.trigger_mandatory_lane_bindings.length < 2
+    || hashValue(breakerReceipt.trigger_mandatory_lane_bindings)
+      !== hashValue(breakerReceipt.mandatory_lane_bindings)
+    || breakerReceipt.final_state_sha256 !== hashValue(state)
+    || state.lane_states?.broker?.pipeline_status !== "PASS_DEGRADED"
+    || state.lane_states?.broker?.summary?.fault_contained_to_zero_authority !== true
+    || brokerSelectedValueCount !== 0
+    || archivedRaw.length !== 1
+    || archivedRaw[0]?.content_sha256 !== brokerHash
+  ) {
+    throw new Error(
+      "Post-close broker failure did not traverse exactly one hash-bound zero-authority fallback.",
+    );
+  }
 }
 if (deliveryAttestation.status !== "PASS" || deliveryAttestation.violations?.length !== 0) {
   throw new Error("Delivered raw-input workbook lacks a clean live-delivery attestation.");
@@ -953,14 +1088,18 @@ if (rawFilingKind === "generated_complete_face_statements") {
 const branchReceipts = {
   dcs_ingress_projection: bondInstrument?.balance_basis === dcsBalanceBasis,
   broker_archive_only_close: brokerState === "failed_optional_close"
+    || injectPostCloseBrokerIngressFailure
     ? state.lane_states?.broker?.summary?.fault_contained_to_zero_authority === true
     : true,
-  broker_authority_compiled: brokerState === "usable"
+  broker_authority_compiled: brokerState === "usable" && !injectPostCloseBrokerIngressFailure
     ? brokerSelectedValueCount > 0
     : brokerSelectedValueCount === 0,
-  broker_case_selected: brokerState === "usable"
+  broker_case_selected: brokerState === "usable" && !injectPostCloseBrokerIngressFailure
     ? deliveredModelCase.controls?.broker_case !== "Forecast Waterfall"
     : deliveredModelCase.controls?.broker_case === "Forecast Waterfall",
+  post_close_broker_fault_contained: injectPostCloseBrokerIngressFailure
+    ? breakerReceipt.zero_authority_retry_count === 1
+    : true,
   stage4_started: Boolean(userFlow.workbook),
   delivery_attested: deliveryAttestation.status === "PASS",
 };
@@ -997,7 +1136,7 @@ console.log(JSON.stringify({
         sha256: realFilingExpectationsSha256,
       }
     : null,
-  public_entrypoint: "scripts/run_excel_inflow_vnext.mjs",
+  public_entrypoint: "scripts/run_excel_inflow_bootstrap.mjs",
   preauthored_statement_map: false,
   preauthored_compiler_lanes: false,
   preauthored_broker_crosswalk: brokerState === "usable",
@@ -1017,6 +1156,11 @@ console.log(JSON.stringify({
   filings_lane_status: state.lane_states.filings.pipeline_status,
   dcs_lane_status: state.lane_states.dcs.pipeline_status,
   broker_state: brokerState,
+  injected_post_close_broker_ingress_failure: injectPostCloseBrokerIngressFailure,
+  post_close_fault_receipt_sha256: postCloseFaultReceipt
+    ? sha256(await fs.readFile(postCloseFaultReceiptPath))
+    : null,
+  breaker_receipt_sha256: breakerReceipt.receipt_sha256,
   dcs_balance_basis: dcsBalanceBasis,
   branch_receipts: branchReceipts,
   workbook,

@@ -2532,13 +2532,53 @@ def main() -> int:
             return 2
         seal_checkpoint(pack_path, pack_receipt, pack_input)
     pack = read_json(pack_path, "compiled broker pack")
+    final_semantic_path = compiled_root / "broker-semantic-verification-report.json"
+    final_crosswalk_receipt_path = compiled_root / "broker-crosswalk-receipt.json"
+    final_semantic = read_json(
+        final_semantic_path, "final compiled broker semantic report"
+    )
+    final_crosswalk_receipt = read_json(
+        final_crosswalk_receipt_path, "final compiled broker crosswalk receipt"
+    )
+    final_semantic_sha256 = sha256_file(final_semantic_path)
+    final_violation_count = final_semantic.get("total_violation_count")
+    if (
+        not isinstance(final_violation_count, int)
+        or isinstance(final_violation_count, bool)
+    ):
+        raise ValueError(
+            "The final broker semantic report omitted its typed violation count."
+        )
+    if (
+        final_semantic.get("status") != "PASS"
+        or final_violation_count != 0
+        or final_crosswalk_receipt.get("independent_semantic_report_sha256")
+        != final_semantic_sha256
+    ):
+        raise ValueError(
+            "The compiled broker pack does not bind one final PASS semantic-report byte object."
+        )
     artifacts.update({
         "broker_pack": str(pack_path),
         "source_tables": str(compiled_root / "broker-source-tables.json"),
         "broker_source_tables": str(compiled_root / "broker-source-tables.json"),
-        "broker_crosswalk_receipt": str(compiled_root / "broker-crosswalk-receipt.json"),
-        "broker_semantic_verification": str(compiled_root / "broker-semantic-verification-report.json"),
+        "broker_crosswalk_receipt": str(final_crosswalk_receipt_path),
+        # Diagnostic verifier outputs may exist earlier in the bounded broker
+        # loop, but pack compilation is the final semantic authority.  Both
+        # public artifact names deliberately point to the same byte object so
+        # the controller state, degraded-close receipt, attachment ingress and
+        # evidence-run projection cannot bind different equivalent reports.
+        "broker_semantic_verification": str(final_semantic_path),
+        "semantic_report": str(final_semantic_path),
     })
+    checkpoint(
+        checkpoints,
+        stage="final_semantic_binding",
+        status="PASS",
+        input_digest=pack_input,
+        output=final_semantic_path,
+        reused=pack_reused,
+    )
     checkpoint(checkpoints, stage="pack_compilation", status="PASS", input_digest=pack_input, output=pack_path, reused=pack_reused)
     eligibility = pack.get("eligibility_summary", {})
     summary = {

@@ -2,9 +2,9 @@
   "schema_version": "critical-invariant-oracle-matrix/2.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "372ddcee0f3eea4f111b658578211d2622bad6e25f063f666903c0a73de6645d",
+    "oracle_sha256": "762514c14227c8c34fd53a11f9629066c9f768a1906d385976fac9f6675e6582",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "2c2340bdd4bbaa8c4203d081d2ad4e4f3d608ba89474a16353db4f1388168ad5"
+    "registry_sha256": "1c7c599fe2a134a0b8fe1f9066ea1997f9888d83a9856444c4ed94c5211e21de"
   },
   "artifact_oracle": {
     "test_id": "emitted-candidate-independent-oracle",
@@ -335,7 +335,10 @@
     },
     "host_requirements": {
       "soffice": "a LibreOffice binary able to convert .xlsx to PDF",
-      "python_modules": ["openpyxl", "fitz (PyMuPDF)"],
+      "python_modules": [
+        "openpyxl",
+        "fitz (PyMuPDF)"
+      ],
       "unavailable_here": {
         "module": "reportlab",
         "blocks": "scripts/render/selftest.py, which lays out a synthetic PDF with known geometry to prove each render check fires without LibreOffice",
@@ -445,7 +448,10 @@
       "status": "IN_USE",
       "previously": "declared in assets/development-test-registry.json metadata_contract.allowed_audit_classes and referred to by nothing",
       "meaning": "reader-visible workbook state whose only detector is a human, or a native spreadsheet host, looking at the live workbook — because the print-render lane is PROVABLY blind to it (zero changed pixels against an approved baseline), not merely unimplemented.",
-      "carried_by": ["freeze_pane_removed", "gridlines_shown"],
+      "carried_by": [
+        "freeze_pane_removed",
+        "gridlines_shown"
+      ],
       "enforced_by": "scripts/run_visual_mutation_pairing_tests.py asserts the class is in the registry's allowed_audit_classes, that this scope carries it, and that every NO_VISUAL_DETECTOR pairing declares it",
       "outstanding_registry_defect": "metadata_contract.audit_class_by_test_class maps no test_class to visual_manual, so no REGISTERED TEST can ever carry the class even though it is allowed. assets/development-test-registry.json is outside this package's allowed files; the mapping is a handover item for its owner."
     }

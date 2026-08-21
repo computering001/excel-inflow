@@ -116,8 +116,31 @@ try {
   assert.equal(fixtureIdentity.deployment_status, "not_installed");
   assert.notEqual(fixtureIdentity.source_commit, null);
   assert.notEqual(fixtureIdentity.source_tree, null);
+
+  // Deployment placement is installed-host evidence. Environment variables may
+  // locate tools and external package artefacts, but they may never declare
+  // that source bytes are installed, promoted or owned by an installation.
+  const priorDeploymentStatus = process.env.EXCEL_INFLOW_DEPLOYMENT_STATUS;
+  const priorInstallationIdentity = process.env.EXCEL_INFLOW_INSTALLATION_IDENTITY;
+  process.env.EXCEL_INFLOW_DEPLOYMENT_STATUS = "production_promoted";
+  process.env.EXCEL_INFLOW_INSTALLATION_IDENTITY = "environment-spoofed-installation";
+  try {
+    const environmentSpoof = await resolveSourceIdentity({
+      skillRoot: fixtureRoot,
+      overrides: { runtime_code_closure_sha256: "a".repeat(64) },
+    });
+    assert.equal(environmentSpoof.deployment_status, "not_installed");
+    assert.equal(environmentSpoof.installation_identity, null);
+    assert.equal(environmentSpoof.product_identity.deployment.status, "not_installed");
+    assert.equal(environmentSpoof.product_identity.deployment.installation_identity, null);
+  } finally {
+    if (priorDeploymentStatus === undefined) delete process.env.EXCEL_INFLOW_DEPLOYMENT_STATUS;
+    else process.env.EXCEL_INFLOW_DEPLOYMENT_STATUS = priorDeploymentStatus;
+    if (priorInstallationIdentity === undefined) delete process.env.EXCEL_INFLOW_INSTALLATION_IDENTITY;
+    else process.env.EXCEL_INFLOW_INSTALLATION_IDENTITY = priorInstallationIdentity;
+  }
 } finally {
   await fs.rm(fixtureRoot, { recursive: true, force: true });
 }
 
-console.log(JSON.stringify({ status: "PASS", checks: 22, instruction_rollback_mutations_caught: 1 }));
+console.log(JSON.stringify({ status: "PASS", checks: 26, instruction_rollback_mutations_caught: 1 }));

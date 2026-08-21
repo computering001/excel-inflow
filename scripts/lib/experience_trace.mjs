@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import {readFileSync} from 'node:fs';
+import path from 'node:path';
 
 export const EXPERIENCE_TRACE_VERSION='experience-trace/1.0';
+export const EXPERIENCE_TRACE_SCOPES=Object.freeze(['controller_process','attachment_transaction','host_user_visible']);
 // P6.6: ONE threshold authority for every performance judgement in the runtime.
 // These numbers used to be literals here while assets/performance-policy-v1.json
 // declared the same values with zero code consumers. They are now READ from the
@@ -73,6 +75,7 @@ export function experienceCoverageSummary(spans,duration){
   return {classified,unknown,leaf_span_ids:leaf.map((span)=>span.span_id),classified_ms:classifiedMs,unknown_ms:unknownMs,longest_unknown_gap_ms:Math.max(0,...unknown.map(([a,b])=>b-a))};
 }
 export function createExperienceTrace({runId,scope='controller_process',traceId=crypto.randomUUID().replaceAll('-','')}={}){
+  if(!EXPERIENCE_TRACE_SCOPES.includes(scope))throw new Error(`Unsupported experience-trace scope: ${scope}`);
   const wall=Date.now(), mono=nowMs(); const spans=[];
   return {
     traceId, runId, scope,
@@ -81,4 +84,4 @@ export function createExperienceTrace({runId,scope='controller_process',traceId=
     finish(){const duration=Math.max(0,nowMs()-mono); for(const s of spans){if(s.end_offset_ms===null){s.end_offset_ms=duration;s.duration_ms=Math.max(0,duration-s.start_offset_ms);s.status='BLOCKED';}} const coverage=experienceCoverageSummary(spans,duration); return {schema_version:EXPERIENCE_TRACE_VERSION,trace_id:traceId,run_id:String(runId??'unknown'),scope,started_at:iso(wall),ended_at:iso(Date.now()),duration_ms:duration,spans,summary:{classified_duration_ms:coverage.classified_ms,unknown_duration_ms:coverage.unknown_ms,classification_ratio:duration<=1e-9?1:Math.min(1,coverage.classified_ms/duration),longest_unknown_gap_ms:coverage.longest_unknown_gap_ms,warning_gap_count:coverage.unknown.filter(([a,b])=>b-a>TRACE_POLICY.warning_ms).length,investigation_gap_count:coverage.unknown.filter(([a,b])=>b-a>TRACE_POLICY.investigation_ms).length,certification_block_gap_count:coverage.unknown.filter(([a,b])=>b-a>TRACE_POLICY.certification_block_ms).length,classified_leaf_span_ids:coverage.leaf_span_ids,initial_classification_target:TRACE_POLICY.initial_target,engineering_classification_target:TRACE_POLICY.engineering_target}};}
   };
 }
-export async function writeExperienceTrace(target,trace){await fs.mkdir(new URL('.',`file://${target}`).pathname,{recursive:true}).catch(()=>{}); await fs.writeFile(target,JSON.stringify(trace,null,2)+'\n','utf8');}
+export async function writeExperienceTrace(target,trace){await fs.mkdir(path.dirname(path.resolve(target)),{recursive:true}); await fs.writeFile(target,JSON.stringify(trace,null,2)+'\n','utf8');}

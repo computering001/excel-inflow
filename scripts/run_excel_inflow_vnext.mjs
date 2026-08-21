@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 /**
- * One model-first controller: raw evidence transaction -> model decisions ->
+ * Private model-first controller. Public invocations must enter through
+ * run_excel_inflow_bootstrap.mjs, which verifies compiled-package custody
+ * before this module and its transitive imports are instantiated.
+ *
+ * Raw evidence transaction -> model decisions ->
  * sealed authority resolution -> existing workbook build and delivery.
  *
  * The proven case compiler, economic graph, solver, renderer and validators
  * remain unchanged. This controller replaces host-side stage choreography and
  * emits one typed outcome instead of surfacing internal lane states.
  */
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,7 +23,12 @@ import {
   authorityQualitySummary,
   validatePreBrokerDemandCoverage,
 } from "./lib/run_constitution_graph.mjs";
-import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
+import {
+  assertBreakerReceiptCarried,
+  executeOptionalBrokerCircuitBreaker,
+  validateBrokerBreakerReceipt,
+} from "./lib/optional_broker_circuit_breaker.mjs";
+import { laneBudgetCaps, loadLaneResourcePolicy } from "./lib/lane_resource_policy.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
 import { compilePerformanceReceipt, validatePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { cancelProcessTreePids, runProcessTree } from "./lib/process_tree.mjs";
@@ -33,7 +42,9 @@ import {
 } from "./lib/runtime_budget_policy.mjs";
 import {
   RUN_DEADLINE_ENV,
+  STAGE_FLOOR_MS,
   beginComputeSpan,
+  boundedOuterTimeoutMs,
   closeRunDeadline,
   endComputeSpan,
   openRunDeadline,
@@ -46,6 +57,14 @@ import {
   validateProgressEvidence,
 } from "./lib/progress_heartbeat.mjs";
 import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
+import { deriveRuntimeMode } from "./lib/runtime_mode.mjs";
+import {
+  consumeScreenSession,
+  issueScreenSession,
+} from "./lib/screen_session.mjs";
+import {
+  COMPANY_SCREEN_SESSION_CONTRACT_SHA256,
+} from "./lib/flow_screens.mjs";
 import { classifySupport } from "./lib/support_envelope.mjs";
 import { assertRunRootOutsideSkill } from "./lib/runtime_isolation.mjs";
 import {
@@ -54,12 +73,18 @@ import {
   runRuntimeDoctor,
   writeInstalledCapabilityArtifactSet,
 } from "./lib/runtime_doctor.mjs";
+import {
+  consumeControllerHandoff,
+  createControllerHandoff,
+} from "./lib/controller_handoff.mjs";
 
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
+const CONTROLLER_FILE = fileURLToPath(import.meta.url);
+const PUBLIC_BOOTSTRAP_FILE = path.join(HERE, "run_excel_inflow_bootstrap.mjs");
+const USER_FLOW_FILE = path.join(HERE, "run_user_flow.mjs");
 const CONTROLLER_VERSION = "excel-inflow-vnext/1.0";
-const COMPANY_HANDOFF_ENV = "EXCEL_INFLOW_TOP_CONTROLLER_HANDOFF";
 let ACTIVE_RUNTIME_CLOSURE = null;
 let ACTIVE_PERFORMANCE = null;
 let ACTIVE_EXPERIENCE_TRACE = null;
@@ -106,7 +131,7 @@ const RUNTIME_DOCTOR_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8"),
 );
 const INSTALLED_CAPABILITY_SCHEMA = JSON.parse(
-  await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8"),
+  await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.3.schema.json"), "utf8"),
 );
 const HOST_PREFLIGHT_POINTER_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "host-preflight-pointer-v1.schema.json"), "utf8"),
@@ -148,6 +173,10 @@ async function runMandatoryHostPreflight({
   receiptPath,
   python = null,
   soffice = null,
+  diskSpacePolicyPath = null,
+  diskSpacePolicySha256 = null,
+  minFreeBytes = null,
+  installStateRoot = null,
 }) {
   const report = await runRuntimeDoctor({
     skillRoot: ROOT,
@@ -156,6 +185,10 @@ async function runMandatoryHostPreflight({
     runRoot,
     python,
     soffice,
+    diskSpacePolicyPath,
+    diskSpacePolicySha256,
+    minFreeBytes,
+    installStateRoot,
   });
   const reportErrors = validateJsonSchema(report, RUNTIME_DOCTOR_SCHEMA);
   if (reportErrors.length > 0) {
@@ -196,6 +229,55 @@ async function runMandatoryHostPreflight({
     pythonExecutable,
     sofficeExecutable,
   };
+}
+
+function requiredScreenSessionInputs(options) {
+  const receiptPath = typeof options["screen-session-receipt"] === "string"
+    ? path.resolve(String(options["screen-session-receipt"]))
+    : null;
+  const sessionId = typeof options["screen-session-id"] === "string"
+    ? String(options["screen-session-id"])
+    : null;
+  const sessionSecret = typeof options["screen-session-secret"] === "string"
+    ? String(options["screen-session-secret"])
+    : null;
+  if (!receiptPath || !sessionId || !sessionSecret) {
+    throw new Error(
+      "Company and product routes require --screen-session-receipt, " +
+      "--screen-session-id and --screen-session-secret from the same explicit session.",
+    );
+  }
+  return Object.freeze({
+    receiptPath,
+    sessionRoot: path.dirname(receiptPath),
+    sessionId,
+    sessionSecret,
+  });
+}
+
+function screenSessionExpected(runtimeMode) {
+  return Object.freeze({
+    runtime_mode: runtimeMode.runtime_mode,
+    source_commit: runtimeMode.source_identity_overrides.source_commit,
+    source_tree: runtimeMode.source_identity_overrides.source_tree,
+    runtime_closure_sha256:
+      runtimeMode.source_identity_overrides.runtime_code_closure_sha256,
+    package_inventory_sha256:
+      runtimeMode.source_identity_overrides.complete_package_inventory_sha256,
+    installation_identity:
+      runtimeMode.source_identity_overrides.installation_identity,
+    active_pointer_sha256:
+      runtimeMode.installed_placement.active_pointer_sha256,
+  });
+}
+
+async function deriveModeFromPreflight(preflight) {
+  return deriveRuntimeMode({
+    skillRoot: ROOT,
+    installStateRoot: process.env.EXCEL_INFLOW_INSTALL_STATE_ROOT ?? null,
+    capabilityReceipt: preflight.receipt,
+    capabilityReceiptSha256: preflight.receipt.receipt_sha256,
+  });
 }
 
 async function runtimeClosure() {
@@ -242,6 +324,7 @@ async function run(command, args, {
   timeout = 3_600_000,
   progress = null,
   budgetStage = null,
+  preconsultedRunAllowance = false,
 } = {}) {
   const started = Date.now();
   // The remaining budget comes from the PERSISTED run clock, not from this
@@ -259,7 +342,9 @@ async function run(command, args, {
       nowEpochMs: started,
     })
     : Number(timeout);
-  const effectiveTimeout = clockOpen && budgetStage
+  const effectiveTimeout = preconsultedRunAllowance
+    ? Number(timeout)
+    : clockOpen && budgetStage
     ? boundedStageTimeout({
       policy: ACTIVE_RUNTIME_BUDGET,
       stage: budgetStage,
@@ -328,6 +413,23 @@ async function run(command, args, {
       documentsComplete: progress.documentsTotal ?? 0,
       actionRequired: false,
     });
+  }
+}
+
+async function runUserFlow(childArgs, options = {}) {
+  const handoff = await createControllerHandoff({
+    packageRoot: ROOT,
+    parentController: CONTROLLER_FILE,
+    childController: USER_FLOW_FILE,
+    childArgs,
+  });
+  try {
+    return await run(process.execPath, [USER_FLOW_FILE, ...childArgs], {
+      ...options,
+      env: { ...(options.env ?? process.env), ...handoff.env },
+    });
+  } finally {
+    await handoff.cleanup();
   }
 }
 
@@ -453,51 +555,93 @@ async function main() {
     started_epoch_ms: Date.now(),
     stages: {},
   };
-  const options = parseArgs(process.argv.slice(2));
+  const rawArgs = process.argv.slice(2);
+  const options = parseArgs(rawArgs);
+  if (options["controller-diagnostic"] === true) {
+    process.stdout.write(`${JSON.stringify({
+      schema_version: "excel-inflow-private-controller-diagnostic/1.0",
+      controller: "run_excel_inflow_vnext",
+      status: "PASS",
+      product_route_executed: false,
+    })}\n`);
+    return;
+  }
+  await consumeControllerHandoff({
+    packageRoot: ROOT,
+    parentController: PUBLIC_BOOTSTRAP_FILE,
+    childController: CONTROLLER_FILE,
+    childArgs: rawArgs,
+  });
   const runtimeBudgetOverrides = options["runtime-budget"]
     ? await readJson(path.resolve(String(options["runtime-budget"])), "runtime budget overrides")
     : {};
   ACTIVE_RUNTIME_BUDGET = resolveRuntimeBudgetPolicy(runtimeBudgetOverrides.budgets_ms ?? runtimeBudgetOverrides);
   if (options.screen) {
     if (String(options.screen) === "company") {
+      const session = requiredScreenSessionInputs(options);
+      await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: session.sessionRoot });
+      await fs.mkdir(session.sessionRoot, { recursive: true });
       const screenCapabilityRoot = await fs.mkdtemp(
-        path.join(os.tmpdir(), "excel-inflow-company-screen-capability-"),
+        path.join(session.sessionRoot, "screen-preflight-"),
       );
-      try {
-        const preflight = await runMandatoryHostPreflight({
-          runRoot: path.join(screenCapabilityRoot, "prospective-run"),
-          receiptPath: path.join(screenCapabilityRoot, "installed-capability-receipt.json"),
-          python: String(
-            options.python ?? process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3",
-          ),
-          soffice: options.soffice ? String(options.soffice) : null,
-        });
-        const controllerHandoff = `${randomUUID()}${randomUUID()}`;
-        const screen = await run(process.execPath, [
-          path.join(HERE, "run_user_flow.mjs"),
-          "--screen",
-          String(options.screen),
-          "--controller-handoff",
-          controllerHandoff,
-          "--host-capability-receipt",
-          preflight.receiptPath,
-          "--runtime-doctor-report",
-          preflight.reportPath,
-        ], {
-          timeout: 30_000,
-          env: { ...process.env, [COMPANY_HANDOFF_ENV]: controllerHandoff },
-        });
-        if (screen.code !== 0) {
-          throw new Error(screen.stderr.trim() || `Unable to render ${options.screen} screen.`);
-        }
-        process.stdout.write(screen.stdout);
-        return;
-      } finally {
-        await fs.rm(screenCapabilityRoot, { recursive: true, force: true });
+      const preflight = await runMandatoryHostPreflight({
+        runRoot: path.join(screenCapabilityRoot, "prospective-run"),
+        receiptPath: path.join(screenCapabilityRoot, "installed-capability-receipt.json"),
+        python: String(
+          options.python ?? process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3",
+        ),
+        soffice: options.soffice ? String(options.soffice) : null,
+        diskSpacePolicyPath: options["disk-space-policy"] ? String(options["disk-space-policy"]) : null,
+        diskSpacePolicySha256: options["disk-space-policy-sha256"] ? String(options["disk-space-policy-sha256"]) : null,
+        minFreeBytes: options["min-free-bytes"] ? Number(options["min-free-bytes"]) : null,
+        installStateRoot: process.env.EXCEL_INFLOW_INSTALL_STATE_ROOT ?? null,
+      });
+      const runtimeMode = await deriveModeFromPreflight(preflight);
+      const issued = await issueScreenSession({
+        skillRoot: ROOT,
+        sessionRoot: session.sessionRoot,
+        receiptPath: session.receiptPath,
+        sessionId: session.sessionId,
+        sessionSecret: session.sessionSecret,
+        runtimeMode: runtimeMode.runtime_mode,
+        sourceCommit: runtimeMode.source_identity_overrides.source_commit,
+        sourceTree: runtimeMode.source_identity_overrides.source_tree,
+        runtimeClosureSha256:
+          runtimeMode.source_identity_overrides.runtime_code_closure_sha256,
+        packageInventorySha256:
+          runtimeMode.source_identity_overrides.complete_package_inventory_sha256,
+        installationIdentity:
+          runtimeMode.source_identity_overrides.installation_identity,
+        activePointerSha256:
+          runtimeMode.installed_placement.active_pointer_sha256,
+        capabilityReceiptSha256: await sha256File(preflight.receiptPath),
+        runtimeDoctorReportSha256: await sha256File(preflight.reportPath),
+        screenContractSha256: COMPANY_SCREEN_SESSION_CONTRACT_SHA256,
+      });
+      const screenArgs = [
+        "--screen",
+        String(options.screen),
+        "--host-capability-receipt",
+        preflight.receiptPath,
+        "--runtime-doctor-report",
+        preflight.reportPath,
+        "--screen-session-receipt",
+        issued.receiptPath,
+        "--screen-session-id",
+        session.sessionId,
+        "--screen-session-secret",
+        session.sessionSecret,
+      ];
+      const screen = await runUserFlow(screenArgs, {
+        timeout: 30_000,
+      });
+      if (screen.code !== 0) {
+        throw new Error(screen.stderr.trim() || `Unable to render ${options.screen} screen.`);
       }
+      process.stdout.write(screen.stdout);
+      return;
     }
-    const screen = await run(process.execPath, [
-      path.join(HERE, "run_user_flow.mjs"),
+    const screen = await runUserFlow([
       "--screen",
       String(options.screen),
     ], { timeout: 30_000 });
@@ -520,6 +664,7 @@ async function main() {
     throw new Error("vNext run output must be outside the immutable skill tree.");
   }
   await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: out });
+  const screenSession = requiredScreenSessionInputs(options);
   // Open THE clock before the mandatory host probe or any model work is
   // spawned. It lives in the run directory,
   // so a second invocation of this controller against the same run inherits
@@ -545,7 +690,7 @@ async function main() {
       controller_elapsed_ms: Date.now() - ACTIVE_PROGRESS_STARTED_EPOCH_MS,
     }),
   });
-  ACTIVE_EXPERIENCE_TRACE = createExperienceTrace({ runId: path.basename(out), scope: "vnext_controller" });
+  ACTIVE_EXPERIENCE_TRACE = createExperienceTrace({ runId: path.basename(out), scope: "controller_process" });
   ACTIVE_EXPERIENCE_ROOT_SPAN = ACTIVE_EXPERIENCE_TRACE.start(
     "vnext_controller",
     "run_excel_inflow_vnext",
@@ -560,10 +705,27 @@ async function main() {
       options.python ?? process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3",
     ),
     soffice: options.soffice ? String(options.soffice) : null,
+    diskSpacePolicyPath: options["disk-space-policy"] ? String(options["disk-space-policy"]) : null,
+    diskSpacePolicySha256: options["disk-space-policy-sha256"] ? String(options["disk-space-policy-sha256"]) : null,
+    minFreeBytes: options["min-free-bytes"] ? Number(options["min-free-bytes"]) : null,
+    installStateRoot: process.env.EXCEL_INFLOW_INSTALL_STATE_ROOT ?? null,
   });
   ACTIVE_PERFORMANCE.stages.host_preflight_ms = Math.max(1, Date.now() - hostPreflightStarted);
   ACTIVE_RUNTIME_CLOSURE = await runtimeClosure();
-  ACTIVE_SOURCE_IDENTITY = await resolveActiveSourceIdentity({ skillRoot: ROOT });
+  const activeRuntimeMode = await deriveModeFromPreflight(hostPreflight);
+  await consumeScreenSession({
+    skillRoot: ROOT,
+    sessionRoot: screenSession.sessionRoot,
+    receiptPath: screenSession.receiptPath,
+    sessionId: screenSession.sessionId,
+    sessionSecret: screenSession.sessionSecret,
+    expected: screenSessionExpected(activeRuntimeMode),
+    consumerRunId: `vnext-${digestBytes(out).slice(0, 24)}`,
+  });
+  ACTIVE_SOURCE_IDENTITY = await resolveActiveSourceIdentity({
+    skillRoot: ROOT,
+    overrides: activeRuntimeMode.source_identity_overrides,
+  });
   const pythonCommand = hostPreflight.pythonExecutable;
   const sofficeCommand = hostPreflight.sofficeExecutable;
   const pythonProbe = await run(pythonCommand, [
@@ -608,6 +770,23 @@ async function main() {
       attachmentOut,
     ];
     const attachmentStatePath = path.join(attachmentOut, "attachment-evidence-run-state.json");
+    const brokerBreakerReceiptPath = path.join(
+      out,
+      "optional-broker-breaker-receipt.json",
+    );
+    const priorBrokerBreakerReceipt = await readJson(
+      brokerBreakerReceiptPath,
+      "prior optional broker breaker receipt",
+    ).catch(() => null);
+    const usablePriorBrokerBreakerReceipt = priorBrokerBreakerReceipt
+      && validateBrokerBreakerReceipt(priorBrokerBreakerReceipt).length === 0
+      ? priorBrokerBreakerReceipt
+      : null;
+    const remainingRunBudgetMs = remainingComputeMs(ACTIVE_RUN_DEADLINE);
+    const brokerBudgetSliceMs = laneBudgetCaps({
+      policy: loadLaneResourcePolicy(),
+      remainingComputeMs: remainingRunBudgetMs,
+    }).optional_cap_ms ?? ACTIVE_RUNTIME_BUDGET.budgets_ms.broker_global;
     const brokerCircuitBreaker = await executeOptionalBrokerCircuitBreaker({
       runPrimary: () => run(pythonCommand, attachmentArgs, {
         timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.end_to_end_hard_ceiling,
@@ -621,16 +800,40 @@ async function main() {
       fingerprintState: () => fs.stat(attachmentStatePath)
         .then((entry) => `${entry.mtimeMs}:${entry.size}`)
         .catch(() => null),
-      runZeroAuthority: () => run(
-        pythonCommand,
-        [...attachmentArgs, "--force-zero-broker"],
-        {
-          timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.broker_global,
-          env: runtimeEnv,
-          progress: { stage: "evidence review", documentsTotal: documentTotal },
-        },
-      ),
+      runZeroAuthority: async () => {
+        // This is deterministic state closure over preserved broker custody,
+        // not another broker-processing attempt. Consult the persisted run
+        // clock for one small closure allowance and bypass run()'s second
+        // remaining-compute clamp only because that exact allowance is already
+        // ledger-recorded here.
+        const closureAllowanceMs = await boundedOuterTimeoutMs(ACTIVE_RUN_DEADLINE, {
+          stage: "optional_broker_zero_authority_close",
+          requestedMs: STAGE_FLOOR_MS,
+          floorMs: STAGE_FLOOR_MS,
+        });
+        return run(
+          pythonCommand,
+          [...attachmentArgs, "--force-zero-broker"],
+          {
+            timeout: closureAllowanceMs,
+            env: runtimeEnv,
+            progress: { stage: "evidence review", documentsTotal: documentTotal },
+            preconsultedRunAllowance: true,
+          },
+        );
+      },
+      remainingBudgetMs: remainingRunBudgetMs,
+      budgetSliceMs: brokerBudgetSliceMs,
+      priorReceipt: usablePriorBrokerBreakerReceipt,
     });
+    const brokerBreakerReceipt = assertBreakerReceiptCarried(brokerCircuitBreaker);
+    await writeJson(brokerBreakerReceiptPath, brokerBreakerReceipt);
+    artifacts.optional_broker_breaker_receipt = brokerBreakerReceiptPath;
+    checkpoints.push(await checkpoint(
+      "optional_broker_circuit_breaker",
+      brokerCircuitBreaker.circuit_breaker_used ? "PASS_DEGRADED" : "PASS",
+      brokerBreakerReceiptPath,
+    ));
     attachmentState = brokerCircuitBreaker.state;
     ACTIVE_PERFORMANCE.stages.evidence_resolution_ms = Date.now() - attachmentStarted;
     if (attachmentState.summary?.performance) {
@@ -770,7 +973,6 @@ async function main() {
   const userFlowOut = path.join(out, "model");
   const workspaceToken = String(options["workspace-token"] ?? `vnext:${digestBytes(out).slice(0, 24)}`);
   const firstArgs = [
-    path.join(HERE, "run_user_flow.mjs"),
     evidencePath,
     "--out",
     userFlowOut,
@@ -787,7 +989,7 @@ async function main() {
   firstArgs.push("--python", pythonCommand);
   firstArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
   firstArgs.push("--soffice", sofficeCommand);
-  const firstExecution = await run(process.execPath, firstArgs, {
+  const firstExecution = await runUserFlow(firstArgs, {
     timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.case_compilation_and_ownership,
     budgetStage: "case_compilation_and_ownership",
     env: runtimeEnv,
@@ -993,7 +1195,6 @@ async function main() {
   checkpoints.push(await checkpoint("authority_resolution", "PASS", runGraphPath));
 
   const resumeArgs = [
-    path.join(HERE, "run_user_flow.mjs"),
     "--carrier",
     path.resolve(userFlowResult.carrier),
     "--out",
@@ -1006,7 +1207,7 @@ async function main() {
   resumeArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
   resumeArgs.push("--soffice", sofficeCommand);
   const pausedResultSha256 = await sha256File(userFlowResultPath);
-  const resumeExecution = await run(process.execPath, resumeArgs, {
+  const resumeExecution = await runUserFlow(resumeArgs, {
     // This is only the controller watchdog. Stage-4 enforces solver, build,
     // recalc and validation independently and cumulatively. The watchdog is
     // sized by the PERSISTED clock, so a resume gets what the run has left —
@@ -1209,7 +1410,7 @@ main().catch(async (error) => {
   let artifactNote = "no --out directory was resolvable; no artifact written";
   try {
     const outFlagIndex = process.argv.indexOf("--out");
-    const outDir = outFlagIndex >= 0 && process.argv[outFlagIndex + 1]
+    const outDir = !error?.controller_handoff_refusal && outFlagIndex >= 0 && process.argv[outFlagIndex + 1]
       ? path.resolve(String(process.argv[outFlagIndex + 1]))
       : null;
     if (outDir) {

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./json_schema.mjs";
@@ -21,7 +22,7 @@ import {
   sealBrokerConsensusMembership,
 } from "./broker_consensus.mjs";
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
 const ASSETS = path.resolve(HERE, "..", "..", "assets");
 const SHA256 = /^[a-f0-9]{64}$/;

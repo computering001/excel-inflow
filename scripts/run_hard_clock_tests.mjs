@@ -182,7 +182,8 @@ try {
   //     that fallback is the reset this package removes. Regression check: the
   //     controller must render a screen with the clock unopened.
   const screen = await exec(process.execPath, [
-    path.join(HERE, "run_excel_inflow_vnext.mjs"),
+    path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+    "vnext",
     "--screen",
     "company",
   ], { cwd: ROOT, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
@@ -209,7 +210,8 @@ try {
   const runDir = path.join(workspace, "twice", "run");
   async function driveFlow(target) {
     return exec(process.execPath, [
-      path.join(HERE, "run_user_flow.mjs"),
+      path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+      "user_flow",
       cleanEvidence,
       "--out",
       target,
@@ -438,7 +440,8 @@ try {
   // and read the clock afterwards.
   const thrownDir = path.join(workspace, "thrown", "run");
   await exec(process.execPath, [
-    path.join(HERE, "run_user_flow.mjs"),
+    path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+    "user_flow",
     path.join(workspace, "does-not-exist.json"),
     "--out",
     thrownDir,

@@ -7,6 +7,8 @@
 // decisions without asserting on typography, and on typography without running
 // a solver.
 //
+import { createHash } from "node:crypto";
+
 import {
   SCREEN_CONTRACT,
   stageById,
@@ -26,7 +28,6 @@ const ASCII_REPLACEMENTS = Object.freeze([
   [/£/g, "GBP"],
   [/¥/g, "JPY"],
   [/[–—]/g, "-"],
-  [/·/g, "-"],
   [/←/g, "<-"],
   [/→/g, "->"],
   [/⚠/g, "WARNING:"],
@@ -37,7 +38,7 @@ export function asciiText(value) {
   for (const [pattern, replacement] of ASCII_REPLACEMENTS) {
     text = text.replace(pattern, replacement);
   }
-  return text.normalize("NFKD").replace(/[^\x00-\x7F]/g, "?");
+  return text.normalize("NFKD").replace(/[^\x00-\x7F·]/g, "?");
 }
 
 export function inspectScreen(screen) {
@@ -48,8 +49,12 @@ export function inspectScreen(screen) {
   const lines = body.split("\n");
   const semanticBody = body.replace(/\s+/g, " ");
   const violations = [];
-  if (SCREEN_CONTRACT.ascii_only && /[^\x00-\x7F]/.test(body)) {
-    violations.push("screen contains non-ASCII characters");
+  const allowedNonAscii = new Set(SCREEN_CONTRACT.allowed_non_ascii ?? []);
+  const unexpectedNonAscii = [...body].filter(
+    (character) => character.codePointAt(0) > 0x7f && !allowedNonAscii.has(character),
+  );
+  if (unexpectedNonAscii.length > 0) {
+    violations.push("screen contains an undeclared non-ASCII character");
   }
   lines.forEach((line, index) => {
     if (displayWidth(line) > RULE_WIDTH) {
@@ -408,10 +413,43 @@ export function framedScreen({ title, states, lines, reply = null }) {
 // is collected at the BROKERS stage and the FactSet export at the DEBT
 // stage. The fast path (everything supplied up front) is stated, not
 // demanded.
-export const COMPANY_SCREEN = framedScreen({
-  title: "COMPANY",
-  states: { Company: "active" },
-  lines: [
+export const COMPANY_RUNTIME_MODES = Object.freeze([
+  "DEVELOPMENT_SOURCE",
+  "INSTALLED_CANDIDATE",
+  "PRODUCTION_ACTIVE",
+]);
+
+export const COMPANY_SCREEN_SESSION_CONTRACT = Object.freeze({
+  schema_version: "excel-inflow-company-screen-contract/1.0",
+  runtime_modes: COMPANY_RUNTIME_MODES,
+  mode_markers: Object.freeze({
+    DEVELOPMENT_SOURCE: "DEVELOPMENT SOURCE · NOT INSTALLED",
+    INSTALLED_CANDIDATE: "CANDIDATE SLOT · NOT ACTIVE",
+    PRODUCTION_ACTIVE: null,
+  }),
+  host_marker_prefix: "HOST READY · SESSION ",
+  nonce_pattern: "^[A-F0-9]{6}$",
+});
+
+export const COMPANY_SCREEN_SESSION_CONTRACT_SHA256 = createHash("sha256")
+  .update(JSON.stringify(COMPANY_SCREEN_SESSION_CONTRACT))
+  .digest("hex");
+
+export function renderCompanyScreen({ runtimeMode, screenNonce }) {
+  if (!COMPANY_RUNTIME_MODES.includes(runtimeMode)) {
+    throw new Error(`Company screen requires one derived runtime mode; got ${runtimeMode}.`);
+  }
+  if (!/^[A-F0-9]{6}$/.test(String(screenNonce ?? ""))) {
+    throw new Error("Company screen requires one six-character uppercase hexadecimal session nonce.");
+  }
+  const modeMarker = COMPANY_SCREEN_SESSION_CONTRACT.mode_markers[runtimeMode];
+  return framedScreen({
+    title: "COMPANY",
+    states: { Company: "active" },
+    lines: [
+    ...(modeMarker ? [modeMarker, ""] : []),
+    `${COMPANY_SCREEN_SESSION_CONTRACT.host_marker_prefix}${screenNonce}`,
+    "",
     "DEBT OVERLAY",
     "Debt, leverage and liquidity - fully formula-driven.",
     "Three years back, three years forward. Every figure",
@@ -430,9 +468,10 @@ export const COMPANY_SCREEN = framedScreen({
     "",
     "Currency, fiscal calendar and periods follow the",
     "company. You will not be asked to confirm them.",
-  ],
-  reply: ["company name (e.g. AstraZeneca)"],
-});
+    ],
+    reply: ["company name (e.g. AstraZeneca)"],
+  });
+}
 
 // The Brokers milestone is an explicit upload-or-skip checkpoint. Broker
 // evidence is optional, but absence is not consent to skip it. This screen is

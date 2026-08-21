@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/inline-xbrl-facts-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_sha256",
+    "fact_count",
+    "context_count",
+    "unit_count",
+    "units",
+    "facts"
+  ],
+  "properties": {
+    "schema_version": { "const": "inline-xbrl-facts/1.0" },
+    "source_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fact_count": { "type": "integer", "minimum": 1 },
+    "context_count": { "type": "integer", "minimum": 1 },
+    "unit_count": { "type": "integer", "minimum": 1 },
+    "units": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/fact" }
+    }
+  },
+  "$defs": {
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept",
+        "context_ref",
+        "unit_ref",
+        "value",
+        "decimals",
+        "scale",
+        "sign",
+        "period",
+        "dimensions"
+      ],
+      "properties": {
+        "concept": { "type": "string", "minLength": 1 },
+        "context_ref": { "type": "string", "minLength": 1 },
+        "unit_ref": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "decimals": { "type": ["string", "null"] },
+        "scale": { "type": ["string", "null"] },
+        "sign": { "type": ["string", "null"] },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "instant": { "type": "string" },
+            "start": { "type": "string" },
+            "end": { "type": "string" }
+          }
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

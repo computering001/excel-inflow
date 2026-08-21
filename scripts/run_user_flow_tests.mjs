@@ -8,7 +8,12 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { COMPANY_SCREEN, inspectScreen, renderBrokerIntakeScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+import {
+  inspectScreen,
+  renderBrokerIntakeScreen,
+  renderCompanyScreen,
+  WELCOME_SCREEN,
+} from "./lib/flow_screens.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { resolvePythonExecutable } from "./lib/process_tree.mjs";
@@ -44,8 +49,11 @@ function assert(condition, message) {
 }
 
 async function command(script, args, { allowFailure = false } = {}) {
+  const invocation = script === "run_user_flow.mjs"
+    ? [path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"), "user_flow", ...args]
+    : [path.join(HERE, script), ...args];
   try {
-    return await exec(process.execPath, [path.join(HERE, script), ...args], {
+    return await exec(process.execPath, invocation, {
       cwd: path.resolve(HERE, ".."),
       timeout: 300000,
       maxBuffer: 64 * 1024 * 1024,
@@ -138,7 +146,7 @@ await test("bare chat invocation is routed to the canonical Company screen", asy
     const flatText = text.replace(/\s+/g, " ");
     assert(text.includes("run excel inflow"), `${name} does not declare the bare trigger`);
     assert(
-      text.includes("node scripts/run_excel_inflow_vnext.mjs --screen company"),
+      text.includes("node scripts/run_excel_inflow_bootstrap.mjs --screen company"),
       `${name} does not route the bare trigger to the production controller`,
     );
     assert(
@@ -182,10 +190,29 @@ await test("bare chat invocation is routed to the canonical Company screen", asy
   assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "bare trigger target is not canonical Company bytes");
 });
 
-await test("vNext is the single public Company-screen controller", async () => {
-  const result = await command("run_excel_inflow_vnext.mjs", ["--screen", "company"]);
-  assert(result.stdout === `${COMPANY_SCREEN}\n`, "vNext did not render the canonical Company screen bytes");
-  assert(inspectScreen(result.stdout).ok, "vNext Company screen violates the screen contract");
+await test("bootstrap is the single public Company-screen controller", async () => {
+  const sessionRoot = path.join(out, "company-screen-session");
+  const receiptPath = path.join(sessionRoot, "company-screen.json");
+  const result = await command("run_excel_inflow_bootstrap.mjs", [
+    "--screen", "company",
+    "--screen-session-receipt", receiptPath,
+    "--screen-session-id", "user-flow-focused-company",
+    "--screen-session-secret", "user-flow-focused-company-secret-0123456789",
+    "--python", TEST_PYTHON,
+    ...(TEST_SOFFICE ? ["--soffice", TEST_SOFFICE] : []),
+  ]);
+  const sessionReceipt = JSON.parse(await fs.readFile(receiptPath, "utf8"));
+  const expected = renderCompanyScreen({
+    runtimeMode: "DEVELOPMENT_SOURCE",
+    screenNonce: sessionReceipt.screen_nonce,
+  });
+  assert(result.stdout === `${expected}\n`, "bootstrap did not render the receipt-bound Company screen bytes");
+  assert(result.stdout.includes("DEVELOPMENT SOURCE · NOT INSTALLED"), "development screen is not visibly marked");
+  assert(
+    result.stdout.includes(`HOST READY · SESSION ${sessionReceipt.screen_nonce}`),
+    "Company screen does not expose its receipt-bound nonce",
+  );
+  assert(inspectScreen(result.stdout).ok, "bootstrap Company screen violates the screen contract");
 });
 
 await test("production controller owns one canonical six-milestone visible journey", async () => {

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/active-install-pointer-v1.schema.json",
+  "title": "Excel Inflow active installed-package pointer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "generation", "slot_id", "installation_identity",
+    "installation_receipt_sha256", "package_inventory_sha256", "archive_sha256",
+    "runtime_closure_sha256", "promotion_receipt_sha256", "previous_slot_id",
+    "rollback_package_sha256", "activated_at", "pointer_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-active-install-pointer/1.0" },
+    "generation": { "type": "integer", "minimum": 1 },
+    "slot_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "installation_identity": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$" },
+    "installation_receipt_sha256": { "$ref": "#/$defs/sha256" },
+    "package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+    "archive_sha256": { "$ref": "#/$defs/sha256" },
+    "runtime_closure_sha256": { "$ref": "#/$defs/sha256" },
+    "promotion_receipt_sha256": { "$ref": "#/$defs/sha256" },
+    "previous_slot_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "rollback_package_sha256": { "$ref": "#/$defs/sha256" },
+    "activated_at": { "type": "string", "format": "date-time" },
+    "pointer_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

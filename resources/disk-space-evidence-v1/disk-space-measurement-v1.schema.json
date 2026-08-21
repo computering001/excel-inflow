@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/disk-space-measurement-v1.schema.json",
+  "title": "Excel Inflow distilled disk-space measurement 1.1",
+  "description": "Observed cohort statistics and separately typed conservative derived bounds. Derived values can never occupy observed-statistic fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "measurement_status", "generated_at", "methodology", "measured_source_identity", "host_identity", "evidence_manifests", "observed_cohorts", "derived_bounds"],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-disk-space-measurement/1.1" },
+    "measurement_status": { "const": "COMPLETE" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "methodology": {
+      "type": "object", "additionalProperties": false,
+      "required": ["units", "peak_definition", "sampling_interval_ms", "quantile_method", "minimum_samples_per_observed_cohort", "tool"],
+      "properties": {
+        "units": { "const": "bytes" },
+        "peak_definition": { "type": "string", "minLength": 1 },
+        "sampling_interval_ms": { "type": "integer", "minimum": 1 },
+        "quantile_method": { "const": "nearest_rank" },
+        "minimum_samples_per_observed_cohort": { "type": "integer", "minimum": 20 },
+        "tool": {
+          "type": "object", "additionalProperties": false,
+          "required": ["name", "version", "sha256"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "measured_source_identity": { "$ref": "#/$defs/measuredSourceIdentity" },
+    "host_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["os_platform", "os_release", "architecture"],
+      "properties": {
+        "os_platform": { "type": "string", "minLength": 1 },
+        "os_release": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence_manifests": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sample_receipts", "corpora"],
+      "properties": {
+        "sample_receipts": { "$ref": "#/$defs/manifestPointer" },
+        "corpora": {
+          "type": "object", "additionalProperties": false,
+          "required": ["filings", "brokers", "workbook"],
+          "properties": {
+            "filings": { "$ref": "#/$defs/manifestPointer" },
+            "brokers": { "$ref": "#/$defs/manifestPointer" },
+            "workbook": { "$ref": "#/$defs/manifestPointer" }
+          }
+        }
+      }
+    },
+    "observed_cohorts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["filings", "brokers", "workbook", "actual_combined"],
+      "properties": {
+        "filings": { "$ref": "#/$defs/observedCohort" },
+        "brokers": { "$ref": "#/$defs/observedCohort" },
+        "workbook": { "$ref": "#/$defs/observedCohort" },
+        "actual_combined": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/observedCohort" }] }
+      }
+    },
+    "derived_bounds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence", "combined"],
+      "properties": {
+        "evidence": { "$ref": "#/$defs/derivedLane" },
+        "combined": { "$ref": "#/$defs/derivedLane" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safeRelativePath": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\](?:.*[^/\\\\])?$" },
+    "measuredSourceIdentity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "source_commit", "source_tree", "measured_certified_code_closure_sha256"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "measured_certified_code_closure_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Asset-excluding certified-runtime-code-closure/1.1 module graph measured with the cohort; never the final package closure."
+        }
+      }
+    },
+    "manifestPointer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": { "$ref": "#/$defs/safeRelativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "observedStats": {
+      "type": "object", "additionalProperties": false,
+      "required": ["statistic_kind", "sample_count", "median_bytes", "p95_bytes", "observed_max_bytes"],
+      "properties": {
+        "statistic_kind": { "const": "OBSERVED" },
+        "sample_count": { "type": "integer", "minimum": 1 },
+        "median_bytes": { "type": "integer", "minimum": 0 },
+        "p95_bytes": { "type": "integer", "minimum": 0 },
+        "observed_max_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "observedCohort": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cohort_id", "workload_kind", "corpus_manifest_ref", "sample_receipt_manifest_ref", "sample_count", "root_statistics"],
+      "properties": {
+        "cohort_id": { "type": "string", "minLength": 1 },
+        "workload_kind": { "enum": ["filings", "brokers", "workbook", "actual_combined"] },
+        "corpus_manifest_ref": { "type": "string", "minLength": 1 },
+        "sample_receipt_manifest_ref": { "const": "#/evidence_manifests/sample_receipts" },
+        "sample_count": { "type": "integer", "minimum": 1 },
+        "root_statistics": {
+          "type": "object", "additionalProperties": false,
+          "required": ["work_root", "temp_root", "shared_volume_total"],
+          "properties": {
+            "work_root": { "$ref": "#/$defs/observedStats" },
+            "temp_root": { "$ref": "#/$defs/observedStats" },
+            "shared_volume_total": { "$ref": "#/$defs/observedStats" }
+          }
+        }
+      }
+    },
+    "derivedBound": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bound_kind", "derived_conservative_bound_bytes", "input_refs"],
+      "properties": {
+        "bound_kind": { "const": "DERIVED_CONSERVATIVE_BOUND" },
+        "derived_conservative_bound_bytes": { "type": "integer", "minimum": 0 },
+        "input_refs": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string", "pattern": "^#/observed_cohorts/" } }
+      }
+    },
+    "derivedLane": {
+      "type": "object", "additionalProperties": false,
+      "required": ["derivation_kind", "formula", "concurrency_assumption", "input_cohorts", "bounds"],
+      "properties": {
+        "derivation_kind": { "const": "DERIVED_CONSERVATIVE_BOUND" },
+        "formula": { "const": "SUM_OBSERVED_MAXIMA" },
+        "concurrency_assumption": { "const": "SUM_WHEN_CONCURRENCY_NOT_DISPROVED" },
+        "input_cohorts": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "enum": ["filings", "brokers", "workbook"] } },
+        "bounds": {
+          "type": "object", "additionalProperties": false,
+          "required": ["work_root", "temp_root", "shared_volume_total"],
+          "properties": {
+            "work_root": { "$ref": "#/$defs/derivedBound" },
+            "temp_root": { "$ref": "#/$defs/derivedBound" },
+            "shared_volume_total": { "$ref": "#/$defs/derivedBound" }
+          }
+        }
+      }
+    }
+  }
+}

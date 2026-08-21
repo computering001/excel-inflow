@@ -319,7 +319,7 @@ for (let index = 0; index < RUNTIME_SLO.cohort.minimum_samples_per_cohort; index
   const ledgerPath = path.join(runDir, "run-deadline.json");
   const args = [evidenceRun, "--out", runDir, "--answers", answers, "--stop-after", "decisions", "--json"];
 
-  const coldResult = JSON.parse((await command("run_user_flow.mjs", args)).stdout);
+  const coldResult = JSON.parse((await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", ...args])).stdout);
   const coldLedger = await readJson(ledgerPath);
   check(coldResult.status === "PAUSED", `cold run ${index} did not pause lawfully: ${coldResult.status}`);
   check((coldResult.reused_stages ?? []).length === 0, `cold run ${index} claimed reuse`);
@@ -332,7 +332,7 @@ for (let index = 0; index < RUNTIME_SLO.cohort.minimum_samples_per_cohort; index
     reusedStages: coldResult.reused_stages ?? [],
   }));
 
-  const warmResult = JSON.parse((await command("run_user_flow.mjs", args)).stdout);
+  const warmResult = JSON.parse((await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", ...args])).stdout);
   const warmLedger = await readJson(ledgerPath);
   check(warmResult.status === "PAUSED", `warm run ${index} did not pause lawfully: ${warmResult.status}`);
   check(
@@ -490,7 +490,7 @@ const tinyArgs = [
   evidenceRun, "--out", tinyDir, "--answers", answers, "--stop-after", "decisions",
   "--runtime-budget-policy", tinyPolicyPath, "--json",
 ];
-await command("run_user_flow.mjs", tinyArgs);
+await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", ...tinyArgs]);
 const tinyCold = await readJson(tinyLedgerPath);
 check(tinyCold.hard_deadline_compute_ms === 7, "the stated tiny ceiling was not adopted by the ledger");
 check(tinyCold.compute_elapsed_ms > tinyCold.hard_deadline_compute_ms,
@@ -508,7 +508,7 @@ check(tinyColdReport.observed.overshoot_past_ceiling_ms > 0,
 
 // A SECOND invocation of the same run starts with the ceiling already spent,
 // so every consult must draw BOUNDED floor debt and type it.
-await command("run_user_flow.mjs", tinyArgs);
+await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", ...tinyArgs]);
 const tinyWarm = await readJson(tinyLedgerPath);
 const floorGrants = tinyWarm.stage_allowances.filter((entry) => Number(entry.remaining_ms_at_consult) === 0);
 check(floorGrants.length >= 3, "a run resumed past an exhausted ceiling did not consult the clock at zero remaining");
@@ -530,7 +530,7 @@ const exhausted = clone(tinyWarm);
 exhausted.floor_granted_ms = exhausted.floor_allowance_ms;
 await fs.writeFile(tinyLedgerPath, `${JSON.stringify(exhausted, null, 2)}\n`);
 const grantsBefore = exhausted.stage_allowances.length;
-await command("run_user_flow.mjs", tinyArgs);
+await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", ...tinyArgs]);
 const tinyExhausted = await readJson(tinyLedgerPath);
 const collapsed = tinyExhausted.stage_allowances.slice(grantsBefore);
 check(collapsed.length >= 3, "the exhausted-allowance run recorded no new grants to inspect");

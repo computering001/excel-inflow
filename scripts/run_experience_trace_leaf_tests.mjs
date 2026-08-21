@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 
-import { experienceCoverageSummary } from "./lib/experience_trace.mjs";
+import { createExperienceTrace, experienceCoverageSummary } from "./lib/experience_trace.mjs";
 
 const spans = [
   { span_id: "root", parent_span_id: null, category: "excel_inflow_active", external_wait_reason: null, start_offset_ms: 0, end_offset_ms: 100, metadata: { coverage_role: "root" } },
@@ -21,4 +21,10 @@ const hostile = experienceCoverageSummary([spans[0]], 100);
 assert.equal(hostile.classified_ms, 0, "A root-only trace still masked its unowned time.");
 assert.equal(hostile.unknown_ms, 100);
 
-console.log(JSON.stringify({ status: "PASS", checks: 7, mutations_rejected: 1 }));
+assert.throws(
+  () => createExperienceTrace({ runId: "scope-mutation", scope: "vnext_controller" }),
+  /Unsupported experience-trace scope/,
+  "An unregistered scope must fail before an invalid trace can be emitted.",
+);
+
+console.log(JSON.stringify({ status: "PASS", checks: 8, mutations_rejected: 2 }));

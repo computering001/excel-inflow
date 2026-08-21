@@ -47,6 +47,7 @@ const DISPOSITIONS = {
   "run_broker_intake.mjs": "PIPELINE_ENTRYPOINT",
   "run_broker_pipeline.py": "PIPELINE_ENTRYPOINT",
   "run_dcs_pipeline.py": "PIPELINE_ENTRYPOINT",
+  "run_excel_inflow_bootstrap.mjs": "PIPELINE_ENTRYPOINT",
   "run_excel_inflow_vnext.mjs": "PIPELINE_ENTRYPOINT",
   "run_filings_pipeline.mjs": "PIPELINE_ENTRYPOINT",
   "run_user_flow.mjs": "PIPELINE_ENTRYPOINT",
@@ -55,6 +56,9 @@ const DISPOSITIONS = {
   // The gate/aggregation machinery itself and checks the CI workflow invokes
   // as first-class steps (their verdicts are asserted by the workflow).
   "run_development_gate.mjs": "CI_GATE_MACHINERY",
+  "run_ci_command_with_custody.mjs": "CI_WORKFLOW_STEP",
+  "run_exact_head_package_build_ci.mjs": "CI_WORKFLOW_STEP",
+  "run_archive_only_capability_ci.mjs": "CI_WORKFLOW_STEP",
   "run_current_package_source_identity_check.mjs": "CI_WORKFLOW_STEP",
   "run_merge_compatibility_identity_check.mjs": "CI_WORKFLOW_STEP",
   "run_governance_evidence_tests.mjs": "CI_WORKFLOW_STEP",

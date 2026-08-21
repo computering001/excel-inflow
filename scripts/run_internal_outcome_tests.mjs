@@ -79,7 +79,8 @@ for (const [file, code] of [
   await fs.writeFile(evidencePath, "{\"schema_version\": \"not-an-evidence-run\"}", "utf8");
   const runDir = path.join(out, "run");
   await exec(process.execPath, [
-    path.join(HERE, "run_user_flow.mjs"),
+    path.join(HERE, "test-support", "authenticated_controller_test_harness.mjs"),
+    "user_flow",
     evidencePath, "--out", runDir, "--stop-after", "decisions", "--json",
   ], { cwd: ROOT, timeout: 120000 }).catch(() => {});
   const artifactPath = path.join(runDir, "internal-failure.json");

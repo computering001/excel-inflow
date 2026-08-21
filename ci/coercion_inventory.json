@@ -3,11 +3,11 @@
   "invariant": "blank/nil/missing/parse-failure never become zero",
   "generated_by": "node scripts/run_coercion_ban_tests.mjs --write",
   "classification_legend": {
-    "lawful_counter_or_length": "counter, length, index, layout geometry, duration, id, or boolean-flag default \u2014 safe",
-    "suspect_value_coercion": "financial/value context \u2014 migration candidate",
+    "lawful_counter_or_length": "counter, length, index, layout geometry, duration, id, or boolean-flag default — safe",
+    "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 474,
+  "entry_count": 477,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -1690,6 +1690,26 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/disk_space_measurement_builder.mjs",
+      "content": "const noFollow = process.platform === \"win32\" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);",
+      "fingerprint": "01464816704f351c7cb8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/disk_space_policy.mjs",
+      "content": "const noFollow = process.platform === \"win32\" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);",
+      "fingerprint": "ee625b7391974b72ae9e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
       "file": "scripts/lib/economic_authority_seal.mjs",
       "content": "acquisition_enabled: Number(modelCase?.acquisition?.enabled ?? 0) === 1,",
       "fingerprint": "4d1f7305aae307486447",
@@ -3050,6 +3070,16 @@
       ],
       "occurrences": 1,
       "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/runtime_compatibility.mjs",
+      "content": "const difference = (left[index] ?? 0) - (right[index] ?? 0);",
+      "fingerprint": "44c2ad5a6c580bc312d2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/runtime_doctor.mjs",

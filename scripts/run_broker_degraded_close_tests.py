@@ -1093,6 +1093,42 @@ def main() -> int:
         checks += 3
 
         # Evidence preservation and authority separation.
+        # The broker controller may produce several diagnostic semantic
+        # reports while it converges, but exactly one FINAL byte object may be
+        # authoritative after pack compilation.  The live v3.7.8 failure was
+        # caused by the state retaining the earlier verifier output under
+        # `semantic_report` while the pack and degraded-close receipts bound
+        # `broker_semantic_verification`.  Both names must therefore resolve
+        # to the same physical file and hash after the final pack closes.
+        final_semantic_path = Path(final_state["artifacts"]["semantic_report"]).resolve()
+        compiled_semantic_path = Path(
+            final_state["artifacts"]["broker_semantic_verification"]
+        ).resolve()
+        check(
+            final_semantic_path == compiled_semantic_path,
+            "broker state retained two different final semantic-report byte authorities",
+        )
+        final_semantic_sha256 = broker.sha256_file(final_semantic_path)
+        check(
+            final_state["artifact_sha256"]["semantic_report"]
+            == final_state["artifact_sha256"]["broker_semantic_verification"]
+            == final_semantic_sha256,
+            "broker state hashes do not elect the one final semantic-report byte object",
+        )
+        final_close = json.loads(
+            Path(final_state["artifacts"]["degraded_close_receipt"]).read_text("utf-8")
+        )
+        final_pack_receipt = json.loads(
+            Path(final_state["artifacts"]["broker_crosswalk_receipt"]).read_text("utf-8")
+        )
+        check(
+            final_close["semantic_report_sha256"]
+            == final_pack_receipt["independent_semantic_report_sha256"]
+            == final_semantic_sha256,
+            "broker close, pack receipt and state disagree on final semantic-report bytes",
+        )
+        checks += 3
+
         degraded_bundle = json.loads(Path(final_state["artifacts"]["verified_bundle"]).read_text("utf-8"))
         by_document = {item["document_id"]: item for item in degraded_bundle["documents"]}
         berenberg_surface = by_document["berenberg"]["surfaces"][0]
@@ -1292,7 +1328,10 @@ def main() -> int:
             "utf-8",
         )
 
-        def run_ingress(state_file: Path) -> dict[str, Any]:
+        def run_ingress(
+            state_file: Path,
+            semantic_path_override: Path | None = None,
+        ) -> dict[str, Any]:
             config_path = root / f"ingress-config-{state_file.stem}.json"
             write_json(config_path, {
                 "broker_pack_path": artifacts_map["broker_pack"],
@@ -1305,7 +1344,9 @@ def main() -> int:
                     "source_tables_path": artifacts_map["source_tables"],
                     "crosswalk_path": artifacts_map["crosswalk"],
                     "crosswalk_receipt_path": artifacts_map["broker_crosswalk_receipt"],
-                    "semantic_verification_path": artifacts_map["semantic_report"],
+                    "semantic_verification_path": str(
+                        semantic_path_override or artifacts_map["semantic_report"]
+                    ),
                 },
             })
             completed = subprocess.run(
@@ -1321,6 +1362,37 @@ def main() -> int:
         check(int(accepted.get("archive_house_count", 0)) == 5, "ingress did not preserve every house in broker_archive")
         check(accepted.get("authority_has_presentation") is False, "broker authority retained archive presentation fields")
         checks += 4
+
+        # Byte-authority mutation: reserialize the same valid semantic object
+        # under an earlier artifact path and update only the state-owned hash.
+        # Semantic equality is insufficient; the final pack and close receipts
+        # bind one exact byte object, so ingress must refuse the split.
+        early_semantic_path = root / "early-semantic-report-byte-swap.json"
+        early_semantic_path.write_bytes(final_semantic_path.read_bytes() + b"\n")
+        check(
+            broker.sha256_file(early_semantic_path) != final_semantic_sha256,
+            "the early/final semantic byte mutation is vacuous",
+        )
+        split_state = json.loads(
+            Path(output_root / "broker-run-state.json").read_text("utf-8")
+        )
+        split_state["artifacts"]["semantic_report"] = str(early_semantic_path)
+        split_state["artifact_sha256"]["semantic_report"] = broker.sha256_file(
+            early_semantic_path
+        )
+        split_state_path = output_root / "broker-run-state-split-semantic.json"
+        write_json(split_state_path, split_state)
+        split_refused = run_ingress(split_state_path, early_semantic_path)
+        check(
+            split_refused.get("ok") is False,
+            "semantically equal but byte-different early report displaced the final authority",
+        )
+        check(
+            "detached from its closed run artifacts"
+            in str(split_refused.get("message")).lower(),
+            f"the early/final byte split refusal is unnamed: {split_refused.get('message')}",
+        )
+        checks += 3
 
         # ...and only WITH its quarantine receipts (closure integrity, enforced
         # by the production gate).

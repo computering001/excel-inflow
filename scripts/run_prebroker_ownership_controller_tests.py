@@ -399,7 +399,8 @@ def neutral_working_capital_controller() -> dict[str, Any]:
         python, soffice = portable_runtime()
         run_checked([
             "node",
-            str(HERE / "run_user_flow.mjs"),
+            str(HERE / "test-support" / "authenticated_controller_test_harness.mjs"),
+            "user_flow",
             str(evidence),
             "--out",
             str(run_root),

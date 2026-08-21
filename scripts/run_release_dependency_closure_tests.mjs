@@ -143,7 +143,7 @@ try {
 
   const missingSchema = await cloneSkill("missing-schema-ref");
   await mutateJson(
-    path.join(missingSchema, "assets", "installed-capability-receipt-v1.schema.json"),
+    path.join(missingSchema, "assets", "installed-capability-receipt-v1.3.schema.json"),
     (schema) => {
       schema.allOf = [...(schema.allOf ?? []), { $ref: "release-dependency-missing.schema.json" }];
     },

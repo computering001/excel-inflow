@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
   PRODUCT_IDENTITY_SCHEMA,
@@ -147,7 +148,7 @@ export async function resolveSourceIdentity({
   overrides = {},
   activeRuntimeCodeClosureSha256 = null,
 } = {}) {
-  const root = path.resolve(skillRoot ?? new URL("../../", import.meta.url).pathname);
+  const root = path.resolve(skillRoot ?? fileURLToPath(new URL("../../", import.meta.url)));
   const releaseCandidate = await readJson(path.join(root, "release-manifest.json")) ?? {};
   const runtime = await readJson(path.join(root, "assets", "runtime-manifest.json")) ?? {};
   const deploymentProfile =
@@ -230,7 +231,6 @@ export async function resolveSourceIdentity({
   );
   const deploymentStatus = assertDeploymentStatus(
     overrides.deployment_status ??
-      process.env.EXCEL_INFLOW_DEPLOYMENT_STATUS ??
       attestedIdentity.deployment?.status ??
       releaseIdentity.deployment?.status ??
       release.deploymentStatus ??
@@ -270,7 +270,6 @@ export async function resolveSourceIdentity({
     null;
   const installationIdentity =
     overrides.installation_identity ??
-    process.env.EXCEL_INFLOW_INSTALLATION_IDENTITY ??
     releaseIdentity.deployment?.installation_identity ??
     null;
   const typedIdentity = productIdentity({
@@ -346,7 +345,7 @@ export async function resolveSourceIdentity({
  * through here, so a pinned package whose live bytes moved cannot start.
  */
 export async function resolveActiveSourceIdentity({ skillRoot, overrides = {} } = {}) {
-  const root = path.resolve(skillRoot ?? new URL("../../", import.meta.url).pathname);
+  const root = path.resolve(skillRoot ?? fileURLToPath(new URL("../../", import.meta.url)));
   const integrity = await captureRuntimeIntegrity(root);
   const activeSha256 = integrity.runtime_code_closure.sha256;
   const identity = await resolveSourceIdentity({

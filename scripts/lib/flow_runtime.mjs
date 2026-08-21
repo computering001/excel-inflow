@@ -85,7 +85,12 @@ export const STAGES = Object.freeze([
 ]);
 
 export const SCREEN_CONTRACT = Object.freeze({
-  ascii_only: true,
+  // User screens remain ASCII by default.  Phase 3 admits exactly one
+  // non-ASCII glyph: U+00B7 MIDDLE DOT in the visible, required runtime-mode
+  // and fresh-session markers.  No other Unicode character is presentation
+  // authority.
+  ascii_only: false,
+  allowed_non_ascii: Object.freeze(["·"]),
   width: 61,
   max_lines: 70,
   max_questions: 5,

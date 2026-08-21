@@ -27,17 +27,25 @@ function processExists(pid) {
 }
 
 function snapshotProcessTree(rootPid) {
-  if (process.platform === "win32" || !Number.isInteger(rootPid) || rootPid <= 0) {
+  if (!Number.isInteger(rootPid) || rootPid <= 0) {
     return [rootPid].filter(Number.isInteger);
   }
-  const listed = spawnSync("ps", ["-axo", "pid=,ppid="], {
-    encoding: "utf8",
-    windowsHide: true,
-  });
+  const listed = process.platform === "win32"
+    ? spawnSync("wmic", ["process", "get", "ProcessId,ParentProcessId", "/FORMAT:CSV"], {
+        encoding: "utf8",
+        windowsHide: true,
+      })
+    : spawnSync("ps", ["-axo", "pid=,ppid="], {
+        encoding: "utf8",
+        windowsHide: true,
+      });
   if (listed.status !== 0) return [rootPid];
   const children = new Map();
   for (const line of String(listed.stdout ?? "").split("\n")) {
-    const [pidText, parentText] = line.trim().split(/\s+/);
+    const columns = line.trim().split(process.platform === "win32" ? "," : /\s+/);
+    const [pidText, parentText] = process.platform === "win32"
+      ? [columns.at(-1), columns.at(-2)]
+      : columns;
     const pid = Number(pidText);
     const parent = Number(parentText);
     if (!Number.isInteger(pid) || !Number.isInteger(parent)) continue;
@@ -173,6 +181,7 @@ export async function runProcessTree(binary, args, options = {}) {
   const terminationGraceMs = Number(
     options.terminationGraceMs ?? DEFAULT_TERMINATION_GRACE_MS,
   );
+  const terminateDescendantsOnSuccess = options.terminateDescendantsOnSuccess === true;
   if (!Number.isFinite(maxBuffer) || maxBuffer <= 0) {
     throw new Error("maxBuffer must be a positive finite number.");
   }
@@ -211,6 +220,16 @@ export async function runProcessTree(binary, args, options = {}) {
   let spawnError = null;
   let terminationReason = null;
   let terminationPromise = null;
+  const observedPids = new Set();
+  const observeTree = () => {
+    if (!terminateDescendantsOnSuccess || !child?.pid) return;
+    for (const pid of snapshotProcessTree(child.pid)) observedPids.add(pid);
+  };
+  observeTree();
+  const treeObserver = terminateDescendantsOnSuccess
+    ? setInterval(observeTree, 20)
+    : null;
+  treeObserver?.unref?.();
   let resolveClose;
   const closePromise = new Promise((resolve) => {
     resolveClose = resolve;
@@ -250,6 +269,8 @@ export async function runProcessTree(binary, args, options = {}) {
     : null;
   const closed = await closePromise;
   if (timer) clearTimeout(timer);
+  observeTree();
+  if (treeObserver) clearInterval(treeObserver);
   let terminationEvidence = null;
   if (terminationPromise) {
     try {
@@ -267,6 +288,20 @@ export async function runProcessTree(binary, args, options = {}) {
       ].filter(Boolean).join("\n");
       throw error;
     }
+  } else if (terminateDescendantsOnSuccess) {
+    // Some successful launchers (notably LibreOffice) can detach helpers with
+    // closed stdio immediately before the launcher exits. Observe descendants
+    // while the command is live, then close and verify every captured helper
+    // before returning success to the capability owner.
+    const descendants = [...observedPids].filter((pid) => pid !== child.pid);
+    terminationEvidence = descendants.length > 0
+      ? await cancelProcessTreePids(descendants, { graceMs: terminationGraceMs })
+      : Object.freeze({
+          requested_root_pids: Object.freeze([]),
+          targeted_pids: Object.freeze([]),
+          survivor_pids: Object.freeze([]),
+          verified: true,
+        });
   }
 
   const timedOut = terminationReason === "timeout";

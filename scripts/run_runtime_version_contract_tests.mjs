@@ -39,10 +39,11 @@ assert.equal(
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert.equal(deployment.release_name, "Excel Inflow");
-assert.match(runtime.certification_invalidated_reason, /v3\.7/);
+assert.match(runtime.certification_invalidated_reason, /unreleased runtime, package-custody and exact-head CI changes/);
+assert.doesNotMatch(runtime.certification_invalidated_reason, /\bv\d+\.\d+\.\d+\b/);
 assert.equal(runtime.deployment_requires_explicit_user_approval, true);
 assert.ok(runtime.certification_requires.includes("native_spreadsheet_control_restoration"));
 assert.ok(runtime.certification_requires.includes("visual_review"));
 assert.ok(runtime.certification_requires.includes("installed_fresh_session_test"));
 
-console.log(JSON.stringify({ status: "PASS", checks: 10, skill_version: runtime.skill_version }));
+console.log(JSON.stringify({ status: "PASS", checks: 11, skill_version: runtime.skill_version }));

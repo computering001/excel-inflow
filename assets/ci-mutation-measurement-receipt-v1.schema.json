@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/ci-mutation-measurement-receipt-v1.schema.json",
+  "title": "External exact-head mutation measurement receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "job_id", "status", "source_binding", "total_mutation_suites",
+    "measured_mutation_suites", "unmeasured_mutation_suites", "measurement_coverage",
+    "measured_mutations_applied", "measured_mutations_caught", "measured_mutations_survived",
+    "p0_fully_measured", "p0_status", "report_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-ci-mutation-measurement-receipt/1.0" },
+    "job_id": { "const": "mutation_measurement" },
+    "status": { "const": "PASS" },
+    "source_binding": { "$ref": "#/$defs/source_binding" },
+    "total_mutation_suites": { "type": "integer", "minimum": 1 },
+    "measured_mutation_suites": { "type": "integer", "minimum": 1 },
+    "unmeasured_mutation_suites": { "type": "integer", "minimum": 0 },
+    "measurement_coverage": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "measured_mutations_applied": { "type": "integer", "minimum": 1 },
+    "measured_mutations_caught": { "type": "integer", "minimum": 0 },
+    "measured_mutations_survived": { "type": "integer", "minimum": 0 },
+    "p0_fully_measured": { "const": true },
+    "p0_status": { "const": "PASS" },
+    "report_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_sha", "source_tree", "ref", "event_name", "run_id", "run_attempt"],
+      "properties": {
+        "github_sha": { "$ref": "#/$defs/sha1" },
+        "source_tree": { "$ref": "#/$defs/sha1" },
+        "ref": { "type": "string", "minLength": 1 },
+        "event_name": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "run_attempt": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

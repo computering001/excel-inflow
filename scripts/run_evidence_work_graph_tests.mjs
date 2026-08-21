@@ -614,7 +614,7 @@ await command("run_evidence_run_tests.mjs", [cases, "--emit-clean", cleanEvidenc
 
 const coldRun = path.join(workspace, "cold-run");
 const cold = JSON.parse(
-  (await command("run_user_flow.mjs", [cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(cold.status === "PAUSED", `the end-to-end cold run did not pause after decisions: ${cold.status}`);
 check((cold.reused_stages ?? []).length === 0, `the cold run reused a stage: ${JSON.stringify(cold.reused_stages)}`);
@@ -658,7 +658,7 @@ const coldStage3 = JSON.parse(await fs.readFile(path.join(coldRun, "stages", "de
 // the work the controller still performs unconditionally is now visible as a
 // HIT with a reason rather than only as elapsed time.
 const warm = JSON.parse(
-  (await command("run_user_flow.mjs", [cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(warm.status === "PAUSED", `the end-to-end warm run did not pause after decisions: ${warm.status}`);
 check(
@@ -696,7 +696,7 @@ check(
 const stage1ReceiptPath = path.join(coldRun, "stages", "inputs", "_receipt.json");
 await fs.rm(stage1ReceiptPath, { force: true });
 const restaged = JSON.parse(
-  (await command("run_user_flow.mjs", [cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(restaged.status === "PAUSED", `the re-staged run did not pause after decisions: ${restaged.status}`);
 check(
@@ -726,7 +726,7 @@ evidenceNodeReceipt.receipt_hash = hashValue(evidenceNodeReceipt);
 await fs.rm(stage1ReceiptPath, { force: true });
 await fs.writeFile(evidenceNodeReceiptPath, `${JSON.stringify(evidenceNodeReceipt, null, 2)}\n`, "utf8");
 const changed = JSON.parse(
-  (await command("run_user_flow.mjs", [cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
+  (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", coldRun, "--stop-after", "decisions", "--json"])).stdout,
 );
 check(changed.status === "PAUSED", `the moved-component run did not pause after decisions: ${changed.status}`);
 const changedLog = JSON.parse(await fs.readFile(coldLogPath, "utf8"));

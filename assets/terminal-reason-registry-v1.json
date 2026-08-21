@@ -263,6 +263,19 @@
       "evidence_preserved": true,
       "allowed_terminal_states": ["INTERNAL_FAILURE"]
     },
+    "INTERNAL.runtime_bootstrap_failed": {
+      "owner_layer": "runtime_bootstrap",
+      "category": "internal",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_repair",
+      "user_action": "none - engineering owns this",
+      "source_action": "none",
+      "checkpoint_required": false,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["INTERNAL_FAILURE"],
+      "registered_by": "Phase 1 standard-library public bootstrap. It owns package inventory, child-instantiation and pre-product-start failures before repository modules can establish their own terminal handler."
+    },
     "INTERNAL.forecast_completion_escalated": {
       "owner_layer": "forecast_completion_constitution",
       "category": "internal",

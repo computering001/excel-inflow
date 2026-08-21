@@ -1,320 +1,399 @@
-name: Read-only phased development gate
+name: Exact-head read-only release candidate gate
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
 
+env:
+  CANDIDATE_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+  CANDIDATE_SOURCE_REF: refs/heads/${{ github.head_ref }}
+
 jobs:
-  phase-gates:
-    name: Merge compatibility phase gate (${{ matrix.lane }})
+  source-identity:
+    name: 1 - Exact candidate source identity
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { lane: static-schema, phases: evidence }
-          - { lane: semantic-authority, phases: "graph,forecast" }
-          - { lane: broker, phases: real_corpus }
-          - { lane: finance-schedule, phases: "economics,economic" }
-          - { lane: workbook, phases: cohort }
-          - { lane: package, phases: proof }
-          - { lane: runtime, phases: "workflow,performance" }
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: "22" }
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: "3.12" }
-      - name: Install portable runtime dependencies
+      - name: Install and observe the runtime toolchain
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
           python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
-      - name: Check canonical instruction generation
+      - name: Capture exact-head source identity
         run: |
-          node scripts/generate_canonical_instructions.mjs --check
-          node scripts/run_governance_evidence_tests.mjs
-      - name: CI census — every critical suite registered, every script classified
-        run: node scripts/run_ci_census_tests.mjs --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/test_registry_census.json"
-      - name: Run portable phase lane
-        continue-on-error: true
-        env:
-          GATE_OUT: ${{ runner.temp }}/phase-${{ matrix.lane }}
-        run: |
-          node scripts/run_development_gate.mjs \
-            --profile portable --phase "${{ matrix.phases }}" \
-            --cases test-fixtures/cases \
-            --representative test-fixtures/cases/standard-maximal-v2.json \
-            --python "$(command -v python3)" --soffice "$(command -v soffice)" \
-            --out "$GATE_OUT" --concurrency 3
-      - name: Retain phase custody
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/source-identity"
+          GITHUB_SHA="$CANDIDATE_SOURCE_SHA" GITHUB_REF="$CANDIDATE_SOURCE_REF" node scripts/compile_external_ci_evidence.mjs capture-source-identity \
+            --repo "$GITHUB_WORKSPACE" --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --out "${{ runner.temp }}/source-identity/source-identity.json"
+      - name: Retain immutable source identity
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: portable-${{ matrix.lane }}
-          path: ${{ runner.temp }}/phase-${{ matrix.lane }}/**/*.json
-          if-no-files-found: error
-          retention-days: 30
-      # continue-on-error above exists ONLY so artifact custody survives a
-      # failing lane; this verdict step restores job truthfulness — a failed
-      # lane must present as a failed job, never as green (P0.3).
-      - name: Lane verdict is authoritative
-        env:
-          GATE_OUT: ${{ runner.temp }}/phase-${{ matrix.lane }}
-        run: |
-          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); if(r.status!=='PASS'){console.error('Lane report status:',r.status);process.exit(1);} console.log('lane PASS');"
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source-identity/**", if-no-files-found: error, retention-days: 30 }
 
-  portable-serial:
-    name: Merge compatibility complete portable registry (serial)
+  registry-census:
+    name: 2 - Compile registry selection once
+    needs: [source-identity]
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
-      - name: Install portable runtime dependencies
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - name: Compile and validate the exact registry selection
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
-      - name: Run complete serial portable registry
-        continue-on-error: true
-        env:
-          GATE_OUT: ${{ runner.temp }}/portable-serial
-        run: |
-          node scripts/run_development_gate.mjs \
-            --profile portable --cases test-fixtures/cases \
-            --representative test-fixtures/cases/standard-maximal-v2.json \
-            --python "$(command -v python3)" --soffice "$(command -v soffice)" \
-            --out "$GATE_OUT" --concurrency 1
-      - name: Retain serial custody
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/registry"
+          node scripts/compile_external_ci_evidence.mjs capture-registry-selection \
+            --source-identity "${{ runner.temp }}/source/source-identity.json" \
+            --registry assets/development-test-registry.json --scripts-root scripts \
+            --out "${{ runner.temp }}/registry/registry-selection.json"
+      - name: Retain immutable registry selection
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: portable-serial
-          path: ${{ runner.temp }}/portable-serial/**/*.json
-          if-no-files-found: error
-          retention-days: 30
-      # See phase-gates: artifact custody first, then a truthful job verdict.
-      - name: Serial lane verdict is authoritative
-        env:
-          GATE_OUT: ${{ runner.temp }}/portable-serial
-        run: |
-          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); if(r.status!=='PASS'){console.error('Serial report status:',r.status);process.exit(1);} console.log('serial PASS');"
+        with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry/**", if-no-files-found: error, retention-days: 30 }
 
-  custody-inventory:
-    name: Enumerate custody tests (explicit BLOCKED allowed)
+  targeted-bootstrap-runtime:
+    name: 3 - Targeted bootstrap and runtime contract
+    needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
-          fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - name: Enumerate every custody test
-        continue-on-error: true
-        env:
-          GATE_OUT: ${{ runner.temp }}/custody-inventory
-        run: node scripts/run_development_gate.mjs --profile custody --out "$GATE_OUT" --concurrency 1
-      - name: Retain custody inventory
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: custody-inventory
-          path: ${{ runner.temp }}/custody-inventory/**/*.json
-          if-no-files-found: error
-          retention-days: 30
-      # Custody policy mirrors compile_ci_gate_matrix.mjs: every enumerated
-      # test must be PASS or an EXPLICIT typed BLOCKED (missing custody named);
-      # anything else fails the job here, not only in the aggregate.
-      - name: Custody verdict is authoritative
-        env:
-          GATE_OUT: ${{ runner.temp }}/custody-inventory
-        run: |
-          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); const bad=(r.results??[]).filter(x=>!['PASS','BLOCKED'].includes(x.status)); if(bad.length){console.error('Invalid custody statuses:',bad.map(x=>x.id+':'+x.status).join(', '));process.exit(1);} console.log('custody inventory PASS_OR_EXPLICIT_BLOCKED');"
-
-  # P7.7: the gate is layered, so the LAYERING itself is checked on every
-  # merge. This job validates assets/ci-gate-tiers-v1.json — complete
-  # capability coverage, every deferral declared and pointing at a tier that
-  # actually covers it and actually triggers, and no quarantine without an
-  # owner, without an expiry or past its expiry. It adds no case volume to this
-  # tier and runs in parallel, so the pull-request tier's content and wall
-  # clock are unchanged.
-  gate-tier-declaration:
-    name: Declared CI tier coverage, deferrals and quarantine health
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
-          fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - name: Validate the declared tier register and quarantine expiries
-        run: node scripts/run_ci_gate_tier_tests.mjs --out "${{ runner.temp }}/tiers/ci-gate-tier-declaration.json"
-      - name: Retain the tier declaration
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-gate-tier-declaration
-          path: ${{ runner.temp }}/tiers/*.json
-          if-no-files-found: error
-          retention-days: 30
-
-  merge-compatibility-identity:
-    name: Distinguish merge compatibility from package source
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
-          fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - name: Record the compatibility checkout role
-        env:
-          CANDIDATE_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          EXPECTED_ROLE: ${{ github.event_name == 'pull_request' && 'merge_test' || 'candidate_source' }}
-        run: |
-          node scripts/run_merge_compatibility_identity_check.mjs \
-            --candidate-source-commit "$CANDIDATE_SOURCE_SHA" \
-            --expected-role "$EXPECTED_ROLE" \
-            --out "${{ runner.temp }}/merge-compatibility-identity.json"
-      - name: Retain merge-compatibility identity
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: merge-compatibility-identity
-          path: ${{ runner.temp }}/merge-compatibility-identity.json
-          if-no-files-found: error
-          retention-days: 30
-
-  package-source-identity:
-    name: Compile and bind current package/source identity
-    runs-on: ubuntu-latest
-    # The package compile + smoke runs the full registered surface; its wall
-    # clock grows with the registry. 35 minutes was hit as a silent
-    # "cancelled" conclusion three runs in a row (P0.3 forensics).
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: "22" }
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: "3.12" }
-      - name: Install package smoke dependencies
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry" }
+      - name: Install portable runtime dependencies
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
           python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
-      - name: Compile package and verify exact source binding
-        env:
-          CANDIDATE_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          MERGE_TEST_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || '' }}
+      - name: Run the exact targeted selection
         run: |
-          IDENTITY_ARGS=(--expected-source-commit "$CANDIDATE_SOURCE_SHA")
-          if [[ -n "$MERGE_TEST_SHA" ]]; then IDENTITY_ARGS+=(--merge-test-commit "$MERGE_TEST_SHA"); fi
-          node scripts/run_current_package_source_identity_check.mjs \
-            "${IDENTITY_ARGS[@]}" \
-            --python "$(command -v python3)" --soffice "$(command -v soffice)" \
-            --out "${{ runner.temp }}/current-package-source-identity.json"
-      - name: Retain package/source custody
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/targeted"
+          node scripts/run_development_gate.mjs --profile portable \
+            --only source-release-identity,immutable-release-package-attestation,public-bootstrap,runtime-doctor,installed-filings-capability,screen-session-one-use-binding \
+            --cases test-fixtures/cases --representative test-fixtures/cases/standard-maximal-v2.json \
+            --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/targeted" --concurrency 1
+          node scripts/compile_external_ci_evidence.mjs lifecycle-from-gate-report \
+            --source-identity "${{ runner.temp }}/source/source-identity.json" --registry-selection "${{ runner.temp }}/registry/registry-selection.json" \
+            --gate-report "${{ runner.temp }}/targeted/development-gate-report.json" --job-id targeted_runtime --selection-scope TARGETED \
+            --out "${{ runner.temp }}/targeted/targeted-runtime-receipt.json"
+      - name: Retain targeted results and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: package-source-identity
-          path: ${{ runner.temp }}/current-package-source-identity.json
-          if-no-files-found: error
-          retention-days: 30
+        with: { name: exact-head-targeted-runtime, path: "${{ runner.temp }}/targeted/**", if-no-files-found: error, retention-days: 30 }
 
-  aggregate-and-compare:
-    name: Exact-once matrix and current-SHA serial/parallel comparison
-    needs: [phase-gates, portable-serial, custody-inventory, merge-compatibility-identity, package-source-identity]
+  full-portable:
+    name: 4 - Full exact-head portable registry
+    needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Full history: the programme-control linter proves handover
-          # freshness with merge-base --is-ancestor, which a shallow
-          # clone cannot answer.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry" }
+      - name: Install portable runtime dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Run every portable test once and compile lifecycle
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/portable/raw"
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/portable/raw/evidence-run.json"
+          node scripts/run_development_gate.mjs --profile portable --cases test-fixtures/cases \
+            --representative test-fixtures/cases/standard-maximal-v2.json --raw-canary-evidence "${{ runner.temp }}/portable/raw/evidence-run.json" \
+            --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/portable/results" --concurrency 1
+          node scripts/compile_external_ci_evidence.mjs lifecycle-from-gate-report \
+            --source-identity "${{ runner.temp }}/source/source-identity.json" --registry-selection "${{ runner.temp }}/registry/registry-selection.json" \
+            --gate-report "${{ runner.temp }}/portable/results/development-gate-report.json" --job-id portable_gate --selection-scope PORTABLE_ALL \
+            --out "${{ runner.temp }}/portable/portable-gate-receipt.json"
+      - name: Retain complete portable results and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-full-portable, path: "${{ runner.temp }}/portable/**", if-no-files-found: error, retention-days: 30 }
+
+  package-a:
+    name: 5 - Independent package A
+    needs: [source-identity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - name: Install package build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Build package A from its own clean checkout
+        run: |
+          set -euo pipefail
+          EPOCH="$(git show -s --format=%ct "$CANDIDATE_SOURCE_SHA")"
+          node scripts/run_exact_head_package_build_ci.mjs --label A --commit "$CANDIDATE_SOURCE_SHA" --source-date-epoch "$EPOCH" \
+            --smoke-case test-fixtures/cases/standard-maximal-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --out "${{ runner.temp }}/package-a/build"
+          node scripts/compile_exact_head_ci_job_receipt.mjs package --source-identity "${{ runner.temp }}/source/source-identity.json" \
+            --raw "${{ runner.temp }}/package-a/build/package-a.build-receipt.json" --job-id package_a \
+            --out "${{ runner.temp }}/package-a/package-a-receipt.json"
+          mkdir -p "${{ runner.temp }}/package-a/harness/scripts/lib"
+          install -m 0644 scripts/run_archive_only_capability_ci.mjs "${{ runner.temp }}/package-a/harness/scripts/"
+          install -m 0644 scripts/lib/exact_head_package_ci.mjs scripts/lib/package_ab_comparison.mjs scripts/lib/identity_vocabulary.mjs \
+            "${{ runner.temp }}/package-a/harness/scripts/lib/"
+      - name: Retain package A, archive, inventory, log and harness
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-package-a, path: "${{ runner.temp }}/package-a/**", if-no-files-found: error, retention-days: 30 }
+
+  package-b:
+    name: 6 - Independent package B
+    needs: [source-identity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - name: Install package build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Build package B from its own clean checkout
+        run: |
+          set -euo pipefail
+          EPOCH="$(git show -s --format=%ct "$CANDIDATE_SOURCE_SHA")"
+          node scripts/run_exact_head_package_build_ci.mjs --label B --commit "$CANDIDATE_SOURCE_SHA" --source-date-epoch "$EPOCH" \
+            --smoke-case test-fixtures/cases/standard-maximal-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --out "${{ runner.temp }}/package-b/build"
+          node scripts/compile_exact_head_ci_job_receipt.mjs package --source-identity "${{ runner.temp }}/source/source-identity.json" \
+            --raw "${{ runner.temp }}/package-b/build/package-b.build-receipt.json" --job-id package_b \
+            --out "${{ runner.temp }}/package-b/package-b-receipt.json"
+      - name: Retain package B, archive, inventory and log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-package-b, path: "${{ runner.temp }}/package-b/**", if-no-files-found: error, retention-days: 30 }
+
+  package-reproducibility:
+    name: 7 - Compare independent packages byte for byte
+    needs: [source-identity, package-a, package-b]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: "22" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: portable-*
-          path: ${{ runner.temp }}/portable
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: custody-inventory
-          path: ${{ runner.temp }}/custody
+        with: { name: exact-head-package-a, path: "${{ runner.temp }}/a" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: package-source-identity
-          path: ${{ runner.temp }}/package
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: merge-compatibility-identity
-          path: ${{ runner.temp }}/merge
-      - name: Aggregate, compare and compile complete matrix
-        env:
-          REPORT_ROOT: ${{ runner.temp }}/portable
-          MATRIX_OUT: ${{ runner.temp }}/matrix
+        with: { name: exact-head-package-b, path: "${{ runner.temp }}/b" }
+      - name: Compare paths, types, modes, sizes, bytes and archives
         run: |
-          mkdir -p "$MATRIX_OUT"
-          mapfile -t PHASE_REPORTS < <(find "$REPORT_ROOT" -path '*/portable-serial' -prune -o -name development-gate-report.json -print | sort)
-          REPORT_ARGS=()
-          for REPORT in "${PHASE_REPORTS[@]}"; do REPORT_ARGS+=(--report "$REPORT"); done
-          node scripts/aggregate_development_gate_reports.mjs --profile portable "${REPORT_ARGS[@]}" --out "$MATRIX_OUT/portable-aggregate.json"
-          COMPARE_ARGS=()
-          for REPORT in "${PHASE_REPORTS[@]}"; do COMPARE_ARGS+=(--candidate "$REPORT"); done
-          node scripts/compare_development_gate_reports.mjs --baseline "$REPORT_ROOT/portable-serial/development-gate-report.json" "${COMPARE_ARGS[@]}" --out "$MATRIX_OUT/serial-parallel-comparison.json"
-          node scripts/compile_ci_gate_matrix.mjs \
-            --portable-aggregate "$MATRIX_OUT/portable-aggregate.json" \
-            --comparison "$MATRIX_OUT/serial-parallel-comparison.json" \
-            --custody-report "${{ runner.temp }}/custody/development-gate-report.json" \
-            --merge-report "${{ runner.temp }}/merge/merge-compatibility-identity.json" \
-            --package-report "${{ runner.temp }}/package/current-package-source-identity.json" \
-            --out "$MATRIX_OUT/complete-ci-gate-matrix.json"
-      - name: Retain complete gate matrix
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/repro"
+          node scripts/compare_exact_head_package_builds.mjs --a "${{ runner.temp }}/a/build/package-a.build-receipt.json" \
+            --b "${{ runner.temp }}/b/build/package-b.build-receipt.json" --out "${{ runner.temp }}/repro/package-reproducibility.json"
+          node scripts/compile_exact_head_ci_job_receipt.mjs reproducibility --source-identity "${{ runner.temp }}/source/source-identity.json" \
+            --raw "${{ runner.temp }}/repro/package-reproducibility.json" --package-a "${{ runner.temp }}/a/build/package-a.build-receipt.json" \
+            --package-b "${{ runner.temp }}/b/build/package-b.build-receipt.json" --out "${{ runner.temp }}/repro/package-reproducibility-receipt.json"
+      - name: Retain reproducibility evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-package-reproducibility, path: "${{ runner.temp }}/repro/**", if-no-files-found: error, retention-days: 30 }
+
+  archive-only-capability:
+    name: 8 - Downloaded archive bootstrap, capability and oracle
+    needs: [package-a]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-package-a, path: "${{ runner.temp }}/downloaded-a" }
+      - name: Install host dependencies without a source checkout
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Run only the downloaded archive through the retained harness
+        run: |
+          set -euo pipefail
+          node "${{ runner.temp }}/downloaded-a/harness/scripts/run_archive_only_capability_ci.mjs" \
+            --archive "${{ runner.temp }}/downloaded-a/build/package-a.tar" \
+            --attestation "${{ runner.temp }}/downloaded-a/build/package-a.attestation.json" \
+            --out "${{ runner.temp }}/archive-only" --python "$(command -v python3)" --soffice "$(command -v soffice)"
+      - name: Retain archive-only report, real capability receipt and independent oracle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-archive-only-capability, path: "${{ runner.temp }}/archive-only/**", if-no-files-found: error, retention-days: 30 }
+
+  mutation-measurement:
+    name: 9 - Exact-head mutation measurement
+    needs: [source-identity, registry-census]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          name: complete-development-gate-matrix
-          path: ${{ runner.temp }}/matrix/*.json
-          if-no-files-found: error
-          retention-days: 30
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - name: Install mutation runtime dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+      - name: Execute and count every currently measured mutation
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/mutation/raw"
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/mutation/raw/evidence-run.json"
+          node scripts/compile_mutation_adequacy.mjs --profile all --representative test-fixtures/cases/standard-maximal-v2.json \
+            --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          node scripts/run_mutation_adequacy_tests.mjs --report "${{ runner.temp }}/mutation/mutation-report.json"
+          node scripts/compile_exact_head_ci_job_receipt.mjs mutation-measurement \
+            --source-identity "${{ runner.temp }}/source/source-identity.json" --raw "${{ runner.temp }}/mutation/mutation-report.json" \
+            --out "${{ runner.temp }}/mutation/mutation-measurement-receipt.json"
+      - name: Retain mutation counts, coverage, gaps and zero-survivor receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-mutation-measurement, path: "${{ runner.temp }}/mutation/**", if-no-files-found: error, retention-days: 30 }
+
+  synthetic-merge:
+    name: 10 - Synthetic merge compatibility kept separate
+    needs: [source-identity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - name: Prove the merge object is not the candidate package source
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/merge"
+          node scripts/run_merge_compatibility_identity_check.mjs --candidate-source-commit "$CANDIDATE_SOURCE_SHA" \
+            --expected-role merge_test --out "${{ runner.temp }}/merge/synthetic-merge-raw.json"
+          node scripts/compile_exact_head_ci_job_receipt.mjs synthetic-merge \
+            --source-identity "${{ runner.temp }}/source/source-identity.json" --raw "${{ runner.temp }}/merge/synthetic-merge-raw.json" \
+            --out "${{ runner.temp }}/merge/synthetic-merge-receipt.json"
+      - name: Retain separately labelled synthetic merge evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-synthetic-merge, path: "${{ runner.temp }}/merge/**", if-no-files-found: error, retention-days: 30 }
+
+  final-aggregate:
+    name: 11 - All-needs exact-head D52 attestation
+    if: always()
+    needs: [source-identity, registry-census, targeted-bootstrap-runtime, full-portable, package-a, package-b, package-reproducibility, archive-only-capability, mutation-measurement, synthetic-merge]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { pattern: exact-head-*, path: "${{ runner.temp }}/evidence" }
+      - name: Project raw evidence and compile the final all-needs attestation
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/final"
+          node scripts/compile_exact_head_ci_job_receipt.mjs archive-capability \
+            --source-identity "${{ runner.temp }}/evidence/exact-head-source-identity/source-identity.json" \
+            --raw "${{ runner.temp }}/evidence/exact-head-archive-only-capability/archive-only-capability-report.json" \
+            --package-a "${{ runner.temp }}/evidence/exact-head-package-a/package-a-receipt.json" \
+            --out "${{ runner.temp }}/final/archive-capability-receipt.json"
+          node scripts/compile_external_ci_evidence.mjs final-attestation \
+            --source-identity "${{ runner.temp }}/evidence/exact-head-source-identity/source-identity.json" \
+            --registry-selection "${{ runner.temp }}/evidence/exact-head-registry-selection/registry-selection.json" \
+            --targeted-runtime "${{ runner.temp }}/evidence/exact-head-targeted-runtime/targeted-runtime-receipt.json" \
+            --portable-gate "${{ runner.temp }}/evidence/exact-head-full-portable/portable-gate-receipt.json" \
+            --package-a "${{ runner.temp }}/evidence/exact-head-package-a/package-a-receipt.json" \
+            --package-b "${{ runner.temp }}/evidence/exact-head-package-b/package-b-receipt.json" \
+            --package-reproducibility "${{ runner.temp }}/evidence/exact-head-package-reproducibility/package-reproducibility-receipt.json" \
+            --archive-capability "${{ runner.temp }}/final/archive-capability-receipt.json" \
+            --mutation-measurement "${{ runner.temp }}/evidence/exact-head-mutation-measurement/mutation-measurement-receipt.json" \
+            --synthetic-merge "${{ runner.temp }}/evidence/exact-head-synthetic-merge/synthetic-merge-receipt.json" \
+            --created-at "$(node -e 'process.stdout.write(new Date().toISOString())')" \
+            --out "${{ runner.temp }}/final/release-candidate-attestation.json"
+      - name: Retain final attestation and refusal custody
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: exact-head-release-candidate-attestation, path: "${{ runner.temp }}/final/**", if-no-files-found: warn, retention-days: 30 }

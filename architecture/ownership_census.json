@@ -117,6 +117,15 @@
       "concern": "statement map proposal",
       "target_owner": "Statement Authority compiler (Phase 2)"
     },
+    "lib/controller_handoff.mjs": {
+      "count": 1,
+      "families": {
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "cryptographically bound one-use controller handoff state",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
     "lib/coverage.mjs": {
       "count": 9,
       "families": {
@@ -126,6 +135,24 @@
       "classification": "validator",
       "concern": "coverage checks (must not mutate)",
       "target_owner": "validators stay validators"
+    },
+    "lib/disk_space_measurement_builder.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "independent raw disk-sample recomputation and measurement comparison",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
+    "lib/disk_space_policy.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "sealed disk-policy custody and physical-root headroom evaluation",
+      "target_owner": "Runtime governance (Phase 6)"
     },
     "lib/economic_ir.mjs": {
       "count": 1,
@@ -162,6 +189,25 @@
       "classification": "canonical_writer",
       "concern": "P6.3 evidence-half work nodes + recorded cache decisions (declares and measures; deliberately does not skip work)",
       "target_owner": "Runtime governance (Phase 6)"
+    },
+    "lib/exact_head_package_ci.mjs": {
+      "count": 1,
+      "families": {
+        "release_identity": 1
+      },
+      "classification": "validator",
+      "concern": "exact-head package inventory, independent A/B comparison and archive-only capability proof validation",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
+    "lib/external_ci_evidence.mjs": {
+      "count": 4,
+      "families": {
+        "terminal_status": 3,
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "externally retained exact-head CI receipts and non-promotional release-candidate attestation",
+      "target_owner": "Release/package compiler (Phase 8)"
     },
     "lib/flow.mjs": {
       "count": 2,
@@ -219,12 +265,12 @@
       "target_owner": "Authority selector (Phase 3)"
     },
     "lib/forecast_candidate_compiler.mjs": {
-      "count": 22,
+      "count": 21,
       "families": {
         "forecast_authority": 2,
         "forecast_formula": 3,
         "capture_ownership": 1,
-        "row_topology": 7,
+        "row_topology": 6,
         "economic_values": 9
       },
       "classification": "canonical_writer",
@@ -279,6 +325,24 @@
       "concern": "historical evidence normalisation",
       "target_owner": "Evidence IR (Phase 1)"
     },
+    "lib/installed_inline_xbrl_probe.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "bounded installed-host Inline-XBRL capability verification",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
+    "lib/installed_runtime_identity.mjs": {
+      "count": 5,
+      "families": {
+        "release_identity": 5
+      },
+      "classification": "validator",
+      "concern": "read-only installed slot, active-pointer, promotion and rollback identity verification",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
     "lib/instrument_period_state.mjs": {
       "count": 1,
       "families": {
@@ -296,6 +360,15 @@
       "classification": "canonical_writer",
       "concern": "layered graph constitution records",
       "target_owner": "Canonical graph compiler (Phase 3)"
+    },
+    "lib/libreoffice_workbook_capability.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "bounded installed-host LibreOffice functional workbook verification",
+      "target_owner": "Runtime governance (Phase 6)"
     },
     "lib/local_workbook_review.mjs": {
       "count": 1,
@@ -326,9 +399,9 @@
       "target_owner": "Economic IR (Phase 3)"
     },
     "lib/optional_broker_circuit_breaker.mjs": {
-      "count": 1,
+      "count": 2,
       "families": {
-        "terminal_status": 1
+        "terminal_status": 2
       },
       "classification": "canonical_writer",
       "concern": "broker fault containment status",
@@ -493,6 +566,15 @@
       "concern": "installed-host capability report, receipt and pointer state",
       "target_owner": "Runtime governance (Phase 6)"
     },
+    "lib/screen_session.mjs": {
+      "count": 2,
+      "families": {
+        "release_identity": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "authenticated durable one-use Company-screen session state",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
     "lib/semantic_graph.mjs": {
       "count": 3,
       "families": {
@@ -577,19 +659,20 @@
       "target_owner": "Release/package compiler (Phase 8)"
     },
     "run_excel_inflow_vnext.mjs": {
-      "count": 13,
+      "count": 15,
       "families": {
-        "terminal_status": 11,
-        "release_identity": 2
+        "terminal_status": 12,
+        "release_identity": 3
       },
       "classification": "canonical_writer",
       "concern": "vnext terminal state + release identity stamps",
       "target_owner": "Terminal outcome compiler (Phase 6)"
     },
     "run_user_flow.mjs": {
-      "count": 34,
+      "count": 35,
       "families": {
-        "terminal_status": 34
+        "terminal_status": 34,
+        "release_identity": 1
       },
       "classification": "canonical_writer",
       "concern": "stage choreography status",

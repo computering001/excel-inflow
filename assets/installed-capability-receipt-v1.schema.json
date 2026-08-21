@@ -7,11 +7,11 @@
     "schema_version", "status", "readiness_scope", "candidate_slot_ready", "candidate_slot_refusal_reason",
     "production_promotion_eligible", "production_promotion_refusal_reason",
     "generated_at", "requested_lanes", "host",
-    "source_identity", "node", "python", "workbook", "mandatory_filings_probe", "filesystem",
+    "source_identity", "node", "python", "workbook", "runtime_compatibility", "mandatory_filings_probe", "inline_xbrl_probe", "filesystem",
     "process_spawn", "runtime_doctor_sha256", "receipt_sha256"
   ],
   "properties": {
-    "schema_version": { "const": "excel-inflow-installed-capability-receipt/1.1" },
+    "schema_version": { "const": "excel-inflow-installed-capability-receipt/1.2" },
     "status": { "enum": ["HOST_READY", "REFUSED"] },
     "readiness_scope": { "const": "inactive_candidate_slot_only" },
     "candidate_slot_ready": { "type": "boolean" },
@@ -72,15 +72,18 @@
     },
     "workbook": {
       "type": "object", "additionalProperties": false,
-      "required": ["soffice_executable", "soffice_executable_sha256", "soffice_version"],
+      "required": ["soffice_executable", "soffice_executable_sha256", "soffice_version", "functional_capability"],
       "properties": {
         "soffice_executable": { "type": ["string", "null"] },
         "soffice_executable_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
-        "soffice_version": { "type": ["string", "null"] }
+        "soffice_version": { "type": ["string", "null"] },
+        "functional_capability": { "type": ["object", "null"] }
       }
     },
+    "runtime_compatibility": { "type": ["object", "null"] },
     "process_spawn": { "enum": ["PASS", "FAIL"] },
     "mandatory_filings_probe": { "type": ["object", "null"] },
+    "inline_xbrl_probe": { "type": ["object", "null"] },
     "filesystem": {
       "type": "object", "additionalProperties": false, "required": ["work_root", "temp_root"],
       "properties": {
@@ -104,10 +107,52 @@
           },
           "process_spawn": { "const": "PASS" },
           "workbook": {
+            "required": ["functional_capability"],
             "properties": {
               "soffice_executable": { "type": "string", "minLength": 1 },
               "soffice_executable_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-              "soffice_version": { "type": "string", "minLength": 1 }
+              "soffice_version": { "type": "string", "minLength": 1 },
+              "functional_capability": {
+                "type": "object",
+                "required": ["schema_version", "status", "fixture", "output", "cleanup"],
+                "properties": {
+                  "schema_version": { "const": "libreoffice-workbook-capability/1.0" },
+                  "status": { "const": "PASS" },
+                  "fixture": {
+                    "type": "object",
+                    "required": ["sha256"],
+                    "properties": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+                  },
+                  "output": {
+                    "type": "object",
+                    "required": ["sha256", "cached_result"],
+                    "properties": {
+                      "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                      "cached_result": { "const": 12.5 }
+                    }
+                  },
+                  "cleanup": {
+                    "type": "object",
+                    "required": ["profile_removed", "fixture_removed", "output_removed", "workspace_removed", "residue_paths"],
+                    "properties": {
+                      "profile_removed": { "const": true },
+                      "fixture_removed": { "const": true },
+                      "output_removed": { "const": true },
+                      "workspace_removed": { "const": true },
+                      "residue_paths": { "type": "array", "maxItems": 0 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "runtime_compatibility": {
+            "type": "object",
+            "required": ["status", "total_violations", "evaluated_runtime_names", "observations", "findings"],
+            "properties": {
+              "status": { "const": "PASS" },
+              "total_violations": { "const": 0 },
+              "findings": { "type": "array", "maxItems": 0 }
             }
           },
           "mandatory_filings_probe": {
@@ -119,6 +164,54 @@
               "scratch_removed"
             ],
             "properties": {
+              "scratch_removed": { "const": true }
+            }
+          },
+          "inline_xbrl_probe": {
+            "type": "object",
+            "required": [
+              "schema_version", "status", "reason_code", "selected_python",
+              "lxml_worker_execution", "fixture_sha256", "html_sha256", "worker_sha256",
+              "result_schema_sha256", "result_sha256", "selected_python_sha256",
+              "selected_non_dimensioned_authority", "quarantined_dimensioned_fact",
+              "compatibility_prerequisite", "scratch_removed"
+            ],
+            "properties": {
+              "schema_version": { "const": "excel-inflow-installed-inline-xbrl-probe/1.0" },
+              "status": { "const": "PASS" },
+              "reason_code": { "type": "null" },
+              "selected_python": { "type": "string", "minLength": 1 },
+              "lxml_worker_execution": { "const": "PASS" },
+              "fixture_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "html_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "worker_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "result_schema_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "result_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "selected_python_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "selected_non_dimensioned_authority": { "type": "object", "minProperties": 2 },
+              "quarantined_dimensioned_fact": {
+                "type": "object",
+                "required": ["concept", "context_ref", "dimensions", "value"],
+                "properties": {
+                  "dimensions": { "type": "object", "minProperties": 1 }
+                }
+              },
+              "compatibility_prerequisite": {
+                "type": "object",
+                "required": ["status", "total_violations", "evaluated_runtime_names", "findings"],
+                "properties": {
+                  "status": { "const": "PASS" },
+                  "total_violations": { "const": 0 },
+                  "evaluated_runtime_names": {
+                    "type": "array",
+                    "allOf": [
+                      { "contains": { "const": "Python" } },
+                      { "contains": { "const": "lxml" } }
+                    ]
+                  },
+                  "findings": { "type": "array", "maxItems": 0 }
+                }
+              },
               "scratch_removed": { "const": true }
             }
           },

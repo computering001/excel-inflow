@@ -1160,6 +1160,52 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "post-close-broker-fallback-raw-canary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": [
+        {
+          "name": "raw_canary_evidence",
+          "source": "RAW_CANARY_EVIDENCE",
+          "type": "file"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        },
+        {
+          "name": "arg_4",
+          "value": "--broker-state",
+          "type": "literal"
+        },
+        {
+          "name": "arg_5",
+          "value": "usable",
+          "type": "literal"
+        },
+        {
+          "name": "arg_6",
+          "value": "--inject-post-close-broker-ingress-failure",
+          "type": "literal"
+        }
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 1800,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "real-raw-filing-black-box-canary",
       "phase": "real_corpus",
       "runtime": "node",
@@ -1889,11 +1935,115 @@
       "test_class": "mutation"
     },
     {
+      "id": "public-bootstrap",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_public_bootstrap_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "packaged-path-acceptance",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_packaged_path_acceptance_tests.mjs",
+      "arguments": [
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "runtime-doctor",
       "phase": "performance",
       "runtime": "node",
       "script": "run_runtime_doctor_tests.mjs",
       "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "durable-artifact-generation",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_durable_artifact_generation_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "disk-space-policy",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_disk_space_policy_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "disk-space-measurement-builder",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_disk_space_measurement_builder_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-capability-receipt-v13",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_installed_capability_receipt_v13_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-compatibility",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_compatibility_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "libreoffice-workbook-capability",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_libreoffice_workbook_capability_tests.mjs",
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-inline-xbrl-capability",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_installed_inline_xbrl_probe_tests.mjs",
+      "requires": [
+        "PYTHON"
+      ],
+      "timeout_seconds": 60,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
@@ -1915,6 +2065,31 @@
         }
       ],
       "timeout_seconds": 1800,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-capability-independent-oracle",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_capability_oracle_tests.mjs",
+      "arguments": [
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
@@ -2492,6 +2667,69 @@
       "runtime": "python",
       "script": "run_broker_freshness_policy_tests.py",
       "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-mode-derived-installed-identity",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_runtime_mode_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "screen-session-one-use-binding",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_screen_session_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "phase3-runtime-session-integration",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_phase3_runtime_session_integration_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
+      "id": "external-exact-head-ci-evidence",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_external_ci_evidence_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "independent-exact-head-package-ci",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_exact_head_package_ci_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ci-command-status-custody",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_command_with_custody_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "exact-head-ci-job-receipt-projection",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_exact_head_ci_job_receipt_tests.mjs",
+      "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
     }

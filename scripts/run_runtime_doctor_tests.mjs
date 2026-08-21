@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { probePhysicalFilesystem } from "./lib/filesystem_probe.mjs";
 import { resolvePythonExecutable } from "./lib/process_tree.mjs";
 import {
   PRECONDITION_DECLARATIONS,
@@ -49,6 +50,7 @@ import {
   installedCapabilityReceiptDigest,
   resolveDoctorPython,
   runRuntimeDoctor,
+  selectDiskSpacePolicyAuthority,
   typedCheck,
   writeInstalledCapabilityArtifactSet,
 } from "./lib/runtime_doctor.mjs";
@@ -59,6 +61,28 @@ const ROOT = path.resolve(HERE, "..");
 
 let checks = 0;
 const mutations = [];
+const EXPECTED_MUTATION_IDS = Object.freeze([
+  "poisoned_path_did_not_replace_resolved_interpreter",
+  "bare_relative_python_override_rejected_by_doctor",
+  "silently_skipped_precondition_rejected",
+  "unsatisfied_mandatory_precondition_refused_typed",
+  "mandatory_precondition_not_excusable_while_its_lane_is_requested",
+  "excluded_installed_host_check_never_reported_satisfied",
+  "unknown_result_never_reported_satisfied",
+  "canonical_symlink_into_skill_refused",
+  "physical_probe_write_failure_refused",
+  "physical_probe_read_failure_refused",
+  "physical_probe_rename_failure_refused",
+  "physical_probe_cleanup_failure_refused",
+  "one_volume_only_failure_remained_independent",
+  "durable_doctor_crash_after_alias_kept_prior_pointer",
+  "durable_doctor_crash_after_report_kept_prior_pointer",
+  "durable_doctor_crash_after_receipt_kept_prior_pointer",
+  "durable_doctor_crash_before_pointer_kept_prior_pointer",
+  "out_of_range_runtime_prevents_real_evidence_probes",
+  "aggregate_probe_lease_exhaustion_prevents_subordinates",
+  "broken_preflight_cannot_emit_static_company_screen",
+]);
 
 function check(condition, message) {
   assert.ok(condition, message);
@@ -68,6 +92,35 @@ function check(condition, message) {
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "runtime-doctor-tests-"));
 
 try {
+  const candidateAuthority = selectDiskSpacePolicyAuthority({
+    mode: "candidate",
+    skillRoot: ROOT,
+    profilePolicy: { path: "assets/measured-policy.json", sha256: "a".repeat(64) },
+    callerPolicyPath: "/tmp/forged-lower-policy.json",
+    callerPolicySha256: "b".repeat(64),
+    env: {
+      EXCEL_INFLOW_DISK_SPACE_POLICY: "/tmp/env-forged-policy.json",
+      EXCEL_INFLOW_DISK_SPACE_POLICY_SHA256: "c".repeat(64),
+    },
+  });
+  check(
+    candidateAuthority.authority === "deployment_profile_only" &&
+      candidateAuthority.policy_path === path.join(ROOT, "assets", "measured-policy.json") &&
+      candidateAuthority.expected_policy_sha256 === "a".repeat(64) &&
+      candidateAuthority.candidate_override_refused === true,
+    "candidate disk-policy authority accepted or preferred a caller/environment override",
+  );
+  const unmeasuredDevelopmentAuthority = selectDiskSpacePolicyAuthority({
+    mode: "development",
+    skillRoot: ROOT,
+    profilePolicy: null,
+    env: {},
+  });
+  check(
+    unmeasuredDevelopmentAuthority.policy_path === null &&
+      unmeasuredDevelopmentAuthority.expected_policy_sha256 === null,
+    "development without a measured policy invented a path or hash",
+  );
   // ------------------------------------------------------------------------
   // 0. CLOSED RED — the preflight now owns the first executable boundary.
   // ------------------------------------------------------------------------
@@ -108,10 +161,12 @@ try {
   );
   const companyBranch = topControllerSource.indexOf('String(options.screen) === "company"');
   const companyPreflight = topControllerSource.indexOf("await runMandatoryHostPreflight({", companyBranch);
-  const companyScreenSpawn = topControllerSource.indexOf('path.join(HERE, "run_user_flow.mjs")', companyBranch);
+  const companyScreenSpawn = topControllerSource.indexOf("await runUserFlow(screenArgs", companyBranch);
+  const bootstrapHandoffConsume = topControllerSource.indexOf("await consumeControllerHandoff({");
   check(
-    companyBranch > 0 && companyPreflight > companyBranch && companyPreflight < companyScreenSpawn,
-    "the Company screen can render before the mandatory host preflight closes",
+    bootstrapHandoffConsume > 0 && bootstrapHandoffConsume < companyBranch &&
+      companyBranch > 0 && companyPreflight > companyBranch && companyPreflight < companyScreenSpawn,
+    "the Company route is not ordered bootstrap handoff -> mandatory host preflight -> private screen delegate",
   );
   const runOutGuard = topControllerSource.indexOf("if (out === ROOT");
   const runPreflight = topControllerSource.indexOf("const hostPreflight = await runMandatoryHostPreflight", runOutGuard);
@@ -480,10 +535,10 @@ try {
   // An unknown OPTIONAL precondition is advisory only.
   const unknownOptional = compileRuntimeDoctorReport({
     checks: satisfiedSet({
-      temp_free_space: typedCheck({
-        precondition_id: "temp_free_space",
+      workbook_font_metrics: typedCheck({
+        precondition_id: "workbook_font_metrics",
         result: "unknown",
-        reason: "no free-space floor is declared anywhere, so nothing can be compared",
+        reason: "the optional font corroboration was unavailable",
       }),
     }),
     host,
@@ -496,17 +551,17 @@ try {
   );
   // A non-pass without a reason, and a pass WITH one, are both rejected.
   assert.throws(
-    () => typedCheck({ precondition_id: "temp_free_space", result: "unknown" }),
+    () => typedCheck({ precondition_id: "disk_space_policy", result: "unknown" }),
     /without a reason/,
   );
   checks += 1;
   assert.throws(
-    () => typedCheck({ precondition_id: "temp_free_space", result: "satisfied", reason: "mostly" }),
+    () => typedCheck({ precondition_id: "disk_space_policy", result: "satisfied", reason: "mostly" }),
     /a pass that needs an excuse is not a pass/,
   );
   checks += 1;
   assert.throws(
-    () => typedCheck({ precondition_id: "temp_free_space", result: "probably_fine", reason: "x" }),
+    () => typedCheck({ precondition_id: "disk_space_policy", result: "probably_fine", reason: "x" }),
     /untyped result/,
   );
   checks += 1;
@@ -531,8 +586,21 @@ try {
     (entry) => entry.precondition_id === "work_root_writable",
   );
   check(
-    workRootCheck.detail.run_root_exists === false &&
-    workRootCheck.detail.doctor_created_anything === false,
+    workRootCheck.result === "satisfied" &&
+    workRootCheck.detail.requested_root_existed_before === false &&
+    workRootCheck.detail.requested_root_existed_after === false &&
+    workRootCheck.detail.real_run_directory_created === false &&
+    workRootCheck.detail.created === true &&
+    workRootCheck.detail.written === true &&
+    workRootCheck.detail.flushed === true &&
+    workRootCheck.detail.closed === true &&
+    workRootCheck.detail.read_back === true &&
+    workRootCheck.detail.bytes_match === true &&
+    workRootCheck.detail.renamed === true &&
+    workRootCheck.detail.statted === true &&
+    workRootCheck.detail.deleted === true &&
+    workRootCheck.detail.cleanup_verified === true &&
+    typeof workRootCheck.detail.volume_identity?.device_id === "string",
     "the doctor must report a missing run root, not create it",
   );
   check(
@@ -550,8 +618,146 @@ try {
   );
   // The temp probe cleans up after itself.
   const tempEntriesBefore = (await fs.readdir(os.tmpdir()))
-    .filter((entry) => entry.startsWith("excel-inflow-doctor-probe-"));
+    .filter((entry) => entry.startsWith(".excel-inflow-filesystem-probe-"));
   check(tempEntriesBefore.length === 0, "the temp-root probe left its scratch directory behind");
+
+  // The path matrix is physical, not a string assertion. Each spelling is
+  // probed at the target volume and the runtime modules are imported through a
+  // symlink carrying that exact spelling with Node's symlink preservation on.
+  const pathMatrix = [
+    ["spaces", ["path with spaces"]],
+    ["unicode", ["模型-évidence-Δ"]],
+    ["literal-percent-encoding", ["literal-%2F-%20-%25"]],
+    ["parentheses", ["runtime (candidate)"]],
+    ["nested-long", [
+      `level-${"a".repeat(48)}`,
+      `level-${"b".repeat(48)}`,
+      `level-${"c".repeat(48)}`,
+      `level-${"d".repeat(48)}`,
+    ]],
+  ];
+  const importProbeSource = [
+    "import path from 'node:path'",
+    "import {pathToFileURL} from 'node:url'",
+    "const root=process.argv[1]",
+    "const output=process.argv[2]",
+    "await import(pathToFileURL(path.join(root,'scripts/lib/attachment_ingress.mjs')).href)",
+    "const doctor=await import(pathToFileURL(path.join(root,'scripts/lib/runtime_doctor.mjs')).href)",
+    "if(path.resolve(doctor.RUNTIME_DOCTOR_DEFAULT_SKILL_ROOT)!==path.resolve(root)) throw new Error('runtime doctor decoded the default root incorrectly')",
+    "const identity=await import(pathToFileURL(path.join(root,'scripts/lib/source_identity.mjs')).href)",
+    "const resolved=await identity.resolveSourceIdentity()",
+    "if(!resolved.skill_version) throw new Error('source identity did not resolve from the URL-safe default root')",
+    "const trace=await import(pathToFileURL(path.join(root,'scripts/lib/experience_trace.mjs')).href)",
+    "await trace.writeExperienceTrace(output,{path_probe:true})",
+  ].join(";");
+  for (const [label, segments] of pathMatrix) {
+    const matrixParent = path.join(scratch, "path-matrix", ...segments);
+    await fs.mkdir(matrixParent, { recursive: true });
+    const proposedRunRoot = path.join(matrixParent, "proposed run", "nested");
+    const result = await probePhysicalFilesystem({
+      requestedRoot: proposedRunRoot,
+      skillRoot: ROOT,
+      purpose: "run_root",
+    });
+    check(result.ok, `${label} path failed the physical run-root probe: ${result.facts.error}`);
+    check(
+      result.facts.requested_run_root === path.resolve(proposedRunRoot) &&
+      result.facts.cleanup_verified === true &&
+      result.facts.real_run_directory_created === false,
+      `${label} path was decoded, left residue, or created the real run directory`,
+    );
+    const aliasRoot = path.join(matrixParent, "skill link");
+    await fs.symlink(ROOT, aliasRoot, "dir");
+    const traceTarget = path.join(matrixParent, "trace output", "trace (proof).json");
+    await execFileAsync(process.execPath, [
+      "--input-type=module",
+      "--preserve-symlinks",
+      "--preserve-symlinks-main",
+      "-e",
+      importProbeSource,
+      aliasRoot,
+      traceTarget,
+    ], { maxBuffer: 16 * 1024 * 1024 });
+    check(
+      JSON.parse(await fs.readFile(traceTarget, "utf8")).path_probe === true,
+      `${label} path failed runtime-module import or trace output-path resolution`,
+    );
+  }
+
+  // Canonical path security: an apparently external symlink whose nearest
+  // existing directory resolves into the immutable skill is refused before a
+  // probe directory can be created there.
+  const skillSymlink = path.join(scratch, "symlink-into-skill");
+  await fs.symlink(path.join(ROOT, "assets"), skillSymlink, "dir");
+  const symlinkMutation = await probePhysicalFilesystem({
+    requestedRoot: path.join(skillSymlink, "would-be-run"),
+    skillRoot: ROOT,
+    purpose: "run_root",
+  });
+  check(
+    symlinkMutation.ok === false &&
+    symlinkMutation.facts.outside_immutable_skill_root === false &&
+    symlinkMutation.facts.created === false,
+    "MUTATION FAILED: a symlink into the immutable skill root admitted a physical probe",
+  );
+  mutations.push("canonical_symlink_into_skill_refused");
+
+  const operationMutations = [
+    ["write", { writeSynced: async () => { throw Object.assign(new Error("injected write failure"), { code: "EWRITE" }); } }, "written"],
+    ["read", { readFile: async () => { throw Object.assign(new Error("injected read failure"), { code: "EREAD" }); } }, "read_back"],
+    ["rename", { rename: async () => { throw Object.assign(new Error("injected rename failure"), { code: "ERENAME" }); } }, "renamed"],
+    ["cleanup", { rmdir: async () => { throw Object.assign(new Error("injected cleanup failure"), { code: "ECLEANUP" }); } }, "cleanup_verified"],
+  ];
+  for (const [name, operations, incompleteField] of operationMutations) {
+    let createdProbe = null;
+    const observedOperations = {
+      ...operations,
+      mkdtemp: async (...args) => {
+        createdProbe = await fs.mkdtemp(...args);
+        return createdProbe;
+      },
+    };
+    const result = await probePhysicalFilesystem({
+      requestedRoot: path.join(scratch, "faults", name, "run"),
+      skillRoot: ROOT,
+      purpose: "run_root",
+      operations: observedOperations,
+    });
+    check(
+      result.ok === false && result.facts.error !== null && result.facts[incompleteField] === false,
+      `MUTATION FAILED: injected ${name} failure was reported as a completed filesystem probe`,
+    );
+    check(
+      createdProbe === null || await fs.lstat(createdProbe).then(() => false, (error) => error?.code === "ENOENT"),
+      `injected ${name} failure left probe residue`,
+    );
+    mutations.push(`physical_probe_${name}_failure_refused`);
+  }
+
+  // A pass on one proposed volume/role is never copied onto the other. The
+  // second probe executes independently and can fail alone.
+  const independentRunProbe = await probePhysicalFilesystem({
+    requestedRoot: path.join(scratch, "volume-run", "run"),
+    skillRoot: ROOT,
+    purpose: "run_root",
+  });
+  const independentTempRoot = path.join(scratch, "volume-temp");
+  await fs.mkdir(independentTempRoot, { recursive: true });
+  const independentTempProbe = await probePhysicalFilesystem({
+    requestedRoot: independentTempRoot,
+    skillRoot: ROOT,
+    purpose: "temp_root",
+    operations: {
+      rename: async () => { throw Object.assign(new Error("temp-volume-only failure"), { code: "ERENAME" }); },
+    },
+  });
+  check(
+    independentRunProbe.ok === true && independentTempProbe.ok === false &&
+    independentRunProbe.facts.purpose === "run_root" &&
+    independentTempProbe.facts.purpose === "temp_root",
+    "MUTATION FAILED: one filesystem result was reused for the other root",
+  );
+  mutations.push("one_volume_only_failure_remained_independent");
   // The doctor library declares no absolute host path.
   const doctorSource = await fs.readFile(path.join(HERE, "lib", "runtime_doctor.mjs"), "utf8");
   check(
@@ -574,7 +780,7 @@ try {
     await fs.readFile(path.join(ROOT, "assets", "runtime-doctor-report-v1.schema.json"), "utf8"),
   );
   const capabilitySchema = JSON.parse(
-    await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.schema.json"), "utf8"),
+    await fs.readFile(path.join(ROOT, "assets", "installed-capability-receipt-v1.3.schema.json"), "utf8"),
   );
   const pointerSchema = JSON.parse(
     await fs.readFile(path.join(ROOT, "assets", "host-preflight-pointer-v1.schema.json"), "utf8"),
@@ -657,17 +863,217 @@ try {
     cliReport.checks.find((entry) => entry.precondition_id === "soffice_available").result === "not_applicable",
     "requesting only the evidence lane must make the workbook binary not-applicable, not failed",
   );
+  const evidenceLibreOfficeCapability = cliReport.checks.find(
+    (entry) => entry.precondition_id === "libreoffice_workbook_capability",
+  );
+  check(
+    evidenceLibreOfficeCapability.result === "not_applicable",
+    "requesting only the evidence lane executed or failed the workbook-only LibreOffice capability probe",
+  );
+  const evidenceCompatibility = cliReport.checks.find(
+    (entry) => entry.precondition_id === "runtime_version_compatibility",
+  );
+  check(
+    evidenceCompatibility.result === "satisfied" &&
+      evidenceCompatibility.detail.status === "PASS" &&
+      evidenceCompatibility.detail.total_violations === 0 &&
+      evidenceCompatibility.detail.findings.length === 0,
+    "the evidence-only doctor did not close its active runtime compatibility contract",
+  );
+  check(
+    evidenceCompatibility.detail.contract_sha256 === createHash("sha256").update(
+      await fs.readFile(path.join(ROOT, "assets", "runtime-compatibility-v1.json")),
+    ).digest("hex"),
+    "the compatibility result does not bind the exact central contract bytes",
+  );
+  const measuredDevelopmentDisk = cliReport.checks.find(
+    (entry) => entry.precondition_id === "disk_space_policy",
+  );
+  check(
+    measuredDevelopmentDisk.obligation === "mandatory" &&
+      measuredDevelopmentDisk.result === "satisfied" &&
+      measuredDevelopmentDisk.detail.mode === "development" &&
+      measuredDevelopmentDisk.detail.expected_policy_sha256 ===
+        "bac34ba378984e705e7baa2c38982860f61993adebd175c89567d9b21dcb95b1" &&
+      measuredDevelopmentDisk.detail.evaluation?.status === "PASS" &&
+      measuredDevelopmentDisk.detail.evaluation?.policy_evidence?.policy_sealed === true &&
+      measuredDevelopmentDisk.detail.evaluation?.policy_evidence?.raw_manifest_sha256
+        ?.sample_receipts ===
+        "368ee2800363a2bfaec77082a9a0089afc2b4dec0e5c4f657d96f803ebd03a1a",
+    "the real measured development disk policy did not close or bind its exact sealed evidence",
+  );
+  check(
+    evidenceCompatibility.detail.observations.PyMuPDF.import_name === "fitz" &&
+      evidenceCompatibility.detail.observations.PyMuPDF.distribution_name === "PyMuPDF" &&
+      evidenceCompatibility.detail.observations.lxml.import_name === "lxml" &&
+      evidenceCompatibility.detail.observations.openpyxl.import_name === "openpyxl" &&
+      !evidenceCompatibility.detail.evaluated_runtime_names.includes("LibreOffice") &&
+      !evidenceCompatibility.detail.evaluated_runtime_names.includes("Pillow") &&
+      !evidenceCompatibility.detail.evaluated_runtime_names.includes("NumPy"),
+    "the selected-interpreter evidence observations lost import/distribution identity or evaluated inactive workbook runtimes",
+  );
+  const inlineXbrlCapability = cliReport.checks.find(
+    (entry) => entry.precondition_id === "inline_xbrl_host_probe",
+  );
+  check(
+    inlineXbrlCapability.result === "satisfied" &&
+      inlineXbrlCapability.detail.status === "PASS" &&
+      inlineXbrlCapability.detail.lxml_worker_execution === "PASS" &&
+      inlineXbrlCapability.detail.scratch_removed === true,
+    "the real evidence-lane doctor did not execute and clean the installed Inline XBRL worker",
+  );
+  check(
+    [
+      "fixture_sha256", "html_sha256", "worker_sha256", "result_schema_sha256",
+      "result_sha256", "selected_python_sha256",
+    ].every((field) => /^[a-f0-9]{64}$/.test(inlineXbrlCapability.detail[field] ?? "")) &&
+      inlineXbrlCapability.detail.selected_python ===
+        evidenceCompatibility.detail.observations.Python.executable,
+    "the Inline XBRL report did not bind fixture, worker, schema, result and selected Python bytes",
+  );
+  check(
+    Object.keys(inlineXbrlCapability.detail.selected_non_dimensioned_authority).length === 2 &&
+      Object.keys(inlineXbrlCapability.detail.quarantined_dimensioned_fact.dimensions).length === 1 &&
+      inlineXbrlCapability.detail.quarantined_dimensioned_fact.value === 30000000,
+    "the Inline XBRL report lost selected non-dimensioned authority or dimension quarantine",
+  );
+  check(
+    inlineXbrlCapability.detail.compatibility_prerequisite.status === "PASS" &&
+      inlineXbrlCapability.detail.compatibility_prerequisite.total_violations === 0 &&
+      inlineXbrlCapability.detail.compatibility_prerequisite.evaluated_runtime_names.includes("Python") &&
+      inlineXbrlCapability.detail.compatibility_prerequisite.evaluated_runtime_names.includes("lxml"),
+    "the Inline XBRL worker did not bind a closed selected Python/lxml compatibility prerequisite",
+  );
+
+  // Compatibility is a real execution gate, not a report compiled after the
+  // expensive workers have already run. A development-unpinned copy carries
+  // an intentionally out-of-range PyMuPDF contract and sentinel replacements
+  // for both evidence workers; neither sentinel may execute.
+  const incompatibleSkill = path.join(scratch, "incompatible-runtime-skill");
+  await fs.cp(ROOT, incompatibleSkill, { recursive: true });
+  const incompatibleContractPath = path.join(
+    incompatibleSkill,
+    "assets",
+    "runtime-compatibility-v1.json",
+  );
+  const incompatibleContract = JSON.parse(await fs.readFile(incompatibleContractPath, "utf8"));
+  const pymupdfContract = incompatibleContract.runtimes.find(
+    (entry) => entry.runtime_name === "PyMuPDF",
+  );
+  pymupdfContract.minimum_version = "1.26.4";
+  pymupdfContract.maximum_exclusive_version = "1.26.5";
+  await fs.writeFile(incompatibleContractPath, `${JSON.stringify(incompatibleContract, null, 2)}\n`);
+  const executionSentinel = path.join(scratch, "incompatible-probe-executed");
+  await fs.writeFile(
+    path.join(incompatibleSkill, "scripts", "run_filings_pipeline.mjs"),
+    [
+      'import fs from "node:fs";',
+      'fs.writeFileSync(process.env.EXCEL_INFLOW_PROBE_SENTINEL, "filings");',
+      "process.exit(86);",
+      "",
+    ].join("\n"),
+  );
+  await fs.writeFile(
+    path.join(incompatibleSkill, "scripts", "extract_inline_xbrl.py"),
+    [
+      "import os, pathlib",
+      "pathlib.Path(os.environ['EXCEL_INFLOW_PROBE_SENTINEL']).write_text('xbrl')",
+      "raise SystemExit(86)",
+      "",
+    ].join("\n"),
+  );
+  const incompatibleReport = await runRuntimeDoctor({
+    skillRoot: incompatibleSkill,
+    env: {
+      ...process.env,
+      EXCEL_INFLOW_PYTHON: trueResolved,
+      PYTHON: trueResolved,
+      EXCEL_INFLOW_PROBE_SENTINEL: executionSentinel,
+    },
+    lanes: ["evidence"],
+    runRoot: path.join(scratch, "incompatible-run"),
+    tempRoot: scratch,
+  });
+  const incompatibleVersion = incompatibleReport.checks.find(
+    (entry) => entry.precondition_id === "runtime_version_compatibility",
+  );
+  const skippedFiling = incompatibleReport.checks.find(
+    (entry) => entry.precondition_id === "filings_extraction_probe",
+  );
+  const skippedXbrl = incompatibleReport.checks.find(
+    (entry) => entry.precondition_id === "inline_xbrl_host_probe",
+  );
+  check(
+    incompatibleVersion.result === "unsatisfied" &&
+      skippedFiling.result === "unknown" &&
+      skippedFiling.detail.subordinate_execution_attempted === false &&
+      skippedXbrl.result === "unknown" &&
+      skippedXbrl.detail.subordinate_execution_attempted === false &&
+      await fs.lstat(executionSentinel).then(() => false, (error) => error?.code === "ENOENT"),
+    "MUTATION FAILED: an out-of-range evidence runtime executed a real subordinate probe",
+  );
+  mutations.push("out_of_range_runtime_prevents_real_evidence_probes");
+
+  const exhaustedLeaseReport = await runRuntimeDoctor({
+    skillRoot: ROOT,
+    env: { ...process.env, EXCEL_INFLOW_PYTHON: trueResolved, PYTHON: trueResolved },
+    lanes: ["evidence"],
+    runRoot: path.join(scratch, "exhausted-lease-run"),
+    tempRoot: scratch,
+    probeTimeoutMs: 1,
+  });
+  const leaseFiling = exhaustedLeaseReport.checks.find(
+    (entry) => entry.precondition_id === "filings_extraction_probe",
+  );
+  const leaseXbrl = exhaustedLeaseReport.checks.find(
+    (entry) => entry.precondition_id === "inline_xbrl_host_probe",
+  );
+  check(
+    leaseFiling.result === "unknown" &&
+      leaseFiling.detail.subordinate_execution_attempted === false &&
+      leaseXbrl.result === "unknown" &&
+      leaseXbrl.detail.subordinate_execution_attempted === false,
+    "MUTATION FAILED: the exhausted aggregate host-probe lease launched a subordinate probe",
+  );
+  mutations.push("aggregate_probe_lease_exhaustion_prevents_subordinates");
+  const workbookOnlyReport = await runRuntimeDoctor({
+    skillRoot: ROOT,
+    env: { ...process.env, EXCEL_INFLOW_PYTHON: trueResolved, PYTHON: trueResolved },
+    lanes: ["workbook"],
+    runRoot: path.join(scratch, "workbook-only-run"),
+  });
+  check(
+    workbookOnlyReport.checks.find(
+      (entry) => entry.precondition_id === "inline_xbrl_host_probe",
+    ).result === "not_applicable",
+    "a workbook-only preflight executed or failed the evidence-only Inline XBRL probe",
+  );
 
   const capabilityReceipt = compileInstalledCapabilityReceipt(cliReport);
   check(
+    capabilityReceipt.schema_version === "excel-inflow-installed-capability-receipt/1.3" &&
+      capabilityReceipt.status === "REFUSED" &&
+      capabilityReceipt.candidate_slot_ready === false &&
+      capabilityReceipt.filesystem.disk_space_evaluation?.status === "PASS" &&
+      capabilityReceipt.filesystem.disk_space_evaluation?.mode === "development",
+    "the evidence-only development receipt lost its measured disk proof or overclaimed candidate readiness",
+  );
+  check(
     validateJsonSchema(capabilityReceipt, capabilitySchema).length === 0,
-    "the HOST_READY candidate-slot receipt violated its shipped schema",
+    "the evidence-only installed-capability receipt violated its shipped schema",
   );
   const receiptBody = { ...capabilityReceipt };
   delete receiptBody.receipt_sha256;
   check(
     capabilityReceipt.receipt_sha256 === installedCapabilityReceiptDigest(receiptBody),
     "the candidate-slot receipt is not self-bound to its exact body",
+  );
+  check(
+    capabilityReceipt.inline_xbrl?.result_sha256 ===
+      inlineXbrlCapability.detail.result_sha256 &&
+      capabilityReceipt.inline_xbrl?.selected_python_sha256 ===
+        capabilityReceipt.python.executable_sha256,
+    "the installed receipt did not bind the report's Inline XBRL result and selected interpreter",
   );
   const concurrentArtifactRoot = path.join(scratch, "concurrent-artifact-publish");
   const concurrentPublishes = await Promise.all(
@@ -690,15 +1096,62 @@ try {
   const firstGeneration = await writeInstalledCapabilityArtifactSet({
     artifactDirectory: crashArtifactRoot,
     report: cliReport,
+    reportAliasName: "runtime-doctor-report.json",
+    receiptAliasName: "installed-capability-receipt.json",
   });
   const pointerBeforeCrash = await fs.readFile(firstGeneration.pointerPath, "utf8");
   const nextReport = structuredClone(cliReport);
   nextReport.generated_at = new Date(Date.parse(cliReport.generated_at) + 1_000).toISOString();
+  const doctorStageCrashes = [
+    [
+      "alias",
+      (event) => event.stage === "alias_published" && event.name === "runtime-doctor-report.json",
+    ],
+    [
+      "report",
+      (event) => event.stage === "immutable_published" && event.key === "report",
+    ],
+    [
+      "receipt",
+      (event) => event.stage === "immutable_published" && event.key === "receipt",
+    ],
+  ];
+  for (const [boundary, shouldCrash] of doctorStageCrashes) {
+    let boundaryObserved = false;
+    try {
+      await writeInstalledCapabilityArtifactSet({
+        artifactDirectory: crashArtifactRoot,
+        report: nextReport,
+        reportAliasName: "runtime-doctor-report.json",
+        receiptAliasName: "installed-capability-receipt.json",
+        afterStage: async (event) => {
+          if (!shouldCrash(event)) return;
+          const error = new Error(`injected crash after ${boundary}`);
+          error.code = "INJECTED_DOCTOR_STAGE_CRASH";
+          throw error;
+        },
+      });
+    } catch (error) {
+      boundaryObserved = error.code === "INJECTED_DOCTOR_STAGE_CRASH";
+    }
+    check(boundaryObserved, `the doctor ${boundary} crash boundary did not execute`);
+    check(
+      await fs.readFile(firstGeneration.pointerPath, "utf8") === pointerBeforeCrash,
+      `a crash after doctor ${boundary} publication exposed a partial generation`,
+    );
+    check(
+      (await fs.readdir(crashArtifactRoot)).every((name) => !name.includes(".tmp-")),
+      `a crash after doctor ${boundary} publication left temporary residue`,
+    );
+    mutations.push(`durable_doctor_crash_after_${boundary}_kept_prior_pointer`);
+  }
   let crashObserved = false;
   try {
     await writeInstalledCapabilityArtifactSet({
       artifactDirectory: crashArtifactRoot,
       report: nextReport,
+      reportAliasName: "runtime-doctor-report.json",
+      receiptAliasName: "installed-capability-receipt.json",
       beforePointer: async () => {
         throw new Error("injected crash before pointer publication");
       },
@@ -711,8 +1164,11 @@ try {
     await fs.readFile(firstGeneration.pointerPath, "utf8") === pointerBeforeCrash,
     "a crash before pointer publication exposed a partial generation",
   );
+  mutations.push("durable_doctor_crash_before_pointer_kept_prior_pointer");
   check(
-    bootstrapRefusalSchema.properties.reason_code.const === RUNTIME_DOCTOR_REASON_CODE &&
+    bootstrapRefusalSchema.properties.reason_code.enum.includes(RUNTIME_DOCTOR_REASON_CODE) &&
+      bootstrapRefusalSchema.properties.reason_code.enum.includes("INTERNAL.runtime_bootstrap_failed") &&
+      bootstrapRefusalSchema.properties.subordinate_execution_attempted.type === "boolean" &&
       bootstrapRefusalSchema.required.includes("resumable_checkpoint_path") &&
       bootstrapRefusalSchema.required.includes("preserved_source_hashes"),
     "the shipped bootstrap-refusal schema is not bound to the registered runtime reason/payload",
@@ -793,7 +1249,23 @@ try {
   );
   mutations.push("broken_preflight_cannot_emit_static_company_screen");
 
-  process.stdout.write(`${JSON.stringify({ status: "PASS", checks })}\n`);
+  check(
+    new Set(mutations).size === mutations.length,
+    "the runtime-doctor mutation census contains duplicate identifiers",
+  );
+  check(
+    JSON.stringify([...mutations].sort()) === JSON.stringify([...EXPECTED_MUTATION_IDS].sort()),
+    `the runtime-doctor mutation census drifted: ${JSON.stringify(mutations)}`,
+  );
+  process.stdout.write(`${JSON.stringify({
+    status: "PASS",
+    checks,
+    mutations_declared: EXPECTED_MUTATION_IDS.length,
+    mutations_applied: mutations.length,
+    mutations_caught: mutations.length,
+    mutations_survived: 0,
+    mutation_ids: mutations,
+  })}\n`);
 } finally {
   await fs.rm(scratch, { recursive: true, force: true });
 }

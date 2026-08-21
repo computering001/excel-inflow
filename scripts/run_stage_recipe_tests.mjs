@@ -594,7 +594,7 @@ try {
 
   const cleanRun = path.join(workspace, "clean-run");
   const first = JSON.parse(
-    (await command("run_user_flow.mjs", [cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
+    (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
   );
   check(first.status === "PAUSED", `end-to-end run did not pause after decisions: ${first.status}`);
   const persisted = {};
@@ -650,7 +650,7 @@ try {
 
   // A warm identical run reuses every stage — the tightening did not break reuse.
   const second = JSON.parse(
-    (await command("run_user_flow.mjs", [cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
+    (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
   );
   check(
     ["inputs", "evidence_review", "decisions"].every((stageId) => second.reused_stages.includes(stageId)),
@@ -675,7 +675,7 @@ try {
   })();
   await fs.writeFile(decisionsReceiptPath, `${JSON.stringify(rebound, null, 2)}\n`);
   const refused = JSON.parse(
-    (await command("run_user_flow.mjs", [cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
+    (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
   );
   check(
     !refused.reused_stages.includes("decisions"),
@@ -710,7 +710,7 @@ try {
   })();
   await fs.writeFile(decisionsReceiptPath, `${JSON.stringify(legacyOnDisk, null, 2)}\n`);
   const legacyRun = JSON.parse(
-    (await command("run_user_flow.mjs", [cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
+    (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", cleanEvidence, "--out", cleanRun, "--stop-after", "decisions", "--json"])).stdout,
   );
   check(
     !legacyRun.reused_stages.includes("decisions"),
@@ -732,7 +732,7 @@ try {
   // keyed on the SAME components, so a miss can be diffed across them.
   const questionRun = path.join(workspace, "question-run");
   const questionResult = JSON.parse(
-    (await command("run_user_flow.mjs", [questionEvidence, "--out", questionRun, "--stop-after", "decisions", "--json"])).stdout,
+    (await command("test-support/authenticated_controller_test_harness.mjs", ["user_flow", questionEvidence, "--out", questionRun, "--stop-after", "decisions", "--json"])).stdout,
   );
   check(questionResult.status === "ACTION_REQUIRED", `question path did not stop: ${questionResult.status}`);
   const actionRequiredKeys = Object.keys(questionResult.receipt.input_hashes).sort();
@@ -742,8 +742,8 @@ try {
   const blockedRun = path.join(workspace, "blocked-run");
   const blockedResult = JSON.parse(
     (await command(
-      "run_user_flow.mjs",
-      [questionEvidence, "--out", blockedRun, "--answers", emptyAnswers, "--stop-after", "decisions", "--json"],
+      "test-support/authenticated_controller_test_harness.mjs",
+      ["user_flow", questionEvidence, "--out", blockedRun, "--answers", emptyAnswers, "--stop-after", "decisions", "--json"],
       { allowFailure: true },
     )).stdout,
   );

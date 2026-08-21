@@ -473,11 +473,66 @@ assert(
   "The adversarial forecast candidate plan is internally inconsistent.",
 );
 
-const materializedSelection = materializeForecastPlan(
-  { ...selectionCase, statement_structure: selectionRows },
-  selectionPlan,
+let blockedMaterializationRefused = false;
+try {
+  materializeForecastPlan(
+    { ...selectionCase, statement_structure: selectionRows },
+    selectionPlan,
+  );
+} catch (error) {
+  blockedMaterializationRefused = /blocked forecast plan cannot be materialized/i.test(
+    String(error?.message ?? error),
+  );
+}
+assert(
+  blockedMaterializationRefused,
+  "A plan containing unresolved material forecast states was materialized.",
 );
-const selectedCaptureCandidates = selectionPlan.candidate_ledger.filter(
+
+// Keep the positive materialisation assertions on a separately compiled plan
+// whose rows are all executable. The adversarial rows above remain useful for
+// proving that the candidate compiler blocks them, but they are not lawful
+// economic model inputs.
+const nonExecutableRowIds = new Set([
+  "uncertified_parent",
+  "uncertified_child",
+  "formula_only_parent",
+  "formula_only_child",
+  "strange_seasonal",
+]);
+const materializableRows = {
+  income_statement: clone(selectionRows.income_statement),
+  cash_flow: selectionRows.cash_flow
+    .filter((row) => !nonExecutableRowIds.has(row.row_id))
+    .map((row) => clone(row)),
+};
+const materializableCase = {
+  ...clone(selectionCase),
+  source_coverage: {
+    ...clone(selectionCase.source_coverage),
+    cash_flow: selectionCase.source_coverage.cash_flow.filter((item) =>
+      item.mapped_row_ids.every((rowId) => !nonExecutableRowIds.has(rowId)),
+    ),
+  },
+  statement_structure: materializableRows,
+};
+const materializableBehaviors = {
+  ...clone(selectionBehaviors),
+  rows: selectionBehaviors.rows.filter((row) => !nonExecutableRowIds.has(row.row_id)),
+};
+const materializablePlan = compileForecastPlan(materializableCase, materializableRows, {
+  observations: selectionObservations,
+  behaviorMap: materializableBehaviors,
+});
+assert(
+  materializablePlan.status === "PASS",
+  "The positive forecast materialisation fixture is not fully executable.",
+);
+const materializedSelection = materializeForecastPlan(
+  materializableCase,
+  materializablePlan,
+);
+const selectedCaptureCandidates = materializablePlan.candidate_ledger.filter(
   (candidate) =>
     candidate.selected &&
     candidate.state_id.startsWith("cash_flow.captured_weird_child."),
@@ -488,7 +543,7 @@ assert(
   "The sealed plan did not retain one section-local capture certificate per period.",
 );
 assert(
-  validateForecastPlanCaseParity(materializedSelection, selectionPlan).length === 0,
+  validateForecastPlanCaseParity(materializedSelection, materializablePlan).length === 0,
   "Section-qualified materialisation did not preserve the sealed plan.",
 );
 const promotedLegacyRow = materializedSelection.statement_structure.cash_flow.find(

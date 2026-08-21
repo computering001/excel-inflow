@@ -14,7 +14,9 @@
  *     [--python <executable>]     the Python selection to certify (else EXCEL_INFLOW_PYTHON/PYTHON)
  *     [--soffice <path>]          the LibreOffice binary to certify (else SOFFICE_BIN, else PATH)
  *     [--temp-root <dir>]         the temp root to probe (else TMPDIR)
- *     [--min-free-bytes <n>]      free-space floor for the temp root (else EXCEL_INFLOW_DOCTOR_MIN_FREE_BYTES)
+ *     [--disk-space-policy <json>] measured policy bundle entry point
+ *     [--disk-space-policy-sha256 <sha>] expected exact policy hash (mandatory in candidate mode)
+ *     [--min-free-bytes <n>]      equal-or-higher override; a lower policy override refuses
  *     [--out <report.json>]       also write the typed report to this path
  *     [--capability-receipt <installed-capability-receipt.json>]
  *                                 write the hash-bound candidate-slot receipt
@@ -316,9 +318,18 @@ async function main(options, runtimeDoctor) {
     python: typeof options.python === "string" ? options.python : null,
     soffice: typeof options.soffice === "string" ? options.soffice : null,
     tempRoot: typeof options["temp-root"] === "string" ? options["temp-root"] : null,
+    diskSpacePolicyPath: typeof options["disk-space-policy"] === "string"
+      ? options["disk-space-policy"]
+      : null,
+    diskSpacePolicySha256: typeof options["disk-space-policy-sha256"] === "string"
+      ? options["disk-space-policy-sha256"]
+      : null,
     minFreeBytes: typeof options["min-free-bytes"] === "string"
       ? Number(options["min-free-bytes"])
       : null,
+    // Locator only: the runtime derives every status, slot, installation,
+    // pointer, promotion and rollback fact from the verified files there.
+    installStateRoot: process.env.EXCEL_INFLOW_INSTALL_STATE_ROOT ?? null,
   });
 
   if (typeof options.out === "string" || typeof options["capability-receipt"] === "string") {
@@ -332,13 +343,16 @@ async function main(options, runtimeDoctor) {
     const artifactSet = await writeInstalledCapabilityArtifactSet({
       artifactDirectory: directories[0],
       report,
+      reportAliasName: typeof options.out === "string"
+        ? path.basename(path.resolve(options.out))
+        : null,
+      receiptAliasName: typeof options["capability-receipt"] === "string"
+        ? path.basename(path.resolve(options["capability-receipt"]))
+        : null,
     });
-    if (typeof options.out === "string") {
-      await writeAtomic(path.resolve(options.out), artifactSet.reportBytes);
-    }
-    if (typeof options["capability-receipt"] === "string") {
-      await writeAtomic(path.resolve(options["capability-receipt"]), artifactSet.receiptBytes);
-    }
+    // The durable generation owns aliases, immutable objects and the pointer.
+    // No caller write is permitted after the pointer becomes authoritative.
+    void artifactSet;
   }
 
   if (options.json === true) process.stdout.write(serializeRuntimeDoctorReport(report));

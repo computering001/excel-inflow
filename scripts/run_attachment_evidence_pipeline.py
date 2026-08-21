@@ -390,6 +390,10 @@ LANE_RESOURCE_POLICY_SCHEMA = "excel-inflow-lane-resource-policy/1.0"
 LANE_RESOURCE_PLAN_SCHEMA = "lane-resource-plan/1.0"
 LANE_RESOURCE_RECEIPT_SCHEMA = "lane-resource-receipt/1.0"
 LANE_RESOURCE_RECEIPTS_SCHEMA = "lane-resource-receipts/1.0"
+BROKER_WALL_BUDGET_SCHEMA = "broker-wall-budget/1.0"
+BROKER_WALL_BUDGET_FILE = "broker-wall-budget.json"
+BROKER_OPTIONAL_CLOSE_MAX_MS = 180_000
+BROKER_MIN_EXECUTION_SLICE_MS = 1_000
 # P6.1 owns this variable. This controller is a READER of that ledger.
 RUN_DEADLINE_ENV_NAME = "EXCEL_INFLOW_RUN_DEADLINE"
 
@@ -696,6 +700,241 @@ def compile_lane_resource_receipt(
     return receipt
 
 
+def _broker_wall_budget_path(output_root: Path) -> Path:
+    return output_root / BROKER_WALL_BUDGET_FILE
+
+
+def _new_broker_wall_budget(limit_ms: int) -> dict[str, Any]:
+    return {
+        "schema_version": BROKER_WALL_BUDGET_SCHEMA,
+        "limit_ms": int(limit_ms),
+        "consumed_ms": 0,
+        "segments": [],
+        "open_segment": None,
+        "findings": [],
+    }
+
+
+def _seal_broker_wall_budget(ledger: dict[str, Any]) -> dict[str, Any]:
+    body = {key: value for key, value in ledger.items() if key != "receipt_sha256"}
+    return {**body, "receipt_sha256": sha256_value(body)}
+
+
+def _broker_wall_budget_errors(ledger: dict[str, Any], limit_ms: int) -> list[str]:
+    errors: list[str] = []
+    if ledger.get("schema_version") != BROKER_WALL_BUDGET_SCHEMA:
+        errors.append("schema_version")
+    if ledger.get("limit_ms") != int(limit_ms):
+        errors.append("limit_ms")
+    consumed = ledger.get("consumed_ms")
+    if not isinstance(consumed, int) or isinstance(consumed, bool) or consumed < 0:
+        errors.append("consumed_ms")
+    elif consumed > int(limit_ms):
+        errors.append("consumed_above_limit")
+    segments = ledger.get("segments")
+    if not isinstance(segments, list):
+        errors.append("segments")
+    else:
+        charged = 0
+        for segment in segments:
+            if not isinstance(segment, dict):
+                errors.append("segment_shape")
+                continue
+            value = segment.get("charged_ms")
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                errors.append("segment_charged_ms")
+            else:
+                charged += value
+        if isinstance(consumed, int) and charged != consumed:
+            errors.append("segment_reconciliation")
+    opened = ledger.get("open_segment")
+    if opened is not None and (
+        not isinstance(opened, dict)
+        or not isinstance(opened.get("segment_id"), str)
+        or not isinstance(opened.get("operation"), str)
+        or not isinstance(opened.get("started_wall_epoch_ms"), int)
+        or not isinstance(opened.get("allowance_ms"), int)
+    ):
+        errors.append("open_segment")
+    declared = ledger.get("receipt_sha256")
+    body = {key: value for key, value in ledger.items() if key != "receipt_sha256"}
+    if declared != sha256_value(body):
+        errors.append("receipt_sha256")
+    return sorted(set(errors))
+
+
+def _persist_broker_wall_budget(output_root: Path, ledger: dict[str, Any]) -> dict[str, Any]:
+    sealed = _seal_broker_wall_budget(ledger)
+    atomic_json(_broker_wall_budget_path(output_root), sealed)
+    return sealed
+
+
+def _exhausted_broker_wall_budget(
+    output_root: Path, limit_ms: int, finding: str
+) -> dict[str, Any]:
+    """Fail a broken optional clock closed without blocking mandatory evidence."""
+    ledger = _new_broker_wall_budget(limit_ms)
+    ledger["consumed_ms"] = int(limit_ms)
+    ledger["segments"] = [{
+        "segment_id": f"fail-closed-{time.time_ns()}",
+        "operation": "broker_wall_budget_fail_closed",
+        "observed_ms": int(limit_ms),
+        "charged_ms": int(limit_ms),
+        "overrun_ms": 0,
+        "outcome": "FAIL_CLOSED",
+    }]
+    ledger["findings"] = [str(finding)]
+    return _persist_broker_wall_budget(output_root, ledger)
+
+
+def _load_broker_wall_budget(
+    output_root: Path,
+    *,
+    limit_ms: int,
+    now_wall_epoch_ms: int | None = None,
+    sweep_open: bool = True,
+) -> dict[str, Any]:
+    """Open the persisted broker clock and charge an abandoned invocation."""
+    target = _broker_wall_budget_path(output_root)
+    now_wall = int(now_wall_epoch_ms if now_wall_epoch_ms is not None else time.time() * 1000)
+    if not target.is_file():
+        return _persist_broker_wall_budget(output_root, _new_broker_wall_budget(limit_ms))
+    try:
+        ledger = read_json(target, "broker wall budget")
+    except (OSError, ValueError) as error:
+        return _exhausted_broker_wall_budget(output_root, limit_ms, str(error))
+    errors = _broker_wall_budget_errors(ledger, limit_ms)
+    if errors:
+        return _exhausted_broker_wall_budget(
+            output_root,
+            limit_ms,
+            "invalid persisted broker wall budget: " + ", ".join(errors),
+        )
+    opened = ledger.get("open_segment")
+    if opened is not None and sweep_open:
+        started_wall = int(opened["started_wall_epoch_ms"])
+        remaining = max(0, int(limit_ms) - int(ledger["consumed_ms"]))
+        if now_wall < started_wall:
+            observed = remaining
+            outcome = "ABANDONED_CLOCK_SKEW_FAIL_CLOSED"
+        else:
+            observed = max(0, now_wall - started_wall)
+            outcome = "ABANDONED_INVOCATION"
+        charged = min(remaining, observed)
+        ledger["segments"].append({
+            "segment_id": opened["segment_id"],
+            "operation": opened["operation"],
+            "observed_ms": observed,
+            "charged_ms": charged,
+            "overrun_ms": max(0, observed - charged),
+            "outcome": outcome,
+        })
+        ledger["consumed_ms"] += charged
+        ledger["open_segment"] = None
+        ledger.setdefault("findings", []).append(outcome.lower())
+        ledger = _persist_broker_wall_budget(output_root, ledger)
+    return ledger
+
+
+def begin_broker_wall_segment(
+    output_root: Path,
+    operation: str,
+    *,
+    requested_ms: int,
+    limit_ms: int,
+    now_wall_epoch_ms: int | None = None,
+    now_monotonic_ms: float | None = None,
+) -> dict[str, Any]:
+    """Reserve one slice from the one persisted optional-broker wall envelope."""
+    ledger = _load_broker_wall_budget(
+        output_root,
+        limit_ms=limit_ms,
+        now_wall_epoch_ms=now_wall_epoch_ms,
+    )
+    remaining = max(0, int(limit_ms) - int(ledger["consumed_ms"]))
+    allowance = min(remaining, max(0, int(requested_ms)))
+    if allowance < BROKER_MIN_EXECUTION_SLICE_MS:
+        return {
+            "started": False,
+            "allowance_ms": allowance,
+            "remaining_ms": remaining,
+            "limit_ms": int(limit_ms),
+        }
+    wall = int(now_wall_epoch_ms if now_wall_epoch_ms is not None else time.time() * 1000)
+    monotonic = float(
+        now_monotonic_ms if now_monotonic_ms is not None else time.monotonic() * 1000
+    )
+    segment_id = f"{os.getpid()}-{time.time_ns()}-{len(ledger['segments']) + 1}"
+    ledger["open_segment"] = {
+        "segment_id": segment_id,
+        "operation": str(operation),
+        "started_wall_epoch_ms": wall,
+        "allowance_ms": allowance,
+        "pid": os.getpid(),
+    }
+    _persist_broker_wall_budget(output_root, ledger)
+    return {
+        "started": True,
+        "segment_id": segment_id,
+        "operation": str(operation),
+        "started_wall_epoch_ms": wall,
+        "started_monotonic_ms": monotonic,
+        "allowance_ms": allowance,
+        "remaining_ms": remaining,
+        "limit_ms": int(limit_ms),
+    }
+
+
+def end_broker_wall_segment(
+    output_root: Path,
+    token: dict[str, Any],
+    *,
+    outcome: str,
+    now_wall_epoch_ms: int | None = None,
+    now_monotonic_ms: float | None = None,
+) -> dict[str, Any]:
+    """Charge the larger monotonic/wall observation and close the persisted slice."""
+    limit_ms = int(token["limit_ms"])
+    ledger = _load_broker_wall_budget(
+        output_root,
+        limit_ms=limit_ms,
+        now_wall_epoch_ms=token["started_wall_epoch_ms"],
+        sweep_open=False,
+    )
+    opened = ledger.get("open_segment")
+    if not token.get("started") or not opened or opened.get("segment_id") != token.get("segment_id"):
+        return _exhausted_broker_wall_budget(
+            output_root,
+            limit_ms,
+            "broker wall segment custody mismatch",
+        )
+    wall = int(now_wall_epoch_ms if now_wall_epoch_ms is not None else time.time() * 1000)
+    monotonic = float(
+        now_monotonic_ms if now_monotonic_ms is not None else time.monotonic() * 1000
+    )
+    wall_elapsed = max(0, wall - int(token["started_wall_epoch_ms"]))
+    monotonic_elapsed = max(0, round(monotonic - float(token["started_monotonic_ms"])))
+    observed = max(wall_elapsed, monotonic_elapsed)
+    remaining = max(0, limit_ms - int(ledger["consumed_ms"]))
+    charged = min(remaining, observed)
+    ledger["segments"].append({
+        "segment_id": token["segment_id"],
+        "operation": token["operation"],
+        "observed_ms": observed,
+        "charged_ms": charged,
+        "overrun_ms": max(0, observed - int(token["allowance_ms"])),
+        "outcome": str(outcome),
+    })
+    ledger["consumed_ms"] += charged
+    ledger["open_segment"] = None
+    return _persist_broker_wall_budget(output_root, ledger)
+
+
+def broker_wall_remaining_ms(output_root: Path, *, limit_ms: int) -> int:
+    ledger = _load_broker_wall_budget(output_root, limit_ms=limit_ms)
+    return max(0, int(limit_ms) - int(ledger["consumed_ms"]))
+
+
 """The budget slice granted to each lane currently in flight, in ms.
 
 Written by the pool before the lane starts and read by `run_lane` when it sets
@@ -730,6 +969,21 @@ def assert_lane_resource_receipts_complete(
         raise ValueError(
             "These lanes ran without a resource receipt: " + ", ".join(sorted(missing))
         )
+    for receipt in receipts:
+        granted = receipt.get("granted_budget_ms")
+        consumed = receipt.get("consumed_wall_ms")
+        headroom = receipt.get("budget_headroom_ms")
+        if (
+            not isinstance(granted, int)
+            or not isinstance(consumed, int)
+            or not isinstance(headroom, int)
+            or consumed > granted
+            or headroom < 0
+            or headroom != granted - consumed
+        ):
+            raise ValueError(
+                f"Lane resource receipt for {receipt.get('lane')} exceeded or misstated its grant"
+            )
 
 
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
@@ -793,7 +1047,41 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
     # The lane's own declared watchdog, bounded by whatever budget the pool
     # plan granted this lane. A grant never LENGTHENS a lane's own timer.
     lane_budget_seconds = effective_lane_timeout_seconds(kind, request_path)
-    completed = run(command, timeout_seconds=lane_budget_seconds)
+    lane_started_monotonic_ms = time.monotonic() * 1000
+    broker_limit_ms = int(
+        load_lane_resource_policy()["budget_priority"]["optional_envelope_ms"]
+    ) if kind == "broker" else 0
+    primary_token: dict[str, Any] | None = None
+    if kind == "broker":
+        primary_token = begin_broker_wall_segment(
+            output_root,
+            "broker_primary",
+            requested_ms=lane_budget_seconds * 1000,
+            limit_ms=broker_limit_ms,
+        )
+    if kind != "broker" or primary_token.get("started"):
+        primary_timeout_seconds = lane_budget_seconds if kind != "broker" else max(
+            1, int(primary_token["allowance_ms"]) // 1000
+        )
+        try:
+            completed = run(command, timeout_seconds=primary_timeout_seconds)
+        finally:
+            if primary_token is not None and primary_token.get("started"):
+                end_broker_wall_segment(
+                    output_root,
+                    primary_token,
+                    outcome=(
+                        "PASS" if "completed" in locals() and completed.returncode in {0, 2}
+                        else "TIMEOUT_OR_FAILURE"
+                    ),
+                )
+    else:
+        completed = subprocess.CompletedProcess(
+            command,
+            124,
+            "",
+            "broker wall envelope exhausted before optional broker processing could start",
+        )
     # A lane state is trusted only when THIS invocation stands behind it: the
     # controller exited cleanly (0 = closed, 2 = typed non-terminal state), or
     # it rewrote the state file during this run. A crash that left yesterday's
@@ -838,18 +1126,49 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             # breaker in the same attachment transaction. This preserves all
             # source bytes/page images, selects no disputed value, and prevents
             # an internal task packet from becoming a terminal chat response.
-            closed = run(
-                [*command, "--close-optional"],
-                timeout_seconds=max(1, min(180, lane_budget_seconds)),
+            # Optional close is part of the SAME 720-second broker wall budget
+            # and the SAME pool grant. It receives only what primary did not
+            # consume; it never gets a fresh three minutes after the envelope.
+            invocation_elapsed_ms = max(
+                0, round(time.monotonic() * 1000 - lane_started_monotonic_ms)
             )
-            if closed.returncode in {0, 2} and state_path.is_file():
-                state = read_json(state_path, "broker optional-close state")
-                assert_state(
-                    kind,
-                    str(state.get("pipeline_status") or ""),
-                    state.get("blocker_class"),
-                    state.get("user_blocking") is True,
-                )
+            invocation_remaining_ms = max(
+                0, lane_budget_seconds * 1000 - invocation_elapsed_ms
+            )
+            close_requested_ms = min(
+                BROKER_OPTIONAL_CLOSE_MAX_MS,
+                invocation_remaining_ms,
+                broker_wall_remaining_ms(output_root, limit_ms=broker_limit_ms),
+            )
+            close_token = begin_broker_wall_segment(
+                output_root,
+                "broker_optional_close",
+                requested_ms=close_requested_ms,
+                limit_ms=broker_limit_ms,
+            )
+            if close_token.get("started"):
+                try:
+                    closed = run(
+                        [*command, "--close-optional"],
+                        timeout_seconds=max(1, int(close_token["allowance_ms"]) // 1000),
+                    )
+                finally:
+                    end_broker_wall_segment(
+                        output_root,
+                        close_token,
+                        outcome=(
+                            "PASS" if "closed" in locals() and closed.returncode in {0, 2}
+                            else "TIMEOUT_OR_FAILURE"
+                        ),
+                    )
+                if closed.returncode in {0, 2} and state_path.is_file():
+                    state = read_json(state_path, "broker optional-close state")
+                    assert_state(
+                        kind,
+                        str(state.get("pipeline_status") or ""),
+                        state.get("blocker_class"),
+                        state.get("user_blocking") is True,
+                    )
         return state
     detail = (completed.stderr or completed.stdout).strip()[-4000:]
     # An absent/corrupt caller-supplied raw file is the one no-state failure
@@ -2159,6 +2478,9 @@ def main() -> int:
         payload["receipt_sha256"] = sha256_value(payload)
         atomic_json(target, payload)
         derived_artifacts["lane_resource_receipts"] = str(target)
+        broker_wall_budget_path = _broker_wall_budget_path(output_root)
+        if broker_wall_budget_path.is_file():
+            derived_artifacts["broker_wall_budget"] = str(broker_wall_budget_path)
 
     def execute_lane(
         kind: str, declaration: dict[str, Any], plan: dict[str, Any]
