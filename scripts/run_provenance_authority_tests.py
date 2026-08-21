@@ -64,9 +64,14 @@ from verify.provenance_authority_oracle import (  # noqa: E402
 )
 
 FIXTURES = ("standard-maximal-v2", "standard-net-cash-v2")
+# 488ea00 (B3 sign/B7 clamp/B25 flag) lawfully moved standard-maximal-v2's
+# workbook bytes: the cash-interest row now carries the B3 four-term identity
+# and row 124 gained a zero-denominator guard (B11). Bisected to first-bad by
+# hash probe; net-cash-v2 is unaffected (its lease/ETR shape never hits those
+# rows). Re-certified at integration state 8f71118.
 CERTIFIED_XLSX = {
-    "standard-maximal-v2": "ce89b6db014c989cc679cdc2325f7d8da0af0eb5528413f07bea5b87833e7b6d",
-    "standard-net-cash-v2": "3605f07a860d84a4cd9b275c617117c95b4dbbf472d6df18e771d9989d4aed93",
+    "standard-maximal-v2": "caa5b1774f025a55d0a6d6837c132a62672500495615790870f8ceebd134695b",
+    "standard-net-cash-v2": "f07023b6c52e27fcc2dba8038453b10b7b75fcd53540a43fa77d496ab01426fa",
 }
 
 checks = 0
