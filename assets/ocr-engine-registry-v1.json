@@ -1,0 +1,30 @@
+{
+  "schema_version": "ocr-engine-registry/1.0",
+  "policy": {
+    "required_engine": null,
+    "fallback_order": ["tesseract"],
+    "optional_engine_absence_is_blocking": false,
+    "absence_status": "ocr_engine_unavailable",
+    "rasterizer": {
+      "tool": "pdftoppm",
+      "dpi": 300
+    },
+    "all_outputs_require_scanned_page_classification": true,
+    "weights_may_not_be_bundled": true
+  },
+  "engines": [
+    {
+      "id": "tesseract",
+      "provision": "optional_host_binary",
+      "binary": "tesseract",
+      "capability": "raster TSV OCR word boxes",
+      "required": false
+    },
+    {
+      "id": "unavailable",
+      "provision": "none",
+      "capability": "typed degradation terminal status (never selectable)",
+      "required": false
+    }
+  ]
+}
