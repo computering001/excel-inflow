@@ -1,0 +1,26 @@
+{
+  "schema_version": "product-delivery-constitution/2.0",
+  "product": "excel-inflow",
+  "period_contract": {"historical_years": 3, "forecast_years": 3},
+  "mandatory_lanes": ["filings", "dcs"],
+  "optional_lanes": ["broker"],
+  "filings_source_policy": {
+    "default": "internal",
+    "allowed": ["internal", "user_supplied", "internal_fallback"],
+    "silent_source_mixing": false
+  },
+  "broker_delivery_invariant": "valid mandatory filings and DCS deliver even when optional broker processing closes at zero authority",
+  "economic_invariants": [
+    "one_writer_per_row_period",
+    "one_coherent_broker_house_or_zero_authority",
+    "cash_rcf_interest_fixed_point",
+    "instrument_debt_roll_forward",
+    "source_cell_provenance",
+    "formula_cache_semantic_finance_agreement"
+  ],
+  "legacy_views": [
+    "assets/product-constitution-v1.json",
+    "assets/delivery-constitution-v1.json",
+    "assets/workflow-state-contract-v1.json"
+  ]
+}

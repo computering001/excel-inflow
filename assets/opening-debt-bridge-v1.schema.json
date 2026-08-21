@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opening-debt-bridge-v1",
+  "description": "P4.2: the opening-debt reconciliation as a structured bridge artifact. Every residual is decomposed into taxonomy lines (instrument-level openings, FX translation, classification moves, residual pool, stated unexplained残). An unexplained residual above tolerance is a typed refusal carrying the registered terminal reason code; it is never absorbed into a pool row.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "reporting_currency",
+    "as_of",
+    "reported_form",
+    "lines",
+    "totals",
+    "tolerance",
+    "verdict",
+    "refusal",
+    "years",
+    "errors"
+  ],
+  "properties": {
+    "schema_version": { "const": "opening-debt-bridge/1.0" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "reporting_currency": { "type": ["string", "null"] },
+    "as_of": {
+      "oneOf": [
+        { "type": "string", "format": "date" },
+        { "type": "null" }
+      ]
+    },
+    "reported_form": { "enum": ["scalar", "series3", "absent"] },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["line_kind", "instrument_id", "amount", "currency", "source_ref"],
+        "properties": {
+          "line_kind": {
+            "enum": [
+              "instrument_opening",
+              "fx_translation",
+              "classification_move",
+              "residual_pool",
+              "unexplained_residual"
+            ]
+          },
+          "instrument_id": { "type": ["string", "null"] },
+          "amount": { "type": "number" },
+          "currency": { "type": "string", "minLength": 1 },
+          "source_ref": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_opening_gross_debt",
+        "identified_instrument_total",
+        "fx_translation_total",
+        "residual_pool_total",
+        "explained_total",
+        "unexplained_residual"
+      ],
+      "properties": {
+        "reported_opening_gross_debt": { "type": ["number", "null"] },
+        "identified_instrument_total": { "type": ["number", "null"] },
+        "fx_translation_total": { "type": ["number", "null"] },
+        "residual_pool_total": { "type": ["number", "null"] },
+        "explained_total": { "type": ["number", "null"] },
+        "unexplained_residual": { "type": ["number", "null"] }
+      }
+    },
+    "tolerance": {
+      "oneOf": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        { "type": "null" }
+      ]
+    },
+    "verdict": {
+      "enum": [
+        "RECONCILED",
+        "REFUSE_UNEXPLAINED_RESIDUAL",
+        "NO_REPORTED_ANCHOR",
+        "NOT_EVALUABLE"
+      ]
+    },
+    "refusal": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason_code", "unexplained_residual", "tolerance"],
+          "properties": {
+            "reason_code": { "const": "SOURCE.opening_debt_unresolved" },
+            "unexplained_residual": { "type": "number" },
+            "tolerance": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "years": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["year_index", "reported", "basis"],
+        "properties": {
+          "year_index": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "reported": { "type": ["number", "null"] },
+          "basis": {
+            "enum": [
+              "instrument_register_bridge",
+              "asserted_no_instrument_history",
+              "absent"
+            ]
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "verdict": { "const": "REFUSE_UNEXPLAINED_RESIDUAL" } },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": { "refusal": { "type": "object" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "verdict": { "const": "RECONCILED" } },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": { "refusal": { "type": "null" } }
+      }
+    }
+  ]
+}

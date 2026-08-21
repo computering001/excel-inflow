@@ -1,0 +1,83 @@
+{
+  "schema_version": "canonical-model-graph/2.0",
+  "module_contract": {
+    "required_fields": [
+      "module_id",
+      "module_version",
+      "nodes",
+      "edges",
+      "read_set",
+      "write_set",
+      "iteration_state",
+      "invariants"
+    ]
+  },
+  "modules": [
+    "historical_statements",
+    "operating_forecast",
+    "tax_and_working_capital",
+    "debt_instruments",
+    "leases",
+    "cash_rcf",
+    "interest",
+    "acquisition_overlay",
+    "outputs_and_ratios"
+  ],
+  "module_boundary_register": "scripts/lib/canonical_model_modules.mjs",
+  "module_versions": {
+    "historical_statements": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "0fb2661204ce9e4f70779a00204abd42eb9a34451c0ab3082adc2a6daebc8291"
+    },
+    "operating_forecast": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "00149e8395d598b6dc782ad425b72827e9e69009d2b65175bdded59ab7c3c8c1"
+    },
+    "tax_and_working_capital": {
+      "module_version": "2.1.0",
+      "boundary_sha256": "38fe14c2b47d5a2681bca8cda2954bac9a05b304b88b8cbeb1010b48f30f3a0e"
+    },
+    "debt_instruments": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "c923dd0315019ad26eb327b7af557dd9660c51d1047b25976054b91361781559"
+    },
+    "leases": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "7bd4d4a52cf52cfa62203484486f07d3236b0891c1f75eb9df8cb2dd61bd269c"
+    },
+    "cash_rcf": {
+      "module_version": "2.1.0",
+      "boundary_sha256": "8bb459d7fad036f074ccd6237ad8acf113053029097670f2f165d92135c9922f"
+    },
+    "interest": {
+      "module_version": "2.1.0",
+      "boundary_sha256": "08f26a96823cc9c18dfaeae2cf60793e4cbada117fbc5c2236c590ce6eb4946f"
+    },
+    "acquisition_overlay": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "82b2154921985d3bccdd4c2aefce2f12dfc46ed7811ad38630755856a4f66bba"
+    },
+    "outputs_and_ratios": {
+      "module_version": "2.0.0",
+      "boundary_sha256": "38f69866073e685c055be8b7d99d569b639e9fa8b967875bb7c946c1b2ade2e7"
+    }
+  },
+  "economic_equation_graph_view": "assets/equation-graph.v1.json",
+  "invariants": [
+    "unique_node_ids",
+    "single_writer",
+    "unit_compatible_edges",
+    "declared_cross_module_reads_and_writes",
+    "cycles_only_in_declared_iteration_subgraphs",
+    "circularity_off_has_no_active_scc"
+  ],
+  "solver_hardening": {
+    "two_cycle_detection": true,
+    "damping_factors": [
+      0.5,
+      0.25
+    ],
+    "cash_rcf_boundary": "analytic_min_max_projection",
+    "future_nonanalytic_monotone_fallback": "deterministic_bisection_declared_boundaries_only"
+  }
+}

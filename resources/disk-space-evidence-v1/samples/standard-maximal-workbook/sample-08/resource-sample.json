@@ -1,0 +1,615 @@
+{
+  "assertions": {
+    "authority_plan_sha256": "cf13348eab2521bac591cde004d80236e112fb98458c91d918c4e0b91ba2cf2c",
+    "checks": {
+      "authority_plan_exists_nonempty": true,
+      "reported_workbook_bytes_match": true,
+      "staged_reference_parity_case_exists": true,
+      "status_pass": true,
+      "workbook_exists_nonempty": true
+    },
+    "pass": true,
+    "result": {
+      "status": "PASS",
+      "workbook": "portable://local/0005",
+      "workbook_bytes": 74889
+    },
+    "staged_case_sha256": "1fe802a3635c2bb1dc3f2ab5d7f2b588e5db82ec53b9d896caac0d645ae2efa3",
+    "workbook_sha256": "ce89b6db014c989cc679cdc2325f7d8da0af0eb5528413f07bea5b87833e7b6d"
+  },
+  "cohort_id": "standard-maximal-workbook",
+  "command": [
+    "portable://local/0001",
+    "portable://local/0007",
+    "portable://local/0008",
+    "portable://local/0009",
+    "portable://local/0010",
+    "portable://local/0004"
+  ],
+  "completed_at": "2026-08-21T02:01:11Z",
+  "cwd": "portable://local/0008",
+  "duration_ms": 3160.248,
+  "exit_code": 0,
+  "final": {
+    "run": {
+      "allocated_bytes": 2633728,
+      "directories": 0,
+      "files": 15,
+      "logical_bytes": 2599989
+    },
+    "temp": {
+      "allocated_bytes": 0,
+      "directories": 0,
+      "files": 0,
+      "logical_bytes": 0
+    }
+  },
+  "input_post": [
+    {
+      "actual_sha256": "8b941b4e7bd4ee217ffa44d0cbeb9c2db9cb74fa642f80e7f7e7a6b5ae597e48",
+      "bytes": 144653,
+      "expected_sha256": "8b941b4e7bd4ee217ffa44d0cbeb9c2db9cb74fa642f80e7f7e7a6b5ae597e48",
+      "matches": true,
+      "path": "portable://local/0009"
+    },
+    {
+      "actual_sha256": "881193546010ebdec4c7d6e9d8657ef332ebbc6f5217f9fb9bb13f3c7cac0bea",
+      "bytes": 1618,
+      "expected_sha256": "881193546010ebdec4c7d6e9d8657ef332ebbc6f5217f9fb9bb13f3c7cac0bea",
+      "matches": true,
+      "path": "portable://local/0007"
+    }
+  ],
+  "input_pre": [
+    {
+      "actual_sha256": "8b941b4e7bd4ee217ffa44d0cbeb9c2db9cb74fa642f80e7f7e7a6b5ae597e48",
+      "bytes": 144653,
+      "expected_sha256": "8b941b4e7bd4ee217ffa44d0cbeb9c2db9cb74fa642f80e7f7e7a6b5ae597e48",
+      "matches": true,
+      "path": "portable://local/0009"
+    },
+    {
+      "actual_sha256": "881193546010ebdec4c7d6e9d8657ef332ebbc6f5217f9fb9bb13f3c7cac0bea",
+      "bytes": 1618,
+      "expected_sha256": "881193546010ebdec4c7d6e9d8657ef332ebbc6f5217f9fb9bb13f3c7cac0bea",
+      "matches": true,
+      "path": "portable://local/0007"
+    }
+  ],
+  "inputs_stable_and_bound": true,
+  "peak": {
+    "run": {
+      "allocated_bytes": 2633728,
+      "directories": 0,
+      "files": 15,
+      "logical_bytes": 2599989
+    },
+    "same_volume_total": {
+      "allocated_bytes": 2686976,
+      "logical_bytes": 2651779
+    },
+    "temp": {
+      "allocated_bytes": 126976,
+      "directories": 0,
+      "files": 1,
+      "logical_bytes": 124564
+    }
+  },
+  "portable_projection": {
+    "contract_version": "excel-inflow-disk-space-path-portable-projection/1.0",
+    "projection_sha256": "139566ca4d89c814690f0e4179583b532e51ac69eada09d7a7efb26b85af8105",
+    "redacted_value_count": 13,
+    "source_receipt_sha256": "b7a545c89d2c60ed910cd72a65e2b5d8f4d074190bdffcafb2aa6a5147024de5",
+    "source_schema_version": "excel-inflow-component-resource-sample/1.0"
+  },
+  "run_root": "portable://local/0004",
+  "run_volume_post": {
+    "available_bytes": 514175090688,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0012",
+    "path": "portable://local/0004"
+  },
+  "run_volume_pre": {
+    "available_bytes": 514181918720,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0011",
+    "path": "portable://local/0004"
+  },
+  "same_volume": true,
+  "sample_count": 29,
+  "sample_id": "sample-08",
+  "samples": [
+    {
+      "elapsed_ms": 9.5,
+      "run": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 111.738,
+      "run": {
+        "allocated_bytes": 147456,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 144659
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 221.175,
+      "run": {
+        "allocated_bytes": 147456,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 144659
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 322.796,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 433.21,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 540.357,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 648.256,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 756.398,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 866.752,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 967.462,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1072.967,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1181.235,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1291.656,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1394.056,
+      "run": {
+        "allocated_bytes": 270336,
+        "directories": 0,
+        "files": 2,
+        "logical_bytes": 263832
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1498.138,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1607.042,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1714.685,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1815.593,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1923.431,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2033.634,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2140.772,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2251.458,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2362.149,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2464.675,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2572.914,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2681.634,
+      "run": {
+        "allocated_bytes": 2555904,
+        "directories": 0,
+        "files": 14,
+        "logical_bytes": 2525100
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2790.451,
+      "run": {
+        "allocated_bytes": 2560000,
+        "directories": 0,
+        "files": 15,
+        "logical_bytes": 2527215
+      },
+      "temp": {
+        "allocated_bytes": 126976,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 124564
+      }
+    },
+    {
+      "elapsed_ms": 2892.878,
+      "run": {
+        "allocated_bytes": 2613248,
+        "directories": 0,
+        "files": 15,
+        "logical_bytes": 2580893
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2997.063,
+      "run": {
+        "allocated_bytes": 2633728,
+        "directories": 0,
+        "files": 15,
+        "logical_bytes": 2599989
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    }
+  ],
+  "sampling_interval_ms": 100,
+  "schema_version": "excel-inflow-component-resource-sample-portable/1.0",
+  "source_post": {
+    "commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "file_count": 900,
+    "tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0",
+    "working_source_digest_sha256": "ae19458df80ed55f7f64914ab3b8efae859f32603ac42dd9a5c37822d59aa562",
+    "worktree_status_bytes": 0,
+    "worktree_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_pre": {
+    "commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "file_count": 900,
+    "tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0",
+    "working_source_digest_sha256": "ae19458df80ed55f7f64914ab3b8efae859f32603ac42dd9a5c37822d59aa562",
+    "worktree_status_bytes": 0,
+    "worktree_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_stable_and_clean": true,
+  "started_at": "2026-08-21T02:01:08Z",
+  "status": "PASS",
+  "stderr": {
+    "bytes": 0,
+    "path": "portable://local/0002",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 275,
+    "path": "portable://local/0003",
+    "sha256": "ca5ca6dc8da6e9d03be678a0f7b43ca037071d07658a33826ed1065527214f21"
+  },
+  "temp_root": "portable://local/0006",
+  "temp_volume_post": {
+    "available_bytes": 514175008768,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0013",
+    "path": "portable://local/0006"
+  },
+  "temp_volume_pre": {
+    "available_bytes": 514181918720,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0011",
+    "path": "portable://local/0006"
+  },
+  "timed_out": false
+}

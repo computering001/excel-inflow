@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "kind": "authority_projection_overrides",
+  "status": "prepared_not_active",
+  "supersedes": "authority-projection-overrides.v2.json",
+  "source_contract_sha256": "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3",
+  "source_runtime_sha256": "87e6d132611a1983c758a4b72d4e38f579678154ee18260a06241b4432f34026",
+  "rules": {
+    "allowed_missing_semantic_rows": [],
+    "allowed_added_semantic_rows": [],
+    "semantic_reorder_blocks": [],
+    "control_replacements": [],
+    "control_additions": [],
+    "dynamic_label_variants": [],
+    "formula_provenance_corrections": [],
+    "semantic_style_corrections": [],
+    "physical_style_corrections": []
+  }
+}

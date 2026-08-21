@@ -1,0 +1,25 @@
+{
+  "schema_version": "installed-inline-xbrl-capability-probe/1.0",
+  "license": "CC0-1.0",
+  "description": "Tiny synthetic Inline XBRL host probe: exactly three annual non-dimensioned contexts, one USD unit, one income-statement concept and one cash-flow concept across all three years, plus one benign dimensioned revenue fact that must remain quarantined from selected authority.",
+  "html_sha256": "56e109ee89c4a05709d20ed48994d099ab7664b3e3d40ca7a7e6504e511f5896",
+  "html": "<html xmlns:ix=\"http://www.xbrl.org/2013/inlineXBRL\" xmlns:xbrli=\"http://www.xbrl.org/2003/instance\" xmlns:xbrldi=\"http://xbrl.org/2006/xbrldi\"><body><div style=\"display:none\"><xbrli:context id=\"D2023\"><xbrli:entity><xbrli:identifier scheme=\"https://example.invalid/entity\">probe</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2023-01-01</xbrli:startDate><xbrli:endDate>2023-12-31</xbrli:endDate></xbrli:period></xbrli:context><xbrli:context id=\"D2024\"><xbrli:entity><xbrli:identifier scheme=\"https://example.invalid/entity\">probe</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2024-01-01</xbrli:startDate><xbrli:endDate>2024-12-31</xbrli:endDate></xbrli:period></xbrli:context><xbrli:context id=\"D2025\"><xbrli:entity><xbrli:identifier scheme=\"https://example.invalid/entity\">probe</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context><xbrli:context id=\"DSEG2025\"><xbrli:entity><xbrli:identifier scheme=\"https://example.invalid/entity\">probe</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period><xbrli:scenario><xbrldi:explicitMember dimension=\"probe:SegmentAxis\">probe:SegmentMember</xbrldi:explicitMember></xbrli:scenario></xbrli:context><xbrli:unit id=\"usd\"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit></div><table><tr><td><ix:nonFraction name=\"probe:Revenue\" contextRef=\"D2023\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">100</ix:nonFraction></td><td><ix:nonFraction name=\"probe:Revenue\" contextRef=\"D2024\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">110</ix:nonFraction></td><td><ix:nonFraction name=\"probe:Revenue\" contextRef=\"D2025\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">120</ix:nonFraction></td><td><ix:nonFraction name=\"probe:CashFromOperations\" contextRef=\"D2023\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">20</ix:nonFraction></td><td><ix:nonFraction name=\"probe:CashFromOperations\" contextRef=\"D2024\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">22</ix:nonFraction></td><td><ix:nonFraction name=\"probe:CashFromOperations\" contextRef=\"D2025\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">25</ix:nonFraction></td><td><ix:nonFraction name=\"probe:Revenue\" contextRef=\"DSEG2025\" unitRef=\"usd\" decimals=\"-6\" scale=\"6\">30</ix:nonFraction></td></tr></table></body></html>\n",
+  "expected": {
+    "non_dimensioned_context_ids": ["D2023", "D2024", "D2025"],
+    "dimensioned_context_id": "DSEG2025",
+    "unit_id": "usd",
+    "unit_measure": "iso4217:USD",
+    "period_ends": ["2023-12-31", "2024-12-31", "2025-12-31"],
+    "selected_authority": {
+      "probe:Revenue": [100000000, 110000000, 120000000],
+      "probe:CashFromOperations": [20000000, 22000000, 25000000]
+    },
+    "dimensioned_fact": {
+      "concept": "probe:Revenue",
+      "context_ref": "DSEG2025",
+      "value": 30000000,
+      "dimension": "probe:SegmentAxis",
+      "member": "probe:SegmentMember"
+    }
+  }
+}

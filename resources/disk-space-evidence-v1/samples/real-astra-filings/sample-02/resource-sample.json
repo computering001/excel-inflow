@@ -1,0 +1,532 @@
+{
+  "assertions": {
+    "checks": {
+      "cash_flow_rows_45": true,
+      "document_count_1": true,
+      "income_statement_rows_20": true,
+      "pipeline_pass": true,
+      "violations_0": true
+    },
+    "pass": true,
+    "state_path": "portable://local/0006"
+  },
+  "cohort_id": "real-astra-filings",
+  "command": [
+    "portable://local/0001",
+    "portable://local/0010",
+    "portable://local/0008",
+    "--out",
+    "portable://local/0005"
+  ],
+  "completed_at": "2026-08-21T00:56:05Z",
+  "cwd": "portable://local/0009",
+  "duration_ms": 2626.383,
+  "exit_code": 0,
+  "final": {
+    "run": {
+      "allocated_bytes": 462848,
+      "directories": 2,
+      "files": 8,
+      "logical_bytes": 440657
+    },
+    "temp": {
+      "allocated_bytes": 0,
+      "directories": 0,
+      "files": 0,
+      "logical_bytes": 0
+    }
+  },
+  "input_post": [
+    {
+      "actual_sha256": "6eeeb3471c36a8b1edfa75d2a249dba3f1e600d97db5c7f9cf7cf43c5d9db7de",
+      "bytes": 1717,
+      "expected_sha256": "6eeeb3471c36a8b1edfa75d2a249dba3f1e600d97db5c7f9cf7cf43c5d9db7de",
+      "matches": true,
+      "path": "portable://local/0008"
+    },
+    {
+      "actual_sha256": "a8d5ea39fd06df5ba1fcab2eb09e1512e6b29e93990b491b32881ff06af69620",
+      "bytes": 2425916,
+      "expected_sha256": "a8d5ea39fd06df5ba1fcab2eb09e1512e6b29e93990b491b32881ff06af69620",
+      "matches": true,
+      "path": "portable://local/0002"
+    }
+  ],
+  "input_pre": [
+    {
+      "actual_sha256": "6eeeb3471c36a8b1edfa75d2a249dba3f1e600d97db5c7f9cf7cf43c5d9db7de",
+      "bytes": 1717,
+      "expected_sha256": "6eeeb3471c36a8b1edfa75d2a249dba3f1e600d97db5c7f9cf7cf43c5d9db7de",
+      "matches": true,
+      "path": "portable://local/0008"
+    },
+    {
+      "actual_sha256": "a8d5ea39fd06df5ba1fcab2eb09e1512e6b29e93990b491b32881ff06af69620",
+      "bytes": 2425916,
+      "expected_sha256": "a8d5ea39fd06df5ba1fcab2eb09e1512e6b29e93990b491b32881ff06af69620",
+      "matches": true,
+      "path": "portable://local/0002"
+    }
+  ],
+  "inputs_stable_and_bound": true,
+  "peak": {
+    "run": {
+      "allocated_bytes": 462848,
+      "directories": 2,
+      "files": 8,
+      "logical_bytes": 440657
+    },
+    "same_volume_total": {
+      "allocated_bytes": 462848,
+      "logical_bytes": 440657
+    },
+    "temp": {
+      "allocated_bytes": 0,
+      "directories": 0,
+      "files": 0,
+      "logical_bytes": 0
+    }
+  },
+  "portable_projection": {
+    "contract_version": "excel-inflow-disk-space-path-portable-projection/1.0",
+    "projection_sha256": "e1cecf3d6ec461605500bc6131d945f90f0c05725b983217973d4d90a2b6a371",
+    "redacted_value_count": 12,
+    "source_receipt_sha256": "56134a9baea1168323c3d05c7009e3bc58fb48b6acc653c63ef01c7c04eddbd6",
+    "source_schema_version": "excel-inflow-component-resource-sample/1.0"
+  },
+  "run_root": "portable://local/0005",
+  "run_volume_post": {
+    "available_bytes": 515393826816,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0012",
+    "path": "portable://local/0005"
+  },
+  "run_volume_pre": {
+    "available_bytes": 515394351104,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0011",
+    "path": "portable://local/0005"
+  },
+  "same_volume": true,
+  "sample_count": 24,
+  "sample_id": "sample-02",
+  "samples": [
+    {
+      "elapsed_ms": 13.187,
+      "run": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 114.713,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 215.088,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 323.069,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 425.794,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 533.938,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 639.639,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 749.995,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 860.3,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 970.67,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1071.231,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1173.214,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1283.533,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1393.516,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1500.742,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1606.412,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1716.804,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1827.091,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 1929.814,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2040.192,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2150.61,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2252.692,
+      "run": {
+        "allocated_bytes": 4096,
+        "directories": 0,
+        "files": 1,
+        "logical_bytes": 617
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2354.834,
+      "run": {
+        "allocated_bytes": 462848,
+        "directories": 2,
+        "files": 8,
+        "logical_bytes": 440657
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    },
+    {
+      "elapsed_ms": 2456.511,
+      "run": {
+        "allocated_bytes": 462848,
+        "directories": 2,
+        "files": 8,
+        "logical_bytes": 440657
+      },
+      "temp": {
+        "allocated_bytes": 0,
+        "directories": 0,
+        "files": 0,
+        "logical_bytes": 0
+      }
+    }
+  ],
+  "sampling_interval_ms": 100,
+  "schema_version": "excel-inflow-component-resource-sample-portable/1.0",
+  "source_post": {
+    "commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "file_count": 900,
+    "tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0",
+    "working_source_digest_sha256": "ae19458df80ed55f7f64914ab3b8efae859f32603ac42dd9a5c37822d59aa562",
+    "worktree_status_bytes": 0,
+    "worktree_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_pre": {
+    "commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "file_count": 900,
+    "tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0",
+    "working_source_digest_sha256": "ae19458df80ed55f7f64914ab3b8efae859f32603ac42dd9a5c37822d59aa562",
+    "worktree_status_bytes": 0,
+    "worktree_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_stable_and_clean": true,
+  "started_at": "2026-08-21T00:56:02Z",
+  "status": "PASS",
+  "stderr": {
+    "bytes": 0,
+    "path": "portable://local/0003",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 795,
+    "path": "portable://local/0004",
+    "sha256": "3364b99fc2f085821c39636bf0c7b4391c45f55a368ccbb82ecf7ad86e2ef5b6"
+  },
+  "temp_root": "portable://local/0007",
+  "temp_volume_post": {
+    "available_bytes": 515393826816,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0012",
+    "path": "portable://local/0007"
+  },
+  "temp_volume_pre": {
+    "available_bytes": 515394351104,
+    "block_size": 4096,
+    "device_id": "16777233",
+    "df_exit_code": 0,
+    "df_stderr": "",
+    "df_stdout": "portable://local/0011",
+    "path": "portable://local/0007"
+  },
+  "timed_out": false
+}

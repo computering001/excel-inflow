@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "excel-inflow-policy-registry/1.0",
+  "description": "P2.7 — versioned registry of model-owned assumption families. Every family binds to {policy_id, version, owned_assumption, evidence_hierarchy}; case-level policy objects carry the binding and a version change is receipt-visible. Vocabularies are the EXISTING ones: evidence_hierarchy rungs come from FORECAST_AUTHORITY_PRIORITY (scripts/lib/forecast_authority.mjs), owned_assumption modules from assets/canonical-model-graph-v2.json and schedule roles from SCHEDULE_PRODUCER_BY_ROLE (scripts/lib/forecast_producer_contract.mjs). Cross-vocabulary membership is enforced by scripts/lib/policy_registry.mjs at load, never repaired.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "work_package", "invariant", "entries"],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-policy-registry/1.0" },
+    "work_package": { "const": "P2.7" },
+    "invariant": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "version",
+        "binding_status",
+        "owned_assumption",
+        "evidence_hierarchy",
+        "owner_module",
+        "case_binding",
+        "system_owned"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Stable family identifier; must equal the entry's key in entries."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "description": "Registry version of this family's owned assumption. Bumping it changes every sealed policy binding that carries it — receipt-visible by construction."
+        },
+        "binding_status": {
+          "enum": ["bound", "declared_only"],
+          "description": "bound: the case-level policy object carries a stamped policy_binding end to end. declared_only: coverage is declared here, binding is follow-on work (named in programme/P2.7_issue_card.md)."
+        },
+        "owned_assumption": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope", "module", "schedule_roles", "description"],
+          "properties": {
+            "scope": {
+              "enum": ["model", "runtime"],
+              "description": "model: the assumption lives in the canonical model graph. runtime: an execution-budget family with no model module (module is null)."
+            },
+            "module": {
+              "type": ["string", "null"],
+              "description": "One of assets/canonical-model-graph-v2.json modules when scope is model; null when scope is runtime. Membership enforced by the loader."
+            },
+            "schedule_roles": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Schedule roles this family's assumption drives; each must be a SCHEDULE_PRODUCER_BY_ROLE key. Empty when the family owns no schedule role directly."
+            },
+            "description": { "type": "string", "minLength": 1 }
+          }
+        },
+        "evidence_hierarchy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered rungs, strongest first, each a FORECAST_AUTHORITY_PRIORITY method with strictly increasing priority number (weaker as you descend). Empty ONLY for system_owned engineering constants that no case evidence resolves today."
+        },
+        "owner_module": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository anchor for the family's owning code or contract region."
+        },
+        "case_binding": {
+          "type": ["string", "null"],
+          "description": "The model-case key whose object carries the stamped policy_binding, or null while binding is declared_only."
+        },
+        "system_owned": {
+          "type": "boolean",
+          "description": "True only for engineering-owned constants (numerics, budgets, tolerances, materiality literals). Exactly these entries may carry an empty evidence_hierarchy."
+        },
+        "external_version_identity": {
+          "type": "string",
+          "description": "Pre-existing version identity the family already carries in code or assets (e.g. excel-inflow-tax-rate-policy/1.0); recorded, never replaced."
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

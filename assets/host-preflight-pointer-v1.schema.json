@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/host-preflight-pointer-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "report_file",
+    "report_sha256",
+    "receipt_file",
+    "receipt_sha256",
+    "receipt_self_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-host-preflight-pointer/1.1" },
+    "status": { "enum": ["HOST_READY", "HOST_REFUSED", "REFUSED_BOOTSTRAP"] },
+    "report_file": { "type": "string", "pattern": "^[^/\\\\]+\\.json$" },
+    "report_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "receipt_file": { "type": ["string", "null"], "pattern": "^[^/\\\\]+\\.json$" },
+    "receipt_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "receipt_self_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "REFUSED_BOOTSTRAP" } } },
+      "then": {
+        "properties": {
+          "receipt_file": { "type": "null" },
+          "receipt_sha256": { "type": "null" },
+          "receipt_self_sha256": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "receipt_file": { "type": "string" },
+          "receipt_sha256": { "type": "string" },
+          "receipt_self_sha256": { "type": "string" }
+        }
+      }
+    }
+  ]
+}

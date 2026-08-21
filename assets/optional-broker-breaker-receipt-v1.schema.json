@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excel-inflow.local/schemas/optional-broker-breaker-receipt-v1.schema.json",
+  "title": "Optional broker circuit-breaker receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "breaker_state",
+    "failure_count",
+    "failure_threshold",
+    "attempts",
+    "max_attempts",
+    "minimum_budget_ms",
+    "remaining_budget_ms",
+    "budget_slice_ms",
+    "prior_breaker_state",
+    "open_reason",
+    "trigger_state_sha256",
+    "final_state_sha256",
+    "trigger_mandatory_lane_bindings",
+    "mandatory_lane_bindings",
+    "reason_code",
+    "registry_reason_code",
+    "zero_authority_executed",
+    "zero_authority_retry_count",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "optional-broker-breaker-receipt/1.1" },
+    "run_id": { "type": ["string", "null"] },
+    "breaker_state": { "enum": ["closed", "open", "half_open"] },
+    "failure_count": { "type": "integer", "minimum": 0 },
+    "failure_threshold": { "type": "integer", "minimum": 1 },
+    "attempts": { "type": "integer", "minimum": 0 },
+    "max_attempts": { "type": "integer", "minimum": 0 },
+    "minimum_budget_ms": { "type": "integer", "minimum": 0 },
+    "remaining_budget_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "budget_slice_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "prior_breaker_state": { "enum": ["closed", "open", "half_open", null] },
+    "open_reason": { "enum": ["failure_threshold", "budget_starved", null] },
+    "trigger_state_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "final_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "trigger_mandatory_lane_bindings": {
+      "$ref": "#/$defs/mandatory_lane_bindings"
+    },
+    "mandatory_lane_bindings": {
+      "$ref": "#/$defs/mandatory_lane_bindings"
+    },
+    "reason_code": { "type": ["string", "null"] },
+    "registry_reason_code": { "type": ["string", "null"] },
+    "zero_authority_executed": { "type": "boolean" },
+    "zero_authority_retry_count": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "$defs": {
+    "mandatory_lane_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "pipeline_status", "state_sha256"],
+        "properties": {
+          "lane": { "type": "string", "minLength": 1, "not": { "const": "broker" } },
+          "pipeline_status": { "type": ["string", "null"] },
+          "state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

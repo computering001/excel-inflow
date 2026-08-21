@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/disk-space-policy-v1.schema.json",
+  "title": "Excel Inflow disk-space policy 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_schema_sha256", "policy_status", "lower_override_action", "measured_source_identity", "measurement_evidence", "floors"],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-disk-space-policy/1.1" },
+    "policy_schema_sha256": { "$ref": "#/$defs/sha256" },
+    "policy_status": { "enum": ["DRAFT_UNMEASURED", "SEALED_MEASURED"] },
+    "lower_override_action": { "const": "REFUSE" },
+    "measured_source_identity": { "$ref": "#/$defs/measuredSourceIdentity" },
+    "measurement_evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version", "schema_path", "schema_sha256", "sample_receipt_manifest_sha256", "corpus_manifest_sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/safeRelativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": { "const": "excel-inflow-disk-space-measurement/1.1" },
+        "schema_path": { "$ref": "#/$defs/safeRelativePath" },
+        "schema_sha256": { "$ref": "#/$defs/sha256" },
+        "sample_receipt_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "corpus_manifest_sha256": {
+          "type": "object", "additionalProperties": false,
+          "required": ["filings", "brokers", "workbook"],
+          "properties": {
+            "filings": { "$ref": "#/$defs/sha256" },
+            "brokers": { "$ref": "#/$defs/sha256" },
+            "workbook": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "floors": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence", "workbook", "combined"],
+      "properties": {
+        "evidence": { "$ref": "#/$defs/topologyFloor" },
+        "workbook": { "$ref": "#/$defs/topologyFloor" },
+        "combined": { "$ref": "#/$defs/topologyFloor" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safeRelativePath": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\](?:.*[^/\\\\])?$" },
+    "measuredSourceIdentity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "source_commit", "source_tree", "measured_certified_code_closure_sha256"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "measured_certified_code_closure_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Asset-excluding certified-runtime-code-closure/1.1 module graph measured with the cohort; never the final package closure."
+        }
+      }
+    },
+    "floorBasis": {
+      "type": "object", "additionalProperties": false,
+      "required": ["min_free_bytes", "basis_kind", "basis_ref", "basis_bytes", "safety_margin_bytes"],
+      "properties": {
+        "min_free_bytes": { "type": "integer", "minimum": 1 },
+        "basis_kind": { "enum": ["observed_max_plus_safety", "twice_observed_p95", "derived_conservative_bound_plus_safety"] },
+        "basis_ref": { "type": "string", "pattern": "^#/" },
+        "basis_bytes": { "type": "integer", "minimum": 0 },
+        "safety_margin_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "topologyFloor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["distinct_volumes", "shared_volume"],
+      "properties": {
+        "distinct_volumes": {
+          "type": "object", "additionalProperties": false,
+          "required": ["work_root", "temp_root"],
+          "properties": {
+            "work_root": { "$ref": "#/$defs/floorBasis" },
+            "temp_root": { "$ref": "#/$defs/floorBasis" }
+          }
+        },
+        "shared_volume": { "$ref": "#/$defs/floorBasis" }
+      }
+    }
+  }
+}

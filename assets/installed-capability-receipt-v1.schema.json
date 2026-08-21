@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/installed-capability-receipt-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "readiness_scope", "candidate_slot_ready", "candidate_slot_refusal_reason",
+    "production_promotion_eligible", "production_promotion_refusal_reason",
+    "generated_at", "requested_lanes", "host",
+    "source_identity", "node", "python", "workbook", "runtime_compatibility", "mandatory_filings_probe", "inline_xbrl_probe", "filesystem",
+    "process_spawn", "runtime_doctor_sha256", "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-installed-capability-receipt/1.2" },
+    "status": { "enum": ["HOST_READY", "REFUSED"] },
+    "readiness_scope": { "const": "inactive_candidate_slot_only" },
+    "candidate_slot_ready": { "type": "boolean" },
+    "candidate_slot_refusal_reason": { "type": ["string", "null"] },
+    "production_promotion_eligible": { "const": false },
+    "production_promotion_refusal_reason": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "requested_lanes": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "enum": ["evidence", "workbook"] }
+    },
+    "host": { "type": "object" },
+    "source_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "repository", "source_commit", "source_tree", "source_worktree_dirty", "skill_version", "package_mode",
+        "deployment_status", "closure_check_status", "active_runtime_code_closure_sha256",
+        "declared_runtime_code_closure_sha256", "complete_package_inventory_sha256",
+        "archive_sha256", "release_package_attestation_sha256", "installation_identity"
+      ],
+      "properties": {
+        "repository": { "type": ["string", "null"] },
+        "source_commit": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+        "source_worktree_dirty": { "type": ["boolean", "null"] },
+        "skill_version": { "type": ["string", "null"] },
+        "package_mode": { "type": ["string", "null"] },
+        "deployment_status": { "type": ["string", "null"] },
+        "closure_check_status": { "type": ["string", "null"] },
+        "active_runtime_code_closure_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "declared_runtime_code_closure_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "complete_package_inventory_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "archive_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "release_package_attestation_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "installation_identity": { "type": ["string", "null"] }
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executable", "executable_sha256", "version"],
+      "properties": {
+        "executable": { "type": ["string", "null"] },
+        "executable_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "version": { "type": "string" }
+      }
+    },
+    "python": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executable", "executable_sha256", "version", "required_modules", "per_module", "module_versions"],
+      "properties": {
+        "executable": { "type": ["string", "null"] },
+        "executable_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "version": { "type": ["array", "null"], "items": { "type": "integer" } },
+        "required_modules": { "type": "array", "items": { "type": "string" } },
+        "per_module": { "type": "object", "additionalProperties": { "type": "boolean" } },
+        "module_versions": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+      }
+    },
+    "workbook": {
+      "type": "object", "additionalProperties": false,
+      "required": ["soffice_executable", "soffice_executable_sha256", "soffice_version", "functional_capability"],
+      "properties": {
+        "soffice_executable": { "type": ["string", "null"] },
+        "soffice_executable_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "soffice_version": { "type": ["string", "null"] },
+        "functional_capability": { "type": ["object", "null"] }
+      }
+    },
+    "runtime_compatibility": { "type": ["object", "null"] },
+    "process_spawn": { "enum": ["PASS", "FAIL"] },
+    "mandatory_filings_probe": { "type": ["object", "null"] },
+    "inline_xbrl_probe": { "type": ["object", "null"] },
+    "filesystem": {
+      "type": "object", "additionalProperties": false, "required": ["work_root", "temp_root"],
+      "properties": {
+        "work_root": { "enum": ["satisfied", "unsatisfied", "not_applicable", "unknown", "excluded_installed_host"] },
+        "temp_root": { "enum": ["satisfied", "unsatisfied", "not_applicable", "unknown", "excluded_installed_host"] }
+      }
+    },
+    "runtime_doctor_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "HOST_READY" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "requested_lanes": {
+            "allOf": [
+              { "contains": { "const": "evidence" } },
+              { "contains": { "const": "workbook" } }
+            ]
+          },
+          "process_spawn": { "const": "PASS" },
+          "workbook": {
+            "required": ["functional_capability"],
+            "properties": {
+              "soffice_executable": { "type": "string", "minLength": 1 },
+              "soffice_executable_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "soffice_version": { "type": "string", "minLength": 1 },
+              "functional_capability": {
+                "type": "object",
+                "required": ["schema_version", "status", "fixture", "output", "cleanup"],
+                "properties": {
+                  "schema_version": { "const": "libreoffice-workbook-capability/1.0" },
+                  "status": { "const": "PASS" },
+                  "fixture": {
+                    "type": "object",
+                    "required": ["sha256"],
+                    "properties": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+                  },
+                  "output": {
+                    "type": "object",
+                    "required": ["sha256", "cached_result"],
+                    "properties": {
+                      "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                      "cached_result": { "const": 12.5 }
+                    }
+                  },
+                  "cleanup": {
+                    "type": "object",
+                    "required": ["profile_removed", "fixture_removed", "output_removed", "workspace_removed", "residue_paths"],
+                    "properties": {
+                      "profile_removed": { "const": true },
+                      "fixture_removed": { "const": true },
+                      "output_removed": { "const": true },
+                      "workspace_removed": { "const": true },
+                      "residue_paths": { "type": "array", "maxItems": 0 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "runtime_compatibility": {
+            "type": "object",
+            "required": ["status", "total_violations", "evaluated_runtime_names", "observations", "findings"],
+            "properties": {
+              "status": { "const": "PASS" },
+              "total_violations": { "const": 0 },
+              "findings": { "type": "array", "maxItems": 0 }
+            }
+          },
+          "mandatory_filings_probe": {
+            "type": "object",
+            "required": [
+              "pdf_sha256", "extractor_sha256", "request_sha256", "response_sha256",
+              "response_schema_sha256", "semantic_projection_sha256", "filings_controller_sha256",
+              "filings_state_sha256", "filings_bundle_sha256", "runtime_closure_sha256",
+              "scratch_removed"
+            ],
+            "properties": {
+              "scratch_removed": { "const": true }
+            }
+          },
+          "inline_xbrl_probe": {
+            "type": "object",
+            "required": [
+              "schema_version", "status", "reason_code", "selected_python",
+              "lxml_worker_execution", "fixture_sha256", "html_sha256", "worker_sha256",
+              "result_schema_sha256", "result_sha256", "selected_python_sha256",
+              "selected_non_dimensioned_authority", "quarantined_dimensioned_fact",
+              "compatibility_prerequisite", "scratch_removed"
+            ],
+            "properties": {
+              "schema_version": { "const": "excel-inflow-installed-inline-xbrl-probe/1.0" },
+              "status": { "const": "PASS" },
+              "reason_code": { "type": "null" },
+              "selected_python": { "type": "string", "minLength": 1 },
+              "lxml_worker_execution": { "const": "PASS" },
+              "fixture_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "html_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "worker_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "result_schema_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "result_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "selected_python_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "selected_non_dimensioned_authority": { "type": "object", "minProperties": 2 },
+              "quarantined_dimensioned_fact": {
+                "type": "object",
+                "required": ["concept", "context_ref", "dimensions", "value"],
+                "properties": {
+                  "dimensions": { "type": "object", "minProperties": 1 }
+                }
+              },
+              "compatibility_prerequisite": {
+                "type": "object",
+                "required": ["status", "total_violations", "evaluated_runtime_names", "findings"],
+                "properties": {
+                  "status": { "const": "PASS" },
+                  "total_violations": { "const": 0 },
+                  "evaluated_runtime_names": {
+                    "type": "array",
+                    "allOf": [
+                      { "contains": { "const": "Python" } },
+                      { "contains": { "const": "lxml" } }
+                    ]
+                  },
+                  "findings": { "type": "array", "maxItems": 0 }
+                }
+              },
+              "scratch_removed": { "const": true }
+            }
+          },
+          "filesystem": {
+            "properties": {
+              "work_root": { "const": "satisfied" },
+              "temp_root": { "const": "satisfied" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "candidate_slot_ready": { "const": true } },
+        "required": ["candidate_slot_ready"]
+      },
+      "then": {
+        "properties": {
+          "status": { "const": "HOST_READY" },
+          "candidate_slot_refusal_reason": { "type": "null" },
+          "source_identity": {
+            "properties": {
+              "closure_check_status": { "const": "match" },
+              "source_worktree_dirty": { "const": false },
+              "deployment_status": { "enum": ["installed_candidate", "production_promoted"] },
+              "installation_identity": { "type": "string", "minLength": 1 },
+              "declared_runtime_code_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "complete_package_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "archive_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "release_package_attestation_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "candidate_slot_refusal_reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ]
+}

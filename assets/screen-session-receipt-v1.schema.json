@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/screen-session-receipt-v1.schema.json",
+  "title": "Excel Inflow screen-session receipt",
+  "description": "Durable one-screen/one-continuation authority. The receipt is stored only under an explicitly supplied external session root; it is never discovered through a latest-session pointer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "screen_session_id",
+    "screen_nonce",
+    "session_root_sha256",
+    "receipt_path_sha256",
+    "session_id",
+    "session_secret_sha256",
+    "session_binding_hmac_sha256",
+    "runtime_mode",
+    "created_at",
+    "expires_at",
+    "expected_next_stage",
+    "source_commit",
+    "source_tree",
+    "runtime_closure_sha256",
+    "package_inventory_sha256",
+    "installation_identity",
+    "active_pointer_sha256",
+    "capability_receipt_sha256",
+    "runtime_doctor_report_sha256",
+    "screen_contract_sha256",
+    "rendered_screen_sha256",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-screen-session/1.0" },
+    "screen_session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "screen_nonce": { "type": "string", "pattern": "^[A-F0-9]{6}$" },
+    "session_root_sha256": { "$ref": "#/$defs/sha256" },
+    "receipt_path_sha256": { "$ref": "#/$defs/sha256" },
+    "session_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "session_secret_sha256": { "$ref": "#/$defs/sha256" },
+    "session_binding_hmac_sha256": { "$ref": "#/$defs/sha256" },
+    "runtime_mode": {
+      "enum": ["DEVELOPMENT_SOURCE", "INSTALLED_CANDIDATE", "PRODUCTION_ACTIVE"]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "expected_next_stage": { "const": "company_resolution" },
+    "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "runtime_closure_sha256": { "$ref": "#/$defs/sha256" },
+    "package_inventory_sha256": { "$ref": "#/$defs/nullableSha256" },
+    "installation_identity": { "type": ["string", "null"] },
+    "active_pointer_sha256": { "$ref": "#/$defs/nullableSha256" },
+    "capability_receipt_sha256": { "$ref": "#/$defs/sha256" },
+    "runtime_doctor_report_sha256": { "$ref": "#/$defs/sha256" },
+    "screen_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "rendered_screen_sha256": { "$ref": "#/$defs/nullableSha256" },
+    "receipt_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "runtime_mode": { "const": "DEVELOPMENT_SOURCE" } },
+        "required": ["runtime_mode"]
+      },
+      "then": {
+        "properties": {
+          "package_inventory_sha256": { "type": "null" },
+          "installation_identity": { "type": "null" },
+          "active_pointer_sha256": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "runtime_mode": { "const": "INSTALLED_CANDIDATE" } },
+        "required": ["runtime_mode"]
+      },
+      "then": {
+        "properties": {
+          "package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+          "installation_identity": { "type": "string", "minLength": 1 },
+          "active_pointer_sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "runtime_mode": { "const": "PRODUCTION_ACTIVE" } },
+        "required": ["runtime_mode"]
+      },
+      "then": {
+        "properties": {
+          "package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+          "installation_identity": { "type": "string", "minLength": 1 },
+          "active_pointer_sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/installation-receipt-v1.schema.json",
+  "title": "Excel Inflow immutable installation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "installation_identity", "installation_generation", "slot_id",
+    "installed_at", "package", "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-installation-receipt/1.0" },
+    "installation_identity": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$" },
+    "installation_generation": { "type": "integer", "minimum": 1 },
+    "slot_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "installed_at": { "type": "string", "format": "date-time" },
+    "package": { "$ref": "#/$defs/packageIdentity" },
+    "receipt_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "packageIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit", "source_tree", "package_mode", "package_inventory_sha256",
+        "archive_sha256", "runtime_closure_sha256", "certified_runtime_closure_sha256",
+        "installed_package_sha256"
+      ],
+      "properties": {
+        "source_commit": { "$ref": "#/$defs/gitSha" },
+        "source_tree": { "$ref": "#/$defs/gitSha" },
+        "package_mode": { "enum": ["development", "certified", "portable_certified"] },
+        "package_inventory_sha256": { "$ref": "#/$defs/sha256" },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_closure_sha256": { "$ref": "#/$defs/sha256" },
+        "certified_runtime_closure_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "installed_package_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

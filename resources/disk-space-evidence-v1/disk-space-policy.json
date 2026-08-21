@@ -1,0 +1,102 @@
+{
+  "floors": {
+    "combined": {
+      "distinct_volumes": {
+        "temp_root": {
+          "basis_bytes": 192512,
+          "basis_kind": "derived_conservative_bound_plus_safety",
+          "basis_ref": "#/derived_bounds/combined/bounds/temp_root",
+          "min_free_bytes": 1048576,
+          "safety_margin_bytes": 856064
+        },
+        "work_root": {
+          "basis_bytes": 85786624,
+          "basis_kind": "derived_conservative_bound_plus_safety",
+          "basis_ref": "#/derived_bounds/combined/bounds/work_root",
+          "min_free_bytes": 268435456,
+          "safety_margin_bytes": 182648832
+        }
+      },
+      "shared_volume": {
+        "basis_bytes": 85905408,
+        "basis_kind": "derived_conservative_bound_plus_safety",
+        "basis_ref": "#/derived_bounds/combined/bounds/shared_volume_total",
+        "min_free_bytes": 268435456,
+        "safety_margin_bytes": 182530048
+      }
+    },
+    "evidence": {
+      "distinct_volumes": {
+        "temp_root": {
+          "basis_bytes": 0,
+          "basis_kind": "derived_conservative_bound_plus_safety",
+          "basis_ref": "#/derived_bounds/evidence/bounds/temp_root",
+          "min_free_bytes": 1048576,
+          "safety_margin_bytes": 1048576
+        },
+        "work_root": {
+          "basis_bytes": 83152896,
+          "basis_kind": "derived_conservative_bound_plus_safety",
+          "basis_ref": "#/derived_bounds/evidence/bounds/work_root",
+          "min_free_bytes": 268435456,
+          "safety_margin_bytes": 185282560
+        }
+      },
+      "shared_volume": {
+        "basis_bytes": 83152896,
+        "basis_kind": "derived_conservative_bound_plus_safety",
+        "basis_ref": "#/derived_bounds/evidence/bounds/shared_volume_total",
+        "min_free_bytes": 268435456,
+        "safety_margin_bytes": 185282560
+      }
+    },
+    "workbook": {
+      "distinct_volumes": {
+        "temp_root": {
+          "basis_bytes": 368640,
+          "basis_kind": "twice_observed_p95",
+          "basis_ref": "#/observed_cohorts/workbook/root_statistics/temp_root",
+          "min_free_bytes": 1048576,
+          "safety_margin_bytes": 679936
+        },
+        "work_root": {
+          "basis_bytes": 5267456,
+          "basis_kind": "twice_observed_p95",
+          "basis_ref": "#/observed_cohorts/workbook/root_statistics/work_root",
+          "min_free_bytes": 8388608,
+          "safety_margin_bytes": 3121152
+        }
+      },
+      "shared_volume": {
+        "basis_bytes": 5488640,
+        "basis_kind": "twice_observed_p95",
+        "basis_ref": "#/observed_cohorts/workbook/root_statistics/shared_volume_total",
+        "min_free_bytes": 8388608,
+        "safety_margin_bytes": 2899968
+      }
+    }
+  },
+  "lower_override_action": "REFUSE",
+  "measured_source_identity": {
+    "measured_certified_code_closure_sha256": "f54536debca6911eef033d57e7fc9e8ebbe99129f6f457b68bdf815b56a35d2d",
+    "repository": "excel-inflow-clean-final",
+    "source_commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
+    "source_tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0"
+  },
+  "measurement_evidence": {
+    "corpus_manifest_sha256": {
+      "brokers": "ba6281e5a7aaecb35e9796d8a484e7f9a375331cd0cbe1fc25edcd5c545aac0e",
+      "filings": "7c73da1fb5b37776641533fb23213783116eea6372541b7717e4d7aa6ed4cf33",
+      "workbook": "43590fb72905ba98fd3b2fe34286254fee595f5d53abe8fc98829c2702022ca1"
+    },
+    "path": "disk-space-measurement.json",
+    "sample_receipt_manifest_sha256": "368ee2800363a2bfaec77082a9a0089afc2b4dec0e5c4f657d96f803ebd03a1a",
+    "schema_path": "disk-space-measurement-v1.schema.json",
+    "schema_sha256": "032d527dd207f41775ea63472a75c9bf7ed30004cc908dfa3790c45d6f29c3a3",
+    "schema_version": "excel-inflow-disk-space-measurement/1.1",
+    "sha256": "88202813b86315628a4d43e6edf3dcda15a4a74c924e0ad8298ea6ddbb4e757a"
+  },
+  "policy_schema_sha256": "9b9834b2eecbe1ac3266f9df3772a264900519573c202e10181c9a5577e6a3f9",
+  "policy_status": "SEALED_MEASURED",
+  "schema_version": "excel-inflow-disk-space-policy/1.1"
+}

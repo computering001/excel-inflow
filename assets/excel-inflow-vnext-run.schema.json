@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/excel-inflow-vnext-run.schema.json",
+  "title": "Excel Inflow vNext controller state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "controller_version",
+    "runtime_closure_sha256",
+    "run_id",
+    "status",
+    "quality_mode",
+    "blocker_class",
+    "user_blocking",
+    "checkpoints",
+    "checkpoint_events",
+    "artifacts",
+    "artifact_sha256",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-vnext-run/1.1" },
+    "controller_version": { "const": "excel-inflow-vnext/1.0" },
+    "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "support_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sha256"],
+      "properties": {
+        "version": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+    "status": { "enum": ["NEEDS_INTERNAL_WORK", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"] },
+    "quality_mode": { "enum": ["VERIFIED", "DEGRADED", "INPUT_REQUIRED", "INTERNAL_WORK", "FATAL"] },
+    "blocker_class": { "enum": [null, "INTERNAL_WORK", "USER_DECISION", "FATAL_SOURCE"] },
+    "user_blocking": { "type": "boolean" },
+    "checkpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["checkpoint_id", "status", "sha256"],
+        "properties": {
+          "checkpoint_id": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "checkpoint_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["checkpoint_id", "status", "sha256"],
+        "properties": {
+          "checkpoint_id": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "artifacts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "artifact_sha256": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+    "summary": { "type": "object" }
+  }
+}

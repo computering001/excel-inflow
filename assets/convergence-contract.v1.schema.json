@@ -1,0 +1,165 @@
+{
+  "$id": "convergence-contract/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "graph_binding", "policy_binding", "role_contract", "required_edges", "authority_contract", "rcf_sweep_contract", "scc_contract", "solver_iteration"],
+  "properties": {
+    "schema_version": { "const": "convergence-contract/1.0" },
+    "contract_id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+    "graph_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "graph_id", "canonical_sha256", "hash_encoding"],
+      "properties": {
+        "schema_version": { "const": "equation-graph/1.0" },
+        "graph_id": { "type": "string", "minLength": 1 },
+        "canonical_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "hash_encoding": { "const": "sha256_canonical_json" }
+      }
+    },
+    "policy_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "canonical_sha256", "hash_encoding", "tolerance_source"],
+      "properties": {
+        "schema_version": { "const": "economic-solve-policy/1.0" },
+        "canonical_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "hash_encoding": { "const": "sha256_canonical_json" },
+        "tolerance_source": { "const": "native_tolerances_by_class" }
+      }
+    },
+    "role_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zero_when_off", "live_when_off"],
+      "properties": {
+        "zero_when_off": { "$ref": "#/$defs/roleList" },
+        "live_when_off": { "$ref": "#/$defs/roleList" }
+      }
+    },
+    "required_edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/edgeSelector" }
+    },
+    "authority_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_domain", "consumer_domain", "edge_type", "required_direction", "reverse_direction"],
+      "properties": {
+        "owner_domain": { "const": "interest_schedule" },
+        "consumer_domain": { "const": "income_statement" },
+        "edge_type": { "const": "schedule_to_statement" },
+        "required_direction": { "const": "owner_to_consumer" },
+        "reverse_direction": { "const": "FORBIDDEN" }
+      }
+    },
+    "rcf_sweep_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activation", "edge_ids"],
+      "properties": {
+        "activation": { "const": "always" },
+        "edge_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "scc_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structural", "active_by_circularity"],
+      "properties": {
+        "structural": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scc" } },
+        "active_by_circularity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["0", "1"],
+          "properties": {
+            "0": { "type": "array", "maxItems": 0, "items": false },
+            "1": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scc" } }
+          }
+        }
+      }
+    },
+    "solver_iteration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "non_convergence", "state_by_circularity"],
+      "properties": {
+        "method": { "const": "deterministic_gauss_seidel" },
+        "non_convergence": { "const": "BLOCK" },
+        "state_by_circularity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["0", "1"],
+          "properties": {
+            "0": { "$ref": "#/$defs/iterationOff" },
+            "1": { "$ref": "#/$defs/iterationOn" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "roleList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "edgeSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "type", "activation"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "activation": { "enum": ["always", "circularity_on", "circularity_off"] }
+      }
+    },
+    "scc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nodes"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "nodes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "stateComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "tolerance_class"],
+      "properties": {
+        "node_id": { "type": "string", "minLength": 1 },
+        "tolerance_class": { "enum": ["currency", "ratio", "percentage", "control", "default"] }
+      }
+    },
+    "iterationOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "state_vector"],
+      "properties": {
+        "required": { "const": false },
+        "state_vector": { "type": "array", "maxItems": 0, "items": false }
+      }
+    },
+    "iterationOn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "state_vector"],
+      "properties": {
+        "required": { "const": true },
+        "state_vector": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/stateComponent" } }
+      }
+    }
+  }
+}
