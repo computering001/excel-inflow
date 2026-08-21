@@ -7,7 +7,7 @@
     "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 477,
+  "entry_count": 489,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -203,6 +203,16 @@
       "file": "scripts/build_dynamic_model.mjs",
       "content": "? Number(standaloneValues.get(ratio.row_id) ?? 0)",
       "fingerprint": "33af13c07ed6a4580044",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ".map((rate) => Number(rate ?? 0))",
+      "fingerprint": "49ea16dfa7248aa11ae3",
       "patterns": [
         "js_nullish_zero"
       ],
@@ -1727,8 +1737,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "lawful_counter_or_length",
-      "review_note": "A retry BUDGET, not a value. An unclassified error has no declared budget, so it gets no retries; the guard beside it also requires classification !== null, so the 0 cannot alone authorise a retry. Never reaches a workbook cell."
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/evidence_work_graph.mjs",
@@ -2201,9 +2210,9 @@
       "classification": "suspect_value_coercion"
     },
     {
-      "file": "scripts/lib/flow_screens.mjs",
-      "content": "`   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,",
-      "fingerprint": "f1a1704fb8f817f3dbcc",
+      "file": "scripts/lib/flow_review.mjs",
+      "content": "const quarantined = Number(brokerPreview?.evidence_inventory?.quarantined_cell_count ?? 0);",
+      "fingerprint": "fdffb6f07d6fbe80002a",
       "patterns": [
         "js_nullish_zero"
       ],
@@ -2212,8 +2221,18 @@
     },
     {
       "file": "scripts/lib/flow_screens.mjs",
-      "content": "`   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,",
-      "fingerprint": "9b3bcda7795e91a5621a",
+      "content": "`   Cells set aside ........ ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,",
+      "fingerprint": "d82703a0615e80f50109",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "`   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,",
+      "fingerprint": "f1a1704fb8f817f3dbcc",
       "patterns": [
         "js_nullish_zero"
       ],
@@ -2244,6 +2263,16 @@
       "file": "scripts/lib/flow_screens.mjs",
       "content": "const brokerHouseCount = evidenceRun?.broker_pack?.houses?.length ?? 0;",
       "fingerprint": "f39469677b1545b51768",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow.mjs",
+      "content": "remainingTopics: plan.pending_topic_count ?? 0,",
+      "fingerprint": "944c2c54cbc2942162de",
       "patterns": [
         "js_nullish_zero"
       ],
@@ -2602,12 +2631,92 @@
     },
     {
       "file": "scripts/lib/lease_policy.mjs",
+      "content": "-(Number(grossInterest ?? 0) -",
+      "fingerprint": "04097a18fec1c88ac222",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
       "content": ": [0, 0, Number(policy.opening_liability ?? 0)];",
       "fingerprint": "b437d6c3de853ae668af",
       "patterns": [
         "js_nullish_zero"
       ],
       "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "`-(gross interest ${Number(grossInterest ?? 0)} - lease interest ` +",
+      "fingerprint": "23654c856c84fe03fd30",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "`${Number(leaseInterest ?? 0)} - non-cash interest ` +",
+      "fingerprint": "2d0c764fcf7233f05a5d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "`${Number(nonCashInstrumentInterest ?? 0)}) = ${expected}; the accreted ` +",
+      "fingerprint": "0335e8cb47c15cec0737",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "`${Number(nonCashInterest ?? 0)} - non-cash instrument interest ` +",
+      "fingerprint": "b5083d57f28013e64d88",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "Number(leaseInterest ?? 0) -",
+      "fingerprint": "784548bcfecf7d433157",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "Number(nonCashInstrumentInterest ?? 0));",
+      "fingerprint": "9412bfdafcdca34f1982",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": "Number(nonCashInterest ?? 0) -",
+      "fingerprint": "6e359f2409c40b2cc360",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
       "classification": "suspect_value_coercion"
     },
     {
@@ -2688,8 +2797,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "lawful_counter_or_length",
-      "review_note": "A failure COUNTER. No prior receipt means no prior failures, which is the arithmetic truth, not a substitute for an absent measurement. nonNegativeIntegerOrNull already refuses a malformed count. Never reaches a workbook cell."
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/performance_receipt.mjs",
@@ -3263,16 +3371,6 @@
     },
     {
       "file": "scripts/lib/solver.mjs",
-      "content": "? Math.max(0, openingNative * Number(pikRate ?? 0) / 2)",
-      "fingerprint": "1a5302f618a59a8a4784",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/solver.mjs",
       "content": "? modelCase.rcf_policy?.opening_draw ?? rcfInstrument?.opening_balance ?? 0",
       "fingerprint": "898b14759ed5f8e8f4f4",
       "patterns": [
@@ -3553,6 +3651,16 @@
     },
     {
       "file": "scripts/lib/solver.mjs",
+      "content": "face: Number(instrument.opening_balance ?? 0),",
+      "fingerprint": "ae2842a3a8e5ff4ef27e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
       "content": "iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),",
       "fingerprint": "3ee7f6d9d24f1779dbfe",
       "patterns": [
@@ -3585,6 +3693,16 @@
       "file": "scripts/lib/solver.mjs",
       "content": "Number(fixedEndingBucketBalances.get(bucket.bucket_id) ?? 0) -",
       "fingerprint": "3297538856861f682ffb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(instrument.opening_balance ?? 0)",
+      "fingerprint": "e7f54067982ff72703f5",
       "patterns": [
         "js_nullish_zero"
       ],
