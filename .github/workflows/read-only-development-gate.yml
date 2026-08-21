@@ -20,16 +20,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
       - name: Install and observe the runtime toolchain
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
+        uses: ./.github/actions/setup-toolchain
       - name: Capture exact-head source identity
         run: |
           set -euo pipefail
@@ -87,12 +79,8 @@ jobs:
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry" }
-      - name: Install portable runtime dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
+      - name: Install the portable runtime toolchain
+        uses: ./.github/actions/setup-toolchain
       - name: Run the exact targeted selection
         run: |
           set -euo pipefail
@@ -100,7 +88,7 @@ jobs:
           node scripts/run_development_gate.mjs --profile portable \
             --only source-release-identity,immutable-release-package-attestation,public-bootstrap,runtime-doctor,installed-filings-capability,screen-session-one-use-binding \
             --cases test-fixtures/cases --representative test-fixtures/cases/standard-maximal-v2.json \
-            --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/targeted" --concurrency 1
+            --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/targeted" --concurrency 3
           node scripts/compile_external_ci_evidence.mjs lifecycle-from-gate-report \
             --source-identity "${{ runner.temp }}/source/source-identity.json" --registry-selection "${{ runner.temp }}/registry/registry-selection.json" \
             --gate-report "${{ runner.temp }}/targeted/development-gate-report.json" --job-id targeted_runtime --selection-scope TARGETED \
@@ -115,41 +103,99 @@ jobs:
     needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    # GitHub still sees ONE required job named full-portable: the three
+    # matrix legs are that job's declared shards (deterministic interleaved
+    # slices via --shard index/total), so final-aggregate's needs list is
+    # unchanged. Shard 1 waits for its siblings' retained reports, re-joins
+    # them through the aggregate referee and compiles the single PORTABLE_ALL
+    # lifecycle receipt the attestation consumes.
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry" }
-      - name: Install portable runtime dependencies
+      - name: Install the portable runtime toolchain
+        uses: ./.github/actions/setup-toolchain
+      - name: Run portable shard ${{ matrix.shard }} of 3
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
-      - name: Run every portable test once and compile lifecycle
-        run: |
-          set -euo pipefail
-          mkdir -p "${{ runner.temp }}/portable/raw"
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/portable/raw/evidence-run.json"
+          mkdir -p "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/raw"
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/raw/evidence-run.json"
           node scripts/run_development_gate.mjs --profile portable --cases test-fixtures/cases \
-            --representative test-fixtures/cases/standard-maximal-v2.json --raw-canary-evidence "${{ runner.temp }}/portable/raw/evidence-run.json" \
-            --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/portable/results" --concurrency 1
+            --representative test-fixtures/cases/standard-maximal-v2.json \
+            --raw-canary-evidence "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/raw/evidence-run.json" \
+            --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --out "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/results" --concurrency 3 \
+            --shard ${{ matrix.shard }}/3
+      - name: Retain portable shard ${{ matrix.shard }} results and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: exact-head-full-portable-shard-${{ matrix.shard }}
+          path: "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/**"
+          if-no-files-found: error
+          retention-days: 30
+      - name: Wait for the sibling shard reports
+        if: matrix.shard == 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 3300 ))
+          while :; do
+            ready="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+              --jq '[.artifacts[] | select(.expired == false and (.name == "exact-head-full-portable-shard-2" or .name == "exact-head-full-portable-shard-3"))] | length')"
+            if [ "$ready" -ge 2 ]; then break; fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "Sibling portable shards did not publish their reports in time." >&2
+              exit 1
+            fi
+            sleep 30
+          done
+      - name: Download the sibling shard reports
+        if: matrix.shard == 1
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: exact-head-full-portable-shard-*
+          path: "${{ runner.temp }}/portable/incoming"
+      - name: Re-join the three shards and compile the full portable lifecycle
+        if: matrix.shard == 1
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/portable/results"
+          node scripts/aggregate_development_gate_reports.mjs --profile portable \
+            --report "${{ runner.temp }}/portable/incoming/exact-head-full-portable-shard-1/results/development-gate-report.json" \
+            --report "${{ runner.temp }}/portable/incoming/exact-head-full-portable-shard-2/results/development-gate-report.json" \
+            --report "${{ runner.temp }}/portable/incoming/exact-head-full-portable-shard-3/results/development-gate-report.json" \
+            --out "${{ runner.temp }}/portable/portable-aggregate-verdict.json" \
+            --out-report "${{ runner.temp }}/portable/results/development-gate-report.json"
           node scripts/compile_external_ci_evidence.mjs lifecycle-from-gate-report \
             --source-identity "${{ runner.temp }}/source/source-identity.json" --registry-selection "${{ runner.temp }}/registry/registry-selection.json" \
             --gate-report "${{ runner.temp }}/portable/results/development-gate-report.json" --job-id portable_gate --selection-scope PORTABLE_ALL \
             --out "${{ runner.temp }}/portable/portable-gate-receipt.json"
       - name: Retain complete portable results and logs
-        if: always()
+        if: always() && matrix.shard == 1
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with: { name: exact-head-full-portable, path: "${{ runner.temp }}/portable/**", if-no-files-found: error, retention-days: 30 }
+        with:
+          name: exact-head-full-portable
+          path: |
+            ${{ runner.temp }}/portable/shards/1/**
+            ${{ runner.temp }}/portable/results/**
+            ${{ runner.temp }}/portable/portable-aggregate-verdict.json
+            ${{ runner.temp }}/portable/portable-gate-receipt.json
+          if-no-files-found: error
+          retention-days: 30
 
   package-a:
     name: 5 - Independent package A
@@ -167,12 +213,8 @@ jobs:
         with: { python-version: "3.12" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
-      - name: Install package build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
+      - name: Install the package build toolchain
+        uses: ./.github/actions/setup-toolchain
       - name: Build package A from its own clean checkout
         run: |
           set -euo pipefail
@@ -209,12 +251,8 @@ jobs:
         with: { python-version: "3.12" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
-      - name: Install package build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
+      - name: Install the package build toolchain
+        uses: ./.github/actions/setup-toolchain
       - name: Build package B from its own clean checkout
         run: |
           set -euo pipefail
@@ -274,6 +312,9 @@ jobs:
         with: { python-version: "3.12" }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-package-a, path: "${{ runner.temp }}/downloaded-a" }
+      # This job deliberately has NO source checkout (governance: it runs only
+      # the downloaded archive), so it cannot reference the in-repo composite
+      # setup-toolchain action and keeps its own inline install.
       - name: Install host dependencies without a source checkout
         run: |
           set -euo pipefail
@@ -297,31 +338,58 @@ jobs:
     needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    # pull-requests: read lets the SHA-pinned paths filter read the pull
+    # request's changed-file list; everything else stays read-only.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
+      - name: Detect whether mutation-relevant sources changed
+        id: mutation-scope
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          filters: |
+            mutation_relevant:
+              - 'scripts/lib/**'
+              - 'scripts/build_dynamic_model.mjs'
+              - 'scripts/solver*'
+              - 'test-fixtures/**'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
-      - name: Install mutation runtime dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
-      - name: Execute and count every currently measured mutation
+      - name: Install the mutation runtime toolchain
+        uses: ./.github/actions/setup-toolchain
+      # The attestation refuses any candidate head without a fully measured,
+      # zero-survivor P0 gate, so "paths unchanged" never skips measurement
+      # outright: it DOWNSHIFTS to measuring exactly the derived P0 gate while
+      # honestly enumerating every deferred suite as an owned gap — precisely
+      # what mutation_measurement_custody declares. Changed production-reach
+      # sources still earn the full corpus.
+      - name: Execute mutation measurement at the earned depth
+        env:
+          MUTATION_RELEVANT: ${{ steps.mutation-scope.outputs.mutation_relevant }}
         run: |
           set -euo pipefail
           mkdir -p "${{ runner.temp }}/mutation/raw"
           node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/mutation/raw/evidence-run.json"
-          node scripts/compile_mutation_adequacy.mjs --profile all --representative test-fixtures/cases/standard-maximal-v2.json \
-            --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
-            --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          if [ "$MUTATION_RELEVANT" = "true" ]; then
+            node scripts/compile_mutation_adequacy.mjs --profile all --representative test-fixtures/cases/standard-maximal-v2.json \
+              --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
+              --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          else
+            printf '%s\n' '{"mutation_measurement": "skipped_paths_unchanged", "authority": "scheduled-deep-gate"}' \
+              | tee "${{ runner.temp }}/mutation/mutation-scope-decision.json"
+            node scripts/compile_mutation_adequacy.mjs --profile all --dry-run \
+              --out "${{ runner.temp }}/mutation/p0-scope-dry-run.json"
+            p0_ids="$(node -e 'const r=require(process.argv[1]);process.stdout.write(r.zero_survivor_gate.member_ids.join(","))' "${{ runner.temp }}/mutation/p0-scope-dry-run.json")"
+            node scripts/compile_mutation_adequacy.mjs --profile all --only "$p0_ids" \
+              --representative test-fixtures/cases/standard-maximal-v2.json \
+              --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
+              --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          fi
           node scripts/run_mutation_adequacy_tests.mjs --report "${{ runner.temp }}/mutation/mutation-report.json"
           node scripts/compile_exact_head_ci_job_receipt.mjs mutation-measurement \
             --source-identity "${{ runner.temp }}/source/source-identity.json" --raw "${{ runner.temp }}/mutation/mutation-report.json" \

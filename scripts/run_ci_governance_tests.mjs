@@ -52,7 +52,13 @@ function universalAssertions(name, text) {
   const findings = FORBIDDEN.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
   assert.deepEqual(findings, [], `${name} violates read-only/fail-closed shell governance.`);
   const actions = [...text.matchAll(ACTION_USE)].map((match) => match[1]);
-  assert(actions.length > 0 && actions.every((value) => /@[a-f0-9]{40}$/.test(value)), `${name} contains an unpinned action.`);
+  // Remote actions must be commit-SHA pinned. Local references are allowed
+  // only into the repository's own composite-action directory, where every
+  // nested uses: is itself reviewed and pinned.
+  const unpinned = actions.filter((value) => !value.startsWith("./.github/actions/") && !/@[a-f0-9]{40}$/.test(value));
+  const strayLocal = actions.filter((value) => value.startsWith("./") && !value.startsWith("./.github/actions/"));
+  assert(actions.length > 0 && unpinned.length === 0 && strayLocal.length === 0,
+    `${name} contains an unpinned or out-of-scope action: ${[...unpinned, ...strayLocal].join(", ")}`);
 }
 function exactHeadAssertions(text) {
   assert.deepEqual(workflowJobs(text), REQUIRED_EXACT_HEAD_JOBS, "Exact-head workflow does not contain exactly the eleven ordered jobs.");
@@ -74,6 +80,11 @@ function exactHeadAssertions(text) {
   assert.equal((text.match(/capture-registry-selection/g) ?? []).length, 1, "Registry selection is not compiled exactly once.");
   assert.match(jobBlock(text, "targeted-bootstrap-runtime") ?? "", /--only[\s\S]*public-bootstrap[\s\S]*runtime-doctor/, "Targeted runtime job lacks exact targeted execution.");
   assert.match(jobBlock(text, "full-portable") ?? "", /--profile portable[\s\S]*--selection-scope PORTABLE_ALL/, "Full portable lifecycle is absent.");
+  const portable = jobBlock(text, "full-portable") ?? "";
+  assert.match(portable, /strategy:\s*\n\s+fail-fast:\s*false\s*\n\s+matrix:\s*\n\s+shard:\s*\[1, 2, 3\]/, "The full portable lane is not a three-shard matrix under its single job id.");
+  assert.equal((text.match(/--shard \$\{\{ matrix\.shard \}\}\/3/g) ?? []).length, 1, "The portable gate must carry the shard argument exactly once per leg.");
+  assert.match(portable, /aggregate_development_gate_reports\.mjs/, "Sharded portable reports are never re-joined into one complete report.");
+  assert.match(portable, /name:\s*exact-head-full-portable-shard-\$\{\{ matrix\.shard \}\}/, "Per-shard evidence custody is absent.");
   assert.match(jobBlock(text, "package-a") ?? "", /--label A[\s\S]*--source-date-epoch/, "Package A is not independent/epoch-bound.");
   assert.match(jobBlock(text, "package-b") ?? "", /--label B[\s\S]*--source-date-epoch/, "Package B is not independent/epoch-bound.");
   for (const id of ["package-a", "package-b"]) {
@@ -104,7 +115,7 @@ for (const name of files) {
   if (roleByFile.get(name) === ROLE_PULL_REQUEST_GATE) {
     exactHeadAssertions(text);
     clean = text;
-    checks += 38;
+    checks += 42;
   } else {
     assert.match(text, /^\s*schedule:\s*$/m, `${name} lacks scheduled deep tiers.`);
     assert([...text.matchAll(/^\s*-\s*cron:/gm)].length >= 2, `${name} lacks two declared cron tiers.`);

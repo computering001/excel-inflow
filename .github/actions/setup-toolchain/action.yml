@@ -1,0 +1,45 @@
+name: Set up the exact CI toolchain
+description: >-
+  One cached install of the gate toolchain: Node 22, Python 3.12,
+  LibreOffice Calc, poppler-utils, carlito fonts and the pinned Python
+  packages. The cache key is a canonical fingerprint of exactly those
+  declarations, mirroring the receipts' toolchain_sha256 pattern, so any
+  change to any member invalidates every cache entry at once.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: "22"
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.12"
+    - name: Derive the toolchain fingerprint
+      id: fingerprint
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Canonical JSON, keys sorted, byte-identical on every runner: this is
+        # the same discipline the evidence receipts apply to their toolchain
+        # block before hashing it.
+        fingerprint="$(printf '%s' '{"apt":["libreoffice-calc","poppler-utils","fonts-crosextra-carlito"],"node":"22","pip":["jsonschema","lxml==6.1.1","numpy==2.0.2","openpyxl==3.1.5","pillow==11.3.0","pymupdf==1.26.5"],"python":"3.12"}' | sha256sum | cut -d ' ' -f 1)"
+        printf 'sha256=%s\n' "$fingerprint" >> "$GITHUB_OUTPUT"
+    - name: Restore the toolchain caches (wheels and downloaded debs)
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+      with:
+        path: |
+          ~/.cache/pip
+          /var/cache/apt/archives
+        key: setup-toolchain-${{ runner.os }}-${{ steps.fingerprint.outputs.sha256 }}
+        restore-keys: |
+          setup-toolchain-${{ runner.os }}-
+    - name: Install the pinned toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        # Keep-Downloaded-Packages makes the .deb files survive this install so
+        # the cache post-step can save them; a later hit then installs from the
+        # local archive instead of re-downloading LibreOffice.
+        sudo apt-get install --yes -o APT::Keep-Downloaded-Packages=true libreoffice-calc poppler-utils fonts-crosextra-carlito
+        python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
