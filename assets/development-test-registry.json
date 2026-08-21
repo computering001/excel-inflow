@@ -50,58 +50,155 @@
   },
   "tests": [
     {
-      "id": "workflow-state-contract",
-      "phase": "workflow",
+      "id": "acquisition-funding-integration",
+      "phase": "economics",
       "runtime": "node",
-      "script": "run_workflow_state_tests.mjs",
+      "script": "run_acquisition_funding_integration_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
     },
     {
-      "id": "ci-governance-read-only",
-      "phase": "workflow",
+      "id": "acquisition-plan-purity",
+      "phase": "proof",
       "runtime": "node",
-      "script": "run_ci_governance_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "decision-round-batching",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_decision_round_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "entity-identity",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_entity_identity_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "source-ingress-security",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_source_ingress_security_tests.mjs",
+      "script": "run_acquisition_plan_purity_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "real-filing-custody-inventory",
-      "phase": "evidence",
+      "id": "acquisition-portable-workbook-restoration",
+      "phase": "proof",
       "runtime": "python",
-      "script": "run_real_filing_custody_inventory_tests.py",
-      "timeout_seconds": 60,
+      "script": "run_acquisition_portable_workbook_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "directory"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "acquisition-solver-scenarios",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_acquisition_solver_case_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "acquisition-valuation-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_acquisition_valuation_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "acquisition-workbook-scenarios",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_acquisition_workbook_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "archetype-economics",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_archetype_economics_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "archetype-presentation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_archetype_presentation_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "architecture-ownership",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_architecture_ownership_tests.mjs",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "unit"
+    },
+    {
+      "id": "attachment-evidence-controller",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_evidence_pipeline_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "behavioural-goldens",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_behavioural_golden_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "blocker-replay-corpus",
@@ -117,290 +214,31 @@
       "test_class": "unit"
     },
     {
-      "id": "tax-rate-policy",
-      "phase": "economics",
+      "id": "bounded-parallelism",
+      "phase": "performance",
       "runtime": "node",
-      "script": "run_tax_rate_policy_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "run-deadline",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_run_deadline_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "forecast-completion",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_completion_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "ci-census",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_ci_census_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "support-envelope",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_support_envelope_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "terminal-reason-registry",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_terminal_reason_registry_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "programme-control",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_programme_control_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "ownership-census",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_ownership_census_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "canonical-contracts",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_canonical_contract_tests.mjs",
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "typed-financial-value",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_typed_financial_value_tests.mjs",
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "typed-arithmetic",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_typed_arithmetic_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "producer-boundary",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_producer_boundary_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "etr-receipt-boundary",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_etr_receipt_boundary_tests.mjs",
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "entity-identifier-strength",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_entity_identifier_strength_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "coercion-ban",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_coercion_ban_tests.mjs",
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "dual-read-migration",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_dual_read_migration_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "support-preflight-wire",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_support_preflight_wire_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "internal-outcomes",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_internal_outcome_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "multipage-filing-extraction",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_multipage_filing_extraction_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "layered-graph-constitution",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_layered_graph_constitution_tests.mjs",
-      "arguments": [
-        {
-          "name": "representative",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "equation-graph-and-scc",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_equation_graph_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "fixed-point-multi-archetype",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_fixed_point_constitution_tests.mjs",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--manifest",
-          "type": "literal"
-        },
-        {
-          "name": "fixed_point_cases_manifest",
-          "source": "FIXED_POINT_CASES_MANIFEST",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "FIXED_POINT_CASES_MANIFEST"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "instrument-period-state",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_instrument_period_state_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "debt-class-contract",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_debt_class_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "lease-roll-forward",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_lease_roll_forward_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "instrument-interest-lineage",
-      "phase": "economics",
-      "runtime": "python",
-      "script": "run_interest_lineage_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "interest-economics-contract",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_interest_economics_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "independent-forecast-ownership",
-      "phase": "forecast",
-      "runtime": "python",
-      "script": "run_independent_forecast_ownership_tests.py",
-      "timeout_seconds": 300,
+      "script": "run_bounded_parallelism_tests.mjs",
+      "timeout_seconds": 600,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "broker-consensus-membership-oracle",
-      "phase": "forecast",
-      "runtime": "python",
-      "script": "run_broker_consensus_membership_oracle_tests.py",
+      "id": "bounded-progress-heartbeat",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_progress_heartbeat_tests.mjs",
       "timeout_seconds": 120,
       "mutates_product_tree": false,
-      "test_class": "independent_economic_oracle"
+      "test_class": "unit"
+    },
+    {
+      "id": "broker-carrier-migration",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_migration_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
     },
     {
       "id": "broker-consensus-compiler",
@@ -412,6 +250,15 @@
       "test_class": "unit"
     },
     {
+      "id": "broker-consensus-membership-oracle",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_broker_consensus_membership_oracle_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
       "id": "broker-consensus-workbook-semantics",
       "phase": "forecast",
       "runtime": "node",
@@ -421,194 +268,13 @@
       "test_class": "cross_layer_integration"
     },
     {
-      "id": "forecast-behavior",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_behavior_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "forecast-observation-ledger",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_observation_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "evidence-resolution-v2",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_evidence_resolution_v2_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "run-constitution-graph",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_run_constitution_graph_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "product-constitution",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_product_constitution_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "delivery-constitution",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_delivery_constitution_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "controller-terminal-exits",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_controller_exit_inventory_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "broker-dynamic-concepts",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_broker_dynamic_concept_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "forecast-topology",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_topology_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "statement-classifier",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_statement_classifier_tests.mjs",
-      "arguments": [
-        {
-          "name": "representative",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "case-source-proposer",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_case_source_proposer_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "cash-fx-identity-workbook",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_cash_fx_identity_workbook_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "typed-filing-values-and-row-identity",
+      "id": "broker-core-demand-quality",
       "phase": "evidence",
       "runtime": "python",
-      "script": "run_typed_filing_value_tests.py",
+      "script": "run_broker_core_demand_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "source-arithmetic-precision",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_source_arithmetic_precision_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "source-arithmetic-authority",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_source_arithmetic_authority_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "independent-source-economic-oracle",
-      "phase": "economics",
-      "runtime": "python",
-      "script": "verify/run_source_economic_oracle_tests.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "independent_economic_oracle"
-    },
-    {
-      "id": "historical-normalisation",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_historical_normalisation_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "case-authorship-boundary",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_case_authorship_boundary_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "attachment-evidence-controller",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_evidence_pipeline_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "broker-intake-choice",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_broker_intake_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
+      "test_class": "component_integration"
     },
     {
       "id": "broker-degraded-close",
@@ -629,19 +295,55 @@
       "test_class": "synthetic_integration"
     },
     {
-      "id": "broker-carrier-migration",
+      "id": "broker-dynamic-concepts",
       "phase": "evidence",
-      "runtime": "python",
-      "script": "run_broker_migration_tests.py",
+      "runtime": "node",
+      "script": "run_broker_dynamic_concept_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
     },
     {
-      "id": "broker-preview-gate",
-      "phase": "evidence",
+      "id": "broker-exit-fault-injection",
+      "phase": "workflow",
       "runtime": "node",
-      "script": "run_broker_preview_tests.mjs",
+      "script": "run_broker_exit_fault_injection_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "broker-freshness-policy",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_broker_freshness_policy_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "broker-house-exclusion",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_house_exclusion_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "broker-intake-choice",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_broker_intake_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "broker-native-preflight-reuse",
+      "phase": "performance",
+      "runtime": "python",
+      "script": "run_broker_native_preflight_reuse_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -666,73 +368,22 @@
       "test_class": "synthetic_integration"
     },
     {
-      "id": "internal-evidence-fixed-point",
-      "phase": "workflow",
+      "id": "broker-pdf-timeout-policy",
+      "phase": "performance",
       "runtime": "python",
-      "script": "run_internal_fixed_point_tests.py",
-      "timeout_seconds": 300,
+      "script": "run_broker_pdf_timeout_policy_tests.py",
+      "timeout_seconds": 120,
       "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
+      "test_class": "mutation"
     },
     {
-      "id": "broker-work-graph",
-      "phase": "workflow",
+      "id": "broker-period-grammar",
+      "phase": "forecast",
       "runtime": "python",
-      "script": "run_broker_work_graph_tests.py",
+      "script": "run_broker_period_grammar_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "dcs-lossless-evidence",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_dcs_evidence_tests.py",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "dcs-controller-fixed-point",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_dcs_pipeline_tests.py",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "broker-physical-reconciliation",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_broker_physical_reconciliation_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
+      "test_class": "unit"
     },
     {
       "id": "broker-period-header-recovery",
@@ -753,19 +404,19 @@
       "test_class": "mutation"
     },
     {
-      "id": "broker-house-exclusion",
+      "id": "broker-physical-reconciliation",
       "phase": "evidence",
       "runtime": "python",
-      "script": "run_broker_house_exclusion_tests.py",
+      "script": "run_broker_physical_reconciliation_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
     },
     {
-      "id": "broker-table-engine-adapter",
+      "id": "broker-preview-gate",
       "phase": "evidence",
-      "runtime": "python",
-      "script": "run_broker_table_engine_tests.py",
+      "runtime": "node",
+      "script": "run_broker_preview_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -803,6 +454,1606 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "real_corpus"
+    },
+    {
+      "id": "broker-real-pack-completion",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_broker_real_pack_completion_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "broker_real_pack_manifest",
+          "source": "BROKER_REAL_PACK_MANIFEST",
+          "type": "file"
+        },
+        {
+          "name": "arg_3",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "BROKER_REAL_PACK_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
+      "id": "broker-table-engine-adapter",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_table_engine_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "broker-work-graph",
+      "phase": "workflow",
+      "runtime": "python",
+      "script": "run_broker_work_graph_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "canonical-contracts",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_canonical_contract_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "canonical-graph-binding",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_canonical_graph_binding_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "canonical-model-modules",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_canonical_model_module_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "carrier-product-identity",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_carrier_product_identity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "case-authorship-boundary",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_case_authorship_boundary_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "case-compiler-equivalence",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_case_compiler_equivalence.mjs",
+      "arguments": [
+        {
+          "name": "cases",
+          "source": "CASES",
+          "type": "directory"
+        }
+      ],
+      "requires": [
+        "CASES"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "frozen_authority"
+    },
+    {
+      "id": "case-source-proposer",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_case_source_proposer_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "cash-fx-identity-workbook",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_cash_fx_identity_workbook_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "certified-runtime-code-closure",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_certified_code_closure_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ci-census",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_census_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "ci-command-status-custody",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_command_with_custody_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ci-gate-tiers",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_gate_tier_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ci-governance-read-only",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_governance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "classification-resolution",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_classification_resolution_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "classifier-caption-defects",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_classifier_caption_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "coercion-ban",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_coercion_ban_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "completion-census-scope",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_completion_census_scope_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "controller-terminal-exits",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_controller_exit_inventory_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "critical-invariant-independent-oracle-matrix",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_critical_invariant_oracle_matrix_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "type": "literal",
+          "value": "--soffice"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "dcs-controller-fixed-point",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_dcs_pipeline_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "dcs-lossless-evidence",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_dcs_evidence_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "debt-class-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_debt_class_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "decision-round-batching",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_decision_round_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "declared-fixed-point-completeness",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_declared_fixed_point_completeness_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "declared-value-typed-outcome",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_declared_value_typed_outcome_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "degraded-broker-delivery",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_degraded_broker_delivery_tests.mjs",
+      "arguments": [
+        {
+          "name": "cases",
+          "source": "CASES",
+          "type": "directory"
+        }
+      ],
+      "requires": [
+        "CASES"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "delivery-constitution",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_delivery_constitution_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "delivery-inventory",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_delivery_inventory_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "differential-invalidation",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_differential_invalidation_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "disk-space-measurement-builder",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_disk_space_measurement_builder_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "disk-space-policy",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_disk_space_policy_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "doc-single-source-drift-gate",
+      "phase": "release",
+      "runtime": "node",
+      "script": "run_doc_single_source_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "dual-read-migration",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_dual_read_migration_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "durable-artifact-generation",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_durable_artifact_generation_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ebitda-basis-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_ebitda_basis_contract_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "economic-authority-seal",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_economic_authority_seal_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "economic-ir",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_economic_ir_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "emitted-candidate-independent-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_emitted_candidate_independent_oracle_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "type": "literal",
+          "value": "--soffice"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "file"
+        },
+        {
+          "name": "arg_4",
+          "type": "literal",
+          "value": "--out"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "emitted-formula-derivability",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_emitted_formula_derivability_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "entity-identifier-strength",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_entity_identifier_strength_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "entity-identity",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_entity_identity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "envelope-terminal-legality",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_envelope_terminal_legality_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "equation-graph-and-scc",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_equation_graph_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "etr-dag-safety",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_etr_dag_safety_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "etr-receipt-boundary",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_etr_receipt_boundary_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "evidence-orchestration",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_evidence_orchestration_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "evidence-resolution-v2",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_evidence_resolution_v2_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "evidence-run-compiler",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_evidence_run_tests.mjs",
+      "arguments": [
+        {
+          "name": "cases",
+          "source": "CASES",
+          "type": "directory"
+        }
+      ],
+      "requires": [
+        "CASES"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "evidence-work-graph",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_evidence_work_graph_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "exact-head-ci-job-receipt-projection",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_exact_head_ci_job_receipt_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "excel-value-semantics",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_excel_value_semantics_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "experience-trace-leaf-coverage",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_experience_trace_leaf_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "experience-trace-policy",
+      "phase": "performance",
+      "runtime": "python",
+      "script": "run_experience_trace_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "external-exact-head-ci-evidence",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_external_ci_evidence_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "filings-controller",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_filings_pipeline_tests.mjs",
+      "requires": [
+        "CASES"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "filings-source-mode",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_filings_source_mode_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "fixed-point-multi-archetype",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_fixed_point_constitution_tests.mjs",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "fixed_point_cases_manifest",
+          "source": "FIXED_POINT_CASES_MANIFEST",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "FIXED_POINT_CASES_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "footing-tolerance-defects",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_footing_tolerance_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "forecast-authority-ledger",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_authority_ledger_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "forecast-authority-ranking",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_authority_ranking_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "forecast-behavior",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_behavior_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "forecast-completion",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_completion_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "forecast-observation-ledger",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_observation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "forecast-ownership-physical-oracle",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "verify/run_forecast_ownership_physical_mutations.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "forecast-ownership-preflight",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_ownership_preflight_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "forecast-topology",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_topology_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "formula-ast",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_formula_ast_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "full-run-performance-receipt",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_performance_receipt_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "funded-acquisition-transaction",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_funded_acquisition_transaction_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "gate-side-effect",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_gate_side_effect_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
+      "id": "generated-case-cohort",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_generated_cohort_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "graph-driven-solve",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_graph_driven_solve_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "hard-clock",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_hard_clock_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "historical-normalisation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_historical_normalisation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "host-experience-trace",
+      "phase": "performance",
+      "runtime": "python",
+      "script": "run_host_experience_trace_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "immutable-release-package-attestation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_package_attestation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "independent-exact-head-package-ci",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_exact_head_package_ci_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "independent-forecast-ownership",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_independent_forecast_ownership_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "independent-physical-workbook-binding",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_independent_physical_workbook_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "independent-source-economic-oracle",
+      "phase": "economics",
+      "runtime": "python",
+      "script": "verify/run_source_economic_oracle_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "inline-xbrl-structured-lane",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_inline_xbrl_extraction_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
+      "id": "installed-capability-independent-oracle",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_capability_oracle_tests.mjs",
+      "arguments": [
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-capability-receipt-v13",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_installed_capability_receipt_v13_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-filings-capability",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_filings_capability_tests.mjs",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "timeout_seconds": 1800,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-host-broker-receipt-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_host_broker_receipt_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "installed-host-usable-broker",
+      "phase": "real_corpus",
+      "runtime": "node",
+      "script": "verify_installed_host_broker_canary.mjs",
+      "arguments": [
+        "$INSTALLED_HOST_BROKER_RECEIPT"
+      ],
+      "requires": [
+        "INSTALLED_HOST_BROKER_RECEIPT"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "installed_host"
+    },
+    {
+      "id": "installed-inline-xbrl-capability",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_installed_inline_xbrl_probe_tests.mjs",
+      "requires": [
+        "PYTHON"
+      ],
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "instrument-interest-lineage",
+      "phase": "economics",
+      "runtime": "python",
+      "script": "run_interest_lineage_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "instrument-period-state",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_instrument_period_state_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "interest-economics-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_interest_economics_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "internal-evidence-fixed-point",
+      "phase": "workflow",
+      "runtime": "python",
+      "script": "run_internal_fixed_point_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "internal-outcomes",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_internal_outcome_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "large-broker-pack-stress",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_large_broker_pack_stress_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "layered-graph-constitution",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_layered_graph_constitution_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "lease-roll-forward",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_lease_roll_forward_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "libreoffice-workbook-capability",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_libreoffice_workbook_capability_tests.mjs",
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "local-workbook-review-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_local_workbook_review_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "metamorphic-relations",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_metamorphic_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "model-owned-broker-demand",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_model_owned_broker_demand_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "multipage-filing-extraction",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_multipage_filing_extraction_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "mutation-adequacy",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_mutation_adequacy_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "native-excel-all-cell-error-scan",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_native_excel_error_scan_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "native-excel-number-format-compatibility",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_excel_number_format_compatibility_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "never-zero-and-order-invariance",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_never_zero_and_order_invariance_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "nonrecurring-forecast-policy",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_nonrecurring_forecast_policy_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "opening-amount-typing",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_amount_typing_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "opening-debt-bridge",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_debt_bridge_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "opening-debt-reconciliation",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_debt_reconciliation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "opening-instrument-provenance",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_instrument_provenance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "ownership-census",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_ownership_census_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "package-ab",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_package_ab_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "packaged-path-acceptance",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_packaged_path_acceptance_tests.mjs",
+      "arguments": [
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "performance-receipt-honesty",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_performance_receipt_honesty_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "period-scoring",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_period_scoring_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "period-support-stitch",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_period_support_stitch_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
+      "id": "phase15-portable-fault-injection",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_phase15_fault_injection_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "phase3-runtime-session-integration",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_phase3_runtime_session_integration_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
+      "id": "phase5-operational-runtime-adversarial",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_phase5_operational_runtime_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "phase9-broker-end-to-end-scenarios",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_phase9_broker_e2e_scenarios.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "physical-authority-mutation",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_physical_authority_mutation_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "plan-reconstruction",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_plan_reconstruction_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "policy-registry",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_policy_registry_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "portability-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_portability_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "portable-certification-tier",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_portable_certification_tier_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "portable-finance-workbook-semantic-mutations",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_portable_finance_workbook_mutation_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "file"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "directory"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "post-close-broker-fallback-raw-canary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": [
+        {
+          "name": "raw_canary_evidence",
+          "source": "RAW_CANARY_EVIDENCE",
+          "type": "file"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        },
+        {
+          "name": "arg_4",
+          "value": "--broker-state",
+          "type": "literal"
+        },
+        {
+          "name": "arg_5",
+          "value": "usable",
+          "type": "literal"
+        },
+        {
+          "name": "arg_6",
+          "value": "--inject-post-close-broker-ingress-failure",
+          "type": "literal"
+        }
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 1800,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "prebroker-ownership-controller",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_prebroker_ownership_controller_tests.py",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "producer-boundary",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_producer_boundary_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "product-constitution",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_product_constitution_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "production-user-flow",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_user_flow_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "programme-control",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_programme_control_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "protected-identity-semantic-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "verify/run_protected_identity_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "provenance-authority",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_provenance_authority_tests.py",
+      "arguments": [
+        {
+          "name": "out_flag",
+          "type": "literal",
+          "value": "--out"
+        },
+        {
+          "name": "out",
+          "source": "TEST_OUT",
+          "type": "directory"
+        }
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "public-bootstrap",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_public_bootstrap_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "public-state-ownership",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_public_state_ownership_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "raw-canary-fixture-custody",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_canary_fixture_custody_tests.mjs",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "raw-input-black-box-canary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": [
+        {
+          "name": "raw_canary_evidence",
+          "source": "RAW_CANARY_EVIDENCE",
+          "type": "file"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
     },
     {
       "id": "real-filing-corpus-classification",
@@ -878,248 +2129,6 @@
       "test_class": "real_corpus"
     },
     {
-      "id": "inline-xbrl-structured-lane",
-      "phase": "real_corpus",
-      "runtime": "python",
-      "script": "run_inline_xbrl_extraction_tests.py",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--manifest",
-          "type": "literal"
-        },
-        {
-          "name": "real_filing_corpus_manifest",
-          "source": "REAL_FILING_CORPUS_MANIFEST",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REAL_FILING_CORPUS_MANIFEST"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "real_corpus"
-    },
-    {
-      "id": "period-support-stitch",
-      "phase": "real_corpus",
-      "runtime": "python",
-      "script": "run_period_support_stitch_tests.py",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--manifest",
-          "type": "literal"
-        },
-        {
-          "name": "real_filing_corpus_manifest",
-          "source": "REAL_FILING_CORPUS_MANIFEST",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REAL_FILING_CORPUS_MANIFEST"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "real_corpus"
-    },
-    {
-      "id": "broker-real-pack-completion",
-      "phase": "real_corpus",
-      "runtime": "python",
-      "script": "run_broker_real_pack_completion_tests.py",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--manifest",
-          "type": "literal"
-        },
-        {
-          "name": "broker_real_pack_manifest",
-          "source": "BROKER_REAL_PACK_MANIFEST",
-          "type": "file"
-        },
-        {
-          "name": "arg_3",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "BROKER_REAL_PACK_MANIFEST"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "real_corpus"
-    },
-    {
-      "id": "filings-controller",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_filings_pipeline_tests.mjs",
-      "requires": [
-        "CASES"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "evidence-orchestration",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_evidence_orchestration_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "evidence-run-compiler",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_evidence_run_tests.mjs",
-      "arguments": [
-        {
-          "name": "cases",
-          "source": "CASES",
-          "type": "directory"
-        }
-      ],
-      "requires": [
-        "CASES"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "production-user-flow",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_user_flow_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "stage4-content-addressed-resume",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_stage4_checkpoint_tests.mjs",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--cases",
-          "type": "literal"
-        },
-        {
-          "name": "cases",
-          "source": "CASES",
-          "type": "directory"
-        },
-        {
-          "name": "arg_3",
-          "value": "--python",
-          "type": "literal"
-        },
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "executable"
-        },
-        {
-          "name": "arg_5",
-          "value": "--soffice",
-          "type": "literal"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "executable"
-        }
-      ],
-      "requires": [
-        "CASES",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "degraded-broker-delivery",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_degraded_broker_delivery_tests.mjs",
-      "arguments": [
-        {
-          "name": "cases",
-          "source": "CASES",
-          "type": "directory"
-        }
-      ],
-      "requires": [
-        "CASES"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "broker-exit-fault-injection",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_broker_exit_fault_injection_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "universal-broker-delivery-matrix",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_universal_broker_delivery_matrix.mjs",
-      "arguments": [
-        "$RAW_CANARY_EVIDENCE",
-        "$PYTHON",
-        "$SOFFICE"
-      ],
-      "requires": [
-        "RAW_CANARY_EVIDENCE",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "phase9-broker-end-to-end-scenarios",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_phase9_broker_e2e_scenarios.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "raw-canary-fixture-custody",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_raw_canary_fixture_custody_tests.mjs",
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
       "id": "real-filing-corpus-extraction-outcome-contract",
       "phase": "proof",
       "runtime": "python",
@@ -1129,81 +2138,13 @@
       "test_class": "mutation"
     },
     {
-      "id": "raw-input-black-box-canary",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_raw_input_black_box_canary.mjs",
-      "arguments": [
-        {
-          "name": "raw_canary_evidence",
-          "source": "RAW_CANARY_EVIDENCE",
-          "type": "file"
-        },
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "executable"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "executable"
-        }
-      ],
-      "requires": [
-        "RAW_CANARY_EVIDENCE",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
+      "id": "real-filing-custody-inventory",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_real_filing_custody_inventory_tests.py",
+      "timeout_seconds": 60,
       "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "post-close-broker-fallback-raw-canary",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_raw_input_black_box_canary.mjs",
-      "arguments": [
-        {
-          "name": "raw_canary_evidence",
-          "source": "RAW_CANARY_EVIDENCE",
-          "type": "file"
-        },
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "executable"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "executable"
-        },
-        {
-          "name": "arg_4",
-          "value": "--broker-state",
-          "type": "literal"
-        },
-        {
-          "name": "arg_5",
-          "value": "usable",
-          "type": "literal"
-        },
-        {
-          "name": "arg_6",
-          "value": "--inject-post-close-broker-ingress-failure",
-          "type": "literal"
-        }
-      ],
-      "requires": [
-        "RAW_CANARY_EVIDENCE",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 1800,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
+      "test_class": "unit"
     },
     {
       "id": "real-raw-filing-black-box-canary",
@@ -1259,102 +2200,6 @@
       "test_class": "real_corpus"
     },
     {
-      "id": "case-compiler-equivalence",
-      "phase": "cohort",
-      "runtime": "node",
-      "script": "run_case_compiler_equivalence.mjs",
-      "arguments": [
-        {
-          "name": "cases",
-          "source": "CASES",
-          "type": "directory"
-        }
-      ],
-      "requires": [
-        "CASES"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "frozen_authority"
-    },
-    {
-      "id": "opening-debt-reconciliation",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_opening_debt_reconciliation_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "excel-value-semantics",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_excel_value_semantics_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "protected-identity-semantic-oracle",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "verify/run_protected_identity_oracle_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "independent-physical-workbook-binding",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_independent_physical_workbook_oracle_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "emitted-candidate-independent-oracle",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_emitted_candidate_independent_oracle_tests.py",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        },
-        {
-          "name": "arg_2",
-          "type": "literal",
-          "value": "--soffice"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "file"
-        },
-        {
-          "name": "arg_4",
-          "type": "literal",
-          "value": "--out"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "independent_economic_oracle"
-    },
-    {
       "id": "reconciled-parent-portable-workbook",
       "phase": "proof",
       "runtime": "node",
@@ -1362,15 +2207,6 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
-    },
-    {
-      "id": "native-excel-all-cell-error-scan",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_native_excel_error_scan_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
     },
     {
       "id": "release-certification-contract",
@@ -1382,443 +2218,10 @@
       "test_class": "synthetic_integration"
     },
     {
-      "id": "delivery-inventory",
+      "id": "release-dependency-closure",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_delivery_inventory_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "source-arithmetic-topology",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_source_arithmetic_topology_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "independent_economic_oracle"
-    },
-    {
-      "id": "critical-invariant-independent-oracle-matrix",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_critical_invariant_oracle_matrix_tests.py",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        },
-        {
-          "name": "arg_2",
-          "type": "literal",
-          "value": "--soffice"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE",
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "semantic-role-closure",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_semantic_role_closure_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "cross_layer_integration"
-    },
-    {
-      "id": "public-state-ownership",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_public_state_ownership_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "broker-core-demand-quality",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_broker_core_demand_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "component_integration"
-    },
-    {
-      "id": "nonrecurring-forecast-policy",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_nonrecurring_forecast_policy_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "source-release-identity",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_source_identity_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "release-identity-governance",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_release_identity_governance_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "typed-product-identity-vocabulary",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_identity_vocabulary_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "immutable-release-package-attestation",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_release_package_attestation_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "workbook-build-identity-quality-panel",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_workbook_quality_panel_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "test-registry-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_test_registry_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "portability-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_portability_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "installed-host-broker-receipt-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_installed_host_broker_receipt_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "installed-host-usable-broker",
-      "phase": "real_corpus",
-      "runtime": "node",
-      "script": "verify_installed_host_broker_canary.mjs",
-      "arguments": [
-        "$INSTALLED_HOST_BROKER_RECEIPT"
-      ],
-      "requires": [
-        "INSTALLED_HOST_BROKER_RECEIPT"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "installed_host"
-    },
-    {
-      "id": "source-arithmetic-oracle",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_source_arithmetic_oracle_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "filings-source-mode",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_filings_source_mode_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "model-owned-broker-demand",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_model_owned_broker_demand_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "forecast-authority-ledger",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_authority_ledger_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "classification-resolution",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_classification_resolution_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "opening-debt-bridge",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_opening_debt_bridge_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "statement-family-residual",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_statement_family_residual_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "terminal-crash-paths",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_terminal_crash_path_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "economic-ir",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_economic_ir_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "opening-instrument-provenance",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_opening_instrument_provenance_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "formula-ast",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_formula_ast_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "performance-receipt-honesty",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_performance_receipt_honesty_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "generated-case-cohort",
-      "phase": "cohort",
-      "runtime": "node",
-      "script": "run_generated_cohort_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "roll-forward-invariant",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_roll_forward_invariant_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "canonical-graph-binding",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_canonical_graph_binding_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "etr-dag-safety",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_etr_dag_safety_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-slo",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_runtime_slo_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "metamorphic-relations",
-      "phase": "cohort",
-      "runtime": "node",
-      "script": "run_metamorphic_tests.mjs",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "physical-authority-mutation",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_physical_authority_mutation_tests.py",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "differential-invalidation",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_differential_invalidation_tests.mjs",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "bounded-parallelism",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_bounded_parallelism_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "visual-mutation-pairing",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_visual_mutation_pairing_tests.py",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "emitted-formula-derivability",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_emitted_formula_derivability_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "evidence-work-graph",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_evidence_work_graph_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "canonical-model-modules",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_canonical_model_module_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "graph-driven-solve",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_graph_driven_solve_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "scale-invariant-convergence",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_scale_invariant_convergence_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "never-zero-and-order-invariance",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_never_zero_and_order_invariance_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "declared-value-typed-outcome",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_declared_value_typed_outcome_tests.mjs",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "declared-fixed-point-completeness",
-      "phase": "graph",
-      "runtime": "node",
-      "script": "run_declared_fixed_point_completeness_tests.mjs",
+      "script": "run_release_dependency_closure_tests.mjs",
       "timeout_seconds": 600,
       "mutates_product_tree": false,
       "test_class": "mutation"
@@ -1833,307 +2236,19 @@
       "test_class": "mutation"
     },
     {
-      "id": "gate-side-effect",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_gate_side_effect_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "cross_layer_integration"
-    },
-    {
-      "id": "stage-recipe",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_stage_recipe_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "mutation-adequacy",
+      "id": "release-identity-governance",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_mutation_adequacy_tests.mjs",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "ci-gate-tiers",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_ci_gate_tier_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "hard-clock",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_hard_clock_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "provenance-authority",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_provenance_authority_tests.py",
-      "arguments": [
-        {
-          "name": "out_flag",
-          "type": "literal",
-          "value": "--out"
-        },
-        {
-          "name": "out",
-          "source": "TEST_OUT",
-          "type": "directory"
-        }
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "economic-authority-seal",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_economic_authority_seal_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "package-ab",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_package_ab_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "solver-fixed-point-oracle",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_solver_fixed_point_oracle_tests.py",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "behavioural-goldens",
-      "phase": "cohort",
-      "runtime": "node",
-      "script": "run_behavioural_golden_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "public-bootstrap",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_public_bootstrap_tests.mjs",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "packaged-path-acceptance",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_packaged_path_acceptance_tests.mjs",
-      "arguments": [
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "executable"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "executable"
-        }
-      ],
-      "requires": [
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-doctor",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_runtime_doctor_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "durable-artifact-generation",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_durable_artifact_generation_tests.mjs",
+      "script": "run_release_identity_governance_tests.mjs",
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "disk-space-policy",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_disk_space_policy_tests.mjs",
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "disk-space-measurement-builder",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_disk_space_measurement_builder_tests.mjs",
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "installed-capability-receipt-v13",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_installed_capability_receipt_v13_tests.mjs",
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-compatibility",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_runtime_compatibility_tests.mjs",
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "libreoffice-workbook-capability",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_libreoffice_workbook_capability_tests.mjs",
-      "requires": [
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "installed-inline-xbrl-capability",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_installed_inline_xbrl_probe_tests.mjs",
-      "requires": [
-        "PYTHON"
-      ],
-      "timeout_seconds": 60,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "installed-filings-capability",
+      "id": "release-rollback-policy",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_installed_filings_capability_tests.mjs",
-      "arguments": [
-        {
-          "name": "arg_1",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "timeout_seconds": 1800,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "installed-capability-independent-oracle",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_installed_capability_oracle_tests.mjs",
-      "arguments": [
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "executable"
-        },
-        {
-          "name": "soffice",
-          "source": "SOFFICE",
-          "type": "executable"
-        }
-      ],
-      "requires": [
-        "PYTHON",
-        "SOFFICE"
-      ],
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "portable-certification-tier",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_portable_certification_tier_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "envelope-terminal-legality",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_envelope_terminal_legality_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "footing-tolerance-defects",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_footing_tolerance_defect_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "opening-amount-typing",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_opening_amount_typing_defect_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "classifier-caption-defects",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_classifier_caption_defect_tests.mjs",
+      "script": "run_release_rollback_policy_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
@@ -2148,100 +2263,19 @@
       "test_class": "mutation"
     },
     {
-      "id": "archetype-economics",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_archetype_economics_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "archetype-presentation",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_archetype_presentation_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "period-scoring",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_period_scoring_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "support-coverage-grid",
+      "id": "reviewed-repair-contract",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_support_coverage_grid_tests.mjs",
+      "script": "run_reviewed_repair_contract_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
-      "test_class": "mutation"
+      "test_class": "component_integration"
     },
     {
-      "id": "completion-census-scope",
-      "phase": "forecast",
+      "id": "roll-forward-invariant",
+      "phase": "economics",
       "runtime": "node",
-      "script": "run_completion_census_scope_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "plan-reconstruction",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_plan_reconstruction_tests.py",
-      "timeout_seconds": 900,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "release-rollback-policy",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_release_rollback_policy_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-closure",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_runtime_closure_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "release-dependency-closure",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_release_dependency_closure_tests.mjs",
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "acquisition-plan-purity",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_acquisition_plan_purity_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "xbrl-reconciliation",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_xbrl_reconciliation_tests.mjs",
+      "script": "run_roll_forward_invariant_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
@@ -2256,381 +2290,20 @@
       "test_class": "mutation"
     },
     {
-      "id": "schedule-typed-states",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_schedule_typed_state_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "policy-registry",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_policy_registry_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "statement-scope-inventory",
-      "phase": "evidence",
-      "runtime": "python",
-      "script": "run_statement_scope_inventory_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "forecast-ownership-preflight",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_ownership_preflight_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "prebroker-ownership-controller",
-      "phase": "forecast",
-      "runtime": "python",
-      "script": "run_prebroker_ownership_controller_tests.py",
-      "timeout_seconds": 180,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "forecast-ownership-physical-oracle",
-      "phase": "forecast",
-      "runtime": "python",
-      "script": "verify/run_forecast_ownership_physical_mutations.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "forecast-authority-ranking",
-      "phase": "forecast",
-      "runtime": "node",
-      "script": "run_forecast_authority_ranking_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "funded-acquisition-transaction",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_funded_acquisition_transaction_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "acquisition-valuation-contract",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_acquisition_valuation_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "acquisition-funding-integration",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_acquisition_funding_integration_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "acquisition-solver-scenarios",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_acquisition_solver_case_tests.mjs",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE"
-      ],
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "acquisition-portable-workbook-restoration",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_acquisition_portable_workbook_tests.py",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        },
-        {
-          "name": "arg_2",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "directory"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE",
-        "PYTHON"
-      ],
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "acquisition-workbook-scenarios",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_acquisition_workbook_tests.py",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        },
-        {
-          "name": "arg_2",
-          "value": "--out",
-          "type": "literal"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "file"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE",
-        "PYTHON"
-      ],
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "carrier-product-identity",
-      "phase": "workflow",
-      "runtime": "node",
-      "script": "run_carrier_product_identity_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "architecture-ownership",
+      "id": "run-constitution-graph",
       "phase": "graph",
       "runtime": "node",
-      "script": "run_architecture_ownership_tests.mjs",
+      "script": "run_run_constitution_graph_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "unit"
     },
     {
-      "id": "broker-native-preflight-reuse",
-      "phase": "performance",
-      "runtime": "python",
-      "script": "run_broker_native_preflight_reuse_tests.py",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "broker-pdf-timeout-policy",
-      "phase": "performance",
-      "runtime": "python",
-      "script": "run_broker_pdf_timeout_policy_tests.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "experience-trace-policy",
-      "phase": "performance",
-      "runtime": "python",
-      "script": "run_experience_trace_tests.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "experience-trace-leaf-coverage",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_experience_trace_leaf_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-process-interpreter-lease-custody",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_runtime_custody_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "native-excel-number-format-compatibility",
-      "phase": "proof",
-      "runtime": "python",
-      "script": "run_excel_number_format_compatibility_tests.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "portable-finance-workbook-semantic-mutations",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_portable_finance_workbook_mutation_tests.mjs",
-      "arguments": [
-        {
-          "name": "representative_case",
-          "source": "REPRESENTATIVE",
-          "type": "file"
-        },
-        {
-          "name": "python",
-          "source": "PYTHON",
-          "type": "file"
-        },
-        {
-          "name": "test_out",
-          "source": "TEST_OUT",
-          "type": "directory"
-        }
-      ],
-      "requires": [
-        "REPRESENTATIVE",
-        "PYTHON"
-      ],
-      "timeout_seconds": 600,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "runtime-version-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_runtime_version_contract_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "skill-version-declaration",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_skill_version_declaration_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "certified-runtime-code-closure",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_certified_code_closure_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "reviewed-repair-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_reviewed_repair_contract_tests.mjs",
-      "timeout_seconds": 300,
-      "mutates_product_tree": false,
-      "test_class": "component_integration"
-    },
-    {
-      "id": "host-experience-trace",
-      "phase": "performance",
-      "runtime": "python",
-      "script": "run_host_experience_trace_tests.py",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "ebitda-basis-contract",
-      "phase": "economics",
-      "runtime": "node",
-      "script": "run_ebitda_basis_contract_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "solver-hardening",
-      "phase": "economic",
-      "runtime": "node",
-      "script": "run_solver_hardening_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "workbook-semantic-inventory",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_workbook_semantic_inventory_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "local-workbook-review-contract",
-      "phase": "proof",
-      "runtime": "node",
-      "script": "run_local_workbook_review_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "mutation"
-    },
-    {
-      "id": "large-broker-pack-stress",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_large_broker_pack_stress_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "synthetic_integration"
-    },
-    {
-      "id": "full-run-performance-receipt",
-      "phase": "performance",
-      "runtime": "node",
-      "script": "run_performance_receipt_tests.mjs",
-      "timeout_seconds": 120,
-      "mutates_product_tree": false,
-      "test_class": "unit"
-    },
-    {
-      "id": "bounded-progress-heartbeat",
+      "id": "run-deadline",
       "phase": "workflow",
       "runtime": "node",
-      "script": "run_progress_heartbeat_tests.mjs",
-      "timeout_seconds": 120,
+      "script": "run_run_deadline_tests.mjs",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "unit"
     },
@@ -2644,28 +2317,28 @@
       "test_class": "mutation"
     },
     {
-      "id": "phase15-portable-fault-injection",
-      "phase": "performance",
+      "id": "runtime-closure",
+      "phase": "proof",
       "runtime": "node",
-      "script": "run_phase15_fault_injection_tests.mjs",
-      "timeout_seconds": 120,
+      "script": "run_runtime_closure_tests.mjs",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "phase5-operational-runtime-adversarial",
+      "id": "runtime-compatibility",
       "phase": "performance",
       "runtime": "node",
-      "script": "run_phase5_operational_runtime_tests.mjs",
-      "timeout_seconds": 120,
+      "script": "run_runtime_compatibility_tests.mjs",
+      "timeout_seconds": 60,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "broker-freshness-policy",
-      "phase": "forecast",
-      "runtime": "python",
-      "script": "run_broker_freshness_policy_tests.py",
+      "id": "runtime-doctor",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_doctor_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
@@ -2680,6 +2353,51 @@
       "test_class": "mutation"
     },
     {
+      "id": "runtime-process-interpreter-lease-custody",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_custody_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-slo",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_slo_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-version-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_runtime_version_contract_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "scale-invariant-convergence",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_scale_invariant_convergence_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "schedule-typed-states",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_schedule_typed_state_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "screen-session-one-use-binding",
       "phase": "workflow",
       "runtime": "node",
@@ -2689,47 +2407,356 @@
       "test_class": "mutation"
     },
     {
-      "id": "phase3-runtime-session-integration",
-      "phase": "workflow",
+      "id": "semantic-role-closure",
+      "phase": "forecast",
       "runtime": "node",
-      "script": "run_phase3_runtime_session_integration_tests.mjs",
-      "timeout_seconds": 120,
+      "script": "run_semantic_role_closure_tests.mjs",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "cross_layer_integration"
     },
     {
-      "id": "external-exact-head-ci-evidence",
+      "id": "skill-version-declaration",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_external_ci_evidence_tests.mjs",
+      "script": "run_skill_version_declaration_tests.mjs",
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "independent-exact-head-package-ci",
+      "id": "solver-fixed-point-oracle",
       "phase": "proof",
+      "runtime": "python",
+      "script": "run_solver_fixed_point_oracle_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "solver-hardening",
+      "phase": "economic",
       "runtime": "node",
-      "script": "run_exact_head_package_ci_tests.mjs",
+      "script": "run_solver_hardening_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "source-arithmetic-authority",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_source_arithmetic_authority_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "ci-command-status-custody",
+      "id": "source-arithmetic-oracle",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_source_arithmetic_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "source-arithmetic-precision",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_source_arithmetic_precision_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "source-arithmetic-topology",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_source_arithmetic_topology_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "source-ingress-security",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_source_ingress_security_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "source-release-identity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_source_identity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "stage-recipe",
       "phase": "workflow",
       "runtime": "node",
-      "script": "run_ci_command_with_custody_tests.mjs",
+      "script": "run_stage_recipe_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "stage4-content-addressed-resume",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_stage4_checkpoint_tests.mjs",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--cases",
+          "type": "literal"
+        },
+        {
+          "name": "cases",
+          "source": "CASES",
+          "type": "directory"
+        },
+        {
+          "name": "arg_3",
+          "value": "--python",
+          "type": "literal"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "executable"
+        },
+        {
+          "name": "arg_5",
+          "value": "--soffice",
+          "type": "literal"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "executable"
+        }
+      ],
+      "requires": [
+        "CASES",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "statement-classifier",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_statement_classifier_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "statement-family-residual",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_statement_family_residual_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "statement-scope-inventory",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_statement_scope_inventory_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "support-coverage-grid",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_support_coverage_grid_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "support-envelope",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_support_envelope_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "support-preflight-wire",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_support_preflight_wire_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "tax-rate-policy",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_tax_rate_policy_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "terminal-crash-paths",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_crash_path_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "terminal-reason-registry",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_reason_registry_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "test-registry-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_test_registry_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "typed-arithmetic",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_typed_arithmetic_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "typed-filing-values-and-row-identity",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_typed_filing_value_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "typed-financial-value",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_typed_financial_value_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "typed-product-identity-vocabulary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_identity_vocabulary_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "universal-broker-delivery-matrix",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_universal_broker_delivery_matrix.mjs",
+      "arguments": [
+        "$RAW_CANARY_EVIDENCE",
+        "$PYTHON",
+        "$SOFFICE"
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "visual-mutation-pairing",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_visual_mutation_pairing_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "why-this-number-projection",
+      "phase": "release",
+      "runtime": "node",
+      "script": "test_why_this_number.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "workbook-build-identity-quality-panel",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_workbook_quality_panel_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "workbook-semantic-inventory",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_workbook_semantic_inventory_tests.mjs",
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },
     {
-      "id": "exact-head-ci-job-receipt-projection",
-      "phase": "proof",
+      "id": "workflow-state-contract",
+      "phase": "workflow",
       "runtime": "node",
-      "script": "run_exact_head_ci_job_receipt_tests.mjs",
-      "timeout_seconds": 120,
+      "script": "run_workflow_state_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "xbrl-reconciliation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_xbrl_reconciliation_tests.mjs",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
     }
