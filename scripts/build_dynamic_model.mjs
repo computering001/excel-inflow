@@ -404,6 +404,14 @@ const COUPON = "0.000%";
 // constant could only be one of them, and it was this one.
 const BENCHMARK = "0.00%";
 const MULTIPLE = '0.0x;(0.0x);"–"';
+// A ratio whose denominator is zero (or not numeric) is NOT MEANINGFUL rather
+// than zero. Printing `0.0x` over a zero EBITDA asserts a real multiple of
+// nothing; the solver emits `net_leverage: null` for exactly that state
+// (scripts/lib/solver.mjs:3568-3571), so the workbook degrades to a literal
+// `n/m` token instead. Text ignores the number format ladder, which is what
+// keeps n/m visibly distinct from a computed zero — the same reason the zero
+// section above renders an en-dash rather than 0.
+const NOT_MEANINGFUL = '"n/m"';
 // An FX rate is a price, not a percentage, and four decimals is the quoting
 // convention. It used to ride a raw `0.0000`, which rendered an unpopulated
 // pair as a meaningless `0.0000` — indistinguishable from a rate that really
@@ -6511,8 +6519,8 @@ function configureOperatingModel(
           ],
           [
             debtRows.net_debt_company_reported_to_adjusted_ebitda,
-            `=IFERROR(${col}${debtRows.net_debt_company_reported}/` +
-              `${col}${debtRows.company_reported_adjusted_ebitda},0)`,
+            // B11: zero/non-numeric denominator renders n/m, never 0.0x.
+            `=IFERROR(IF(N(${col}${debtRows.company_reported_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${debtRows.net_debt_company_reported}/${col}${debtRows.company_reported_adjusted_ebitda}),${NOT_MEANINGFUL})`,
           ],
         ]
       : [];
@@ -6532,15 +6540,16 @@ function configureOperatingModel(
       ? [
           [
             debtRows.net_debt_excluding_leases_to_adjusted_ebitda,
-            `=IFERROR(${col}${debtRows.net_debt_excluding_leases}/` +
-              `${col}${debtRows.leverage_adjusted_ebitda},0)`,
+            // B11: zero/non-numeric denominator renders n/m, never 0.0x.
+            `=IFERROR(IF(N(${col}${debtRows.leverage_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${debtRows.net_debt_excluding_leases}/${col}${debtRows.leverage_adjusted_ebitda}),${NOT_MEANINGFUL})`,
           ],
         ]
       : []),
     [
       debtRows.net_debt_to_adjusted_ebitda,
-      `=IFERROR(${col}${leverageNetDebtRow}/` +
-        `${col}${debtRows.leverage_adjusted_ebitda},0)`,
+      // B11: matches the solver's net_leverage:null on zero EBITDA
+      // (scripts/lib/solver.mjs:3568-3571).
+      `=IFERROR(IF(N(${col}${debtRows.leverage_adjusted_ebitda})=0,${NOT_MEANINGFUL},${col}${leverageNetDebtRow}/${col}${debtRows.leverage_adjusted_ebitda}),${NOT_MEANINGFUL})`,
     ],
     [
       debtRows.leverage_net_interest,
@@ -6550,8 +6559,9 @@ function configureOperatingModel(
     ],
     [
       debtRows.adjusted_ebitda_to_net_interest,
-      `=IFERROR(${col}${debtRows.leverage_adjusted_ebitda}/` +
-        `${col}${debtRows.leverage_net_interest},0)`,
+      // B11: coverage over a nil/absent net interest denominator is not a
+      // computable multiple; degrade to the shared n/m token.
+      `=IFERROR(IF(N(${col}${debtRows.leverage_net_interest})=0,${NOT_MEANINGFUL},${col}${debtRows.leverage_adjusted_ebitda}/${col}${debtRows.leverage_net_interest}),${NOT_MEANINGFUL})`,
     ],
   ];
   for (const column of HISTORICAL_COLUMNS) {
