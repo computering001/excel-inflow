@@ -43,3 +43,15 @@ runs:
         # local archive instead of re-downloading LibreOffice.
         sudo apt-get install --yes -o APT::Keep-Downloaded-Packages=true libreoffice-calc poppler-utils fonts-crosextra-carlito
         python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
+    - name: Export the toolchain custody names
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The development gate resolves its PYTHON/SOFFICE custody inputs from
+        # these exact environment names when the per-job flags are absent, so
+        # every job that installs this toolchain satisfies those names by
+        # construction.  Fail loudly if either binary did not actually land.
+        python_bin="$(command -v python3)" || { echo "python3 is not on PATH after setup" >&2; exit 1; }
+        soffice_bin="$(command -v soffice)" || { echo "soffice is not on PATH after setup" >&2; exit 1; }
+        printf 'PYTHON=%s\n' "$python_bin" >> "$GITHUB_ENV"
+        printf 'SOFFICE=%s\n' "$soffice_bin" >> "$GITHUB_ENV"
