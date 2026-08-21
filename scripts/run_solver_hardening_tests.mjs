@@ -26,7 +26,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { detectTwoCycle, solveCase } from "./lib/solver.mjs";
+import {
+  assertRcfAverageFxUsable,
+  detectTwoCycle,
+  solveCase,
+} from "./lib/solver.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..");
@@ -195,6 +199,74 @@ check("detectTwoCycle tolerates missing history", () => {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// B8 — an undeclared benchmark floor raises ASK; an explicit [0,0,0] is silent.
+// ---------------------------------------------------------------------------
+
+{
+  const makeCase = (withDeclaredFloor) => {
+    const modelCase = readCase(path.join(CASES, "standard-maximal-v2.json"));
+    const pool = modelCase.instruments ?? modelCase.debt_instruments;
+    const target = pool[pool.length - 1];
+    target.rate_type = "floating";
+    target.benchmark_rate = [0.03, 0.03, 0.03];
+    target.spread_bps = 250;
+    if (withDeclaredFloor) target.benchmark_floor = [0, 0, 0];
+    else delete target.benchmark_floor;
+    return modelCase;
+  };
+  const undeclared = solveCase(makeCase(false));
+  const declared = solveCase(makeCase(true));
+  check("B8: every forecast period raises exactly one deduped ASK finding", () => {
+    const findings = undeclared.solver_findings.filter(
+      (finding) => finding.code === "benchmark_floor_undeclared",
+    );
+    assert.equal(findings.length, undeclared.forecast.length);
+    for (const finding of findings) {
+      assert.equal(finding.severity, "ASK");
+      assert.ok(finding.instrument_id, "finding names the instrument");
+      assert.equal(finding.applied_floor, 0);
+      assert.ok(
+        undeclared.forecast.some((p) => p.period === finding.period),
+        `finding period ${finding.period} matches a forecast period`,
+      );
+    }
+  });
+  check("B8: an explicitly declared [0,0,0] floor stays silent", () => {
+    assert.equal(
+      declared.solver_findings.filter(
+        (finding) => finding.code === "benchmark_floor_undeclared",
+      ).length,
+      0,
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// B12 — the unusable RCF average FX rate refuses with the typed transport.
+// ---------------------------------------------------------------------------
+
+check("B12: non-positive/non-finite average FX refuses typed", () => {
+  for (const bad of [Number.NaN, 0, -1.2]) {
+    assert.throws(
+      () => assertRcfAverageFxUsable(bad, { caseId: "c1", period: "2026-12-31", currency: "EUR" }),
+      (error) =>
+        error.code === "SOLVER_RCF_FX_INVALID" &&
+        error.message.startsWith("SOLVER_RCF_FX_INVALID:") &&
+        error.typed_internal_outcome.reason_code === "SOLVER_RCF_FX_INVALID" &&
+        error.typed_internal_outcome.earliest_responsible_layer === "fx_assumptions" &&
+        error.typed_internal_outcome.downstream_invalidation_scope ===
+          "solve_and_below" &&
+        error.typed_internal_outcome.rcf_average_fx === bad,
+      `average fx ${bad} must refuse`,
+    );
+  }
+});
+check("B12: usable rates pass through untouched", () => {
+  assert.doesNotThrow(() => assertRcfAverageFxUsable(1.0875, {}));
+  assert.doesNotThrow(() => assertRcfAverageFxUsable("1.0875", {}));
+});
 
 // ---------------------------------------------------------------------------
 // B25 — the forced single-pass path publishes stale_iteration.

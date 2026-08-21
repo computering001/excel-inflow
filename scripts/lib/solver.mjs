@@ -1003,15 +1003,46 @@ function instrumentBalanceCurrency(modelCase, instrument) {
     : instrument?.currency;
 }
 
-function allInRate(instrument, forecastIndex) {
+function allInRate(instrument, forecastIndex, onUndeclaredFloor) {
   const manual = asSeries3(instrument.coupon_or_all_in_rate, 0)[forecastIndex];
   if (instrument.rate_type !== "floating") return manual;
+  // B8 — an UNDECLARED floor (`benchmark_floor === undefined`) still borrows
+  // the historic zero-floor economics, but it no longer does so silently:
+  // the caller-supplied sink raises one deduped ASK finding per
+  // (instrument, period). An EXPLICIT `[0,0,0]` stays silent — the issuer
+  // declared that floor.
+  if (instrument.benchmark_floor === undefined && onUndeclaredFloor) {
+    onUndeclaredFloor(instrument);
+  }
   const benchmark = asSeries3(instrument.benchmark_rate, 0)[forecastIndex];
   const floor = asSeries3(instrument.benchmark_floor, 0)[forecastIndex];
   const spread = Number(instrument.spread_bps ?? 0) / 10000;
   // A contractual floor belongs to the reference leg, before the spread. Its
   // omission deliberately preserves the historic zero-floor behaviour.
   return Math.max(floor, benchmark) + spread;
+}
+
+// B12 — the typed refusal for an unusable RCF average FX rate. Exported so
+// the hardening suite can pin the transport shape without manufacturing a
+// corrupt FX table; solveCase calls it at every period before the sweep.
+export function assertRcfAverageFxUsable(rcfAverageFx, context = {}) {
+  if (Number(rcfAverageFx) > 0) return;
+  const error = new Error(
+    `SOLVER_RCF_FX_INVALID: case ${context.caseId ?? "?"} period ` +
+      `${context.period ?? "?"} has an unusable RCF average FX rate ` +
+      `(${rcfAverageFx}) for currency ${context.currency ?? "?"}; the revolver ` +
+      `sweep divides by it, so no balances may be published.`,
+  );
+  error.code = "SOLVER_RCF_FX_INVALID";
+  error.typed_internal_outcome = {
+    reason_code: "SOLVER_RCF_FX_INVALID",
+    earliest_responsible_layer: "fx_assumptions",
+    downstream_invalidation_scope: "solve_and_below",
+    period: context.period ?? null,
+    currency: context.currency ?? null,
+    rcf_average_fx: rcfAverageFx,
+  };
+  throw error;
 }
 
 function nonCashMovementComponents(instrument, forecastIndex) {
@@ -2508,20 +2539,36 @@ export function solveCase(
             Math.max(0, periodIndex - 1),
             "period_end",
           );
+      // B8 — one evaluated rate per instrument per sweep; an undeclared
+      // benchmark floor raises exactly one ASK finding per (instrument,
+      // period) through the solver-finding sink instead of borrowing 0 in
+      // silence.
+      const instrumentAllInRate = allInRate(
+        instrument,
+        forecastIndex,
+        (floatingInstrument) => {
+          recordSolverFinding("benchmark_floor_undeclared", "ASK", {
+            period: period.date,
+            scope: `instrument:${floatingInstrument.instrument_id}`,
+            instrument_id: floatingInstrument.instrument_id,
+            applied_floor: 0,
+          });
+        },
+      );
       const rawCashCouponInterestReporting = compiledState
         ? Number(compiledState.average_interest_balance.reporting_amount) *
-          allInRate(instrument, forecastIndex)
+          instrumentAllInRate
         : dynamicV2
         ? (timing.weightedBase +
             pikInterestNative * timing.activeFraction / 2) *
-          allInRate(instrument, forecastIndex) *
+          instrumentAllInRate *
           averageFx
         : (maturityRepaymentNative > 0
             ? (openingNative *
                 (new Date(instrument.maturity_date).getUTCMonth() + 1)) /
               12
             : (openingNative + preMaturityEnding) / 2) *
-          allInRate(instrument, forecastIndex) *
+          instrumentAllInRate *
           averageFx;
       const cashCouponInterestReporting =
         modelCase.controls.circularity === 1
@@ -2708,7 +2755,14 @@ export function solveCase(
     );
     solveOrder.record("rcf.capacity");
     const rcfRate = rcfInstrument
-      ? allInRate(rcfInstrument, forecastIndex)
+      ? allInRate(rcfInstrument, forecastIndex, (floatingInstrument) => {
+          recordSolverFinding("benchmark_floor_undeclared", "ASK", {
+            period: period.date,
+            scope: `instrument:${floatingInstrument.instrument_id}`,
+            instrument_id: floatingInstrument.instrument_id,
+            applied_floor: 0,
+          });
+        })
       : 0;
     const rcfOpeningFx = foreignRcf
       ? fxRate(modelCase, rcfInstrument.currency, periodIndex - 1, "period_end")
@@ -2716,6 +2770,16 @@ export function solveCase(
     const rcfAverageFx = foreignRcf
       ? fxRate(modelCase, rcfInstrument.currency, periodIndex, "average")
       : 1;
+    // B12 — every native↔reporting conversion in the sweep below divides by
+    // the average FX rate (draw, repayment, deficit/surplus, the cash-loop
+    // receipt). A non-finite or non-positive rate cannot produce balances;
+    // refuse typed instead of emitting NaN economics, mirroring the
+    // OPENING_DEBT_UNRESOLVED transport shape.
+    assertRcfAverageFxUsable(rcfAverageFx, {
+      caseId: modelCase.case_id,
+      period: period.date,
+      currency: rcfInstrument?.currency ?? null,
+    });
     const rcfEndingFx = foreignRcf
       ? fxRate(modelCase, rcfInstrument.currency, periodIndex, "period_end")
       : 1;
