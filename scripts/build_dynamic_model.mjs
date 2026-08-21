@@ -5795,9 +5795,16 @@ function configureOperatingModel(
       const baseEndingBeforePik = plan.amortisation_row
         ? `MAX(0,${openingWithMovements}-${cappedAmortisation})`
         : availableBeforeAmortisation;
+      // B6 parity: the maturity test carries the SAME ISNUMBER discipline as
+      // instrumentTimingExpressions' maturityActive above (:5456-5458). A
+      // text-typed maturity cell reads as "no maturity" in both places, so the
+      // repayment test can no longer diverge from the day-weighting that feeds
+      // interest and PIK; a naked `<=` against text silently never matures and
+      // diverges from the solver's parsed-date maturity path
+      // (scripts/lib/solver.mjs:2395-2406).
       const matures = instrument.maturity_date
         ? `IF($C$${c.debt_maturities_roll}=1,` +
-          `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0)`
+          `IF(ISNUMBER($E${plan.debt_row}),IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0),0)`
         : "0";
       const pikRateRow = rowPlan.pik_rate_rows?.[instrument.instrument_id];
       const pikRate = pikRateRow ? `$${column}$${pikRateRow}` : "0";
@@ -5808,11 +5815,41 @@ function configureOperatingModel(
         column,
         opening,
       );
+      // B6 parity (shared convention 1, scripts/lib/solver.mjs:1022-1038
+      // solvedPikAccretion, applied to the maturity year at :2395-2406): PIK
+      // accretes by the closed form weightedBase*r/(1-r*f/2), where
+      // weightedBase and the active fraction are the DAY-WEIGHTED base and
+      // fraction computed to min(periodEnd, maturityDate) by
+      // instrumentTimingExpressions — the same cap in both engines.
       const pikAccretion = plan.pik_row
         ? `IF($C$${c.circularity}=0,0,IF(1-${pikRate}*(${timing.activeFraction})/2<=0,0,` +
           `(${timing.weightedBase})*${pikRate}/(1-${pikRate}*(${timing.activeFraction})/2)))`
         : "0";
       if (plan.pik_row) {
+        // B14: the formula above degrades to zero when 1 - r*f/2 <= 0, while
+        // the solver THROWS on the identical domain ("PIK rate must be below
+        // 200% under the average-balance convention.",
+        // scripts/lib/solver.mjs:1033-1036). A silent zero misstates the
+        // liability roll-forward, so the build detects the degenerate domain
+        // from the declared PIK rate series — the active fraction is at most
+        // 1, so any declared rate >= 200% can reach it — and emits a typed
+        // degraded marker on the face and in the build log. It never fails
+        // silently, and it does not write a cell error that would cascade
+        // through every downstream sum.
+        const degenerateRates = (instrument.pik_rate ?? [])
+          .map((rate) => Number(rate ?? 0))
+          .filter((rate) => rate >= 2);
+        if (degenerateRates.length > 0) {
+          const marker = [
+            `PIK_ACCRETION_DEGENERATE: declared PIK rate(s) ${degenerateRates
+              .map((rate) => `${(rate * 100).toFixed(1)}%`)
+              .join(", ")} reach the domain where 1 - rate x active-fraction / 2 <= 0.`,
+            `The solver throws on this state (solvedPikAccretion, scripts/lib/solver.mjs:1033-1036); this workbook degrades the affected period's accretion to zero and flags the cell rather than failing silently.`,
+            `Resolution: restate the declared PIK rate below 200%.`,
+          ].join("\n");
+          addCommentOnce(workbook, sheet, `${column}${plan.pik_row}`, marker);
+          process.stderr.write(`${modelCase.case_id}: ${marker}\n`);
+        }
         applyFormula(sheet, `${column}${plan.pik_row}`, `=${pikAccretion}`);
         applyFormula(sheet, `${adjustmentColumn}${plan.pik_row}`, "=0");
         applyFormula(
