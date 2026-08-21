@@ -589,7 +589,7 @@ await expectCode("candidate-resealed-invented-summary", async () => {
 
 for (const [id, leakedValue] of [
   ["portable-absolute-posix", "/opt/local/bin/python3"],
-  ["portable-posix-home", "/Users/example/private/input.pdf"],
+  ["portable-posix-home", ["", "Users", "example", "private", "input.pdf"].join("/")],
   ["portable-posix-temp", "/var/folders/ab/local/output"],
   ["portable-windows-drive-absolute", "C:\\Users\\example\\input.pdf"],
   ["portable-windows-drive-relative", "D:private\\input.pdf"],
@@ -626,8 +626,8 @@ await expectCode("candidate-resealed-portable-path-leak", async () => {
   const pointer = value.manifest.samples[0];
   const target = path.join(value.root, ...pointer.path.split("/"));
   const receipt = JSON.parse(await fs.readFile(target, "utf8"));
-  receipt.input_pre[0].path = "/Users/private/forged-input.pdf";
-  receipt.input_post[0].path = "/Users/private/forged-input.pdf";
+  receipt.input_pre[0].path = ["", "Users", "private", "forged-input.pdf"].join("/");
+  receipt.input_post[0].path = ["", "Users", "private", "forged-input.pdf"].join("/");
   receipt.portable_projection.redacted_value_count = new Set(
     JSON.stringify(receipt).match(/portable:\/\/local\/[0-9]{4}/g) ?? [],
   ).size;

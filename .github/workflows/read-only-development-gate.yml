@@ -278,7 +278,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Run only the downloaded archive through the retained harness
         run: |
           set -euo pipefail
@@ -312,7 +312,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy==2.0.2 pymupdf==1.26.5 openpyxl==3.1.5 pillow==11.3.0 jsonschema lxml==6.1.1
       - name: Execute and count every currently measured mutation
         run: |
           set -euo pipefail

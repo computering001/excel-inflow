@@ -122,7 +122,7 @@ function lifecycleFromGateReport({ source, registry, gate, jobId, selectionScope
     signal: row.signal ?? null,
     started_at: row.started_at,
     completed_at: row.completed_at,
-    duration_ms: row.duration_ms,
+    duration_ms: Math.round(row.duration_ms),
     timeout_ms: row.timeout_ms,
     timed_out: row.timed_out,
     stdout_log: row.stdout_log,

@@ -137,9 +137,9 @@
       "target_owner": "validators stay validators"
     },
     "lib/disk_space_measurement_builder.mjs": {
-      "count": 1,
+      "count": 3,
       "families": {
-        "terminal_status": 1
+        "terminal_status": 3
       },
       "classification": "validator",
       "concern": "independent raw disk-sample recomputation and measurement comparison",
@@ -200,10 +200,10 @@
       "target_owner": "Release/package compiler (Phase 8)"
     },
     "lib/external_ci_evidence.mjs": {
-      "count": 4,
+      "count": 5,
       "families": {
         "terminal_status": 3,
-        "release_identity": 1
+        "release_identity": 2
       },
       "classification": "canonical_writer",
       "concern": "externally retained exact-head CI receipts and non-promotional release-candidate attestation",
