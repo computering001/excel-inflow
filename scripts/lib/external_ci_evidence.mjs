@@ -443,7 +443,82 @@ function requirePackage(receipt, jobId, binding, source) {
   validLog(receipt.build_log, `${jobId}.build_log`);
 }
 
-export function compileReleaseCandidateAttestation(input, { createdAt = input?.source_identity?.recorded_at } = {}) {
+export const D52_CLOSURE_LEDGER_PATH = "audit/v379/d52-closure-ledger.json";
+const D52_FINDING_STATUSES = Object.freeze(["closed", "custody-deferred", "open"]);
+const D52_SUMMARY_KEYS = Object.freeze(["total", "closed", "custody_deferred", "open"]);
+
+export function summarizeD52ClosureLedger(ledger) {
+  if (!ledger || typeof ledger !== "object" || Array.isArray(ledger)) throw new Error("D52 closure ledger must be an object.");
+  if (typeof ledger.schema_version !== "string" || !/^excel-inflow-d52-closure-ledger\/\d+\.\d+$/.test(ledger.schema_version)) {
+    throw new Error("D52 closure ledger schema_version is not an excel-inflow-d52-closure-ledger version.");
+  }
+  if (!Array.isArray(ledger.findings) || ledger.findings.length === 0) throw new Error("D52 closure ledger findings must be a non-empty array.");
+  const counts = Object.fromEntries(D52_SUMMARY_KEYS.map((key) => [key, 0]));
+  const seen = new Set();
+  ledger.findings.forEach((finding, index) => {
+    const label = `D52 closure ledger finding ${index}`;
+    if (!finding || typeof finding !== "object" || Array.isArray(finding)) throw new Error(`${label} must be an object.`);
+    const id = requireString(finding.finding_id, `${label}.finding_id`);
+    if (seen.has(id)) throw new Error(`D52 closure ledger repeats finding id ${id}.`);
+    seen.add(id);
+    if (!D52_FINDING_STATUSES.includes(finding.status)) throw new Error(`${label} (${id}) has an unrecognized status.`);
+    if (!Array.isArray(finding.mapped_commits)) throw new Error(`${label} (${id}) must carry a mapped_commits array.`);
+    finding.mapped_commits.forEach((commit, commitIndex) => {
+      requireSha(commit?.sha, SHA1, `${label} (${id}).mapped_commits[${commitIndex}].sha`);
+    });
+    if (!Array.isArray(finding.proof_suites)) throw new Error(`${label} (${id}) must carry a proof_suites array.`);
+    finding.proof_suites.forEach((suite, suiteIndex) => {
+      requireString(suite?.suite, `${label} (${id}).proof_suites[${suiteIndex}].suite`);
+    });
+    counts.total += 1;
+    counts[finding.status === "custody-deferred" ? "custody_deferred" : finding.status] += 1;
+  });
+  if (ledger.summary !== undefined) {
+    if (!ledger.summary || typeof ledger.summary !== "object" || Array.isArray(ledger.summary) ||
+        D52_SUMMARY_KEYS.some((key) => !Number.isInteger(ledger.summary[key]) || ledger.summary[key] !== counts[key])) {
+      throw new Error("D52 closure ledger summary counts do not match its findings.");
+    }
+  }
+  return counts;
+}
+
+export function loadD52ClosureLedger({ root = ROOT, ledger_path = D52_CLOSURE_LEDGER_PATH, required = false } = {}) {
+  const file = path.resolve(root, ledger_path);
+  let bytes;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch (error) {
+    if (error?.code === "ENOENT" && !required) return null;
+    throw new Error(error?.code === "ENOENT"
+      ? `D52 closure ledger is absent at ${file}.`
+      : `D52 closure ledger is not readable: ${error.message}`);
+  }
+  let ledger;
+  try {
+    ledger = JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    throw new Error(`D52 closure ledger is not readable JSON: ${error.message}`);
+  }
+  return {
+    summary: Object.freeze({
+      ...summarizeD52ClosureLedger(ledger),
+      ledger_sha256: createHash("sha256").update(bytes).digest("hex"),
+    }),
+    ledger,
+  };
+}
+
+function requireD52ClosureSummary(value) {
+  exactKeys(value, [...D52_SUMMARY_KEYS, "ledger_sha256"], "D52 closure summary");
+  D52_SUMMARY_KEYS.forEach((key) => requireInteger(value[key], `d52_closure.${key}`, 0));
+  if (value.total < 1 || value.closed + value.custody_deferred + value.open !== value.total) {
+    throw new Error("d52_closure counts do not sum to the ledger total.");
+  }
+  requireSha(value.ledger_sha256, SHA256, "d52_closure.ledger_sha256");
+  return canonical(value);
+}
+
+export function compileReleaseCandidateAttestation(input, { createdAt = input?.source_identity?.recorded_at, d52Closure = null } = {}) {
   exactKeys(input, JOB_IDS, "release candidate prerequisites");
   const source = verifySourceIdentityReceipt(input.source_identity);
   const binding = sourceBinding(source);
@@ -461,6 +536,7 @@ export function compileReleaseCandidateAttestation(input, { createdAt = input?.s
     throw new Error("Package A and B do not share one candidate version and build timestamp policy.");
   }
   requireIso(createdAt, "created_at");
+  const d52ClosureSummary = d52Closure == null ? null : requireD52ClosureSummary(d52Closure);
 
   const repro = input.package_reproducibility;
   exactKeys(repro, [
@@ -593,6 +669,7 @@ export function compileReleaseCandidateAttestation(input, { createdAt = input?.s
       p0_fully_measured: mutation.p0_fully_measured,
       p0_status: mutation.p0_status,
     },
+    ...(d52ClosureSummary ? { d52_closure: d52ClosureSummary } : {}),
     prerequisites,
   }, "attestation_sha256");
   requireSchema(attestation, ATTESTATION_SCHEMA, "release candidate attestation");

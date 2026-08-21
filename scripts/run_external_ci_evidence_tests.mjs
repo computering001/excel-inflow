@@ -14,6 +14,8 @@ import {
   compileReleaseCandidateAttestation,
   compileSourceIdentityReceipt,
   compileTestLifecycleReceipt,
+  loadD52ClosureLedger,
+  summarizeD52ClosureLedger,
   verifyRegistrySelectionReceipt,
   verifyReleaseCandidateAttestation,
   verifySourceIdentityReceipt,
@@ -183,6 +185,24 @@ check(attestation.exact_head_ci_run === "github-actions:computering001/excel-inf
 check(attestation.scope === "EXACT_HEAD_DEVELOPMENT_EVIDENCE_ONLY" && attestation.production_promotion_eligible === false && attestation.full_release_certification === false, "partial exact-head evidence falsely claims promotion or full certification");
 verifyReleaseCandidateAttestation(attestation);
 check(true, "attestation verifier rejected compiler output");
+check(!Object.hasOwn(attestation, "d52_closure"), "attestation fabricated a D52 closure block without a ledger input");
+
+const loadedLedger = loadD52ClosureLedger();
+check(loadedLedger !== null && loadedLedger.ledger.schema_version === "excel-inflow-d52-closure-ledger/1.0", "committed D52 closure ledger did not load");
+const d52Summary = loadedLedger.summary;
+const d52Deferred = loadedLedger.ledger.findings.filter((finding) => finding.status === "custody-deferred").length;
+check(d52Summary.total === loadedLedger.ledger.findings.length &&
+  d52Summary.closed + d52Summary.custody_deferred + d52Summary.open === d52Summary.total &&
+  d52Summary.custody_deferred === d52Deferred &&
+  /^[a-f0-9]{64}$/.test(d52Summary.ledger_sha256),
+  "D52 closure summary is not honest about custody-deferred findings or its digest");
+const attestationWithD52 = compileReleaseCandidateAttestation(prerequisites, { createdAt: AT, d52Closure: d52Summary });
+check(attestationWithD52.d52_closure.total === d52Summary.total && attestationWithD52.d52_closure.closed === d52Summary.closed &&
+  attestationWithD52.d52_closure.custody_deferred === d52Summary.custody_deferred && attestationWithD52.d52_closure.open === d52Summary.open &&
+  attestationWithD52.d52_closure.ledger_sha256 === d52Summary.ledger_sha256,
+  "attestation did not bind the real D52 closure ledger digest and per-status counts");
+verifyReleaseCandidateAttestation(attestationWithD52);
+check(true, "attestation verifier rejected the D52-bearing compiler output");
 
 for (const [name, schemaFile, value] of [
   ["source", "ci-source-identity-receipt-v1.schema.json", source],
@@ -190,6 +210,7 @@ for (const [name, schemaFile, value] of [
   ["lifecycle", "ci-test-lifecycle-receipt-v1.schema.json", portable],
   ["mutation", "ci-mutation-measurement-receipt-v1.schema.json", mutationReceipt],
   ["attestation", "release-candidate-attestation-v1.schema.json", attestation],
+  ["attestation+d52", "release-candidate-attestation-v1.schema.json", attestationWithD52],
 ]) {
   const schema = JSON.parse(await fs.readFile(path.join(ROOT, "assets", schemaFile), "utf8"));
   check(validateJsonSchema(value, schema).length === 0, `${name} output is not schema-valid`);
@@ -260,6 +281,25 @@ mutation("final/candidate not parent", () => compileReleaseCandidateAttestation(
 mutation("final/failed portable lifecycle", () => compileReleaseCandidateAttestation({ ...prerequisites, portable_gate: lifecycle({ terminals: [terminal("public-bootstrap", "FAIL"), terminals[1]] }) }), /not PASS/);
 mutation("final/tampered attestation", () => verifyReleaseCandidateAttestation({ ...attestation, package: { ...attestation.package, archive_sha256: H("wrong") } }), /does not match/);
 mutation("final/forged promotion eligibility", () => verifyReleaseCandidateAttestation({ ...attestation, production_promotion_eligible: true }), /schema-valid/);
+mutation("d52/summary does not sum", () => compileReleaseCandidateAttestation(prerequisites, { createdAt: AT, d52Closure: { ...d52Summary, closed: d52Summary.closed + 1 } }), /do not sum/);
+mutation("d52/bad digest", () => compileReleaseCandidateAttestation(prerequisites, { createdAt: AT, d52Closure: { ...d52Summary, ledger_sha256: "not-a-digest" } }), /canonical digest/);
+mutation("d52/extra key", () => compileReleaseCandidateAttestation(prerequisites, { createdAt: AT, d52Closure: { ...d52Summary, extra: 1 } }), /keys must be exactly/);
+mutation("d52/negative count", () => compileReleaseCandidateAttestation(prerequisites, { createdAt: AT, d52Closure: { ...d52Summary, open: -1 } }), /integer/);
+mutation("d52/bad schema version", () => summarizeD52ClosureLedger({ ...loadedLedger.ledger, schema_version: "other-ledger/9.9" }), /schema_version/);
+mutation("d52/unrecognized status", () => summarizeD52ClosureLedger({
+  ...loadedLedger.ledger,
+  findings: loadedLedger.ledger.findings.map((finding, index) => index ? finding : { ...finding, status: "closed-forever" }),
+}), /unrecognized status/);
+mutation("d52/summary disagrees with findings", () => summarizeD52ClosureLedger({ ...loadedLedger.ledger, summary: { ...loadedLedger.ledger.summary, closed: 1 } }), /summary counts do not match/);
+mutation("d52/duplicate finding id", () => summarizeD52ClosureLedger({ ...loadedLedger.ledger, findings: [loadedLedger.ledger.findings[0], loadedLedger.ledger.findings[0]] }), /repeats finding id/);
+mutation("d52/non-canonical commit sha", () => summarizeD52ClosureLedger({
+  ...loadedLedger.ledger,
+  findings: loadedLedger.ledger.findings.map((finding, index) => index ? finding : { ...finding, mapped_commits: [{ sha: "nope" }] }),
+}), /mapped_commits\[0\].sha/);
+mutation("d52/empty proof suite label", () => summarizeD52ClosureLedger({
+  ...loadedLedger.ledger,
+  findings: loadedLedger.ledger.findings.map((finding, index) => index ? finding : { ...finding, proof_suites: [{ suite: " " }] }),
+}), /proof_suites\[0\].suite/);
 
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "external-ci-evidence-tests-"));
 try {
@@ -345,12 +385,28 @@ try {
     receiptPaths[key] = receiptPath;
   }
   const finalOutPath = path.join(scratch, "release-candidate-attestation.json");
-  const finalArgs = [path.join(ROOT, "scripts", "compile_external_ci_evidence.mjs"), "final-attestation"];
-  for (const jobId of CI_PREREQUISITE_JOB_IDS) finalArgs.push(`--${jobId.replaceAll("_", "-")}`, receiptPaths[jobId]);
-  finalArgs.push("--created-at", AT, "--out", finalOutPath);
-  await exec(process.execPath, finalArgs);
+  const finalBase = [path.join(ROOT, "scripts", "compile_external_ci_evidence.mjs"), "final-attestation"];
+  for (const jobId of CI_PREREQUISITE_JOB_IDS) finalBase.push(`--${jobId.replaceAll("_", "-")}`, receiptPaths[jobId]);
+  finalBase.push("--created-at", AT);
+  await exec(process.execPath, [...finalBase, "--out", finalOutPath]);
   const cliAttestation = JSON.parse(await fs.readFile(finalOutPath, "utf8"));
-  check(cliAttestation.attestation_sha256 === attestation.attestation_sha256, "final attestation CLI disagrees with module compiler");
+  check(cliAttestation.attestation_sha256 === attestationWithD52.attestation_sha256,
+    "final attestation CLI did not consume the committed D52 closure ledger exactly like the module compiler");
+  const finalExplicitPath = path.join(scratch, "release-candidate-attestation-explicit-d52.json");
+  await exec(process.execPath, [
+    ...finalBase,
+    "--d52-closure-ledger", path.join(ROOT, "audit", "v379", "d52-closure-ledger.json"),
+    "--out", finalExplicitPath,
+  ]);
+  const cliExplicit = JSON.parse(await fs.readFile(finalExplicitPath, "utf8"));
+  check(cliExplicit.attestation_sha256 === cliAttestation.attestation_sha256 && cliExplicit.d52_closure.total === d52Summary.total,
+    "explicit --d52-closure-ledger disagrees with default ledger detection");
+  await assert.rejects(
+    exec(process.execPath, [...finalBase, "--d52-closure-ledger", path.join(scratch, "absent-ledger.json"), "--out", finalExplicitPath]),
+    /absent/,
+    "CLI accepted a missing explicitly requested D52 closure ledger",
+  );
+  checks += 1;
   await assert.rejects(
     exec(process.execPath, [path.join(ROOT, "scripts", "compile_external_ci_evidence.mjs"), "source-identity", "--input", inputPath, "--out", outPath, "--unexpected", "yes"]),
     /Options must be exactly/,
@@ -367,6 +423,7 @@ console.log(JSON.stringify({
   checks,
   mutations_caught: mutationsCaught,
   prerequisite_job_count: CI_PREREQUISITE_JOB_IDS.length,
-  schemas_validated: 5,
+  schemas_validated: 6,
+  d52_closure_counts: d52Summary,
   cli_modes_exercised: ["capture-source-identity", "capture-registry-selection", "source-identity", "registry-selection", "lifecycle-from-gate-report", "final-attestation"],
 }));

@@ -12,6 +12,7 @@ import {
   compileReleaseCandidateAttestation,
   compileSourceIdentityReceipt,
   compileTestLifecycleReceipt,
+  loadD52ClosureLedger,
 } from "./lib/external_ci_evidence.mjs";
 
 const exec = promisify(execFile);
@@ -85,11 +86,15 @@ function parse(argv) {
   return { mode, options };
 }
 
-function exactOptions(options, required) {
-  const actual = Object.keys(options).sort();
-  const expected = [...required].sort();
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error(`Options must be exactly ${expected.map((key) => `--${key}`).join(", ")}; received ${actual.map((key) => `--${key}`).join(", ")}.`);
+function exactOptions(options, required, optional = []) {
+  const expected = [...required].sort().map((key) => `--${key}`).join(", ");
+  const unexpected = Object.keys(options).filter((key) => !required.includes(key) && !optional.includes(key));
+  if (unexpected.length > 0) {
+    throw new Error(`Options must be exactly ${expected}; received unexpected ${unexpected.sort().map((key) => `--${key}`).join(", ")}.`);
+  }
+  const missing = required.filter((key) => !(key in options));
+  if (missing.length > 0) {
+    throw new Error(`Options must be exactly ${expected}; missing ${missing.sort().map((key) => `--${key}`).join(", ")}.`);
   }
 }
 
@@ -190,11 +195,14 @@ if (mode === "capture-source-identity") {
     "package-a", "package-b", "package-reproducibility", "archive-capability",
     "mutation-measurement", "synthetic-merge",
   ];
-  exactOptions(options, [...receiptOptions, "created-at", "out"]);
+  exactOptions(options, [...receiptOptions, "created-at", "out"], ["d52-closure-ledger"]);
   const values = await Promise.all(receiptOptions.map((key) => readJson(options[key], `${key} receipt`)));
+  const d52Closure = loadD52ClosureLedger(options["d52-closure-ledger"]
+    ? { ledger_path: options["d52-closure-ledger"], required: true }
+    : {});
   result = compileReleaseCandidateAttestation(
     Object.fromEntries(receiptOptions.map((key, index) => [key.replaceAll("-", "_"), values[index]])),
-    { createdAt: options["created-at"] },
+    { createdAt: options["created-at"], d52Closure: d52Closure?.summary ?? null },
   );
 }
 
