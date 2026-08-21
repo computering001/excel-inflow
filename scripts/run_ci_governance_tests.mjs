@@ -75,6 +75,11 @@ function exactHeadAssertions(text) {
   assert.match(jobBlock(text, "full-portable") ?? "", /--profile portable[\s\S]*--selection-scope PORTABLE_ALL/, "Full portable lifecycle is absent.");
   assert.match(jobBlock(text, "package-a") ?? "", /--label A[\s\S]*--source-date-epoch/, "Package A is not independent/epoch-bound.");
   assert.match(jobBlock(text, "package-b") ?? "", /--label B[\s\S]*--source-date-epoch/, "Package B is not independent/epoch-bound.");
+  for (const id of ["package-a", "package-b"]) {
+    const block = jobBlock(text, id) ?? "";
+    assert.match(block, /--smoke-case test-fixtures\/release-smoke\/production-model-smoke-case-v2\.json/, `${id} does not compile the declared production release-smoke case.`);
+    assert.doesNotMatch(block, /--smoke-case test-fixtures\/cases\/standard-maximal-v2\.json/, `${id} still compiles the legacy pre-compiler fixture.`);
+  }
   assert.match(jobBlock(text, "package-reproducibility") ?? "", /compare_exact_head_package_builds\.mjs[\s\S]*package-a\.build-receipt[\s\S]*package-b\.build-receipt/, "A/B byte comparison is absent.");
   assert.match(jobBlock(text, "mutation-measurement") ?? "", /compile_mutation_adequacy\.mjs[\s\S]*mutation-measurement-receipt/, "Mutation counts/coverage job is absent.");
   const final = jobBlock(text, "final-aggregate") ?? "";

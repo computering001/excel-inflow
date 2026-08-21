@@ -178,7 +178,7 @@ jobs:
           set -euo pipefail
           EPOCH="$(git show -s --format=%ct "$CANDIDATE_SOURCE_SHA")"
           node scripts/run_exact_head_package_build_ci.mjs --label A --commit "$CANDIDATE_SOURCE_SHA" --source-date-epoch "$EPOCH" \
-            --smoke-case test-fixtures/cases/standard-maximal-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --smoke-case test-fixtures/release-smoke/production-model-smoke-case-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
             --out "${{ runner.temp }}/package-a/build"
           node scripts/compile_exact_head_ci_job_receipt.mjs package --source-identity "${{ runner.temp }}/source/source-identity.json" \
             --raw "${{ runner.temp }}/package-a/build/package-a.build-receipt.json" --job-id package_a \
@@ -219,7 +219,7 @@ jobs:
           set -euo pipefail
           EPOCH="$(git show -s --format=%ct "$CANDIDATE_SOURCE_SHA")"
           node scripts/run_exact_head_package_build_ci.mjs --label B --commit "$CANDIDATE_SOURCE_SHA" --source-date-epoch "$EPOCH" \
-            --smoke-case test-fixtures/cases/standard-maximal-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
+            --smoke-case test-fixtures/release-smoke/production-model-smoke-case-v2.json --python "$(command -v python3)" --soffice "$(command -v soffice)" \
             --out "${{ runner.temp }}/package-b/build"
           node scripts/compile_exact_head_ci_job_receipt.mjs package --source-identity "${{ runner.temp }}/source/source-identity.json" \
             --raw "${{ runner.temp }}/package-b/build/package-b.build-receipt.json" --job-id package_b \
