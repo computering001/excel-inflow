@@ -338,27 +338,58 @@ jobs:
     needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    # pull-requests: read lets the SHA-pinned paths filter read the pull
+    # request's changed-file list; everything else stays read-only.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with: { node-version: "22" }
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
+      - name: Detect whether mutation-relevant sources changed
+        id: mutation-scope
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          filters: |
+            mutation_relevant:
+              - 'scripts/lib/**'
+              - 'scripts/build_dynamic_model.mjs'
+              - 'scripts/solver*'
+              - 'test-fixtures/**'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
       - name: Install the mutation runtime toolchain
         uses: ./.github/actions/setup-toolchain
-      - name: Execute and count every currently measured mutation
+      # The attestation refuses any candidate head without a fully measured,
+      # zero-survivor P0 gate, so "paths unchanged" never skips measurement
+      # outright: it DOWNSHIFTS to measuring exactly the derived P0 gate while
+      # honestly enumerating every deferred suite as an owned gap — precisely
+      # what mutation_measurement_custody declares. Changed production-reach
+      # sources still earn the full corpus.
+      - name: Execute mutation measurement at the earned depth
+        env:
+          MUTATION_RELEVANT: ${{ steps.mutation-scope.outputs.mutation_relevant }}
         run: |
           set -euo pipefail
           mkdir -p "${{ runner.temp }}/mutation/raw"
           node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean "${{ runner.temp }}/mutation/raw/evidence-run.json"
-          node scripts/compile_mutation_adequacy.mjs --profile all --representative test-fixtures/cases/standard-maximal-v2.json \
-            --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
-            --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          if [ "$MUTATION_RELEVANT" = "true" ]; then
+            node scripts/compile_mutation_adequacy.mjs --profile all --representative test-fixtures/cases/standard-maximal-v2.json \
+              --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
+              --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          else
+            printf '%s\n' '{"mutation_measurement": "skipped_paths_unchanged", "authority": "scheduled-deep-gate"}' \
+              | tee "${{ runner.temp }}/mutation/mutation-scope-decision.json"
+            node scripts/compile_mutation_adequacy.mjs --profile all --dry-run \
+              --out "${{ runner.temp }}/mutation/p0-scope-dry-run.json"
+            p0_ids="$(node -e 'const r=require(process.argv[1]);process.stdout.write(r.zero_survivor_gate.member_ids.join(","))' "${{ runner.temp }}/mutation/p0-scope-dry-run.json")"
+            node scripts/compile_mutation_adequacy.mjs --profile all --only "$p0_ids" \
+              --representative test-fixtures/cases/standard-maximal-v2.json \
+              --raw-canary-evidence "${{ runner.temp }}/mutation/raw/evidence-run.json" --python "$(command -v python3)" \
+              --soffice "$(command -v soffice)" --out "${{ runner.temp }}/mutation/mutation-report.json"
+          fi
           node scripts/run_mutation_adequacy_tests.mjs --report "${{ runner.temp }}/mutation/mutation-report.json"
           node scripts/compile_exact_head_ci_job_receipt.mjs mutation-measurement \
             --source-identity "${{ runner.temp }}/source/source-identity.json" --raw "${{ runner.temp }}/mutation/mutation-report.json" \
