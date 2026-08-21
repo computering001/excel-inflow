@@ -1,5 +1,10 @@
 # Calculation rules
 
+Normative companions: `cash-waterfall-spec.md` (cash/RCF waterfall, shortfall
+and RCF-exhaustion contract), `interest-conventions-spec.md` (average-balance,
+PIK, floors, commitment fee) and `tax-and-earnings-spec.md` (ETR normalisation,
+loss flooring). Where this document summarises, those documents govern.
+
 ## Instrument register
 
 Create one row for each material instrument or homogeneous debt pool.
