@@ -70,6 +70,27 @@ rather than dropped without trace.  ``observations`` carries typed statements
 about behaviour that is neither a break of an identity nor derivable from the
 case -- most importantly the cash-tax forecast authority, where the case's own
 ``forecast_calculation`` and the shipped forecast-authority waterfall disagree.
+
+THE CANDIDATE CASH-FLOW CONSTRUCTIONS
+-------------------------------------
+Operating cash flow is recomputed under every construction the case's declared
+data admits, and the reconciling one is recorded:
+
+  * ``accrual_link`` -- cash taxes = the declared accrual charge
+    (``link(tax_expense)``), inside the generic indirect CFO;
+  * ``latest_reported_carry_forward`` -- cash taxes held flat at the latest
+    reported figure, the waterfall's disclosed fallback;
+  * ``declared_graph`` (1.1) -- the case's OWN cash-flow statement resolved
+    row by row exactly as the emitted workbook evaluates it: declared
+    ``sum``/``link``/``negate`` rules, the forecast-authority waterfall's
+    rejection of the legacy cash-tax link in favour of a carry-forward chain,
+    the classifier's adoption of the finance captions, and the B3
+    cash-interest convention on any row calculated against the interest
+    schedule -- with the oracle's own solved circular quantities bound in as
+    overrides, mirroring the production statementOverrides binding.  Offered
+    only when the case declares a derivable ``cash_from_operations`` graph;
+    a graph that cannot be evaluated independently withdraws the branch
+    rather than guessing.
 """
 
 from __future__ import annotations
@@ -98,7 +119,13 @@ FORBIDDEN_PRODUCTION_IMPORTS: list[str] = [
     "solver",
 ]
 
-ORACLE_VERSION = "solver-fixed-point-oracle/1.0"
+ORACLE_VERSION = "solver-fixed-point-oracle/1.1"
+# 1.1 -- the candidate cash-flow construction set gained its third member:
+# ``declared_graph``, which evaluates the case's OWN declared cash-flow
+# presentation (per-row link/hold-flat semantics, the rejected legacy
+# cash-tax link, the classified finance captions) with this oracle's solved
+# circular quantities bound in, matching the structure the emitted workbook
+# actually carries.  Every expectation remains a pure function of the case.
 
 # ---------------------------------------------------------------------------
 # Declared tolerance
@@ -606,6 +633,243 @@ class IncomeStatement:
         )
 
 
+class DeclaredGraphWithdrawn(Exception):
+    """The case's declared cash-flow graph cannot be evaluated independently."""
+
+
+class DeclaredCashFlowGraph:
+    """The case's OWN cash-flow statement, resolved as the workbook evaluates it.
+
+    Where the generic constructions rebuild operating cash flow indirectly
+    from the drivers, this graph walks the DECLARED presentation row by row:
+    each row's forecast rule under the shipped authority waterfall, the
+    classifier's adoption of the finance captions on unlabeled rows, and the
+    disclosed rejection of a silent ``link(tax_expense)`` on the cash-tax line
+    in favour of a carry-forward chain.  The oracle's own solved circular
+    quantities -- the interest schedule, the profit block, the drivers -- are
+    bound in as overrides keyed by semantic role, mirroring the production
+    statement-overrides binding; every remaining number comes from the case
+    alone.
+
+    A graph that cannot be evaluated independently -- an unsupported
+    operator, an undeclared reference, a circular reference -- withdraws its
+    candidacy (:class:`DeclaredGraphWithdrawn`) rather than guessing.  Cases
+    without a declared ``cash_from_operations`` row (every archetype) offer no
+    branch at all.
+    """
+
+    # Mirror of classifyStatementLine's accepted outcomes for the four roles
+    # the normaliser adopts inline on unlabeled cash-flow rows.
+    CAPTION_ALIASES = {
+        "income taxes paid": "cash_taxes",
+        "finance costs paid": "cash_interest_paid",
+        "finance income received": "cash_interest_received",
+        "net finance costs add-back": "net_finance_addback",
+    }
+
+    SUPPORTED_OPERATORS = (
+        "sum", "link", "subtract", "negate", "negate_sum", "ratio",
+        "negated_ratio", "growth", "tax", "average",
+        "prior_period", "prior_period_scaled_by",
+    )
+
+    def __init__(self, case: dict, historical_count: int, forecast_count: int) -> None:
+        self.historical_count = historical_count
+        self.forecast_count = forecast_count
+        self.withdrawal: Optional[str] = None
+        self.offered = False
+        # The declared rows, income statement first so cash-flow links into it
+        # resolve, with the classifier mirror applied: an unlabeled row whose
+        # caption the production classifier adopts carries that role here too.
+        self.rows: Dict[str, dict] = {}
+        for section in ("income_statement", "cash_flow"):
+            for raw in (case.get("statement_structure") or {}).get(section) or []:
+                row = dict(raw)
+                if not row.get("row_id"):
+                    continue
+                if not row.get("semantic_role"):
+                    classified = self.CAPTION_ALIASES.get(self._caption(row.get("label")))
+                    if classified == "cash_taxes":
+                        self._reject_silent_tax_link(row, self.rows)
+                    if not row.get("semantic_role"):
+                        row["semantic_role"] = classified  # may stay None
+                self.rows[row["row_id"]] = row
+        if "cash_from_operations" not in self.rows:
+            self.withdrawal = "the case declares no cash_from_operations row"
+            return
+        try:
+            previous = self.reported_values()
+            for index in range(self.forecast_count):
+                self.resolve(index, {}, previous)
+        except DeclaredGraphWithdrawn as reason:
+            self.withdrawal = str(reason)
+            return
+        self.offered = True
+
+    @staticmethod
+    def _caption(label: Any) -> str:
+        return " ".join(str(label or "").lower().replace("–", "-").split())
+
+    def _reject_silent_tax_link(self, row: dict, declared: Dict[str, dict]) -> None:
+        """The waterfall's disclosed rejection of a silent cash-tax link.
+
+        A cash-flow row captioned as taxes paid whose declared forecast rule
+        is a bare ``link(tax_expense)`` is re-owned by the carry-forward
+        chain: the reported figures stand and every forecast column holds the
+        latest reported figure flat via ``prior_period`` on the row itself.
+        """
+        rule = row.get("forecast_calculation") or {}
+        refs = rule.get("refs") or []
+        ref_row = declared.get(refs[0]) if refs else None
+        is_tax_ref = (
+            rule.get("operator") == "link"
+            and len(refs) == 1
+            and (
+                refs[0] == "tax_expense"
+                or (ref_row or {}).get("semantic_role") == "tax_expense"
+            )
+        )
+        if not is_tax_ref:
+            return
+        row["semantic_role"] = "cash_taxes"
+        original = list(row.get("values") or [])
+        row.pop("forecast_calculation", None)
+        row["values"] = original[:self.historical_count] + [None] * self.forecast_count
+        row["forecast_period_calculations"] = [
+            {"operator": "prior_period", "refs": [row["row_id"]]}
+            for _ in range(self.forecast_count)
+        ]
+        row["forecast_treatment"] = "formula"
+
+    def reported_values(self) -> Dict[str, float]:
+        """The latest reported column per row -- what period 1 chains from."""
+        position = max(0, self.historical_count - 1)
+        state: Dict[str, float] = {}
+        for row_id, row in self.rows.items():
+            values = row.get("values") or []
+            state[row_id] = number(values[position]) if position < len(values) else 0.0
+        return state
+
+    def forecast_rule(self, row: Optional[dict], forecast_index: int) -> Optional[dict]:
+        """The authority-waterfall mirror: which rule owns this row this period."""
+        if row is None:
+            return None
+        per_period = row.get("forecast_period_calculations")
+        if isinstance(per_period, list):
+            return per_period[forecast_index] if forecast_index < len(per_period) else None
+        if row.get("forecast_calculation"):
+            return row["forecast_calculation"]
+        treatment = row.get("forecast_treatment")
+        if treatment in ("broker", "hardcode", "zero", "uncalculated"):
+            certified = (
+                row.get("row_type") == "uncalculated"
+                or bool(row.get("forecast_capture_parent_id"))
+            )
+            if treatment == "uncalculated" and not certified and row.get("calculation"):
+                return row["calculation"]
+            return None
+        return row.get("calculation")
+
+    def resolve(self, forecast_index: int, overrides: Dict[str, float],
+                previous: Dict[str, float]) -> Dict[str, float]:
+        """Resolve EVERY declared row for one forecast period.
+
+        A role bound in ``overrides`` reads the bound quantity -- the oracle's
+        own solved circular state; otherwise the row's waterfall rule
+        evaluates over its refs and ``previous``, the prior period's resolved
+        state; otherwise the declared values stand.
+        """
+        values: Dict[str, float] = {}
+
+        def resolve_row(row_id: str, active: frozenset) -> float:
+            if row_id in values:
+                return values[row_id]
+            if row_id in active:
+                raise DeclaredGraphWithdrawn("circular reference through %s" % row_id)
+            row = self.rows.get(row_id)
+            if row is None:
+                raise DeclaredGraphWithdrawn("reference to undeclared row %s" % row_id)
+            active = active | {row_id}
+            role = row.get("semantic_role")
+            if role and role in overrides:
+                values[row_id] = number(overrides[role])
+                return values[row_id]
+            rule = self.forecast_rule(row, forecast_index)
+            if rule is not None:
+                value = self._evaluate(rule, resolve_row, previous, row, active)
+            else:
+                declared = row.get("values") or []
+                position = self.historical_count + forecast_index
+                value = (
+                    number(declared[position])
+                    if position < len(declared) and declared[position] is not None
+                    else 0.0
+                )
+            values[row_id] = float(value)
+            return values[row_id]
+
+        for row_id in self.rows:
+            resolve_row(row_id, frozenset())
+        return values
+
+    def _evaluate(self, rule: dict, resolve, previous: Dict[str, float],
+                  row: dict, active: frozenset) -> float:
+        """One declared rule, in the workbook's own evaluation order."""
+        operator = rule.get("operator")
+        refs = rule.get("refs") or []
+        if operator not in self.SUPPORTED_OPERATORS:
+            raise DeclaredGraphWithdrawn(
+                "unsupported operator %r on %s" % (operator, row.get("row_id"))
+            )
+        if operator == "prior_period":
+            return number(previous.get(refs[0], 0.0))
+        if operator == "prior_period_scaled_by":
+            if len(refs) < 2:
+                raise DeclaredGraphWithdrawn(
+                    "%s needs two refs on %s" % (operator, row.get("row_id"))
+                )
+            current = resolve(refs[1], active)
+            prior_denominator = number(previous.get(refs[1], 0.0))
+            if prior_denominator == 0:
+                return 0.0
+            return number(previous.get(refs[0], 0.0)) * current / prior_denominator
+        values = [resolve(ref, active) for ref in refs]
+        if operator == "sum":
+            return sum(values)
+        if operator == "link":
+            return values[0] if values else 0.0
+        if operator == "subtract":
+            return (values[0] if values else 0.0) - sum(values[1:])
+        if operator == "negate":
+            return -(values[0] if values else 0.0)
+        if operator == "negate_sum":
+            return -sum(values)
+        if operator in ("ratio", "negated_ratio") and len(values) < 2:
+            raise DeclaredGraphWithdrawn(
+                "%s needs two refs on %s" % (operator, row.get("row_id"))
+            )
+        if operator == "ratio":
+            return 0.0 if values[1] == 0 else values[0] / values[1]
+        if operator == "negated_ratio":
+            return 0.0 if values[1] == 0 else -values[0] / values[1]
+        if operator == "growth":
+            # Single-ref convention: the prior figure is the referenced row's
+            # own prior-period resolved value.
+            if not values:
+                raise DeclaredGraphWithdrawn(
+                    "%s needs a ref on %s" % (operator, row.get("row_id"))
+                )
+            prior = number(previous.get(refs[0], 0.0))
+            return 0.0 if prior == 0 else values[0] / prior - 1.0
+        if operator == "tax":
+            return -(values[0] * values[1]) if values[0] > 0 else 0.0
+        if operator == "average":
+            return sum(values) / len(values) if values else 0.0
+        raise DeclaredGraphWithdrawn(
+            "unsupported operator %r on %s" % (operator, row.get("row_id"))
+        )
+
+
 def effective_tax_rates(case: dict, forecast_count: int) -> Tuple[List[float], str]:
     """The declared effective-tax-rate authority.
 
@@ -640,8 +904,11 @@ def declared_cash_tax_candidates(case: dict, forecast_count: int,
     ``forecast_calculation: link(tax_expense)``.  The shipped forecast-authority
     waterfall may instead hold the latest reported cash-tax figure flat, which
     it discloses.  Both are derivable from declared data; WHICH one governs is
-    not, so both are enumerated and the reconciling branch is recorded.  See
-    ``declared_gaps``.
+    not, so both are enumerated and the reconciling branch is recorded.  A case
+    that declares a derivable cash-flow graph additionally carries the
+    ``declared_graph`` branch (appended by :class:`Recomputation`), which
+    resolves the issuer's own presentation instead of a generic indirect CFO.
+    See ``declared_gaps``.
     """
     row = cash_flow_row(case, "income_taxes_paid")
     calculation = (row.get("forecast_calculation") or {})
@@ -775,6 +1042,17 @@ class Recomputation:
         self.cash_tax_candidates = declared_cash_tax_candidates(
             case, self.forecast_count, self.historical_count
         )
+        # The third construction, offered only where the case declares its own
+        # derivable cash-flow presentation.  Cases without such a graph -- the
+        # archetypes -- carry the two generic branches alone.
+        self.cash_flow_graph = DeclaredCashFlowGraph(
+            case, self.historical_count, self.forecast_count
+        )
+        if self.cash_flow_graph.offered:
+            self.cash_tax_candidates.append({
+                "branch": "declared_graph",
+                "declared_by": "statement_structure.cash_flow.cash_from_operations",
+            })
 
     # -- gap declaration ---------------------------------------------------
 
@@ -790,10 +1068,12 @@ class Recomputation:
             "cash_taxes_paid_forecast_authority",
             "the case declares forecast_calculation link(tax_expense) on income_taxes_paid, "
             "while the shipped forecast-authority waterfall may instead hold the latest "
-            "reported cash tax flat and disclose it. Both branches are derivable from "
+            "reported cash tax flat and disclose it. Both constructions are derivable from "
             "declared data; which one governs is a waterfall decision the case does not "
-            "declare, so this oracle recomputes the whole fixed point under BOTH and "
-            "records which reconciles.",
+            "declare, so this oracle recomputes the whole fixed point under EVERY declared "
+            "construction -- the accrual link, the disclosed carry-forward and, where the "
+            "case declares a derivable cash-flow presentation, that presentation itself -- "
+            "and records which reconciles.",
             ["cash_from_operations", "cash_before_rcf", "rcf_draw", "rcf_repayment", "ending_cash"],
         )
         if number((self.case.get("acquisition") or {}).get("enabled")) == 1:
@@ -1081,6 +1361,15 @@ class Recomputation:
         )
         opening_cash_declared = number(self.cash_policy.get("opening_cash"))
 
+        # The declared_graph branch resolves the case's own cash-flow
+        # presentation instead of the generic indirect constructions below.
+        using_graph = (
+            cash_tax_branch["branch"] == "declared_graph"
+            and self.cash_flow_graph is not None
+            and self.cash_flow_graph.offered
+        )
+        graph_overrides: Dict[str, float] = {}
+
         # State the loop iterates on.
         ending_cash = [opening_cash_declared] * self.forecast_count
         ending_rcf_native = [opening_draw_native] * self.forecast_count
@@ -1093,6 +1382,9 @@ class Recomputation:
             previous_cash = opening_cash_declared
             previous_rcf_native = opening_draw_native
             worst = 0.0
+            graph_previous = (
+                self.cash_flow_graph.reported_values() if using_graph else {}
+            )
             for index in range(self.forecast_count):
                 period_index = index + self.historical_count
                 roll = rolls[index]
@@ -1162,51 +1454,101 @@ class Recomputation:
                 else:
                     net_income = pre_tax_income - tax
 
-                # --- cash taxes: the declared branch under test -----------
-                if cash_tax_branch["branch"] == "accrual_link":
-                    cash_taxes_paid = tax
-                else:
-                    cash_taxes_paid = number(cash_tax_branch.get("amount"))
+                if using_graph:
+                    # The circular quantities this oracle has just resolved,
+                    # bound into the presentation exactly as the production
+                    # statement overrides bind them.  The two finance captions
+                    # carry the B3 convention wherever their rows are
+                    # calculated against the interest schedule.
+                    graph_overrides = {
+                        "revenue": self.drivers["revenue"][index],
+                        "adjusted_ebitda": adjusted_ebitda,
+                        "depreciation_and_amortisation":
+                            self.drivers["depreciation_and_amortisation"][index],
+                        "cash_flow_da": self.drivers["depreciation_and_amortisation"][index],
+                        "ebit": ebit,
+                        "interest_income": interest_income,
+                        "interest_expense": -gross_interest,
+                        "net_finance_addback": net_interest,
+                        "pre_tax_income": pre_tax_income,
+                        "tax_expense": -tax,
+                        "net_income": net_income,
+                        "change_in_working_capital":
+                            self.drivers["change_in_working_capital"][index],
+                        "non_cash_interest_addback":
+                            non_cash_interest[index] + non_cash_instrument_interest,
+                        "other_non_cash": self.drivers["other_non_cash"][index],
+                        "capex": self.drivers["capex"][index],
+                        "other_investing": self.drivers["other_investing"][index],
+                    }
+                    costs_row = self.cash_flow_graph.rows.get("finance_costs_paid")
+                    if self.cash_flow_graph.forecast_rule(costs_row, index) is not None:
+                        graph_overrides["cash_interest_paid"] = -(
+                            gross_interest - lease["interest"]
+                            - non_cash_interest[index] - non_cash_instrument_interest
+                        )
+                    income_row = self.cash_flow_graph.rows.get("finance_income_received")
+                    if self.cash_flow_graph.forecast_rule(income_row, index) is not None:
+                        graph_overrides["cash_interest_received"] = interest_income
 
-                cash_interest_paid = (
-                    gross_interest - non_cash_interest[index] - non_cash_instrument_interest
-                )
-                if self.profit_supplied:
-                    # Indirect from the supplied profit: the only non-cash item
-                    # the case declares alongside it is the depreciation charge.
-                    cash_from_operations = (
-                        net_income
-                        + self.drivers["depreciation_and_amortisation"][index]
-                        + self.drivers["change_in_working_capital"][index]
-                        + self.drivers["other_non_cash"][index]
+                # --- cash taxes: the declared branch under test -----------
+                if using_graph:
+                    graph_values = self.cash_flow_graph.resolve(
+                        index, graph_overrides, graph_previous
                     )
+                    # The presentation files its payments as outflows; the
+                    # recorded charge keeps the positive-outflow convention of
+                    # the generic branches.
+                    cash_taxes_paid = -number(graph_values.get("income_taxes_paid"))
+                    cash_from_operations = number(
+                        graph_values.get("cash_from_operations")
+                    )
+                    graph_previous.update(graph_values)
                 else:
-                    # Anything the declared statement puts between EBITDA and
-                    # profit before tax that is neither the depreciation charge
-                    # nor net interest -- an impairment inside operating profit,
-                    # a share of associates, a discontinued result -- is a
-                    # movement the statement declares and the cash flow carries
-                    # at its declared sign.  It is recovered as a residual of
-                    # the declared statement rather than by matching row names,
-                    # so a new line cannot be missed by not being enumerated.
-                    # A line that is genuinely non-cash is reversed by the
-                    # case's own other_non_cash add-back.
-                    statement_extra = (
-                        pre_tax_income
-                        - (adjusted_ebitda
-                           - self.drivers["depreciation_and_amortisation"][index])
-                        - interest_income
-                        + gross_interest
+                    if cash_tax_branch["branch"] == "accrual_link":
+                        cash_taxes_paid = tax
+                    else:
+                        cash_taxes_paid = number(cash_tax_branch.get("amount"))
+
+                    cash_interest_paid = (
+                        gross_interest - non_cash_interest[index] - non_cash_instrument_interest
                     )
-                    cash_from_operations = (
-                        adjusted_ebitda
-                        + self.drivers["change_in_working_capital"][index]
-                        + self.drivers["other_non_cash"][index]
-                        + statement_extra
-                        + interest_income
-                        - cash_interest_paid
-                        - cash_taxes_paid
-                    )
+                    if self.profit_supplied:
+                        # Indirect from the supplied profit: the only non-cash item
+                        # the case declares alongside it is the depreciation charge.
+                        cash_from_operations = (
+                            net_income
+                            + self.drivers["depreciation_and_amortisation"][index]
+                            + self.drivers["change_in_working_capital"][index]
+                            + self.drivers["other_non_cash"][index]
+                        )
+                    else:
+                        # Anything the declared statement puts between EBITDA and
+                        # profit before tax that is neither the depreciation charge
+                        # nor net interest -- an impairment inside operating profit,
+                        # a share of associates, a discontinued result -- is a
+                        # movement the statement declares and the cash flow carries
+                        # at its declared sign.  It is recovered as a residual of
+                        # the declared statement rather than by matching row names,
+                        # so a new line cannot be missed by not being enumerated.
+                        # A line that is genuinely non-cash is reversed by the
+                        # case's own other_non_cash add-back.
+                        statement_extra = (
+                            pre_tax_income
+                            - (adjusted_ebitda
+                               - self.drivers["depreciation_and_amortisation"][index])
+                            - interest_income
+                            + gross_interest
+                        )
+                        cash_from_operations = (
+                            adjusted_ebitda
+                            + self.drivers["change_in_working_capital"][index]
+                            + self.drivers["other_non_cash"][index]
+                            + statement_extra
+                            + interest_income
+                            - cash_interest_paid
+                            - cash_taxes_paid
+                        )
                 cash_from_investing = (
                     -self.drivers["capex"][index] + self.drivers["other_investing"][index]
                 )
@@ -1554,11 +1896,27 @@ def choose_branch(recomputation: Recomputation,
     launder the answer into the expectation: a solved value that matches no
     branch still produces findings (against the closest branch, so they are
     informative rather than arbitrary).
+
+    A branch whose own recomputation fails -- it refuses, or it never
+    converges -- is not evidence about the others: it scores infinity and is
+    chosen only when nothing else survived, in which case the convergence
+    refusal below still fires.
     """
-    runs = [recomputation.fixed_point(candidate)
-            for candidate in recomputation.cash_tax_candidates]
+    runs: List[dict] = []
+    failure: Optional[Refusal] = None
+    for candidate in recomputation.cash_tax_candidates:
+        try:
+            runs.append(recomputation.fixed_point(candidate))
+        except Refusal as refusal:
+            if failure is None:
+                failure = refusal
+    if not runs and failure is not None:
+        raise failure
     scored: List[Tuple[float, dict]] = []
     for run in runs:
+        if not run["converged"]:
+            scored.append((float("inf"), run))
+            continue
         worst = 0.0
         # Scored on the FIRST forecast period only.  The branches differ there
         # in full, and a later period's own divergence must not be allowed to
@@ -1918,14 +2276,30 @@ def compare(case: dict, solution_document: Any, workbook_path: Optional[Path] = 
         candidate["branch"] == "accrual_link" for candidate in recomputation.cash_tax_candidates
     )
     if declared_link and chosen["branch"]["branch"] != "accrual_link":
+        if chosen["branch"]["branch"] == "declared_graph":
+            per_period = (
+                "%.6g" % number(chosen["periods"][0].get("cash_taxes_paid"))
+                if chosen["periods"] else "its declared carry-forward"
+            )
+            detail = (
+                "the case declares forecast_calculation link(tax_expense) on "
+                "income_taxes_paid, but the artifact reconciles only under the case's "
+                "own declared cash-flow presentation (the declared_graph branch), which "
+                "resolves the cash-tax line to %s per period from the presentation's "
+                "carry-forward chain rather than from the accrual charge." % per_period
+            )
+        else:
+            detail = (
+                "the case declares forecast_calculation link(tax_expense) on "
+                "income_taxes_paid, but the artifact reconciles only under the "
+                "latest-reported-cash-tax carry-forward branch (%s per period). The "
+                "declared link would change operating cash flow, and therefore the "
+                "revolver sweep, in every forecast period."
+                % chosen["branch"].get("amount")
+            )
         comparison.observe(
             "SFP_CASH_TAX_AUTHORITY_OVERRIDES_DECLARED_LINK",
-            "the case declares forecast_calculation link(tax_expense) on "
-            "income_taxes_paid, but the artifact reconciles only under the "
-            "latest-reported-cash-tax carry-forward branch (%s per period). The "
-            "declared link would change operating cash flow, and therefore the "
-            "revolver sweep, in every forecast period."
-            % chosen["branch"].get("amount"),
+            detail,
             reconciling_branch=chosen["branch"]["branch"],
             declared_branch="accrual_link",
         )
@@ -1972,6 +2346,10 @@ def compare(case: dict, solution_document: Any, workbook_path: Optional[Path] = 
                 candidate["branch"] for candidate in recomputation.cash_tax_candidates
             ],
             "cash_tax_branch_reconciling": chosen["branch"]["branch"],
+            "declared_cash_flow_graph": {
+                "offered": bool(recomputation.cash_flow_graph.offered),
+                "withdrawal": recomputation.cash_flow_graph.withdrawal,
+            },
             "non_revolver_instrument_count": len(
                 chosen["instrument_roll_forward"][0] if chosen["instrument_roll_forward"] else {}
             ),
