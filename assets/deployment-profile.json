@@ -378,6 +378,7 @@
     "lib/experience_trace.mjs",
     "lib/face_statement_manifest.mjs",
     "lib/filings_acquisition.mjs",
+    "lib/extraction_cache.mjs",
     "lib/fixed_point_constitution.mjs",
     "lib/flow.mjs",
     "lib/flow_entity.mjs",
