@@ -51,7 +51,25 @@ export const SYNTHETIC_CASE_RECIPES = Object.freeze({
   C32: ["profile:maximal", "accounting:ifrs", "statement:nature", "cashflow:debt-parent-children", "debt:all-movement-classes", "fx:translation-without-cash"],
 });
 
-const SUPPORTED_RECIPE_TOKENS = new Set(Object.values(SYNTHETIC_CASE_RECIPES).flat());
+const ADVERSARIAL_ECONOMIC_RECIPE_TOKENS = Object.freeze([
+  // mp-L adversarial economic archetypes (test-fixtures/archetypes/economics/).
+  // Declared overlays for degenerate/adversarial shapes: no C1-C32 recipe uses
+  // them yet, but future cohort recipes may, so the derivation below must
+  // accept them or validateManifest would reject them as unknown tokens.
+  "economics:zero-revenue-year",
+  "economics:negative-equity",
+  "leverage:net-debt-gt-20x",
+  "fiscal:mid-year-end-sep",
+  "fx:multi-currency-stack",
+  "debt:pik-capitalised-hook",
+  "debt:sale-leaseback-proceeds",
+]);
+
+// hyperinflationary shapes reuse the existing fx:* vocabulary and add no token.
+const SUPPORTED_RECIPE_TOKENS = new Set([
+  ...Object.values(SYNTHETIC_CASE_RECIPES).flat(),
+  ...ADVERSARIAL_ECONOMIC_RECIPE_TOKENS,
+]);
 
 function clone(value) {
   return structuredClone(value);
