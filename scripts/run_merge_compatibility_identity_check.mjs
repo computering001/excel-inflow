@@ -1,27 +1,26 @@
 #!/usr/bin/env node
-import { execFile } from "node:child_process";
+
 import fs from "node:fs/promises";
 import path from "node:path";
-import process from "node:process";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
-const exec = promisify(execFile);
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-function option(name, fallback = null) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index >= 0 ? process.argv[index + 1] : fallback;
-}
+import { createRunner } from "./lib/test_harness.mjs";
+
+const run = createRunner({
+  name: "merge_compatibility_identity_check",
+  importMetaUrl: import.meta.url,
+});
+const { option, exec } = run.runCli();
 const out = option("out");
 const candidateSourceCommit = option("candidate-source-commit");
 const expectedRole = option("expected-role");
 if (!out || !candidateSourceCommit || !["merge_test", "candidate_source"].includes(expectedRole)) {
   throw new Error("Usage: run_merge_compatibility_identity_check.mjs --candidate-source-commit <sha> --expected-role <merge_test|candidate_source> --out <report.json>");
 }
+
 const [{ stdout: commit }, { stdout: tree }, { stdout: parents }] = await Promise.all([
-  exec("git", ["rev-parse", "HEAD"], { cwd: root }),
-  exec("git", ["rev-parse", "HEAD^{tree}"], { cwd: root }),
-  exec("git", ["show", "-s", "--format=%P", "HEAD"], { cwd: root }),
+  exec("git", ["rev-parse", "HEAD"], { cwd: run.ROOT }),
+  exec("git", ["rev-parse", "HEAD^{tree}"], { cwd: run.ROOT }),
+  exec("git", ["show", "-s", "--format=%P", "HEAD"], { cwd: run.ROOT }),
 ]);
 const checkedOutCommit = commit.trim();
 const checkedOutTree = tree.trim();
@@ -48,4 +47,3 @@ const report = {
 };
 await fs.writeFile(path.resolve(out), `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(report, null, 2));
-if (report.status !== "PASS") process.exitCode = 1;

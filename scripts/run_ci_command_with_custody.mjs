@@ -5,20 +5,29 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
+import { createRunner } from "./lib/test_harness.mjs";
+
 import { runProcessTree } from "./lib/process_tree.mjs";
 
+const run = createRunner({
+  name: "ci_command_with_custody",
+  importMetaUrl: import.meta.url,
+});
+
+// Guarded option scan: a flag whose value is another flag does not consume it.
+const { argv } = run.runCli();
 function option(name, fallback = null) {
-  const index = process.argv.indexOf(`--${name}`);
+  const index = argv.indexOf(`--${name}`);
   if (index < 0) return fallback;
-  const value = process.argv[index + 1];
+  const value = argv[index + 1];
   return value && !value.startsWith("--") ? value : fallback;
 }
 
-const separator = process.argv.indexOf("--");
+const separator = argv.indexOf("--");
 const out = option("out");
 const jobId = option("job-id");
 const timeoutMs = Number(option("timeout-ms", "3600000"));
-if (!out || !jobId || separator < 0 || separator === process.argv.length - 1) {
+if (!out || !jobId || separator < 0 || separator === argv.length - 1) {
   throw new Error(
     "Usage: run_ci_command_with_custody.mjs --job-id <id> --out <directory> " +
       "[--timeout-ms <ms>] -- <command> [arguments...]",
@@ -28,8 +37,8 @@ if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
   throw new Error("--timeout-ms must be a positive finite number.");
 }
 
-const command = process.argv[separator + 1];
-const args = process.argv.slice(separator + 2);
+const command = argv[separator + 1];
+const args = argv.slice(separator + 2);
 const outputRoot = path.resolve(out);
 const logsRoot = path.join(outputRoot, "test-logs");
 await fs.mkdir(logsRoot, { recursive: true });
