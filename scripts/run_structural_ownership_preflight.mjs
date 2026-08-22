@@ -8,6 +8,13 @@ import {
   compileStructuralOwnershipPreflight,
   verifyStructuralOwnershipPreflight,
 } from "./lib/forecast_ownership_resolver.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
+
+const run = createRunner({
+  name: "structural_ownership_preflight",
+  importMetaUrl: import.meta.url,
+});
+const { argv } = run.runCli();
 
 function parseArgs(argv) {
   const positional = [];
@@ -107,7 +114,7 @@ function projectedCase(filingsBundle, demandGraph) {
 }
 
 async function main() {
-  const { positional, options } = parseArgs(process.argv.slice(2));
+  const { positional, options } = parseArgs(argv);
   if (positional.length !== 2 || !options.out) {
     throw new Error(
       "Usage: run_structural_ownership_preflight.mjs <filings-bundle.json> <pre-broker-demand.json> --out <receipt.json> [--verify <receipt.json>]",
