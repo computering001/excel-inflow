@@ -8,17 +8,20 @@ import { ROLE_PULL_REQUEST_GATE, ROLE_SCHEDULED_DEEP_GATE, jobBlock, loadRegiste
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflowsRoot = path.join(root, ".github", "workflows");
+// Audit §3.1: the portable lane is a three-shard matrix plus a dedicated
+// portable-aggregate referee job, so the gate pins exactly TWELVE ordered
+// top-level jobs.
 const REQUIRED_EXACT_HEAD_JOBS = Object.freeze([
-  "source-identity", "registry-census", "targeted-bootstrap-runtime", "full-portable", "package-a", "package-b",
+  "source-identity", "registry-census", "targeted-bootstrap-runtime", "full-portable", "portable-aggregate", "package-a", "package-b",
   "package-reproducibility", "archive-only-capability", "mutation-measurement", "synthetic-merge", "final-aggregate",
 ]);
 const CANDIDATE_CHECKOUT_JOBS = Object.freeze([
-  "source-identity", "registry-census", "targeted-bootstrap-runtime", "full-portable", "package-a", "package-b",
+  "source-identity", "registry-census", "targeted-bootstrap-runtime", "full-portable", "portable-aggregate", "package-a", "package-b",
   "package-reproducibility", "mutation-measurement", "final-aggregate",
 ]);
 const PREREQUISITES = REQUIRED_EXACT_HEAD_JOBS.slice(0, -1);
 const REQUIRED_ARTIFACTS = Object.freeze([
-  "exact-head-source-identity", "exact-head-registry-selection", "exact-head-targeted-runtime", "exact-head-full-portable",
+  "exact-head-source-identity", "exact-head-registry-selection", "exact-head-targeted-runtime", "exact-head-portable-aggregate",
   "exact-head-package-a", "exact-head-package-b", "exact-head-package-reproducibility", "exact-head-archive-only-capability",
   "exact-head-mutation-measurement", "exact-head-synthetic-merge", "exact-head-release-candidate-attestation",
 ]);
@@ -61,7 +64,7 @@ function universalAssertions(name, text) {
     `${name} contains an unpinned or out-of-scope action: ${[...unpinned, ...strayLocal].join(", ")}`);
 }
 function exactHeadAssertions(text) {
-  assert.deepEqual(workflowJobs(text), REQUIRED_EXACT_HEAD_JOBS, "Exact-head workflow does not contain exactly the eleven ordered jobs.");
+  assert.deepEqual(workflowJobs(text), REQUIRED_EXACT_HEAD_JOBS, "Exact-head workflow does not contain exactly the twelve ordered jobs.");
   assert.doesNotMatch(text, /^\s*continue-on-error:\s*true\s*$/m, "Exact-head required jobs may not mask a failing step.");
   assert.match(text, /^\s*pull_request:\s*$/m, "Exact-head workflow is not a pull-request candidate-head gate.");
   for (const row of multilineShells(text)) assert.equal(row.first, "set -euo pipefail", `Multiline shell at line ${row.line} lacks set -euo pipefail.`);
@@ -79,11 +82,20 @@ function exactHeadAssertions(text) {
   assert.match(merge, /--expected-role merge_test/, "Synthetic merge evidence is not explicitly classified as merge compatibility.");
   assert.equal((text.match(/capture-registry-selection/g) ?? []).length, 1, "Registry selection is not compiled exactly once.");
   assert.match(jobBlock(text, "targeted-bootstrap-runtime") ?? "", /--only[\s\S]*public-bootstrap[\s\S]*runtime-doctor/, "Targeted runtime job lacks exact targeted execution.");
-  assert.match(jobBlock(text, "full-portable") ?? "", /--profile portable[\s\S]*--selection-scope PORTABLE_ALL/, "Full portable lifecycle is absent.");
+  // Audit §3.1: the single-artifact PORTABLE_ALL assertion is SPLIT. The
+  // full-portable matrix legs only run their interleaved slice and retain
+  // per-shard evidence; the dedicated portable-aggregate referee job waits
+  // on all three legs and alone re-joins the reports into the one complete
+  // report and PORTABLE_ALL lifecycle receipt.
+  assert.match(jobBlock(text, "full-portable") ?? "", /--profile portable[\s\S]*--shard \$\{\{ matrix\.shard \}\}\/3/, "The portable shard legs do not run their exact slice.");
+  const portableShards = jobBlock(text, "full-portable") ?? "";
+  assert.doesNotMatch(portableShards, /aggregate_development_gate_reports\.mjs/, "A portable matrix leg re-joins shard reports; audit §3.1 reserves that for the referee job.");
+  const portableAggregate = jobBlock(text, "portable-aggregate") ?? "";
+  assert.match(portableAggregate, /needs:\s*\[[^\]]*\bfull-portable\b[^\]]*\]/, "The portable aggregate referee does not wait for the full-portable legs.");
+  assert.match(portableAggregate, /aggregate_development_gate_reports\.mjs[\s\S]*lifecycle-from-gate-report[\s\S]*--selection-scope PORTABLE_ALL/, "Full portable lifecycle is absent from the aggregate referee.");
   const portable = jobBlock(text, "full-portable") ?? "";
   assert.match(portable, /strategy:\s*\n\s+fail-fast:\s*false\s*\n\s+matrix:\s*\n\s+shard:\s*\[1, 2, 3\]/, "The full portable lane is not a three-shard matrix under its single job id.");
   assert.equal((text.match(/--shard \$\{\{ matrix\.shard \}\}\/3/g) ?? []).length, 1, "The portable gate must carry the shard argument exactly once per leg.");
-  assert.match(portable, /aggregate_development_gate_reports\.mjs/, "Sharded portable reports are never re-joined into one complete report.");
   assert.match(portable, /name:\s*exact-head-full-portable-shard-\$\{\{ matrix\.shard \}\}/, "Per-shard evidence custody is absent.");
   assert.match(jobBlock(text, "package-a") ?? "", /--label A[\s\S]*--source-date-epoch/, "Package A is not independent/epoch-bound.");
   assert.match(jobBlock(text, "package-b") ?? "", /--label B[\s\S]*--source-date-epoch/, "Package B is not independent/epoch-bound.");
@@ -115,7 +127,7 @@ for (const name of files) {
   if (roleByFile.get(name) === ROLE_PULL_REQUEST_GATE) {
     exactHeadAssertions(text);
     clean = text;
-    checks += 42;
+    checks += 45;
   } else {
     assert.match(text, /^\s*schedule:\s*$/m, `${name} lacks scheduled deep tiers.`);
     assert([...text.matchAll(/^\s*-\s*cron:/gm)].length >= 2, `${name} lacks two declared cron tiers.`);
@@ -130,8 +142,12 @@ const mutations = [
   ["pipefail", clean.replace("set -euo pipefail", "set -e")],
   ["missing job", clean.replace("  package-b:\n", "  package-b-removed:\n")],
   ["candidate ref", clean.replace("          ref: ${{ github.event.pull_request.head.sha }}\n", "")],
-  ["always aggregate", clean.replace("  final-aggregate:\n    name: 11 - All-needs exact-head D52 attestation\n    if: always()", "  final-aggregate:\n    name: 11 - All-needs exact-head D52 attestation\n    if: success()")],
+  ["always aggregate", clean.replace("  final-aggregate:\n    name: 12 - All-needs exact-head D52 attestation\n    if: always()", "  final-aggregate:\n    name: 12 - All-needs exact-head D52 attestation\n    if: success()")],
   ["artifact", clean.replace("exact-head-package-reproducibility", "missing-repro-artifact")],
+  // Audit §3.1: the referee job itself is pinned — renaming it away or
+  // downgrading its PORTABLE_ALL scope must both be caught.
+  ["aggregate referee", clean.replace("  portable-aggregate:\n", "  portable-aggregate-renamed:\n")],
+  ["aggregate scope", clean.replace("--selection-scope PORTABLE_ALL", "--selection-scope TARGETED")],
   ["merge role", clean.replace("--expected-role merge_test", "--expected-role candidate_source")],
   ["continue on error", clean.replace("    timeout-minutes: 15", "    continue-on-error: true\n    timeout-minutes: 15")],
 ];

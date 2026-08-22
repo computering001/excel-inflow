@@ -121,7 +121,7 @@
         ]
       },
       "wall_clock_budget_minutes": 180,
-      "speed_contract": "This tier gates each pull-request candidate head through eleven separately owned jobs; independent packages and mutation measurement run in parallel while the final always-run aggregate consumes their immutable evidence.",
+      "speed_contract": "This tier gates each pull-request candidate head through twelve separately owned jobs; independent packages and mutation measurement run in parallel while the final always-run aggregate consumes their immutable evidence.",
       "jobs": [
         {
           "id": "source-identity",
@@ -147,6 +147,11 @@
             "tier_declaration_and_quarantine_health",
             "generated_cohort_volume_300"
           ]
+        },
+        {
+          "id": "portable-aggregate",
+          "timeout_minutes": 15,
+          "covers": []
         },
         {
           "id": "package-a",
