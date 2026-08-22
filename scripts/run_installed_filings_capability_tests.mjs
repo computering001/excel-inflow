@@ -45,6 +45,8 @@ const EXPECTED_MUTATIONS_BASE = Object.freeze([
   "installed-inline-xbrl-missing-worker",
   "installed-inline-xbrl-timeout",
   "installed-extractor-byte-drift",
+  "packaged-html-tables-route",
+  "packaged-html-tables-worker-missing",
   "invalid-temp-root",
   "invalid-work-root",
   "missing-fixture",
