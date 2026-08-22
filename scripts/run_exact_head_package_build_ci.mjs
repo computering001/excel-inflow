@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import process from "node:process";
 import { compilePackageBuildReceipt } from "./lib/exact_head_package_ci.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const exec = promisify(execFile);
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const run = createRunner({ name: "exact_head_package_build_ci", importMetaUrl: import.meta.url });
+const { argv, exec } = run.runCli();
+const ROOT = run.ROOT;
 async function observedVersion(executable, label) {
   if (!executable) return null;
   const result = await exec(path.resolve(executable), ["--version"], { timeout: 30_000, maxBuffer: 1024 * 1024 });
@@ -26,7 +26,7 @@ function parse(argv) {
   }
   return result;
 }
-const options = parse(process.argv.slice(2));
+const options = parse(argv);
 if (!/^[AB]$/.test(options.label ?? "") || !/^[a-f0-9]{40}$/.test(options.commit ?? "") || !/^\d+$/.test(options["source-date-epoch"] ?? "") || !options["smoke-case"] || !options.out) {
   throw new Error("Usage: run_exact_head_package_build_ci.mjs --label A|B --commit <40sha> --source-date-epoch <seconds> --smoke-case <json> --out <directory> [--python <exe>] [--soffice <exe>]");
 }
@@ -59,9 +59,9 @@ delete env.EXCEL_INFLOW_BUILD_TIMESTAMP;
 delete env.EXCEL_INFLOW_SOURCE_COMMIT;
 delete env.EXCEL_INFLOW_SOURCE_TREE;
 const started = new Date().toISOString();
-let run;
+let build;
 try {
-  run = await exec(process.execPath, [
+  build = await exec(process.execPath, [
     path.join(ROOT, "scripts", "compile_skill_release.mjs"), "--skill", ROOT,
     "--out", packageRoot, "--development", "--smoke-case", smokeCasePath,
     "--archive-out", archivePath, "--attestation-out", attestationPath,
@@ -74,7 +74,7 @@ await fs.writeFile(logPath, [
   `started_at=${started}`, `completed_at=${new Date().toISOString()}`,
   `source_commit=${head.trim()}`, `source_tree=${tree.trim()}`,
   `source_date_epoch=${options["source-date-epoch"]}`, "exit_code=0",
-  "--- stdout ---", run.stdout ?? "", "--- stderr ---", run.stderr ?? "",
+  "--- stdout ---", build.stdout ?? "", "--- stderr ---", build.stderr ?? "",
 ].join("\n"));
 const receipt = await compilePackageBuildReceipt({
   label: options.label, packageRoot, archivePath, attestationPath, buildLogPath: logPath,
