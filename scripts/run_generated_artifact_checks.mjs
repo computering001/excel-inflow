@@ -295,6 +295,16 @@ for (const artifact of register.artifacts) {
 
   if (artifactPath === "architecture/ownership_census.json") {
     suiteCheck(artifact, process.execPath, ["scripts/run_ownership_census_tests.mjs"]);
+  } else if (artifactPath === "assets/document-ownership-register.json") {
+    suiteCheck(artifact, process.execPath, ["scripts/generate_document_ownership_register.mjs", "--check"]);
+  } else if (artifactPath === "central-instructions.md" || artifactPath === "references/runtime-core.md") {
+    suiteCheck(artifact, process.execPath, ["scripts/generate_instruction_docs.mjs", "--check"]);
+  } else if (artifactPath === "architecture/current_mutation_map.md") {
+    suiteCheck(artifact, process.execPath, ["scripts/run_ownership_census_tests.mjs"]);
+  } else if (artifactPath === "audit/v379/D52_CLOSURE_SUMMARY.md") {
+    suiteCheck(artifact, process.execPath, ["scripts/generate_d52_closure_summary.mjs", "--check"]);
+  } else if (artifactPath === "RELEASE_NOTES.md#release-identity-banner" || artifactPath === "KNOWN_LIMITATIONS.md#release-identity-header") {
+    suiteCheck(artifact, process.execPath, ["scripts/run_release_identity_governance_tests.mjs"]);
   } else if (artifactPath === "assets/runtime-manifest.json") {
     suiteCheck(artifact, process.execPath, ["scripts/run_certified_code_closure_tests.mjs"]);
   } else if (artifactPath === "assets/controller-terminal-exit-inventory-v1.json") {
@@ -343,6 +353,10 @@ const mutationProofs = [
   {
     id: "well-formed-foreign-skill-version-drift",
     passed: runReleaseIdentityMutationProof(),
+  },
+  {
+    id: "all-derived-document-families-reject-hand-edits",
+    passed: run(process.execPath, ["scripts/run_derived_document_governance_tests.mjs"], 600_000).ok,
   },
 ];
 for (const mutation of mutationProofs) {

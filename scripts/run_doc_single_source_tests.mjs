@@ -18,11 +18,17 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 
-import { applyTransforms, generateAll, stripFrontmatter } from './generate_instruction_docs.mjs';
+import {
+  applyTransforms,
+  generateAll,
+  removeInstructionMirrorBanner,
+  stripFrontmatter,
+} from './generate_instruction_docs.mjs';
 import { createRunner } from './lib/test_harness.mjs';
 
 const run = createRunner({ name: 'doc_single_source_tests', importMetaUrl: import.meta.url });
@@ -31,8 +37,8 @@ const GENERATOR = 'scripts/generate_instruction_docs.mjs';
 const CANONICAL = 'SKILL.md';
 const GENERATED = ['central-instructions.md', join('references', 'runtime-core.md')];
 
-function runGenerator(args) {
-  return spawnSync(process.execPath, [join(GENERATOR), ...args], { cwd: REPO_ROOT, encoding: 'utf8' });
+function runGenerator(args, root = REPO_ROOT) {
+  return spawnSync(process.execPath, [join(REPO_ROOT, GENERATOR), ...args, '--root', root], { cwd: REPO_ROOT, encoding: 'utf8' });
 }
 
 function sha256(text) {
@@ -43,43 +49,49 @@ function readRepo(path) {
   return readFileSync(join(REPO_ROOT, path), 'utf8');
 }
 
-// --- T0/T1: regenerate to a consistent baseline, then prove determinism ------
-const gen1 = runGenerator([]);
-run.ok(gen1.status === 0, 'T0 generator runs cleanly');
-const hashesRun1 = Object.fromEntries(GENERATED.map((p) => [p, sha256(readRepo(p))]));
-const gen2 = runGenerator([]);
-run.ok(gen2.status === 0, 'T1a second generator run exits 0');
-const hashesRun2 = Object.fromEntries(GENERATED.map((p) => [p, sha256(readRepo(p))]));
-run.ok(JSON.stringify(hashesRun1) === JSON.stringify(hashesRun2), 'T1b generator is byte-deterministic across runs');
-
+const scratch = mkdtempSync(join(tmpdir(), 'excel-inflow-doc-single-source-'));
 try {
+  cpSync(join(REPO_ROOT, CANONICAL), join(scratch, CANONICAL));
+  for (const relative of GENERATED) {
+    const target = join(scratch, relative);
+    mkdirSync(join(target, '..'), { recursive: true });
+    cpSync(join(REPO_ROOT, relative), target, { recursive: true });
+  }
+
+  // --- T0/T1: read-only check, scratch regeneration, determinism ------------
+  const cleanCheck = runGenerator(['--check']);
+  run.ok(cleanCheck.status === 0, 'T0 committed instruction mirrors pass the read-only exact-regeneration check');
+  const gen1 = runGenerator([], scratch);
+  run.ok(gen1.status === 0, 'T1a sanctioned writer runs cleanly in scratch');
+  const hashesRun1 = Object.fromEntries(GENERATED.map((p) => [p, sha256(readFileSync(join(scratch, p), 'utf8'))]));
+  const gen2 = runGenerator([], scratch);
+  run.ok(gen2.status === 0, 'T1b second scratch writer run exits 0');
+  const hashesRun2 = Object.fromEntries(GENERATED.map((p) => [p, sha256(readFileSync(join(scratch, p), 'utf8'))]));
+  run.ok(JSON.stringify(hashesRun1) === JSON.stringify(hashesRun2), 'T1c generator is byte-deterministic across runs');
+
   // --- T2: --check catches induced drift in each generated file --------------
   for (const path of GENERATED) {
-    const original = readRepo(path);
-    try {
-      const drifted = `${original}<!-- induced drift for doc-single-source drift gate -->\n`;
-      const { writeFileSync } = await import('node:fs');
-      writeFileSync(join(REPO_ROOT, path), drifted, 'utf8');
-      const res = runGenerator(['--check']);
-      run.ok(res.status === 1 && res.stderr.includes(path), `T2 --check detects induced drift in ${path}`);
-    } finally {
-      const { writeFileSync } = await import('node:fs');
-      writeFileSync(join(REPO_ROOT, path), original, 'utf8'); // restore even on failure
-    }
+    const target = join(scratch, path);
+    const original = readFileSync(target, 'utf8');
+    writeFileSync(target, `${original}<!-- induced drift for doc-single-source drift gate -->\n`, 'utf8');
+    const res = runGenerator(['--check'], scratch);
+    run.ok(res.status === 1 && res.stderr.includes(path), `T2 --check detects induced drift in ${path}`);
+    writeFileSync(target, original, 'utf8');
   }
-  const clean = runGenerator(['--check']);
+  const clean = runGenerator(['--check'], scratch);
   run.ok(clean.status === 0, 'T2b --check exits 0 after restore');
 
   // --- T3: no frontmatter leaks into generated files -------------------------
   for (const path of GENERATED) {
     const text = readRepo(path);
     run.ok(!text.startsWith('---\n') && !text.includes('name: excel-inflow'), `T3 ${path} has no YAML frontmatter`);
+    run.ok(text.includes('generated-document:instruction-mirror/1.0') && text.includes('Do not hand-edit'), `T3b ${path} carries an unambiguous generator and drift-remedy banner`);
   }
 
   // --- T4: shared-body hash equality ------------------------------------------
   const canonicalBody = stripFrontmatter(readRepo(CANONICAL));
-  const centralHash = sha256(readRepo('central-instructions.md'));
-  const coreText = readRepo(join('references', 'runtime-core.md'));
+  const centralHash = sha256(removeInstructionMirrorBanner(readRepo('central-instructions.md')));
+  const coreText = removeInstructionMirrorBanner(readRepo(join('references', 'runtime-core.md')));
   const coreReversed = applyTransforms(coreText, [
     { kind: 'set-first-h1', value: '# Excel Inflow' },
   ]);
@@ -99,8 +111,7 @@ try {
   }
   run.ok(t5ok, 'T5 on-disk generated files match fresh generation of SKILL.md');
 } finally {
-  // Leave the tree consistent regardless of test outcome.
-  runGenerator([]);
+  rmSync(scratch, { recursive: true, force: true });
 }
 
 run.finish();

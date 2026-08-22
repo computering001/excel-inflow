@@ -1,5 +1,12 @@
 # Excel Inflow runtime core
 
+<!-- generated-document:instruction-mirror/1.0 BEGIN -->
+<!-- DERIVED DOCUMENT: references/runtime-core.md is generated from SKILL.md. -->
+<!-- Writer: node scripts/generate_instruction_docs.mjs -->
+<!-- Read-only check: node scripts/generate_instruction_docs.mjs --check -->
+<!-- Do not hand-edit. Drift remedy: edit SKILL.md, then run the writer. -->
+<!-- generated-document:instruction-mirror/1.0 END -->
+
 ## Outcome
 Build a formula-driven corporate debt-overlay workbook with exactly **three historical and three forecast years**. The output must follow one of two standardised design profiles: maximal for full debt, lease, RCF, interest and optional acquisition topology; net cash only for a simple opening-net-cash issuer with no more than two instruments and acquisition off.
 

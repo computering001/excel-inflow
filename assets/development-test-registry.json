@@ -890,6 +890,15 @@
       "test_class": "unit"
     },
     {
+      "id": "derived-document-governance",
+      "phase": "release",
+      "runtime": "node",
+      "script": "run_derived_document_governance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "dual-read-migration",
       "phase": "evidence",
       "runtime": "node",

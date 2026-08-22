@@ -48,6 +48,41 @@
       "artifact_path": "assets/runtime-manifest.json#skill_version",
       "writer_script": "MP2-A release_identity writer (scripts/compile_skill_release.mjs) — declared here because no mp2-D-local writer regenerates the field",
       "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (exact equality to assets/release-identity.json#/version and #/channel), plus independent node scripts/run_skill_version_declaration_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/document-ownership-register.json",
+      "writer_script": "node scripts/generate_document_ownership_register.mjs --write",
+      "check_invocation": "node scripts/generate_document_ownership_register.mjs --check, plus node scripts/run_derived_document_governance_tests.mjs"
+    },
+    {
+      "artifact_path": "central-instructions.md",
+      "writer_script": "node scripts/generate_instruction_docs.mjs",
+      "check_invocation": "node scripts/generate_instruction_docs.mjs --check, plus node scripts/run_doc_single_source_tests.mjs"
+    },
+    {
+      "artifact_path": "references/runtime-core.md",
+      "writer_script": "node scripts/generate_instruction_docs.mjs",
+      "check_invocation": "node scripts/generate_instruction_docs.mjs --check, plus node scripts/run_doc_single_source_tests.mjs"
+    },
+    {
+      "artifact_path": "architecture/current_mutation_map.md",
+      "writer_script": "node scripts/run_ownership_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ownership_census_tests.mjs (exact JSON and Markdown regeneration)"
+    },
+    {
+      "artifact_path": "audit/v379/D52_CLOSURE_SUMMARY.md",
+      "writer_script": "node scripts/generate_d52_closure_summary.mjs",
+      "check_invocation": "node scripts/generate_d52_closure_summary.mjs --check, plus node scripts/run_derived_document_governance_tests.mjs"
+    },
+    {
+      "artifact_path": "RELEASE_NOTES.md#release-identity-banner",
+      "writer_script": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check_invocation": "node scripts/run_release_identity_governance_tests.mjs; prose outside the generated block is hand-owned"
+    },
+    {
+      "artifact_path": "KNOWN_LIMITATIONS.md#release-identity-header",
+      "writer_script": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check_invocation": "node scripts/run_release_identity_governance_tests.mjs; limitation prose outside the generated header is hand-owned"
     }
   ]
 }

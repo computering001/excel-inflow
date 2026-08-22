@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 70,
-      "cross_layer_integration": 113,
+      "cross_layer_integration": 114,
       "independent_economic_oracle": 9,
       "installed_host": 1,
       "real_corpus": 7,
@@ -21,7 +21,7 @@
       "evidence-authority": 49,
       "finance-schedule": 22,
       "forecast-authority": 22,
-      "release-proof": 66,
+      "release-proof": 67,
       "runtime-governance": 40,
       "runtime-performance": 24,
       "semantic-constitution": 14,
@@ -29,11 +29,11 @@
     },
     "by_profile": {
       "custody": 13,
-      "portable": 236
+      "portable": 237
     },
     "self_confirmation_risk": {
       "false": 18,
-      "true": 231
+      "true": 232
     }
   },
   "records": [
@@ -1054,6 +1054,20 @@
         "PASS": 0
       },
       "id": "doc-single-source-drift-gate",
+      "owner": "release-proof",
+      "phase": "release",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "derived-document-governance",
       "owner": "release-proof",
       "phase": "release",
       "profile": "portable",
@@ -3526,8 +3540,8 @@
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "69b37dc384f135e7867120ad27db259a715f65c9850e78692e20105ea24553f6",
-    "test_count": 249
+    "sha256": "0788b44aba59a78de2637ae0edc6b43ff6a79e4c2680d30df3c90c4dc7d0afcc",
+    "test_count": 250
   },
   "schema_version": "development-test-classification-census/1.0"
 }

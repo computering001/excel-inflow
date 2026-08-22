@@ -1,0 +1,749 @@
+{
+  "schema_version": "excel-inflow-document-ownership-register/1.0",
+  "invariant": "every tracked Markdown document is explicitly classified; derived regions name their authority, writer, read-only check, banner and drift remedy",
+  "drift_remedy": "Never repair a derived document by hand. Edit its named authority and run its sanctioned writer; hand-owned documents are edited directly.",
+  "documents": [
+    {
+      "path": "HANDOVER-MP2-FINISH.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "KNOWN_LIMITATIONS.md",
+      "ownership": "mixed",
+      "family": "release_identity_views",
+      "authority": [
+        "assets/release-identity.json"
+      ],
+      "generated_region": "release-identity:generated/1.0 header",
+      "hand_owned_region": "all limitation prose outside the generated identity header",
+      "writer": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check": "node scripts/run_release_identity_governance_tests.mjs",
+      "banner": "release-identity:generated/1.0"
+    },
+    {
+      "path": "RELEASE_NOTES.md",
+      "ownership": "mixed",
+      "family": "release_identity_views",
+      "authority": [
+        "assets/release-identity.json"
+      ],
+      "generated_region": "release-identity:generated/1.0 BEGIN..END",
+      "hand_owned_region": "all content outside the generated identity block",
+      "writer": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check": "node scripts/run_release_identity_governance_tests.mjs",
+      "banner": "release-identity:generated/1.0"
+    },
+    {
+      "path": "SKILL.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "architecture/current_mutation_map.md",
+      "ownership": "derived",
+      "family": "ownership_mutation_map",
+      "authority": [
+        "architecture/ownership_census.json",
+        "scripts/run_ownership_census_tests.mjs"
+      ],
+      "writer": "node scripts/run_ownership_census_tests.mjs --write",
+      "check": "node scripts/run_ownership_census_tests.mjs",
+      "banner": "generated-document:ownership-mutation-map/1.0"
+    },
+    {
+      "path": "audit/v379/D52_CLOSURE_SUMMARY.md",
+      "ownership": "derived",
+      "family": "d52_closure_summary",
+      "authority": [
+        "audit/v379/d52-closure-ledger.json",
+        "audit/v379/commit-to-finding-map.json"
+      ],
+      "writer": "node scripts/generate_d52_closure_summary.mjs",
+      "check": "node scripts/generate_d52_closure_summary.mjs --check",
+      "banner": "generated-document:d52-closure-summary/1.0"
+    },
+    {
+      "path": "central-instructions.md",
+      "ownership": "derived",
+      "family": "instruction_mirrors",
+      "authority": [
+        "SKILL.md"
+      ],
+      "writer": "node scripts/generate_instruction_docs.mjs",
+      "check": "node scripts/generate_instruction_docs.mjs --check",
+      "banner": "generated-document:instruction-mirror/1.0"
+    },
+    {
+      "path": "evidence/phase_6/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "evidence/release_v377/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "evidence/release_v377/approvals/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "goldens/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/HANDOVER_2026-08-19.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.1_micro_checkpoint.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.2_micro_checkpoint.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.6_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P0.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.6_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P1.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.10_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.11_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.6_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P2.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.6a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P3.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.10_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.1a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.4a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.6_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P4.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.1a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P5.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.0a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.6_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P6.8_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.10_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.11_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.1a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.1b_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.1c_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.2_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.3_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.3a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.4_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.5_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.6a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P7.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.0_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.10_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.1_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.2a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.6a_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.7_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/P8.9_issue_card.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/PHASE0_checkpoint.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/PHASE1_checkpoint.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/SCOPE_DECISION_2026-08-20.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/DEFECT_REGISTER.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/EQUIVALENCE_COHORT_BASELINE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/P2.7_EXECUTION_BRIEF.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/P3.6_EXECUTION_BRIEF.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/PHASE2-5_WORK_ORDERS.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/PHASE6_WORK_ORDERS.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/PHASE7_WORK_ORDERS.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/PHASE8_WORK_ORDERS.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/gap-reports/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/FRESH_MODEL_HANDOVER_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/INVARIANT_CONTRACT_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/PHASE_CHECKPOINT_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/REGRESSION_CASE_RECORD_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/RELEASE_CERTIFICATION_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/THREE_STRIKE_DIAGNOSIS_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "programme/templates/WORK_PACKAGE_ISSUE_CARD_TEMPLATE.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/acquisition.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/advanced-history-and-fx.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/broker-extraction.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/calculation-rules.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/cash-waterfall-spec.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/convergence-dossier.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/development-and-release-loop.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/forecast-and-input-policy.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/interest-conventions-spec.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/model-contract.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/model-intent.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/order-dependence-root-cause.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/release-rollback-runbook.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/runtime-core.md",
+      "ownership": "derived",
+      "family": "instruction_mirrors",
+      "authority": [
+        "SKILL.md"
+      ],
+      "writer": "node scripts/generate_instruction_docs.mjs",
+      "check": "node scripts/generate_instruction_docs.mjs --check",
+      "banner": "generated-document:instruction-mirror/1.0"
+    },
+    {
+      "path": "references/tax-and-earnings-spec.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/template-and-formatting.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "references/validation.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-corpus/blockers/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-fixtures/archetypes/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-fixtures/archetypes/economics/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-fixtures/archetypes/presentation/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-fixtures/cases/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
+      "path": "test-fixtures/release-smoke/README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    }
+  ]
+}
