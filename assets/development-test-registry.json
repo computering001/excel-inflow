@@ -2823,6 +2823,15 @@
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-cash-flow-articulation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_cash_flow_articulation_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     }
   ]
 }
