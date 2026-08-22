@@ -623,9 +623,12 @@ function behaviorCall({ planningCase = "pc-aaaa" } = {}) {
     recipe: nodeById("forecast_behavior_map").recipe,
     inputs: { planning_case: hashValue({ planning_case: planningCase }) },
     outputs: { forecast_behavior_map: behaviorArtifact },
-    action: () => {
+    action: async () => {
       behaviorInvocations += 1;
-      return { map: `v1:${planningCase}` };
+      const value = { map: `v1:${planningCase}` };
+      await fs.mkdir(path.dirname(behaviorArtifact), { recursive: true });
+      await fs.writeFile(behaviorArtifact, `${JSON.stringify(value)}\n`, "utf8");
+      return value;
     },
   };
 }
@@ -641,7 +644,7 @@ check(
   `the cold enactable run did not MISS: ${reuseCold.decision}`,
 );
 check(behaviorInvocations === 1, `the cold enactable run invoked its action ${behaviorInvocations} time(s)`);
-await fs.writeFile(behaviorArtifact, `${JSON.stringify(reuseCold.value)}\n`, "utf8"); // as the controller does after the stage
+// (the action itself persists the declared output — E2's absence gate requires it)
 
 const reuseWarmGraph = await openGraph(reuseDir);
 const reuseWarm = await reuseWarmGraph.runNode(behaviorCall());
