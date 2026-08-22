@@ -308,6 +308,15 @@
       "concern": "family/capture ownership",
       "target_owner": "Family ownership compiler (Phase 3)"
     },
+    "lib/forecast_plan_status.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "forecast plan semantic status classification (E1 gate)",
+      "target_owner": "Authority selector (Phase 3)"
+    },
     "lib/funded_acquisition_plan.mjs": {
       "count": 2,
       "families": {
@@ -690,9 +699,9 @@
       "target_owner": "Terminal outcome compiler (Phase 6)"
     },
     "run_user_flow.mjs": {
-      "count": 35,
+      "count": 37,
       "families": {
-        "terminal_status": 34,
+        "terminal_status": 36,
         "release_identity": 1
       },
       "classification": "canonical_writer",

@@ -54,6 +54,7 @@ const FILE_OWNERSHIP = {
   "lib/case_source_proposer.mjs": { role: "canonical_writer", concern: "statement map proposal", target_owner: "Statement Authority compiler (Phase 2)" },
   "lib/forecast_candidate_compiler.mjs": { role: "canonical_writer", concern: "forecast candidates + authority selection", target_owner: "Authority selector (Phase 3)" },
   "lib/forecast_ownership_resolver.mjs": { role: "canonical_writer", concern: "family/capture ownership", target_owner: "Family ownership compiler (Phase 3)" },
+  "lib/forecast_plan_status.mjs": { role: "canonical_writer", concern: "forecast plan semantic status classification (E1 gate)", target_owner: "Authority selector (Phase 3)" },
   "lib/capture_transition.mjs": { role: "canonical_writer", concern: "the single legal capture writer", target_owner: "Family ownership compiler (Phase 3)" },
   "lib/row_plan.mjs": { role: "mixed_legacy_writer", concern: "presentation compiler that ALSO mutates forecast state (waterfall, consolidation rewires, capture marks) - a second writer over forecast concerns", target_owner: "split: Workbook planner (Phase 5) + Authority selector (Phase 3); duplicate forecast writes deleted in Phase 9" },
   "lib/solver.mjs": { role: "canonical_writer", concern: "economic solution", target_owner: "Schedule/solver layer (Phase 4)" },
