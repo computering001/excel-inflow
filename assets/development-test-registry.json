@@ -1364,6 +1364,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "filings-ladder-corpus-rehearsal",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_filings_ladder_corpus_rehearsal_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "historical-normalisation",
       "phase": "evidence",
       "runtime": "node",

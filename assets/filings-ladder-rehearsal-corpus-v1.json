@@ -1,0 +1,64 @@
+{
+  "schema_version": "filings-ladder-rehearsal-corpus/1.0",
+  "corpus_id": "repository-sanitized-filings-ladder-v1",
+  "classification": "SANITIZED_SYNTHETIC_ROUTE_REHEARSAL_NOT_REAL_FILING_EVIDENCE",
+  "purpose": "Eight repository-owned, locally materialised documents force two executions through each maintained filing extraction route. This corpus proves route execution and typed refusal behavior only; it is not issuer evidence, a real-filing corpus, or installed-package proof.",
+  "documents": [
+    {
+      "document_id": "sanitized-ixbrl-a",
+      "route_id": "inline_xbrl",
+      "materializer": "embedded_inline_xbrl",
+      "source_fixture": "assets/installed-inline-xbrl-capability-probe-v1.json",
+      "variant": "original"
+    },
+    {
+      "document_id": "sanitized-ixbrl-b",
+      "route_id": "inline_xbrl",
+      "materializer": "embedded_inline_xbrl",
+      "source_fixture": "assets/installed-inline-xbrl-capability-probe-v1.json",
+      "variant": "entity_alias"
+    },
+    {
+      "document_id": "sanitized-pdf-geometry-a",
+      "route_id": "pdf_geometry",
+      "materializer": "embedded_pdf_geometry",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "variant": "original"
+    },
+    {
+      "document_id": "sanitized-pdf-geometry-b",
+      "route_id": "pdf_geometry",
+      "materializer": "embedded_pdf_geometry",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "variant": "metadata_resave"
+    },
+    {
+      "document_id": "sanitized-html-a",
+      "route_id": "plain_html_tables",
+      "materializer": "repository_file",
+      "source_fixture": "test-fixtures/html-tables/clean_income_statement.html",
+      "variant": "original"
+    },
+    {
+      "document_id": "sanitized-html-b",
+      "route_id": "plain_html_tables",
+      "materializer": "repository_file",
+      "source_fixture": "test-fixtures/html-tables/footnote_superscripts.html",
+      "variant": "original"
+    },
+    {
+      "document_id": "sanitized-ocr-a",
+      "route_id": "ocr_raster",
+      "materializer": "rasterized_probe_page",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "variant": "page_1"
+    },
+    {
+      "document_id": "sanitized-ocr-b",
+      "route_id": "ocr_raster",
+      "materializer": "rasterized_probe_page",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "variant": "page_2"
+    }
+  ]
+}

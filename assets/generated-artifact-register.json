@@ -45,6 +45,26 @@
       "check_invocation": "node scripts/write_hand_owned_artifact_bindings.mjs --check --artifact assets/workflow-state-contract-v1.json, then independent node scripts/run_workflow_state_tests.mjs"
     },
     {
+      "artifact_path": "assets/filings-ladder-corpus-rehearsal-v1.json",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check; independently mutation- and route-forcing-verified by python3 scripts/run_filings_ladder_corpus_rehearsal_tests.py"
+    },
+    {
+      "artifact_path": "README.md#filings-ladder-claims",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
+      "artifact_path": "RELEASE_NOTES.md#filings-ladder-claims",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
+      "artifact_path": "KNOWN_LIMITATIONS.md#filings-ladder-rehearsal",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
       "artifact_path": "assets/runtime-manifest.json#skill_version",
       "writer_script": "MP2-A release_identity writer (scripts/compile_skill_release.mjs) — declared here because no mp2-D-local writer regenerates the field",
       "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (exact equality to assets/release-identity.json#/version and #/channel), plus independent node scripts/run_skill_version_declaration_tests.mjs"

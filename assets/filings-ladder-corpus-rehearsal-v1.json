@@ -1,0 +1,305 @@
+{
+  "classification": "SANITIZED_SYNTHETIC_ROUTE_REHEARSAL_NOT_REAL_FILING_EVIDENCE",
+  "corpus_id": "repository-sanitized-filings-ladder-v1",
+  "documents": [
+    {
+      "detail": {
+        "fact_count": 7
+      },
+      "document_id": "sanitized-ixbrl-a",
+      "duration_ms": 89.15,
+      "exit_code": 0,
+      "intended_route": "inline_xbrl",
+      "materialized_sha256": "56e109ee89c4a05709d20ed48994d099ab7664b3e3d40ca7a7e6504e511f5896",
+      "observed_route": "inline_xbrl",
+      "output_sha256": "d9b611cb0253be4c2a0a52923e1181f92fc04c9b9e414855bb0df6e01a8717ab",
+      "route_force_proof": {
+        "html_table": true,
+        "inline_xbrl_marker": true
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "assets/installed-inline-xbrl-capability-probe-v1.json",
+      "source_fixture_sha256": "0b7f97cf81073193b7a887cec4d4dcc000022a3a03597a10254027b33c4347b5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "fact_count": 7
+      },
+      "document_id": "sanitized-ixbrl-b",
+      "duration_ms": 75.22,
+      "exit_code": 0,
+      "intended_route": "inline_xbrl",
+      "materialized_sha256": "f4919aa075db9fdaf793e7c27a62e8da13c3c9ce63faf47fd2a0b623462a076d",
+      "observed_route": "inline_xbrl",
+      "output_sha256": "415141e52611f2c5fc83b8129a92043af64f089c4509d97da541745752f2cb4c",
+      "route_force_proof": {
+        "html_table": true,
+        "inline_xbrl_marker": true
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "assets/installed-inline-xbrl-capability-probe-v1.json",
+      "source_fixture_sha256": "0b7f97cf81073193b7a887cec4d4dcc000022a3a03597a10254027b33c4347b5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "document_count": 1,
+        "finding_count": 0
+      },
+      "document_id": "sanitized-pdf-geometry-a",
+      "duration_ms": 185.306,
+      "exit_code": 0,
+      "intended_route": "pdf_geometry",
+      "materialized_sha256": "d0ca40ae2e7a449d30ee18179521b875977624a6a93b0a0d5a9e99a4c0b4281b",
+      "observed_route": "pdf_geometry",
+      "output_sha256": "e8bf1856ac000ce6075cdcca94680327840871ffa4b8f7cc7d5c72005ec48356",
+      "route_force_proof": {
+        "native_text_characters_by_page": [
+          292,
+          282
+        ],
+        "pdf_classification": "text"
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "source_fixture_sha256": "c023695308abc69d29e0f48a9076cb805938da4a08d77d9e4e7dbe4c6903c0d3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "document_count": 1,
+        "finding_count": 0
+      },
+      "document_id": "sanitized-pdf-geometry-b",
+      "duration_ms": 206.479,
+      "exit_code": 0,
+      "intended_route": "pdf_geometry",
+      "materialized_sha256": "6b49cd2ab6db6b480bad9a082259d643b4b88465f220155bcfb4a84245469af2",
+      "observed_route": "pdf_geometry",
+      "output_sha256": "1a0eabd70840b33805d2eb05e856466ad943e5502d7b34a7691db8679cad9850",
+      "route_force_proof": {
+        "native_text_characters_by_page": [
+          292,
+          282
+        ],
+        "pdf_classification": "text"
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "source_fixture_sha256": "c023695308abc69d29e0f48a9076cb805938da4a08d77d9e4e7dbe4c6903c0d3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "fact_count": 9,
+        "table_count": 1
+      },
+      "document_id": "sanitized-html-a",
+      "duration_ms": 83.601,
+      "exit_code": 0,
+      "intended_route": "plain_html_tables",
+      "materialized_sha256": "d88bfab66fb8a9af5d766d73ecaa7cb180f3b3ac13b5c5885c3c4e4af19dd01b",
+      "observed_route": "plain_html_tables",
+      "output_sha256": "f07ba792b45cbb817f406bf2b3c0a511b2670302d7941ed53ef1fced435e29c9",
+      "route_force_proof": {
+        "html_table": true,
+        "inline_xbrl_marker": false
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "test-fixtures/html-tables/clean_income_statement.html",
+      "source_fixture_sha256": "d88bfab66fb8a9af5d766d73ecaa7cb180f3b3ac13b5c5885c3c4e4af19dd01b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "fact_count": 3,
+        "table_count": 1
+      },
+      "document_id": "sanitized-html-b",
+      "duration_ms": 79.926,
+      "exit_code": 0,
+      "intended_route": "plain_html_tables",
+      "materialized_sha256": "f5a853f261f2ccc6f0903c0cea6f4db1e5c634487be10cdb7ca9009cafbda20c",
+      "observed_route": "plain_html_tables",
+      "output_sha256": "d9a04738cf06ac39749b58118f3f067157f3dc00f4ea3d870e8c30c84d783a0b",
+      "route_force_proof": {
+        "html_table": true,
+        "inline_xbrl_marker": false
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "EXTRACTION_PASS",
+      "source_fixture": "test-fixtures/html-tables/footnote_superscripts.html",
+      "source_fixture_sha256": "f5a853f261f2ccc6f0903c0cea6f4db1e5c634487be10cdb7ca9009cafbda20c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "detail": {
+        "probed": [
+          "tesseract"
+        ],
+        "typed_status": "ocr_engine_unavailable"
+      },
+      "document_id": "sanitized-ocr-a",
+      "duration_ms": 161.325,
+      "exit_code": 3,
+      "intended_route": "ocr_raster",
+      "materialized_sha256": "3bddbd7b28d2896db2ee3b1101e417d3a8ca003ee5b2809ae2c5b7e5d5bdc8e0",
+      "observed_route": "ocr_raster",
+      "output_sha256": "5ab89d75e085978b1752f34d3cf27489ab6fb5110241230c29098cd375209835",
+      "route_force_proof": {
+        "native_text_characters_by_page": [
+          0
+        ],
+        "pdf_classification": "scanned"
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "OCR_UNAVAILABLE_TYPED_REFUSAL",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "source_fixture_sha256": "c023695308abc69d29e0f48a9076cb805938da4a08d77d9e4e7dbe4c6903c0d3",
+      "stderr_sha256": "d5a5fc4235d07c7ae43850dafaac527a73a97023a8f3abb41b532b58def851d7"
+    },
+    {
+      "detail": {
+        "probed": [
+          "tesseract"
+        ],
+        "typed_status": "ocr_engine_unavailable"
+      },
+      "document_id": "sanitized-ocr-b",
+      "duration_ms": 156.636,
+      "exit_code": 3,
+      "intended_route": "ocr_raster",
+      "materialized_sha256": "d1a57ab237a0f0b0be5c52434162e18ed710654f05ae102a11387b94e00c7657",
+      "observed_route": "ocr_raster",
+      "output_sha256": "aff6f86e46ba2f4c731c7880be909493db87af455ed5479cdc0e9150ca508473",
+      "route_force_proof": {
+        "native_text_characters_by_page": [
+          0
+        ],
+        "pdf_classification": "scanned"
+      },
+      "route_obligation_satisfied": true,
+      "route_result": "OCR_UNAVAILABLE_TYPED_REFUSAL",
+      "source_fixture": "assets/installed-filings-capability-probe-v1.json",
+      "source_fixture_sha256": "c023695308abc69d29e0f48a9076cb805938da4a08d77d9e4e7dbe4c6903c0d3",
+      "stderr_sha256": "d5a5fc4235d07c7ae43850dafaac527a73a97023a8f3abb41b532b58def851d7"
+    }
+  ],
+  "generated_at": "2026-08-22T18:16:11.317821Z",
+  "manifest_sha256": "91413cb2b97b45db33597322473968a30f80d7a3d7e578ce5892211c584973b5",
+  "record_sha256": "ea63e7fd84fd07b6fd523e6ac6a90b0ab9808ba6d84e2d43b77986cb2e45e9eb",
+  "route_claims": {
+    "archive_proof_artifact": null,
+    "b2_all_route_archive_proof_green": false,
+    "production_ladder_phrase_permitted": false,
+    "routes": [
+      {
+        "archive_delete_or_refusal_mutation_declared": true,
+        "archive_positive_proof_declared": true,
+        "archive_proof_assertions_declared": true,
+        "archive_route_proved": false,
+        "claim_status": "PACKAGED_PIPELINE_WIRED",
+        "label": "Inline XBRL",
+        "pipeline_wired": true,
+        "route_id": "inline_xbrl",
+        "runtime_members_declared": true,
+        "worker": "scripts/extract_inline_xbrl.py",
+        "worker_present": true
+      },
+      {
+        "archive_delete_or_refusal_mutation_declared": true,
+        "archive_positive_proof_declared": true,
+        "archive_proof_assertions_declared": true,
+        "archive_route_proved": false,
+        "claim_status": "PACKAGED_PIPELINE_WIRED",
+        "label": "PDF geometry",
+        "pipeline_wired": true,
+        "route_id": "pdf_geometry",
+        "runtime_members_declared": true,
+        "worker": "scripts/extract_filing_statements.py",
+        "worker_present": true
+      },
+      {
+        "archive_delete_or_refusal_mutation_declared": true,
+        "archive_positive_proof_declared": true,
+        "archive_proof_assertions_declared": true,
+        "archive_route_proved": false,
+        "claim_status": "PACKAGED_PIPELINE_WIRED",
+        "label": "plain HTML tables",
+        "pipeline_wired": true,
+        "route_id": "plain_html_tables",
+        "runtime_members_declared": true,
+        "worker": "scripts/extract_html_tables.py",
+        "worker_present": true
+      },
+      {
+        "archive_delete_or_refusal_mutation_declared": false,
+        "archive_positive_proof_declared": false,
+        "archive_proof_assertions_declared": false,
+        "archive_route_proved": false,
+        "claim_status": "SOURCE_ONLY_NOT_PACKAGED",
+        "label": "OCR raster",
+        "pipeline_wired": false,
+        "route_id": "ocr_raster",
+        "runtime_members_declared": false,
+        "worker": "scripts/extract_ocr_tables.py",
+        "worker_present": true
+      }
+    ],
+    "source_only_route_ids": [
+      "ocr_raster"
+    ],
+    "wired_route_ids": [
+      "inline_xbrl",
+      "pdf_geometry",
+      "plain_html_tables"
+    ]
+  },
+  "schema_version": "filings-ladder-corpus-rehearsal/1.0",
+  "source_bindings": {
+    "assets/filings-ladder-rehearsal-corpus-v1.json": "82464ab9392a17a1740fcccc72764a4df7e93b1558fba22bebddbc562fcc4761",
+    "assets/filings-runtime-members.json": "781a48788189abd9fbe7fd45ec43e17f4e497693b49f105d1ce25ecd0734c04b",
+    "assets/installed-filings-capability-probe-v1.json": "c023695308abc69d29e0f48a9076cb805938da4a08d77d9e4e7dbe4c6903c0d3",
+    "assets/installed-inline-xbrl-capability-probe-v1.json": "0b7f97cf81073193b7a887cec4d4dcc000022a3a03597a10254027b33c4347b5",
+    "assets/ocr-engine-registry-v1.json": "49c01937c3567a8305e779a87541693fced0fd7593a4f1e2b8f79a98081385c9",
+    "scripts/broker_numeric.py": "968be7e9e7c9076fb7a35c0d9a39b6dce9ba33b06235319c12f496af43f6469f",
+    "scripts/extract_filing_statements.py": "fa2491e072ac3f91f6ed57a0cf8b55556d3456389d357b31e1e470908802217b",
+    "scripts/extract_html_tables.py": "54b48008514ffc18e213d7e98a1892fd9811bc3603561f82c458fb5bc698cd28",
+    "scripts/extract_inline_xbrl.py": "ee43f94d4495b1e67cd79666ec0ec291240421f0a4fe7c8c811bbafe45bc51ba",
+    "scripts/extract_ocr_tables.py": "5477a653dc7a3cd9a67a9a5e13cc5ba12c764306e3628b5158d6e705cad11e07",
+    "scripts/normalize_pdf.py": "0ecb89148ebeb3df0ed780bf98e725b0e44e5dacf6b9f896692fcdb7d9673158",
+    "scripts/run_filings_ladder_corpus_rehearsal.py": "eb318a4c805b8b30b816eba72f3d0144e751d422a9f463d9077fc50753e971a2",
+    "scripts/run_filings_pipeline.mjs": "d75b466471564cb85910d75ede0f1b8cb10aa3de4d19ed085b49182451f7b66b",
+    "scripts/run_installed_filings_capability_tests.mjs": "6a9775ef8ec9d55022ba1068019513203f1228b274ab3841519e2de96e756eaf",
+    "test-fixtures/html-tables/clean_income_statement.html": "d88bfab66fb8a9af5d766d73ecaa7cb180f3b3ac13b5c5885c3c4e4af19dd01b",
+    "test-fixtures/html-tables/footnote_superscripts.html": "f5a853f261f2ccc6f0903c0cea6f4db1e5c634487be10cdb7ca9009cafbda20c"
+  },
+  "status": "PASS",
+  "summary": {
+    "document_count": 8,
+    "extraction_pass_count": 6,
+    "interpretation": "Eight of eight sanitized route obligations were executed. Typed OCR engine unavailability satisfies only the OCR refusal obligation; it is not an extraction pass.",
+    "route_counts": {
+      "inline_xbrl": 2,
+      "ocr_raster": 2,
+      "pdf_geometry": 2,
+      "plain_html_tables": 2
+    },
+    "route_obligations_satisfied": 8,
+    "typed_ocr_unavailable_count": 2
+  },
+  "toolchain": {
+    "ocr_engine_available": false,
+    "pdftoppm": "pdftoppm version 26.05.0",
+    "pymupdf": "1.26.5",
+    "python": "Python 3.9.6",
+    "rasterizer_available": true,
+    "tesseract": null
+  }
+}

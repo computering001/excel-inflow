@@ -192,6 +192,28 @@ function exactReleaseIdentityCheck(artifact) {
   }
 }
 
+let filingsLadderCheckOutcome = null;
+function filingsLadderGeneratedCheck(artifact, { independent = false } = {}) {
+  if (filingsLadderCheckOutcome === null) {
+    filingsLadderCheckOutcome = run(
+      "python3",
+      ["scripts/run_filings_ladder_corpus_rehearsal.py", "--check"],
+      300_000,
+    );
+  }
+  const mutation = independent
+    ? run("python3", ["scripts/run_filings_ladder_corpus_rehearsal_tests.py"], 300_000)
+    : { ok: true, output: "shared independent route/mutation proof runs on the evidence artifact" };
+  const ok = filingsLadderCheckOutcome.ok && mutation.ok;
+  record(
+    artifact.artifact_path,
+    ok,
+    ok
+      ? `exact generated-section/source-binding check PASS${independent ? "; live 8-document route and 14-mutation proof PASS" : ""}`
+      : `${filingsLadderCheckOutcome.ok ? "drift check PASS" : `drift check FAIL: ${filingsLadderCheckOutcome.output.slice(-350)}`}; ${mutation.ok ? "independent proof PASS" : `independent proof FAIL: ${mutation.output.slice(-350)}`} — run the writer: ${artifact.writer_script}`,
+  );
+}
+
 function copyFileIntoRoot(sourceRoot, targetRoot, relative) {
   const source = path.join(sourceRoot, ...relative.split("/"));
   const target = path.join(targetRoot, ...relative.split("/"));
@@ -320,6 +342,14 @@ for (const artifact of register.artifacts) {
     ]);
   } else if (artifactPath === "assets/workflow-state-contract-v1.json") {
     handOwnedBindingCheck(artifact, ["scripts/run_workflow_state_tests.mjs"]);
+  } else if (artifactPath === "assets/filings-ladder-corpus-rehearsal-v1.json") {
+    filingsLadderGeneratedCheck(artifact, { independent: true });
+  } else if (
+    artifactPath === "README.md#filings-ladder-claims" ||
+    artifactPath === "RELEASE_NOTES.md#filings-ladder-claims" ||
+    artifactPath === "KNOWN_LIMITATIONS.md#filings-ladder-rehearsal"
+  ) {
+    filingsLadderGeneratedCheck(artifact);
   } else {
     record(artifactPath, false, `no runner branch for this artifact — extend scripts/run_generated_artifact_checks.mjs`);
   }

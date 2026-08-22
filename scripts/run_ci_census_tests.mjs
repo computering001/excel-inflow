@@ -53,6 +53,9 @@ const DISPOSITIONS = {
   "run_excel_inflow_bootstrap.mjs": "PIPELINE_ENTRYPOINT",
   "run_excel_inflow_vnext.mjs": "PIPELINE_ENTRYPOINT",
   "run_filings_pipeline.mjs": "PIPELINE_ENTRYPOINT",
+  // MP2-B3/B4: sanctioned generated-evidence/doc writer. Its live route and
+  // mutation harness is registered separately as filings-ladder-corpus-rehearsal.
+  "run_filings_ladder_corpus_rehearsal.py": "GENERATED_ARTIFACT_WRITER",
   "run_user_flow.mjs": "PIPELINE_ENTRYPOINT",
   "run_structural_ownership_preflight.mjs": "PIPELINE_ENTRYPOINT",
   "run_frozen_cohort.mjs": "PIPELINE_ENTRYPOINT",

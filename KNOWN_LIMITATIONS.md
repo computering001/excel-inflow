@@ -25,18 +25,8 @@ the same failure reproduced at head for the next flip.)
   extractor; 2 HTML filings through the Inline XBRL structured lane), superseding the
   earlier honest-but-stale state of one pass / five review / two unsupported. The custody
   receipt is `test-fixtures/real-filings-custody-v1/corpus-extraction-outcomes.json`.
-  The iXBRL lane passes inside its harness and probe suites while its production wiring is
-  still in progress elsewhere; no installed-host claim rests on it yet.
-- The filings extraction ladder's text-born routes are packaged: documents carrying Inline
-  XBRL go to the structured lane and marker-free HTML goes to the plain-HTML table lane
-  (`scripts/extract_html_tables.py`, emitting bound `html-table-facts/1.0` fact tables).
-  Both workers are declared members of `assets/filings-runtime-members.json`, the packaged
-  `run_filings_pipeline.mjs` routes to them, and the installed-filings capability suite
-  proves each packaged route plus its delete-the-worker typed refusal. A fallback-lane fact
-  table never mints face-statement authority: it always ends in selected face-statement
-  adjudication before any row can bind a model case. Raster/OCR filing extraction remains
-  declared-unavailable — no OCR lane is implemented or packaged, and scanned-image filings
-  stay unsupported instead of being silently routed to another lane.
+  That external-custody result and the repository-owned sanitized route rehearsal below
+  answer different questions; neither is promoted into the other's evidence class.
 - The reviewed five-house broker pack reaches `PASS_DEGRADED`: stale responses are quarantined, and no broker authority or mappings are silently retained.
 - `broker_case: "Forecast Waterfall"` has no per-row waterfall composition to draw on, so its broker rows compose from the compatible-house consensus basis; the selection discloses this as `source_kind: forecast_waterfall` with a DEGRADE finding rather than posing as Model Consensus (mp2-E5).
 - The source branch is intentionally not merged to `main`; `main` remains on the prior v3.7.0 line until the held Rogo/native gates are completed.
@@ -166,3 +156,26 @@ than silent holes:
 - Restricted cash and its reconciliation to reported ending cash are unrepresentable.
 - IAS 38 development-cost capitalisation (and its amortisation) has no vocabulary distinct from
   generic capex.
+
+<!-- filings-ladder-rehearsal:generated/1.0 begin -->
+## Generated eight-document extraction-route rehearsal
+
+The sanctioned writer executed a maintained, sanitized corpus made only from repository-owned fixtures. It is intentionally separate from the hash-only real-filing custody receipt and from unpacked-package proof.
+
+- Packaged and pipeline-wired: **Inline XBRL, PDF geometry, plain HTML tables**. Archive-suite assertions exist, but no separate all-route PASS artifact is recorded for this head.
+- Maintained source-only / not yet archive-proved: **OCR raster**.
+- An `OCR_UNAVAILABLE_TYPED_REFUSAL` is a successful refusal rehearsal, not an extracted document.
+
+| Document | Observed route | Result | Measured wall time |
+|---|---|---:|---:|
+| `sanitized-ixbrl-a` | Inline XBRL | `EXTRACTION_PASS` | 89.150 ms |
+| `sanitized-ixbrl-b` | Inline XBRL | `EXTRACTION_PASS` | 75.220 ms |
+| `sanitized-pdf-geometry-a` | PDF geometry | `EXTRACTION_PASS` | 185.306 ms |
+| `sanitized-pdf-geometry-b` | PDF geometry | `EXTRACTION_PASS` | 206.479 ms |
+| `sanitized-html-a` | plain HTML tables | `EXTRACTION_PASS` | 83.601 ms |
+| `sanitized-html-b` | plain HTML tables | `EXTRACTION_PASS` | 79.926 ms |
+| `sanitized-ocr-a` | OCR raster | `OCR_UNAVAILABLE_TYPED_REFUSAL` | 161.325 ms |
+| `sanitized-ocr-b` | OCR raster | `OCR_UNAVAILABLE_TYPED_REFUSAL` | 156.636 ms |
+
+Evidence record: `assets/filings-ladder-corpus-rehearsal-v1.json` (`record_sha256=ea63e7fd84fd07b6fd523e6ac6a90b0ab9808ba6d84e2d43b77986cb2e45e9eb`).
+<!-- filings-ladder-rehearsal:generated/1.0 end -->

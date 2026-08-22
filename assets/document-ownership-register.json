@@ -22,6 +22,11 @@
       "banner": "release-identity:generated/1.0"
     },
     {
+      "path": "README.md",
+      "ownership": "hand_owned",
+      "rule": "edit directly; no generator may overwrite this document"
+    },
+    {
       "path": "RELEASE_NOTES.md",
       "ownership": "mixed",
       "family": "release_identity_views",

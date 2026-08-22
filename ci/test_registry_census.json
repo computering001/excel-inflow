@@ -18,7 +18,7 @@
     },
     "by_owner": {
       "broker-and-real-corpus": 8,
-      "evidence-authority": 49,
+      "evidence-authority": 50,
       "finance-schedule": 22,
       "forecast-authority": 22,
       "release-proof": 67,
@@ -1698,6 +1698,20 @@
         "PASS": 0
       },
       "id": "html-table-fallback-lane",
+      "owner": "evidence-authority",
+      "phase": "evidence",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "filings-ladder-corpus-rehearsal",
       "owner": "evidence-authority",
       "phase": "evidence",
       "profile": "portable",
@@ -3540,7 +3554,7 @@
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "0788b44aba59a78de2637ae0edc6b43ff6a79e4c2680d30df3c90c4dc7d0afcc",
+    "sha256": "08ecb7dd6704516d88f960406833a8000f9af3dcf1d6595d5e167f93d866d974",
     "test_count": 250
   },
   "schema_version": "development-test-classification-census/1.0"
