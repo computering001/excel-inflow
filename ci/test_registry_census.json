@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 70,
-      "cross_layer_integration": 112,
+      "cross_layer_integration": 113,
       "independent_economic_oracle": 9,
       "installed_host": 1,
       "real_corpus": 7,
@@ -22,18 +22,18 @@
       "finance-schedule": 22,
       "forecast-authority": 22,
       "release-proof": 66,
-      "runtime-governance": 39,
+      "runtime-governance": 40,
       "runtime-performance": 24,
       "semantic-constitution": 14,
       "workbook-oracle": 4
     },
     "by_profile": {
       "custody": 13,
-      "portable": 235
+      "portable": 236
     },
     "self_confirmation_risk": {
       "false": 18,
-      "true": 230
+      "true": 231
     }
   },
   "records": [
@@ -830,6 +830,20 @@
         "PASS": 0
       },
       "id": "controller-terminal-exits",
+      "owner": "runtime-governance",
+      "phase": "workflow",
+      "profile": "portable",
+      "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "cross_layer_integration",
+      "declared_test_class": "mutation",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "review-lifecycle",
       "owner": "runtime-governance",
       "phase": "workflow",
       "profile": "portable",
@@ -3512,8 +3526,8 @@
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "a6e18724de5453107faa499a9803d2d7bef5749ded017cf09b3f41d38808a00d",
-    "test_count": 248
+    "sha256": "69b37dc384f135e7867120ad27db259a715f65c9850e78692e20105ea24553f6",
+    "test_count": 249
   },
   "schema_version": "development-test-classification-census/1.0"
 }

@@ -353,7 +353,7 @@
     "source_sha256": {
       "scripts/run_excel_inflow_bootstrap.mjs": "38b47ad9bbac6241c424cd0fad34f1e2f5b1aed54372f2ff8edf9609162b6fc7",
       "scripts/run_excel_inflow_vnext.mjs": "3f97dc0c3855959a475f839b8a2a5736b6e5de83cd5e26e3f393820940fbd308",
-      "scripts/run_user_flow.mjs": "aa7a60a360fcf62a4f3c3a908bfdfd7e6d2563ebaf31e77bf63b85f254145c8a"
+      "scripts/run_user_flow.mjs": "bf46b0b367bbdd7f11d414f55031d8cae6c6ce0b6c129af0cc8f40bcbc44ace8"
     },
     "verifier_path": "scripts/run_controller_exit_inventory_tests.mjs",
     "verifier_sha256": "5550ecfd5e538e98fcdd680e3ae077090b7d2276113b767eda9b032500850f11",

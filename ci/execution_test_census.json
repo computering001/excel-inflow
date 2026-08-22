@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 511,
-  "source_commit": "aea3a66106760405652f284ddff10bb1b2e41556",
-  "source_tree": "c284994dfdff2f011df177c74cf06f656d986031",
+  "checks": 513,
+  "source_commit": "edf252969355d16c9263dd2031bd4a685f7988b0",
+  "source_tree": "adb59170914288587f5d648bd40e30f36df19099",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 248
+    "test_count": 249
   },
   "scripts": [
     {
@@ -867,6 +867,10 @@
     },
     {
       "script": "run_required_role_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_review_lifecycle_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
