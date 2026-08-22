@@ -130,18 +130,15 @@ function lifecycleFromGateReport({ source, registry, gate, jobId, selectionScope
     duration_ms: Math.round(row.duration_ms),
     timeout_ms: row.timeout_ms,
     timed_out: row.timed_out,
-    // The gate report carries log paths as strings plus their custody digests;
-    // the lifecycle contract needs the structured log object.
-    stdout_log: {
-      path: row.stdout_log,
-      sha256: row.stdout_sha256,
-      bytes: row.stdout_bytes,
-    },
-    stderr_log: {
-      path: row.stderr_log,
-      sha256: row.stderr_sha256,
-      bytes: row.stderr_bytes,
-    },
+    // Gate reports may carry logs either as legacy string paths (plus the
+    // custody digest fields) or as structured log objects. Normalise both to
+    // the structured shape the lifecycle contract requires.
+    stdout_log: typeof row.stdout_log === "string"
+      ? { path: row.stdout_log, sha256: row.stdout_sha256, bytes: row.stdout_bytes }
+      : row.stdout_log,
+    stderr_log: typeof row.stderr_log === "string"
+      ? { path: row.stderr_log, sha256: row.stderr_sha256, bytes: row.stderr_bytes }
+      : row.stderr_log,
   }));
   return compileTestLifecycleReceipt({
     job_id: jobId,

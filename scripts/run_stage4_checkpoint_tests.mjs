@@ -231,6 +231,7 @@ await fs.rename(emittedWorkbook, `${emittedWorkbook}.missing-output-test`);
 const scratchReuse = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   scratchReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",
@@ -242,6 +243,7 @@ await fs.rename(workbook, `${workbook}.missing-output-test`);
 const repaired = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(repaired.status === "PASS_PENDING_MANUAL", `Missing-output repair did not deliver: ${JSON.stringify(repaired)}`);
 const repairedBuild = JSON.parse(await fs.readFile(path.join(runDir, "stages", "build_checks", "build-result.json"), "utf8"));
