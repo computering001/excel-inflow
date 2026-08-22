@@ -157,6 +157,9 @@ export function normaliseUserFlowResult(result) {
   if (value.status === "ACTION_REQUIRED" && value.blocker_class === undefined) {
     value.blocker_class = "USER_DECISION";
   }
+  if (value.status === "NEEDS_INTERNAL_WORK" && value.blocker_class === undefined) {
+    value.blocker_class = "INTERNAL_WORK";
+  }
   if (value.status === "BLOCKED" && value.blocker_class === undefined) {
     throw new Error(
       `BLOCKED user-flow result at ${value.stage ?? "unknown"} lacks typed blocker ownership`,
@@ -192,6 +195,14 @@ export function normaliseUserFlowResult(result) {
       fatalReason: value.fatal_reason,
       domain: value.blocker_domain,
     });
+  }
+  if (value.status === "NEEDS_INTERNAL_WORK") {
+    if (value.blocker_class !== "INTERNAL_WORK") {
+      throw new Error("NEEDS_INTERNAL_WORK must be owned by INTERNAL_WORK");
+    }
+    if (value.fatal_reason !== undefined || value.blocker_domain !== undefined) {
+      throw new Error("NEEDS_INTERNAL_WORK is resumable internal work, not a fatal delivery blocker");
+    }
   }
   if (["SCREEN", "PAUSED", "PASS_PENDING_MANUAL"].includes(value.status)) {
     if (value.blocker_class !== undefined && value.blocker_class !== null) {

@@ -12,6 +12,7 @@ import {
   selectForecastAuthority,
 } from "./forecast_authority.mjs";
 import { observationsForConcept } from "./forecast_observation.mjs";
+import { canonicalJson } from "./run_store.mjs";
 import { taxRatePolicyCandidate } from "./tax_rate_policy.mjs";
 import {
   sealForecastAuthorityLedger,
@@ -1576,8 +1577,8 @@ export function validateForecastPlan(plan, rowsBySection) {
   const expected = [];
   for (const candidate of plan?.candidate_ledger ?? []) {
     if (
-      JSON.stringify(candidate.rank_vector) !==
-      JSON.stringify(forecastAuthorityRankVector(candidate))
+      canonicalJson(candidate.rank_vector) !==
+      canonicalJson(forecastAuthorityRankVector(candidate))
     ) {
       errors.push(`${candidate.candidate_id ?? "unknown candidate"} rank proof is stale or invalid.`);
     }
@@ -1592,8 +1593,8 @@ export function validateForecastPlan(plan, rowsBySection) {
     if (selected[0]?.candidate_id !== state.selected_candidate_id) errors.push(`${state.state_id} selected candidate does not match the state.`);
     if (
       selected[0] &&
-      JSON.stringify(state.selected_rank_vector) !==
-        JSON.stringify(selected[0].rank_vector)
+      canonicalJson(state.selected_rank_vector) !==
+        canonicalJson(selected[0].rank_vector)
     ) {
       errors.push(`${state.state_id} selected rank proof does not match its candidate.`);
     }
@@ -2006,8 +2007,8 @@ export function validateForecastPlanCaseParity(modelCase, plan) {
     if (resolved.method !== state.method) errors.push(`${state.state_id} method ${resolved.method} does not match sealed ${state.method}.`);
     if (finite(state.value) && finite(resolved.value) && Math.abs(Number(state.value) - Number(resolved.value)) > 1e-9) errors.push(`${state.state_id} value ${resolved.value} does not match sealed ${state.value}.`);
     if (
-      JSON.stringify(resolved.selection_rank ?? null) !==
-      JSON.stringify(state.selected_rank_vector ?? null)
+      canonicalJson(resolved.selection_rank ?? null) !==
+      canonicalJson(state.selected_rank_vector ?? null)
     ) {
       errors.push(`${state.state_id} materialized rank proof does not match the sealed plan.`);
     }

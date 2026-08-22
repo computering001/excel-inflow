@@ -34,10 +34,11 @@
  * Two gates stand between a clean hit and a skip, because an enacting cache
  * must not serve what is no longer there:
  *
- *  1. EXISTENCE: every file-backed declared output path must still exist
- *     (`hashDeclaredPaths`, no `absent`). A vanished artifact is not a hit;
- *     the node falls through and does the work again. (This composes naturally
- *     with any downstream absence gating: vanished output ⇒ no clean hit.)
+ *  1. BYTE IDENTITY: every file-backed declared output path must still exist
+ *     and its current hash must equal the hash sealed in the prior receipt.
+ *     A vanished or modified artifact is not a hit; the node falls through
+ *     and does the work again. (This composes naturally with downstream
+ *     invalidation: moved output ⇒ recompute this node and its dependants.)
  *  2. A RECORDED VALUE: the prior receipt must carry the `recorded_value` the
  *     successful action produced (sealed into the receipt body by
  *     `receipt_hash`). Without one — a legacy receipt written before this
@@ -872,20 +873,34 @@ export function createEvidenceWorkGraph({
 
     // ENACTMENT. An opted-in node on a clean hit may replay its prior receipt
     // instead of re-running its action — but only past both gates: every
-    // file-backed declared output must still exist, and the receipt must carry
-    // a recorded value to serve. Anything less and the graph falls through and
-    // does the work; a cache that cannot account for what it returns has not
-    // earned the right to return it.
+    // file-backed declared output must still be byte-identical to the hash in
+    // the receipt, and the receipt must carry a recorded value to serve.
+    // Anything less falls through and does the work; a cache that cannot
+    // account for the exact bytes it returns has not earned the right to
+    // return them.
     if (
       ENACT_EVIDENCE_REUSE &&
       node.reuse_enactable === true &&
       reason === "hit.inputs_unchanged"
     ) {
       const outputFilesNow = await hashDeclaredPaths(declaredOutputs);
-      const outputsPresent =
-        Object.keys(outputFilesNow).length === 0 ||
-        Object.values(outputFilesNow).every((fileHash) => fileHash !== "absent");
-      if (outputsPresent && prior.receipt.recorded_value !== undefined) {
+      const recordedOutputFiles = prior.receipt.output_files ?? {};
+      const missingOutputs = Object.entries(outputFilesNow)
+        .filter(([, fileHash]) => fileHash === "absent")
+        .map(([name]) => name);
+      const movedOutputs = Object.entries(outputFilesNow)
+        .filter(
+          ([name, fileHash]) =>
+            fileHash !== "absent" && recordedOutputFiles[name] !== fileHash,
+        )
+        .map(([name, fileHash]) => ({
+          name,
+          recorded: recordedOutputFiles[name] ?? "absent",
+          current: fileHash,
+        }));
+      const outputsByteIdentical =
+        missingOutputs.length === 0 && movedOutputs.length === 0;
+      if (outputsByteIdentical && prior.receipt.recorded_value !== undefined) {
         timingsMs[id] = 0;
         outputDigests.set(id, prior.receipt.output_digest);
         nodeReceipts[id] = prior.receipt.receipt_hash;
@@ -913,8 +928,21 @@ export function createEvidenceWorkGraph({
           value: prior.receipt.recorded_value,
         };
       }
-      // No replayable receipt (legacy) or a declared artifact vanished: fall
-      // through and recompute honestly.
+      if (missingOutputs.length > 0) {
+        reason = "invalid.declared_output_absent";
+        moved = missingOutputs.map(
+          (name) => `declared_output ${name}: absent (${declaredOutputs[name]})`,
+        );
+      } else if (movedOutputs.length > 0) {
+        reason = "invalid.output_digest_mismatch";
+        moved = movedOutputs.map(
+          ({ name, recorded, current }) =>
+            `declared_output ${name}: ${String(recorded).slice(0, 12)} -> ${String(current).slice(0, 12)}`,
+        );
+      }
+      // No replayable value (legacy), vanished output, or byte-moved output:
+      // fall through and recompute honestly with the invalidation reason
+      // preserved in the new decision receipt.
     }
 
     // The action runs on every pass that reaches here: for non-enactable nodes

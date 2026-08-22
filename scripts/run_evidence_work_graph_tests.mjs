@@ -672,15 +672,15 @@ check(
   `the decision log does not record the enacted node reuse: ${JSON.stringify(reuseRecord)}`,
 );
 
-// (c) DELETED OUTPUT — the declared artifact vanishes: the existence gate
-// fails the replay, the node re-executes on the same key, and the recomputed
-// output AGREES with what was served before. No false HIT.
+// (c) DELETED OUTPUT — the declared artifact vanishes: the byte-identity gate
+// invalidates the replay, the node re-executes on the same key, and the
+// recomputed output AGREES with what was served before. No false HIT.
 await fs.rm(behaviorArtifact, { force: true });
 const reuseDeletedGraph = await openGraph(reuseDir);
 const reuseDeleted = await reuseDeletedGraph.runNode(behaviorCall());
 await reuseDeletedGraph.close();
 check(
-  reuseDeleted.decision === "HIT" && reuseDeleted.reason === "hit.inputs_unchanged",
+  reuseDeleted.decision === "INVALID" && reuseDeleted.reason === "invalid.declared_output_absent",
   `a vanished artifact did not force honest re-execution: ${reuseDeleted.decision} / ${reuseDeleted.reason}`,
 );
 check(behaviorInvocations === 2, `a node whose output vanished did not re-run its action (${behaviorInvocations} invocation(s))`);
@@ -693,6 +693,27 @@ check(
   `the re-execution after artifact loss did not verify against the record: ${JSON.stringify(deletedRecord)}`,
 );
 
+// (d) MODIFIED OUTPUT — presence alone is not custody. A byte-moved artifact
+// under the same key must invalidate and re-execute instead of replaying the
+// receipt-sealed value over tampered bytes.
+await fs.writeFile(behaviorArtifact, `${JSON.stringify({ map: "tampered" })}\n`, "utf8");
+const reuseModifiedGraph = await openGraph(reuseDir);
+const reuseModified = await reuseModifiedGraph.runNode(behaviorCall());
+await reuseModifiedGraph.close();
+check(
+  reuseModified.decision === "INVALID" && reuseModified.reason === "invalid.output_digest_mismatch",
+  `a modified artifact did not invalidate enacted reuse: ${reuseModified.decision} / ${reuseModified.reason}`,
+);
+check(behaviorInvocations === 3, `a node whose output moved did not re-run its action (${behaviorInvocations} invocation(s))`);
+const modifiedLog = JSON.parse(
+  await fs.readFile(path.join(reuseDir, "stages", EVIDENCE_WORK_GRAPH_DIR, EVIDENCE_WORK_DECISION_FILE), "utf8"),
+);
+const modifiedRecord = modifiedLog.decisions.find((record) => record.node === "forecast_behavior_map");
+check(
+  modifiedRecord?.executed === true && modifiedRecord?.output_agreed === true,
+  `the re-execution after artifact tamper did not verify against the record: ${JSON.stringify(modifiedRecord)}`,
+);
+
 // (b) TOUCHED INPUT — the key moves, the receipt cannot be replayed, and the
 // miss names the component that moved.
 const reuseMovedGraph = await openGraph(reuseDir);
@@ -702,7 +723,7 @@ check(
   reuseMoved.decision === "MISS" && reuseMoved.reason === "miss.input_component_moved",
   `a touched input did not force re-execution: ${reuseMoved.decision} / ${reuseMoved.reason}`,
 );
-check(behaviorInvocations === 3, `a touched-input node ran the wrong number of times (${behaviorInvocations})`);
+check(behaviorInvocations === 4, `a touched-input node ran the wrong number of times (${behaviorInvocations})`);
 
 // The NO-FILE branch: statement_normalisation declares no file-backed outputs,
 // so enactment rests on the recorded value alone.

@@ -2107,7 +2107,7 @@ async function main() {
     // selection consumes those state methods as decided economics, so the
     // gate sits between plan validation and selected_authority_contract:
     // any material BLOCKED state stops the flow here with a typed,
-    // resumable BLOCKED result owned by INTERNAL_WORK (resolving the row is
+    // resumable NEEDS_INTERNAL_WORK result (resolving the row is
     // compiler work, not a user decision), and the authority node never runs.
     // Non-material BLOCKED states degrade to solver_findings-style DEGRADE
     // findings carried on the plan and the flow continues.
@@ -2132,13 +2132,16 @@ async function main() {
       );
       return finish({
         runDir,
-        screen: renderForecastPlanScreen(planningCase, forecastPlan),
+        // Internal capability debt is not rendered as a user decision screen.
+        // Machine callers receive the preserved carrier and status artifact;
+        // human-mode callers receive the typed one-line internal-work result.
+        screen: null,
         machine: options.json === true,
         result: {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
-          status: "BLOCKED",
+          status: "NEEDS_INTERNAL_WORK",
           stage: "decisions",
           outcome: "forecast_plan_blocked",
           reason_code: "forecast_plan_blocked",
@@ -2959,7 +2962,7 @@ async function guardedMain() {
 
 guardedMain()
   .then((result) => {
-    process.exitCode = ["SCREEN", "PAUSED", "ACTION_REQUIRED", "PASS_PENDING_MANUAL"].includes(result.status)
+    process.exitCode = ["SCREEN", "PAUSED", "ACTION_REQUIRED", "NEEDS_INTERNAL_WORK", "PASS_PENDING_MANUAL"].includes(result.status)
       ? 0
       : 1;
   })

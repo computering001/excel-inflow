@@ -1,7 +1,7 @@
 {
   "schema_version": "terminal-outcome-taxonomy/1.0",
   "title": "Terminal-outcome taxonomy v1 (audit section 10, step 6)",
-  "doctrine": "Every user-flow termination classifies into EXACTLY ONE of the four declared classes. A termination is any invocation-ending exit of scripts/run_user_flow.mjs: a finish() result (status + outcome) or a thrown run (typed internal outcome / handoff refusal). The class answers one question — WHAT KIND OF THING ENDED THIS RUN — and is deliberately a different axis from the workflow-state contract's blocker_class ownership field: blocker_class says who owns the state, this taxonomy says what the termination IS. Because INTERNAL_WORK work resumes automatically by contract (response_contract.BLOCKED_INTERNAL), it can never be a TERMINAL class: anything declared terminal in the delivery-blocker constitution must be a human decision or a constitutional review gate.",
+  "doctrine": "Every user-flow invocation-ending exit classifies into EXACTLY ONE of the four declared classes. The class answers what ended this invocation and is a different axis from blocker_class ownership. INTERNAL_WORK is a hidden, automatically resumable invocation stop and can never enter the terminal delivery-blocker constitution; terminal delivery blocks remain human decisions or constitutional review gates.",
   "classes": {
     "USER_DECISION": {
       "definition": "Review gate that requires a human: the run stopped because a person must decide, answer, or supply something only they hold.",
@@ -13,7 +13,7 @@
       "requires_human": false,
       "automatic_continuation": true
     },
-    "MISSING_FIXTURE_APPROVAL": {
+    "FIXTURE_INCOMPLETE": {
       "definition": "External custody or approval absent: a fixture, installed capability, or signed handoff living outside the controller's custody was not provided, so the run cannot lawfully start or continue.",
       "requires_human": true,
       "automatic_continuation": false
@@ -27,7 +27,7 @@
   "class_names_must_match_exactly": [
     "USER_DECISION",
     "INTERNAL_WORK",
-    "MISSING_FIXTURE_APPROVAL",
+    "FIXTURE_INCOMPLETE",
     "REVIEW_GATE"
   ],
   "sources_of_truth": {
@@ -75,6 +75,21 @@
         "stage",
         "blocker_class",
         "receipt",
+        "reused_stages"
+      ]
+    },
+    "NEEDS_INTERNAL_WORK": {
+      "class": "INTERNAL_WORK",
+      "surface": "user_flow_internal_work",
+      "process_exit_code": 0,
+      "contract_user_blocking": false,
+      "rationale": "Controller-owned capability work remains. The carrier is preserved, no human reply is requested, and the workflow resumes automatically after the internal repair.",
+      "required_receipt_fields": [
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
         "reused_stages"
       ]
     },
@@ -500,7 +515,7 @@
       ]
     },
     "INTERNAL.host_precondition_unsatisfied": {
-      "class": "MISSING_FIXTURE_APPROVAL",
+      "class": "FIXTURE_INCOMPLETE",
       "surface": "internal_failure",
       "declared_in": "assets/terminal-reason-registry-v1.json",
       "rationale": "A declared host capability (workbook engine, python, custody fixture) is absent from the environment: external custody absent, not an internal defect.",
@@ -513,7 +528,7 @@
       ]
     },
     "INTERNAL.controller_handoff_refused": {
-      "class": "MISSING_FIXTURE_APPROVAL",
+      "class": "FIXTURE_INCOMPLETE",
       "surface": "controller_handoff",
       "declared_in": "scripts/lib/controller_handoff.mjs",
       "rationale": "The parent controller's signed handoff token is absent, expired or invalid: the approval custody needed to start a child run is missing, so the run refuses before executing any product route.",
@@ -525,11 +540,9 @@
     },
     "forecast_plan_blocked": {
       "class": "INTERNAL_WORK",
-      "surface": "internal_failure",
+      "surface": "user_flow_internal_work",
       "stage": "decisions",
       "blocker_class": "INTERNAL_WORK",
-      "fatal_reason": "equation_system_unsolved",
-      "blocker_domain": "forecast_plan",
       "declared_in": "assets/terminal-reason-registry-v1.json",
       "rationale": "E1 semantic gate: a material forecast state is BLOCKED (unresolved+blocking). Capability debt owned internally — resumes automatically after repair; never a user-facing delivery block.",
       "required_receipt_fields": [

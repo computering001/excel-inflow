@@ -96,6 +96,11 @@
         "requires_explicit_reply": false,
         "automatic_continuation": true,
         "user_visible": false
+      },
+      "NEEDS_INTERNAL_WORK": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true,
+        "user_visible": false
       }
     }
   },
@@ -583,6 +588,19 @@
             "decisions"
           ]
         },
+        "NEEDS_INTERNAL_WORK": {
+          "blocker_classes": [
+            "INTERNAL_WORK"
+          ],
+          "user_blocking": false,
+          "stages": [
+            "inputs",
+            "evidence_review",
+            "decisions",
+            "build_checks",
+            "delivery"
+          ]
+        },
         "BLOCKED": {
           "blocker_classes": [
             "INTERNAL_WORK",
@@ -616,23 +634,34 @@
         "PAUSED": [
           "PAUSED",
           "ACTION_REQUIRED",
+          "NEEDS_INTERNAL_WORK",
           "BLOCKED",
           "PASS_PENDING_MANUAL"
         ],
         "ACTION_REQUIRED": [
           "ACTION_REQUIRED",
           "PAUSED",
+          "NEEDS_INTERNAL_WORK",
+          "BLOCKED",
+          "PASS_PENDING_MANUAL"
+        ],
+        "NEEDS_INTERNAL_WORK": [
+          "NEEDS_INTERNAL_WORK",
+          "PAUSED",
+          "ACTION_REQUIRED",
           "BLOCKED",
           "PASS_PENDING_MANUAL"
         ],
         "BLOCKED": [
           "BLOCKED",
+          "NEEDS_INTERNAL_WORK",
           "PAUSED",
           "ACTION_REQUIRED",
           "PASS_PENDING_MANUAL"
         ],
         "PASS_PENDING_MANUAL": [
           "PASS_PENDING_MANUAL",
+          "NEEDS_INTERNAL_WORK",
           "PAUSED"
         ]
       }

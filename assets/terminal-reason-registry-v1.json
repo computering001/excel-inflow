@@ -394,6 +394,10 @@
       "user_action": "none — capability debt owned by the compiler team",
       "source_action": "extend the forecast compiler to resolve the blocking row",
       "checkpoint_required": true,
+      "evidence_preserved": true,
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ],
       "evidence": [
         "forecast-plan-status.json",
         "row_plan"

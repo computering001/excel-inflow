@@ -229,7 +229,7 @@ await test("controller gates between plan validation and authority selection", a
 
   const gateRegion = source.slice(gateSite, authoritySite);
   for (const token of [
-    'status: "BLOCKED"',
+    'status: "NEEDS_INTERNAL_WORK"',
     'stage: "decisions"',
     'outcome: "forecast_plan_blocked"',
     'blocker_class: "INTERNAL_WORK"',
@@ -263,16 +263,16 @@ await test("the typed stop is lawful through the workflow-state constitution", (
   const normalised = normaliseUserFlowResult({
     schema_version: "user-flow-run/1.0",
     run_id: "semantic_stop_test",
-    status: "BLOCKED",
+    status: "NEEDS_INTERNAL_WORK",
     stage: "decisions",
     outcome: "forecast_plan_blocked",
     blocker_class: "INTERNAL_WORK",
     message,
   });
-  assert.equal(normalised.status, "BLOCKED");
+  assert.equal(normalised.status, "NEEDS_INTERNAL_WORK");
   assert.equal(normalised.stage, "decisions");
-  assert.equal(normalised.fatal_reason, "equation_system_unsolved");
-  assert.equal(normalised.blocker_domain, "equation_graph");
+  assert.equal(normalised.fatal_reason, undefined);
+  assert.equal(normalised.blocker_domain, undefined);
   assert.equal(normalised.user_blocking, false, "INTERNAL_WORK must not be user-blocking");
 });
 

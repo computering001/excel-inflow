@@ -4,7 +4,7 @@
  *
  * Invariant (audit section 10, step 6): every user-flow termination classifies
  * into EXACTLY ONE of the four declared classes — USER_DECISION,
- * INTERNAL_WORK, MISSING_FIXTURE_APPROVAL, REVIEW_GATE — and the taxonomy
+ * INTERNAL_WORK, FIXTURE_INCOMPLETE, REVIEW_GATE — and the taxonomy
  * cannot drift from the two surfaces it binds:
  *   (a) STATIC: the status/outcome literals in scripts/run_user_flow.mjs must
  *       equal (statuses, both directions) or be covered by (outcomes) the
@@ -13,7 +13,7 @@
  *   (b) CONTRACT: blocked_outcomes in the workflow-state contract must map,
  *       one-for-one and with identical fatal bindings, to taxonomy classes
  *       USER_DECISION or REVIEW_GATE only — an INTERNAL_WORK or
- *       MISSING_FIXTURE_APPROVAL classification of a terminal constitution
+ *       FIXTURE_INCOMPLETE classification of a terminal constitution
  *       outcome is illegal, because internal work resumes automatically and
  *       never terminates.
  * The mutation proofs at the bottom feed KNOWN-BAD taxonomies through the very
@@ -54,13 +54,14 @@ const handoffSource = await fs.readFile(
 const FOUR_CLASSES = new Set([
   "USER_DECISION",
   "INTERNAL_WORK",
-  "MISSING_FIXTURE_APPROVAL",
+  "FIXTURE_INCOMPLETE",
   "REVIEW_GATE",
 ]);
 const SURFACES = new Set([
   "user_flow_screen",
   "user_flow_paused",
   "user_flow_action_required",
+  "user_flow_internal_work",
   "user_flow_blocked",
   "user_flow_pass_pending_manual",
   "internal_failure",
@@ -71,6 +72,7 @@ const USER_FLOW_SURFACES = new Set([
   "user_flow_screen",
   "user_flow_paused",
   "user_flow_action_required",
+  "user_flow_internal_work",
   "user_flow_blocked",
   "user_flow_pass_pending_manual",
 ]);
@@ -153,7 +155,7 @@ export function validateTaxonomySchema(t) {
     if (spec.terminal !== false) push(`non-terminal literal ${literal} must declare terminal: false`);
   }
   // An internal failure is by definition capability debt, never a human
-  // question; MISSING_FIXTURE_APPROVAL stays lawful there (custody fixtures).
+  // question; FIXTURE_INCOMPLETE stays lawful there (custody fixtures).
   for (const [code, spec] of Object.entries(t.outcome_codes ?? {})) {
     if (spec.surface === "internal_failure" && spec.class === "USER_DECISION") {
       push(`outcome ${code}: an internal failure can never be a USER_DECISION`);
@@ -381,7 +383,7 @@ for (const [status, spec] of Object.entries(taxonomy.terminal_statuses)) {
 }
 // Exactly one class per termination is structural: schema forbids class AND
 // class_source coexisting, and every outcome carries exactly one class.
-check(Object.keys(taxonomy.terminal_statuses).length === 5, "exactly five terminal statuses");
+check(Object.keys(taxonomy.terminal_statuses).length === 6, "exactly six terminal statuses");
 
 // ---------------------------------------------------------------------------
 // Mutation proofs: each known-bad taxonomy MUST be caught by the same cores.
@@ -415,8 +417,8 @@ function mustFail(name, errors, expectedNeedle) {
 }
 {
   const mutated = structuredClone(taxonomy);
-  mutated.outcome_codes.bad_inputs.class = "MISSING_FIXTURE_APPROVAL";
-  mustFail("blocked_outcome reclassified MISSING_FIXTURE_APPROVAL",
+  mutated.outcome_codes.bad_inputs.class = "FIXTURE_INCOMPLETE";
+  mustFail("blocked_outcome reclassified FIXTURE_INCOMPLETE",
     crossCheckContract(mutated, contract), "only USER_DECISION or REVIEW_GATE is lawful");
 }
 {
@@ -460,7 +462,7 @@ process.stdout.write(`${JSON.stringify({
   non_terminal_literals: Object.keys(taxonomy.non_terminal_status_literals).length,
   contract_blocked_outcomes: contractBlocked.length,
   class_breakdown: Object.fromEntries(
-    ["USER_DECISION", "REVIEW_GATE", "INTERNAL_WORK", "MISSING_FIXTURE_APPROVAL"]
+    ["USER_DECISION", "REVIEW_GATE", "INTERNAL_WORK", "FIXTURE_INCOMPLETE"]
       .map((k) => [k, byClass[k] ?? 0]),
   ),
 })}\n`);

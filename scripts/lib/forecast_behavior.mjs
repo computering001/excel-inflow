@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
+import { canonicalJson } from "./run_store.mjs";
 import { canonicalSemanticRole, isStructuredEventRole } from "./semantic_roles.mjs";
 
 const SCHEMA = JSON.parse(fs.readFileSync(
@@ -484,7 +485,11 @@ export function validateForecastBehaviorMap(map) {
     }
   }
   const expectedRowViolations = (map?.rows ?? []).flatMap(rowViolations);
-  if (JSON.stringify(map?.violations ?? []) !== JSON.stringify(expectedRowViolations)) {
+  // Persisted artifacts are written as canonical JSON, which deliberately
+  // sorts object keys. Semantic validation must therefore compare canonical
+  // values rather than insertion-order-sensitive JSON.stringify output; a
+  // valid cold in-memory result must remain valid when replayed from disk.
+  if (canonicalJson(map?.violations ?? []) !== canonicalJson(expectedRowViolations)) {
     violations.push({ code: "VIOLATION_LEDGER_MISMATCH", message: "Violation ledger does not match row-level blocking conditions." });
   }
   const expectedStatus = expectedRowViolations.length === 0 ? "PASS" : "BLOCK";
