@@ -801,8 +801,13 @@ check("both certified fixtures converge in exactly the sweeps they always did", 
   assert.deepEqual(
     solveCase(certified("standard-net-cash-v2")).forecast.map((period) => period.iterations),
     // 488ea00 (B1/B3/B6/B7 economic conventions) lawfully moved net-cash's
-    // convergence path: the B1 declared-tax canonicalisation adds one sweep
-    // per period. Damping/bisection mechanics are untouched.
+    // convergence path [2,2,2] -> [6,6,6]: single-fix reverts attribute the
+    // move to B3's cash_interest_paid lease-leg exclusion, which gives the
+    // interest<->CFO<->cash loop a small per-sweep gain (~0.0125) where the
+    // old map was exactly one-shot; declared outputs at convergence are
+    // identical either side of the boundary (oracle delta 0). Damping and
+    // bisection mechanics are untouched. Residual traces, revert table and
+    // mechanism: references/convergence-dossier.md
     [6, 6, 6],
   );
   // P4.9's one declared sweep change is still the only one.
