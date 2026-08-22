@@ -8,7 +8,7 @@
   "counts": {
     "by_audit_class": {
       "component_integration": 70,
-      "cross_layer_integration": 114,
+      "cross_layer_integration": 115,
       "independent_economic_oracle": 9,
       "installed_host": 1,
       "real_corpus": 7,
@@ -29,11 +29,11 @@
     },
     "by_profile": {
       "custody": 13,
-      "portable": 237
+      "portable": 238
     },
     "self_confirmation_risk": {
       "false": 18,
-      "true": 232
+      "true": 233
     }
   },
   "records": [
@@ -3554,8 +3554,8 @@
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "08ecb7dd6704516d88f960406833a8000f9af3dcf1d6595d5e167f93d866d974",
-    "test_count": 250
+    "sha256": "0233b09f63cab60abf1cc5f2baa0e3eb48943717b46f5247e50ef567f66bca3a",
+    "test_count": 251
   },
   "schema_version": "development-test-classification-census/1.0"
 }
