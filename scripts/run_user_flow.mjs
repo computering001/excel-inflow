@@ -115,6 +115,11 @@ import {
   validateForecastPlan,
 } from "./lib/forecast_candidate_compiler.mjs";
 import {
+  buildForecastPlanStatusArtifact,
+  classifyForecastSemanticStatus,
+  forecastSemanticStopMessage,
+} from "./lib/forecast_plan_status.mjs";
+import {
   compileForecastBehaviorMap,
   validateForecastBehaviorMap,
 } from "./lib/forecast_behavior.mjs";
@@ -2094,6 +2099,58 @@ async function main() {
     );
     if (forecastPlanErrors.length > 0) {
       throw new Error(`Forecast plan artifact is invalid: ${forecastPlanErrors[0]}`);
+    }
+    // SEMANTIC-STATUS GATE — structural validity is not semantic authority.
+    // A plan that validates can still carry material BLOCKED states (the
+    // compiler sets status BLOCKED when a material row's method is unresolved
+    // or its behavior gate emptied every compatible candidate). Authority
+    // selection consumes those state methods as decided economics, so the
+    // gate sits between plan validation and selected_authority_contract:
+    // any material BLOCKED state stops the flow here with a typed,
+    // resumable BLOCKED result owned by INTERNAL_WORK (resolving the row is
+    // compiler work, not a user decision), and the authority node never runs.
+    // Non-material BLOCKED states degrade to solver_findings-style DEGRADE
+    // findings carried on the plan and the flow continues.
+    const semanticStatus = classifyForecastSemanticStatus(forecastPlan);
+    if (semanticStatus.blocked.length > 0) {
+      const message = forecastSemanticStopMessage(semanticStatus.blocked);
+      const forecastPlanStatusPath = path.join(
+        stage3Dir,
+        "forecast-plan-status.json",
+      );
+      await writeJsonAtomic(forecastPlanJsonPath, forecastPlan);
+      await writeJsonAtomic(
+        forecastPlanStatusPath,
+        buildForecastPlanStatusArtifact({
+          blocked: semanticStatus.blocked,
+          message,
+        }),
+      );
+      await writeTextAtomic(
+        forecastPlanPath,
+        `${renderForecastPlanScreen(planningCase, forecastPlan)}\n`,
+      );
+      return finish({
+        runDir,
+        screen: renderForecastPlanScreen(planningCase, forecastPlan),
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "BLOCKED",
+          stage: "decisions",
+          outcome: "forecast_plan_blocked",
+          blocker_class: "INTERNAL_WORK",
+          message,
+          forecast_plan: forecastPlanJsonPath,
+          forecast_plan_status: forecastPlanStatusPath,
+          reused_stages: reusedStages,
+        },
+      });
+    }
+    if (semanticStatus.degrade_findings.length > 0) {
+      forecastPlan.degrade_findings = semanticStatus.degrade_findings;
     }
     const selectedAuthorityContract = (await workGraph.runNode({
       id: "selected_authority_contract",
