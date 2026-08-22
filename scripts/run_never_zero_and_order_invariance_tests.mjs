@@ -14,6 +14,13 @@
  * through scripts/lib/canonical_sum.mjs, whose order-invariance is a proof
  * (see that file's header) and is exercised here by shuffling.
  *
+ * E9 extends the repair to the LAST sibling of the class: reporting_total in
+ * instrument_period_state.mjs and its replay in opening_instrument_provenance.mjs
+ * (the "D32 sibling lock" below held that defect open until the fixture figure
+ * could be re-agreed; it is now inverted into an order-invariance assertion).
+ * The mechanism and the remaining solver-side sites of the same class are
+ * documented in references/order-dependence-root-cause.md.
+ *
  * INVARIANT 1 is NOT repaired here (D31 / MG-4). Its only mint site is
  * scripts/lib/solver.mjs, which this work package is forbidden to edit. What
  * this suite carries instead is a REPRODUCTION LOCK: the defect's exact
@@ -219,43 +226,61 @@ check("MUTATION — D32: reversing the instrument register no longer moves the r
   );
 });
 
-check("D32 sibling lock: the opening register's reporting_total is STILL order-dependent", () => {
-  // A FOURTH site of the same class, found by this package's sweep and NOT
-  // registered anywhere: instrument_period_state.mjs's `reporting_total`
-  // reduces `rows.filter(include_in_gross_debt).map(reporting_amount)` in
-  // register order. It sums the SAME multiset the bridge does, so it drifts on
-  // the same seeds (700563, 700569, 700577 of the 700560+24 cohort).
+check("D36 RETIRED (E9): the opening register's reporting_total is order-invariant across the cohort", () => {
+  // This was the "D32 sibling lock", which held the defect OPEN: it asserted
+  // that reporting_total STILL drifted on exactly [700563, 700569, 700579],
+  // because routing it through canonicalSum moved a maintained fixture figure
+  // in its last place and that move needed the fixture owner's authority.
   //
-  // It is deliberately NOT repaired here. Routing it through canonicalSum is a
-  // two-line change and it works — but it moves a MAINTAINED FIXTURE value in
-  // its last place (run_opening_instrument_provenance_tests.mjs:563 asserts
-  // reporting_total === 9335.506; canonical order yields 9335.505999999998).
-  // Moving a maintained number to make a repair land is out of this package's
-  // authority, so the drift is locked here and reported instead.
+  // E9 closed it (references/order-dependence-root-cause.md): both
+  // accumulation sites — compileOpeningInstrumentState's reporting_total and
+  // replayOpeningInstrumentSelection's replayed total — now accumulate through
+  // canonical_sum.mjs, so the result is a function of the addend MULTISET
+  // alone. The drift set is structurally empty, which is what this inverted
+  // check asserts: register reversal moves nothing, on any register, forever.
   //
-  // RETIREMENT: when reporting_total is canonicalised (and the fixture figure
-  // is re-agreed by its owner), `drifted` becomes 0, this check fails, and it
-  // should be inverted to assert order-invariance.
+  // The check stays non-vacuous two ways. (1) It counts registers whose NAIVE
+  // left-fold would still disagree with itself under reversal — the cohort
+  // must keep at least one adversarial multiset, or no future regression to
+  // naive summation could be detected here. (2) The exact-equality pin in
+  // run_opening_instrument_provenance_tests.mjs ("the maintained fixture
+  // opening totals are pinned") holds compiled and replayed totals to the
+  // BIT, so reverting either site alone fails that suite immediately.
   const wide = buildMetamorphicCohort({ solve: solveCase, rootSeed: 700560, count: 24 });
   let checked = 0;
-  const drifted = [];
+  let adversarial = 0;
   for (const item of [...wide.refused, ...wide.solvable]) {
     const instruments = item.model_case.instruments;
     if (!Array.isArray(instruments) || instruments.length < 2) continue;
     const baseline = compileOpeningInstrumentState(clone(item.model_case));
     if (baseline.status !== "PASS") continue;
+    const addends = baseline.rows
+      .filter((row) => row.include_in_gross_debt)
+      .map((row) => row.reporting_amount);
     const reversed = clone(item.model_case);
     reversed.instruments = [...instruments].reverse();
     checked += 1;
-    if (!Object.is(compileOpeningInstrumentState(reversed).reporting_total, baseline.reporting_total)) {
-      drifted.push(item.seed);
+    if (
+      !Object.is(
+        addends.reduce((total, value) => total + value, 0),
+        [...addends].reverse().reduce((total, value) => total + value, 0),
+      )
+    ) {
+      adversarial += 1;
     }
+    assert.ok(
+      Object.is(
+        compileOpeningInstrumentState(reversed).reporting_total,
+        baseline.reporting_total,
+      ),
+      `seed ${item.seed}: reporting_total moved under register reversal`,
+    );
   }
   assert.ok(checked >= 10, `only ${checked} multi-instrument registers inspected`);
-  // mp-L archetype expansion moved the drift cohort: 700577 left (its residual
-  // re-pinned above) and 700579 entered. The INVARIANT — a small declared
-  // order-dependent sibling set exists and is stable under shuffles — holds.
-  assert.deepEqual(drifted, [700563, 700569, 700579], "the sibling drift set has CHANGED");
+  assert.ok(
+    adversarial >= 1,
+    "the cohort holds no multiset a naive fold would drift — this check could no longer catch a regression",
+  );
 });
 
 check("D32: order-invariance holds across a 24-seed cohort, not just the registered seed", () => {
