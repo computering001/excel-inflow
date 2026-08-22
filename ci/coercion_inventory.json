@@ -7,7 +7,7 @@
     "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 480,
+  "entry_count": 475,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -1603,16 +1603,6 @@
     },
     {
       "file": "scripts/lib/case_source_proposer.mjs",
-      "content": "opening_liability: Number(filings.reported_lease_liability ?? 0),",
-      "fingerprint": "bcb12ea84c34435cae11",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/case_source_proposer.mjs",
       "content": "reported_opening_gross_debt: historicalGrossDebt ?? Number(filings.reported_gross_debt ?? 0),",
       "fingerprint": "e021528e9893ec88a85d",
       "patterns": [
@@ -1675,16 +1665,6 @@
       "file": "scripts/lib/design_contract.mjs",
       "content": "const openingCash = Number(modelCase.cash_policy?.opening_cash ?? 0);",
       "fingerprint": "082c59383ecfaf3ed447",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/design_contract.mjs",
-      "content": "modelCase.lease_policy?.historical_liabilities?.[2] ?? 0,",
-      "fingerprint": "5943f1523f46858c682d",
       "patterns": [
         "js_nullish_zero"
       ],
@@ -2053,16 +2033,6 @@
     },
     {
       "file": "scripts/lib/flow_questions.mjs",
-      "content": ": Number(draftCase.lease_policy?.opening_liability ?? 0);",
-      "fingerprint": "575bc41d5573e81610db",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/flow_questions.mjs",
       "content": "const openingCash = Number(draftCase.cash_policy?.opening_cash ?? 0);",
       "fingerprint": "a6a3fff2427f310177bd",
       "patterns": [
@@ -2305,16 +2275,6 @@
         "js_nullish_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
-    },
-    {
-      "file": "scripts/lib/forecast_authority.mjs",
-      "content": "vectors.map((vector) => Number(vector[dimension] ?? 0)).reduce(reducer);",
-      "fingerprint": "ee3dba577fa956174b62",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
       "classification": "unreviewed"
     },
     {
@@ -3755,16 +3715,6 @@
         "js_nullish_zero"
       ],
       "occurrences": 2,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/solver.mjs",
-      "content": "return Number(modelCase?.lease_policy?.opening_liability ?? 0);",
-      "fingerprint": "99fc59fae661aa689bfb",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
       "classification": "suspect_value_coercion"
     },
     {
