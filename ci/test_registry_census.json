@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 491,
-  "source_commit": "d61b95f301f5cf7513bf7cb8d95245d938e316ad",
-  "source_tree": "b27ca93eb6b8a86b60148fed6644f98679af2fc2",
+  "checks": 497,
+  "source_commit": "f7d33aec619ca1d713bd8d3929962f0a7521355d",
+  "source_tree": "8e9cb5a488857b23a783fac10a0cacef778fcd50",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 238
+    "test_count": 241
   },
   "scripts": [
     {
@@ -371,6 +371,10 @@
     },
     {
       "script": "run_economic_authority_seal_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_economic_ir_parity_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -842,6 +846,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_review_sealing_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_reviewed_portable_gate.py",
       "disposition": "ORPHANED_LEGACY_GATE"
     },
@@ -1011,6 +1019,10 @@
     },
     {
       "script": "run_terminal_reason_registry_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_terminal_taxonomy_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
