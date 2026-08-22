@@ -44,6 +44,21 @@
  * changes a value the controller computed. A node that throws is RECORDED and
  * then RETHROWN unchanged.
  *
+ * WHAT A SUCCESS RECEIPT PROMISES (MP2 E2)
+ * ----------------------------------------
+ * A node receipt with status "success" is a claim that the node's DECLARED
+ * OUTPUTS exist on disk. `runNode` checks that claim on every executed pass:
+ * after the action completes, each declared output path the call site named
+ * is hashed, and any path that hashes `absent` refuses success — the node is
+ * sealed with status "BLOCKED", blocker_class "INTERNAL_WORK" and reason
+ * `invalid.declared_output_absent`, naming the missing files, and a typed
+ * `EvidenceWorkOutputAbsentError` is thrown so callers fail loudly instead of
+ * building downstream work on artifacts that were never written. The same
+ * honesty governs reuse claims: `reuseStage` re-verifies that a previously
+ * successful node's recorded output paths still exist BEFORE it records a
+ * stage-level hit for that node; an output that has vanished since is
+ * recorded as `invalid.declared_output_absent`, never as a clean hit.
+ *
  * RELATION TO P6.2
  * ----------------
  * P6.2 made `nodeInputDigest`/`explainMiss` live and gave the STAGE a miss
@@ -93,6 +108,7 @@ export const EVIDENCE_WORK_REASONS = Object.freeze([
   "invalid.receipt_tampered",
   "invalid.output_digest_mismatch",
   "invalid.output_not_hashable",
+  "invalid.declared_output_absent",
   "invalid.node_threw",
 ]);
 
@@ -101,6 +117,28 @@ const DECISION_OF_REASON = Object.freeze({
   miss: "MISS",
   invalid: "INVALID",
 });
+
+/**
+ * Thrown by `runNode` when a node's action completed but did not write one or
+ * more of the output paths the call site declared. A success receipt would be
+ * a lie about artifacts that do not exist, so the node is sealed BLOCKED and
+ * this typed error is thrown instead — callers fail loudly, never silently
+ * onward over work that produced nothing.
+ */
+export class EvidenceWorkOutputAbsentError extends Error {
+  constructor(nodeId, missing) {
+    super(
+      `Evidence work node ${nodeId} completed without writing its declared output(s): ${missing
+        .map((entry) => `${entry.name} (${entry.path ?? "no path declared"})`)
+        .join(", ")}`,
+    );
+    this.name = "EvidenceWorkOutputAbsentError";
+    this.code = "invalid.declared_output_absent";
+    this.blocker_class = "INTERNAL_WORK";
+    this.node_id = nodeId;
+    this.missing_outputs = missing;
+  }
+}
 
 /**
  * The declared evidence-half work DAG.
@@ -671,6 +709,37 @@ export function createEvidenceWorkGraph({
     return hashes;
   }
 
+  /**
+   * The declared output paths the call site named as REAL filesystem targets.
+   * A null target declares a name without a file — the unit suites drive nodes
+   * that way — so only string targets can be checked for existence, and the
+   * absence gate below deliberately applies to them alone.
+   */
+  function declaredPathTargets(outputs) {
+    return Object.entries(outputs ?? {})
+      .filter(([, target]) => typeof target === "string")
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([name, target]) => ({ name, path: target }));
+  }
+
+  /**
+   * The declared string targets that are not readable files right now. A
+   * directory is absent too: an output is something `hashFile` can digest, and
+   * that is exactly what the success receipt will claim about it.
+   */
+  async function absentDeclaredPaths(targets) {
+    const missing = [];
+    for (const entry of targets) {
+      try {
+        const stat = await fs.stat(entry.path);
+        if (!stat.isFile()) missing.push(entry);
+      } catch {
+        missing.push(entry);
+      }
+    }
+    return missing;
+  }
+
   async function runNode({ id, recipe, inputs, outputs, action }) {
     const node = byId.get(id);
     if (!node) throw new Error(`${id} is not a declared evidence work node`);
@@ -783,6 +852,56 @@ export function createEvidenceWorkGraph({
     timingsMs[id] = durationMs;
     const { digest: outputDigest, hashable } = safeOutputDigest(value);
     const outputFiles = await hashDeclaredPaths(declaredOutputs);
+
+    // MP2 E2 — THE ABSENCE GATE. The action has run; before anything may claim
+    // success, every output path the call site declared as a real file must
+    // exist. A success receipt is a claim about artifacts, and sealing one over
+    // a file that was never written would poison every downstream key that
+    // digests this node's outputs. So the node is sealed BLOCKED instead — same
+    // body, honest status — the decision is recorded, the value digest is NOT
+    // published to dependents (a missing artifact must not look like input for
+    // the next node's key), and a typed error is thrown so the caller fails
+    // loudly rather than building on nothing.
+    const pathTargets = declaredPathTargets(declaredOutputs);
+    const missingOutputs = await absentDeclaredPaths(pathTargets);
+    if (missingOutputs.length > 0) {
+      executedNodes.push(id);
+      const blockedBody = {
+        schema_version: EVIDENCE_WORK_NODE_SCHEMA,
+        node: id,
+        stage: node.stage,
+        run_id: runId,
+        controller_version: controllerVersion,
+        recipe,
+        status: "BLOCKED",
+        blocker_class: "INTERNAL_WORK",
+        key_components: [...node.key_components],
+        invalidated_by: node.invalidated_by,
+        depends_on: [...node.depends_on],
+        input_components: digest,
+        input_digest: inputDigest,
+        output_names: [...node.outputs],
+        output_paths: Object.fromEntries(pathTargets.map((entry) => [entry.name, entry.path])),
+        output_files: outputFiles,
+        output_digest: outputDigest,
+        decision: "INVALID",
+        reason: "invalid.declared_output_absent",
+        moved: missingOutputs.map((entry) => `declared_output ${entry.name}: absent (${entry.path})`),
+        missing_outputs: missingOutputs,
+      };
+      const blockedReceipt = { ...blockedBody, receipt_hash: hashValue(blockedBody) };
+      await atomicWrite(receiptPath(id), `${canonicalJson(blockedReceipt)}\n`);
+      nodeReceipts[id] = blockedReceipt.receipt_hash;
+      await record({
+        node,
+        reason: "invalid.declared_output_absent",
+        moved: blockedBody.moved,
+        detail: { missing_outputs: missingOutputs },
+        durationMs,
+      });
+      throw new EvidenceWorkOutputAbsentError(id, missingOutputs);
+    }
+    const outputPaths = Object.fromEntries(pathTargets.map((entry) => [entry.name, entry.path]));
     outputDigests.set(id, outputDigest);
 
     // P6.4: the prior recorded output digest, and whether this run's real
@@ -828,6 +947,7 @@ export function createEvidenceWorkGraph({
       input_components: digest,
       input_digest: inputDigest,
       output_names: [...node.outputs],
+      output_paths: outputPaths,
       output_files: outputFiles,
       output_digest: outputDigest,
       decision,
@@ -863,10 +983,46 @@ export function createEvidenceWorkGraph({
    * A stage whose receipt was reused never enters its nodes' actions, so those
    * nodes record the stage-level hit instead. A node that already recorded a
    * decision for ITSELF this run is never overwritten — the finer reason wins.
+   *
+   * MP2 E2 — a stage-level hit is a claim about ARTIFACTS, not only about keys,
+   * so before the hit is recorded each node's receipt is re-verified against
+   * the filesystem: every output path its success receipt named must still
+   * exist. An output that has vanished since refuses the hit — the node is
+   * recorded INVALID at `invalid.declared_output_absent` (executed:false, the
+   * action did not run; the CLAIM was false), it is excluded from the returned
+   * reuse list, and it never reaches `reusedNodes`.
    */
   async function reuseStage(stageId) {
     const pending = nodes.filter((node) => node.stage === stageId && !decided.has(node.id));
+    const verified = [];
     for (const node of pending) {
+      const prior = await readReceipt(node.id);
+      const recordedPaths = Object.entries(prior.receipt?.output_paths ?? {}).filter(
+        ([, target]) => typeof target === "string",
+      );
+      const missingOutputs = await absentDeclaredPaths(
+        recordedPaths.map(([name, target]) => ({ name, path: target })),
+      );
+      if (missingOutputs.length > 0) {
+        decisions.push({
+          node: node.id,
+          stage: node.stage,
+          recipe: node.recipe,
+          decision: "INVALID",
+          reason: "invalid.declared_output_absent",
+          moved: missingOutputs.map((entry) => `declared_output ${entry.name}: absent (${entry.path})`),
+          key_components: [...node.key_components],
+          invalidated_by: node.invalidated_by,
+          enacted_reuse: false,
+          executed: false,
+          prior_output_digest: null,
+          output_agreed: null,
+          duration_ms: 0,
+          detail: { stage: stageId, missing_outputs: missingOutputs },
+        });
+        decided.add(node.id);
+        continue;
+      }
       decisions.push({
         node: node.id,
         stage: node.stage,
@@ -885,9 +1041,10 @@ export function createEvidenceWorkGraph({
       });
       decided.add(node.id);
       reusedNodes.push(node.id);
+      verified.push(node.id);
     }
     if (pending.length > 0) await flush();
-    return pending.map((node) => node.id);
+    return verified;
   }
 
   async function close() {
