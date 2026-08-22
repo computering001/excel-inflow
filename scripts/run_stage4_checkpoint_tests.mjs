@@ -126,6 +126,7 @@ await run(process.execPath, [
 
 const runDir = path.join(out, "interrupted-run");
 const paused = await flow(evidence, runDir, ["--stop-after", "decisions"]);
+
 assert(paused.status === "PAUSED" && paused.stage === "decisions", `Could not establish Stage 3: ${JSON.stringify(paused)}`);
 
 const slowSoffice = path.join(out, "slow-soffice");
@@ -279,6 +280,7 @@ await fs.rename(workbook, `${workbook}.render-leaf-test`);
 const renderLeafRepair = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   renderLeafRepair.status === "PASS_PENDING_MANUAL",
@@ -309,6 +311,7 @@ assert(
 const finalReuse = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   finalReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",
