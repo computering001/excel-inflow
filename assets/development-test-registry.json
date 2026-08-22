@@ -2671,6 +2671,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "terminal-outcome-taxonomy",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_taxonomy_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "terminal-reason-registry",
       "phase": "workflow",
       "runtime": "node",
