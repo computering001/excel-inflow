@@ -103,15 +103,11 @@ jobs:
     needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
     timeout-minutes: 150
-    # GitHub still sees ONE required job named full-portable: the three
-    # matrix legs are that job's declared shards (deterministic interleaved
-    # slices via --shard index/total), so final-aggregate's needs list is
-    # unchanged. Shard 1 waits for its siblings' retained reports, re-joins
-    # them through the aggregate referee and compiles the single PORTABLE_ALL
-    # lifecycle receipt the attestation consumes.
-    permissions:
-      contents: read
-      actions: read
+    # The three matrix legs are deterministic interleaved slices of the
+    # portable registry (--shard index/total). Per audit §3.1 a matrix leg
+    # cannot be addressed individually by needs:, so the legs ONLY run their
+    # slice and retain per-shard evidence; the dedicated portable-aggregate
+    # job below owns the sibling re-join and the single PORTABLE_ALL receipt.
     strategy:
       fail-fast: false
       matrix:
@@ -146,31 +142,32 @@ jobs:
           path: "${{ runner.temp }}/portable/shards/${{ matrix.shard }}/**"
           if-no-files-found: error
           retention-days: 30
-      - name: Wait for the sibling shard reports
-        if: matrix.shard == 1
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          deadline=$(( $(date +%s) + 3300 ))
-          while :; do
-            ready="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
-              --jq '[.artifacts[] | select(.expired == false and (.name == "exact-head-full-portable-shard-2" or .name == "exact-head-full-portable-shard-3"))] | length')"
-            if [ "$ready" -ge 2 ]; then break; fi
-            if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "Sibling portable shards did not publish their reports in time." >&2
-              exit 1
-            fi
-            sleep 30
-          done
-      - name: Download the sibling shard reports
-        if: matrix.shard == 1
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+  portable-aggregate:
+    name: 5 - Portable aggregate referee
+    needs: [source-identity, registry-census, full-portable]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Audit §3.1: GitHub cannot address one matrix leg from needs:, so the
+    # old shard-1 polling loop is replaced by this dedicated top-level job.
+    # It waits for ALL three shard legs, re-joins their reports through the
+    # aggregate referee and compiles the single PORTABLE_ALL lifecycle
+    # receipt (--job-id portable_gate) that final-aggregate consumes.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-source-identity, path: "${{ runner.temp }}/source" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: exact-head-registry-selection, path: "${{ runner.temp }}/registry" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: exact-head-full-portable-shard-*
           path: "${{ runner.temp }}/portable/incoming"
       - name: Re-join the three shards and compile the full portable lifecycle
-        if: matrix.shard == 1
         run: |
           set -euo pipefail
           mkdir -p "${{ runner.temp }}/portable/results"
@@ -184,13 +181,12 @@ jobs:
             --source-identity "${{ runner.temp }}/source/source-identity.json" --registry-selection "${{ runner.temp }}/registry/registry-selection.json" \
             --gate-report "${{ runner.temp }}/portable/results/development-gate-report.json" --job-id portable_gate --selection-scope PORTABLE_ALL \
             --out "${{ runner.temp }}/portable/portable-gate-receipt.json"
-      - name: Retain complete portable results and logs
-        if: always() && matrix.shard == 1
+      - name: Retain the complete portable aggregate evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: exact-head-full-portable
+          name: exact-head-portable-aggregate
           path: |
-            ${{ runner.temp }}/portable/shards/1/**
             ${{ runner.temp }}/portable/results/**
             ${{ runner.temp }}/portable/portable-aggregate-verdict.json
             ${{ runner.temp }}/portable/portable-gate-receipt.json
@@ -198,7 +194,7 @@ jobs:
           retention-days: 30
 
   package-a:
-    name: 5 - Independent package A
+    name: 6 - Independent package A
     needs: [source-identity]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -236,7 +232,7 @@ jobs:
         with: { name: exact-head-package-a, path: "${{ runner.temp }}/package-a/**", if-no-files-found: error, retention-days: 30 }
 
   package-b:
-    name: 6 - Independent package B
+    name: 7 - Independent package B
     needs: [source-identity]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -269,7 +265,7 @@ jobs:
         with: { name: exact-head-package-b, path: "${{ runner.temp }}/package-b/**", if-no-files-found: error, retention-days: 30 }
 
   package-reproducibility:
-    name: 7 - Compare independent packages byte for byte
+    name: 8 - Compare independent packages byte for byte
     needs: [source-identity, package-a, package-b]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -301,7 +297,7 @@ jobs:
         with: { name: exact-head-package-reproducibility, path: "${{ runner.temp }}/repro/**", if-no-files-found: error, retention-days: 30 }
 
   archive-only-capability:
-    name: 8 - Downloaded archive bootstrap, capability and oracle
+    name: 9 - Downloaded archive bootstrap, capability and oracle
     needs: [package-a]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -334,7 +330,7 @@ jobs:
         with: { name: exact-head-archive-only-capability, path: "${{ runner.temp }}/archive-only/**", if-no-files-found: error, retention-days: 30 }
 
   mutation-measurement:
-    name: 9 - Exact-head mutation measurement
+    name: 10 - Exact-head mutation measurement
     needs: [source-identity, registry-census]
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -400,7 +396,7 @@ jobs:
         with: { name: exact-head-mutation-measurement, path: "${{ runner.temp }}/mutation/**", if-no-files-found: error, retention-days: 30 }
 
   synthetic-merge:
-    name: 10 - Synthetic merge compatibility kept separate
+    name: 11 - Synthetic merge compatibility kept separate
     needs: [source-identity]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -426,9 +422,11 @@ jobs:
         with: { name: exact-head-synthetic-merge, path: "${{ runner.temp }}/merge/**", if-no-files-found: error, retention-days: 30 }
 
   final-aggregate:
-    name: 11 - All-needs exact-head D52 attestation
+    name: 12 - All-needs exact-head D52 attestation
     if: always()
-    needs: [source-identity, registry-census, targeted-bootstrap-runtime, full-portable, package-a, package-b, package-reproducibility, archive-only-capability, mutation-measurement, synthetic-merge]
+    # portable-aggregate is a declared prerequisite (audit §3.1): its single
+    # PORTABLE_ALL receipt replaces shard 1's combined artifact.
+    needs: [source-identity, registry-census, targeted-bootstrap-runtime, full-portable, portable-aggregate, package-a, package-b, package-reproducibility, archive-only-capability, mutation-measurement, synthetic-merge]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -453,7 +451,7 @@ jobs:
             --source-identity "${{ runner.temp }}/evidence/exact-head-source-identity/source-identity.json" \
             --registry-selection "${{ runner.temp }}/evidence/exact-head-registry-selection/registry-selection.json" \
             --targeted-runtime "${{ runner.temp }}/evidence/exact-head-targeted-runtime/targeted-runtime-receipt.json" \
-            --portable-gate "${{ runner.temp }}/evidence/exact-head-full-portable/portable-gate-receipt.json" \
+            --portable-gate "${{ runner.temp }}/evidence/exact-head-portable-aggregate/portable-gate-receipt.json" \
             --package-a "${{ runner.temp }}/evidence/exact-head-package-a/package-a-receipt.json" \
             --package-b "${{ runner.temp }}/evidence/exact-head-package-b/package-b-receipt.json" \
             --package-reproducibility "${{ runner.temp }}/evidence/exact-head-package-reproducibility/package-reproducibility-receipt.json" \
