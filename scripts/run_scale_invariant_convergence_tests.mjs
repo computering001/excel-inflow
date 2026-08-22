@@ -21,6 +21,12 @@
  *   incomplete graph. Nothing is written to any asset: the edge cannot land
  *   without five artefacts moving together, four of which are forbidden here.
  *
+ *   E6b — Section B3 extends this suite with the envelope BOUNDARY MATRIX:
+ *   fixtures at S = 1e3 ± ε get exactly their declared verdicts, and every
+ *   solved period outside the declared envelope carries a typed DEGRADE
+ *   finding (`scale_envelope_exceeded`) naming the constant, the binding term
+ *   and the offending period — never silent.
+ *
  * Emits one line: {"status":"PASS","checks":N}
  */
 
@@ -34,6 +40,7 @@ import {
   convergenceCriterion,
   convergenceFloatNoiseFloor,
   convergenceStateScale,
+  convergenceWorstStateNode,
   solveCase,
 } from "./lib/solver.mjs";
 import {
@@ -87,6 +94,10 @@ function certified(name) {
 }
 
 const ABSOLUTE_TOLERANCE = ECONOMIC_SOLVE_POLICY.solver.absolute_tolerance;
+// E6b — the declared scale envelope, mirrored from solver.mjs's
+// REFERENCE_STATE_MAGNITUDE (the suite re-derives it from the criterion at
+// "the criterion is derived from the policy", so a drift would be caught).
+const REFERENCE = 1e3;
 const REGISTERED_CASE = "revolver_undrawn_commitment_fee_only.json";
 const SCALE = 1000;
 
@@ -537,6 +548,161 @@ check("the declared envelope is the ONLY reason the criterion is ever not scale-
       (name) => corpus.some((item) => item.name === name),
     ),
   );
+});
+
+// ===========================================================================
+// B3. THE BOUNDARY MATRIX (E6b) — S = REFERENCE_STATE_MAGNITUDE ± ε behaves
+//     EXACTLY as declared, and the findings ledger never stays silent on the
+//     far side. Inside the envelope the relative criterion binds and the
+//     ledger is quiet; outside it the declared absolute ceiling binds AND
+//     every bound period carries a scale_envelope_exceeded DEGRADE finding
+//     naming the constant, the binding term and the offending period.
+// ===========================================================================
+
+const ENVELOPE_FINDING = "scale_envelope_exceeded";
+
+check("BOUNDARY MATRIX — S=1e3-ε, S=1e3 and S=1e3+ε each get the declared verdict", () => {
+  // ε = 1e-3: a 1e-6 RELATIVE excess over the reference magnitude, far clear
+  // of double rounding, so the flip below is the boundary and not noise.
+  const eps = 1e-3;
+  const build = (magnitude) => {
+    const state = new Array(13).fill(magnitude);
+    return convergenceCriterion(state, state, {
+      absoluteTolerance: ABSOLUTE_TOLERANCE,
+    });
+  };
+  const inside = build(REFERENCE - eps);
+  const boundary = build(REFERENCE);
+  const outside = build(REFERENCE + eps);
+  // INSIDE: strictly below the reference magnitude the scale-free term binds.
+  assert.equal(inside.state_scale, REFERENCE - eps);
+  assert.equal(inside.within_declared_envelope, true);
+  assert.equal(inside.binding_term, "relative");
+  assert.equal(inside.applied_tolerance, inside.scale_free_tolerance);
+  assert.ok(inside.applied_tolerance < ABSOLUTE_TOLERANCE);
+  // AT the boundary the envelope is INCLUSIVE: rho * 1e3 == ceiling exactly,
+  // which is the property "reproduces the retired constant at 1e3" relies on.
+  assert.equal(boundary.state_scale, REFERENCE);
+  assert.equal(boundary.within_declared_envelope, true);
+  assert.equal(boundary.binding_term, "relative");
+  assert.equal(boundary.applied_tolerance, ABSOLUTE_TOLERANCE);
+  // OUTSIDE: one ε past the reference the ceiling binds and says so.
+  assert.equal(outside.state_scale, REFERENCE + eps);
+  assert.equal(outside.within_declared_envelope, false);
+  assert.equal(outside.binding_term, "declared_absolute_ceiling");
+  assert.equal(outside.applied_tolerance, ABSOLUTE_TOLERANCE);
+  assert.ok(outside.scale_free_tolerance > ABSOLUTE_TOLERANCE);
+  // And the float-noise floor decides nothing at either side of the boundary.
+  for (const verdict of [inside, boundary, outside]) {
+    assert.notEqual(verdict.binding_term, "float_noise_floor");
+  }
+  // The worst-node diagnostic names the state node carrying the magnitude —
+  // the same L-inf quantity the criterion measured, not a second opinion.
+  const state = new Array(13).fill(REFERENCE + eps);
+  state[4] = REFERENCE * 2;
+  const worst = convergenceWorstStateNode(
+    { state_vector: state.map((_, index) => ({ node_id: `node_${index}` })) },
+    state,
+    state,
+  );
+  assert.equal(worst.node_id, "node_4");
+  assert.equal(worst.magnitude, REFERENCE * 2);
+});
+
+check("BOUNDARY MATRIX — outside fixtures record the DEGRADE finding, inside stay silent", () => {
+  // OUTSIDE fixture: the certified maximal case solves with every period
+  // above the reference magnitude (declared in the corpus check above).
+  const outsideCase = certified("standard-maximal-v2");
+  const outsideSolution = solveCase(structuredClone(outsideCase));
+  const outsidePeriods = outsideSolution.forecast.filter(
+    (period) =>
+      period.graph_driven_solve.convergence_criterion.within_declared_envelope ===
+      false,
+  );
+  assert.ok(outsidePeriods.length > 0, "fixture must sit outside the envelope");
+  for (const period of outsidePeriods) {
+    const criterion = period.graph_driven_solve.convergence_criterion;
+    const findings = outsideSolution.solver_findings.filter(
+      (finding) =>
+        finding.code === ENVELOPE_FINDING && finding.period === period.period,
+    );
+    assert.equal(
+      findings.length,
+      1,
+      `${period.period}: exactly one deduped envelope finding, never silence`,
+    );
+    const finding = findings[0];
+    assert.equal(finding.severity, "DEGRADE");
+    // The finding names the envelope CONSTANT and the binding term.
+    assert.equal(finding.reference_state_magnitude, REFERENCE);
+    assert.equal(finding.binding_term, "declared_absolute_ceiling");
+    assert.equal(finding.envelope_ceiling, ABSOLUTE_TOLERANCE);
+    // ...and the measured state it judged, consistent with the criterion.
+    assert.equal(finding.state_scale, criterion.state_scale);
+    assert.ok(finding.state_scale > REFERENCE);
+    assert.equal(finding.applied_tolerance, criterion.applied_tolerance);
+    // The offending quantity: a declared iteration node, named in scope.
+    assert.match(finding.scope, /^node:/);
+    assert.equal(finding.quantity, finding.scope.slice("node:".length));
+    assert.ok(
+      outsideSolution.solver_findings.some(
+        (candidate) =>
+          candidate.code === ENVELOPE_FINDING &&
+          candidate.period === period.period &&
+          candidate.scope === finding.scope,
+      ),
+    );
+  }
+  // INSIDE fixture: same certified family, whole state under the magnitude —
+  // the criterion is scale-free and the ledger records NOTHING.
+  const insideSolution = solveCase(certified("standard-net-cash-v2"));
+  assert.ok(insideSolution.forecast.length > 0);
+  for (const period of insideSolution.forecast) {
+    assert.equal(
+      period.graph_driven_solve.convergence_criterion.within_declared_envelope,
+      true,
+    );
+  }
+  assert.equal(
+    insideSolution.solver_findings.filter(
+      (finding) => finding.code === ENVELOPE_FINDING,
+    ).length,
+    0,
+    "an inside-envelope solve must not raise envelope findings",
+  );
+});
+
+check("BOUNDARY MATRIX — the ledger mirrors the criterion over the WHOLE corpus", () => {
+  for (const item of corpus) {
+    for (const [index, period] of item.solution.forecast.entries()) {
+      const criterion = period.graph_driven_solve.convergence_criterion;
+      const findings = item.solution.solver_findings.filter(
+        (finding) =>
+          finding.code === ENVELOPE_FINDING &&
+          finding.period === period.period,
+      );
+      if (criterion.within_declared_envelope) {
+        assert.equal(
+          findings.length,
+          0,
+          `${item.name} period ${index}: inside the envelope must be silent`,
+        );
+      } else {
+        assert.equal(
+          findings.length,
+          1,
+          `${item.name} period ${index}: outside the envelope must be named, never silent`,
+        );
+        assert.equal(findings[0].severity, "DEGRADE");
+        assert.equal(findings[0].binding_term, criterion.binding_term);
+        assert.equal(
+          findings[0].reference_state_magnitude,
+          criterion.reference_state_magnitude,
+        );
+        assert.equal(findings[0].state_scale, criterion.state_scale);
+      }
+    }
+  }
 });
 
 check("every solved period's residual is inside the criterion that accepted it", () => {
