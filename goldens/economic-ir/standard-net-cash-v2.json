@@ -1,15 +1,19 @@
 {
   "certification": {
-    "approval_reason": "Genesis behavioural golden freeze for v3.7.7 over the full locally-runnable pipeline scope: both certified fixtures (standard-maximal-v2, standard-net-cash-v2) were compiled end-to-end through the pure-Node IR pipeline on this machine; no workbook-dependent path was needed or exercised.",
-    "approval_record_hash": null,
-    "approved_difference_classes": [],
-    "freeze_event": "genesis_freeze",
-    "frozen_at": "2026-08-21T13:44:37.290Z",
-    "frozen_at_commit": "64a24a861a6917a52e622e243ad36699d917b21a",
+    "approval_reason": "Owner directed end-to-end implementation of the audited MP2 plan. Independent audit confirms the six absent historical RCF draw and repayment slots are structural blanks, not economic zeroes; Economic IR and exact parity gates remain green.",
+    "approval_record_hash": "0a7cb150755682a7d737fb44a9ebc529e75cd13946f13bc014d118571f69482f",
+    "approved_difference_classes": [
+      "coverage_census_drift",
+      "economic_drift",
+      "slot_shape_drift"
+    ],
+    "freeze_event": "approved_regeneration",
+    "frozen_at": "2026-08-22T18:24:35.283Z",
+    "frozen_at_commit": "4852ef9ad254ed6450f62c55fb19d2062615ff50",
     "frozen_by": {
-      "id": "archiepreston (owner, delegated via Hermes agent fleet, 2026-08-21)",
+      "id": "archiepreston (owner, delegated via Codex agent, 2026-08-22)",
       "kind": "human",
-      "role": null
+      "role": "owner"
     },
     "release": "v3.7.7",
     "work_package": "P7.2",
@@ -122,7 +126,7 @@
   },
   "schema_version": "excel-inflow-behavioural-golden/1.0",
   "seal": {
-    "content_sha256": "126bc3868e19dd03ac49b5c41aa9c7bcb2d5bda32666472bf7346d9776fc7ce9",
+    "content_sha256": "685094de3b7b0f234d4dd76bcca8e67b5775820aef7d85bea1c893ed9f474155",
     "sealed_slots": 336
   },
   "shadow_boundary": {
@@ -139,17 +143,17 @@
     "bare_number_slots": 0,
     "forecast_slots": 138,
     "historical_slots": 153,
-    "never_zero_slots": 267,
+    "never_zero_slots": 273,
     "schedule_slots": 45,
     "typed_slots": 336,
-    "value_bearing_slots": 69
+    "value_bearing_slots": 63
   },
   "twelve_state_census": {
     "captured": 12,
-    "derived_number": 24,
+    "derived_number": 18,
     "missing": 12,
     "nil": 0,
-    "not_applicable": 27,
+    "not_applicable": 33,
     "parse_failure": 0,
     "period_support_required": 0,
     "prior_filing_support": 0,
@@ -158,5 +162,5 @@
     "reported_zero": 9,
     "unresolved": 216
   },
-  "record_sha256": "ec6b254e898b760e92cca5a677e3cdf87d2717d870a0a6c60c0e8c22337a772b"
+  "record_sha256": "fb30e958aab4e149b4064e26e0d83ed2f2f13f6195411c2e0409148edc65131a"
 }

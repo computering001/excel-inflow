@@ -1,15 +1,19 @@
 {
   "certification": {
-    "approval_reason": "Genesis behavioural golden freeze for v3.7.7 over the full locally-runnable pipeline scope: both certified fixtures (standard-maximal-v2, standard-net-cash-v2) were compiled end-to-end through the pure-Node IR pipeline on this machine; no workbook-dependent path was needed or exercised.",
-    "approval_record_hash": null,
-    "approved_difference_classes": [],
-    "freeze_event": "genesis_freeze",
-    "frozen_at": "2026-08-21T13:44:37.290Z",
-    "frozen_at_commit": "64a24a861a6917a52e622e243ad36699d917b21a",
+    "approval_reason": "Owner directed end-to-end implementation of the audited MP2 plan. Independent audit confirms the six absent historical RCF draw and repayment slots are structural blanks, not economic zeroes; Economic IR and exact parity gates remain green.",
+    "approval_record_hash": "0a7cb150755682a7d737fb44a9ebc529e75cd13946f13bc014d118571f69482f",
+    "approved_difference_classes": [
+      "coverage_census_drift",
+      "economic_drift",
+      "slot_shape_drift"
+    ],
+    "freeze_event": "approved_regeneration",
+    "frozen_at": "2026-08-22T18:24:35.283Z",
+    "frozen_at_commit": "4852ef9ad254ed6450f62c55fb19d2062615ff50",
     "frozen_by": {
-      "id": "archiepreston (owner, delegated via Hermes agent fleet, 2026-08-21)",
+      "id": "archiepreston (owner, delegated via Codex agent, 2026-08-22)",
       "kind": "human",
-      "role": null
+      "role": "owner"
     },
     "release": "v3.7.7",
     "work_package": "P7.2",
@@ -158,5 +162,5 @@
     "reported_zero": 0,
     "unresolved": 231
   },
-  "record_sha256": "b465e813df9e45e0663666bb7166a6e4112f71ade1e5196b46d65f0dbfe15529"
+  "record_sha256": "4210aa555c83a18246bc778006dfae519b224285959049d4c4c1ec5827b9d1b5"
 }
