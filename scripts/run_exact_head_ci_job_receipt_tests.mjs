@@ -1,23 +1,21 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import { canonicalSha256, compileSourceIdentityReceipt } from "./lib/external_ci_evidence.mjs";
 import { compareExactHeadPackageBuilds } from "./lib/exact_head_package_ci.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const exec = promisify(execFile);
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const run = createRunner({ name: "exact_head_ci_job_receipt_tests", importMetaUrl: import.meta.url });
+const { exec } = run.runCli();
+const ROOT = run.ROOT;
 const CLI = path.join(ROOT, "scripts", "compile_exact_head_ci_job_receipt.mjs");
 const SHA = "a".repeat(64);
 const COMMIT = "1".repeat(40);
 const TREE = "2".repeat(40);
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "exact-head-ci-receipt-"));
-let checks = 0;
 let mutations = 0;
 
 async function write(name, value) {
@@ -26,16 +24,31 @@ async function write(name, value) {
   await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`);
   return target;
 }
-async function run(mode, options, expectPass = true) {
+// Awaited CLI attempt outside any check body (check bodies are synchronous).
+// Returns { ok, error }: `ok` false means the CLI rejected the invocation.
+async function attempt(mode, options) {
   const argv = [CLI, mode];
   for (const [key, value] of Object.entries(options)) argv.push(`--${key}`, value);
   try {
     await exec(process.execPath, argv, { cwd: ROOT });
-    assert(expectPass, `${mode} mutation survived.`);
+    return { ok: true };
   } catch (error) {
-    if (expectPass) throw error;
-    mutations += 1;
+    return { ok: false, error };
   }
+}
+// A valid receipt must compile; a compile failure fails the check (and the suite).
+function accepted(desc, outcome) {
+  run.check(desc, () => {
+    if (!outcome.ok) throw outcome.error;
+    return true;
+  });
+}
+// A mutated receipt must be refused; a survivor is an unexpected crash-grade failure
+// and stays out of the counted checks, matching the pre-harness counting.
+async function refused(mode, options, label) {
+  const outcome = await attempt(mode, options);
+  if (outcome.ok) throw new Error(`${mode} mutation survived: ${label}`);
+  mutations += 1;
 }
 function seal(value, field) { return { ...value, [field]: canonicalSha256(value) }; }
 
@@ -75,20 +88,22 @@ const rawAPath = await write("raw-a.json", rawA);
 const rawBPath = await write("raw-b.json", rawB);
 const outA = path.join(root, "package-a.json");
 const outB = path.join(root, "package-b.json");
-await run("package", { "source-identity": sourcePath, raw: rawAPath, "job-id": "package_a", out: outA });
-await run("package", { "source-identity": sourcePath, raw: rawBPath, "job-id": "package_b", out: outB });
-checks += 2;
+accepted("package A job receipt compiles", await attempt("package", { "source-identity": sourcePath, raw: rawAPath, "job-id": "package_a", out: outA }));
+accepted("package B job receipt compiles", await attempt("package", { "source-identity": sourcePath, raw: rawBPath, "job-id": "package_b", out: outB }));
+
 const badToolchain = seal({ ...rawA, toolchain: { ...toolchain, python: "Python 0" }, receipt_sha256: undefined }, "receipt_sha256");
 delete badToolchain.receipt_sha256;
 const badToolchainSealed = seal(badToolchain, "receipt_sha256");
-await run("package", { "source-identity": sourcePath, raw: await write("bad-toolchain.json", badToolchainSealed), "job-id": "package_a", out: path.join(root, "bad.json") }, false);
+await refused("package", { "source-identity": sourcePath, raw: await write("bad-toolchain.json", badToolchainSealed), "job-id": "package_a", out: path.join(root, "bad.json") }, "tampered toolchain");
 
 const repro = compareExactHeadPackageBuilds(rawA, rawB);
-assert.equal(repro.status, "PASS");
+run.check("A/B package builds reproduce byte-identically", () => {
+  assert.equal(repro.status, "PASS");
+  return true;
+});
 const reproPath = await write("repro.json", repro);
-await run("reproducibility", { "source-identity": sourcePath, raw: reproPath, "package-a": rawAPath, "package-b": rawBPath, out: path.join(root, "repro-receipt.json") });
-checks += 2;
-await run("reproducibility", { "source-identity": sourcePath, raw: reproPath, "package-a": rawAPath, "package-b": rawAPath, out: path.join(root, "bad-repro.json") }, false);
+accepted("reproducibility job receipt compiles", await attempt("reproducibility", { "source-identity": sourcePath, raw: reproPath, "package-a": rawAPath, "package-b": rawBPath, out: path.join(root, "repro-receipt.json") }));
+await refused("reproducibility", { "source-identity": sourcePath, raw: reproPath, "package-a": rawAPath, "package-b": rawAPath, out: path.join(root, "bad-repro.json") }, "non-reproducing pair");
 
 const archiveBody = {
   schema_version: "archive-only-capability-proof/1.0", archive: "/tmp/a.tar", archive_sha256: "7".repeat(64), attestation: "/tmp/a.json", attestation_sha256: "8".repeat(64),
@@ -103,9 +118,8 @@ const archiveBody = {
 };
 const archive = seal(archiveBody, "report_sha256");
 const projectedA = JSON.parse(await fs.readFile(outA, "utf8"));
-await run("archive-capability", { "source-identity": sourcePath, raw: await write("archive.json", archive), "package-a": outA, out: path.join(root, "archive-receipt.json") });
-checks += 1;
-await run("archive-capability", { "source-identity": sourcePath, raw: await write("archive-source.json", seal({ ...archiveBody, source_checkout_used: true }, "report_sha256")), "package-a": outA, out: path.join(root, "bad-archive.json") }, false);
+accepted("archive-capability job receipt compiles", await attempt("archive-capability", { "source-identity": sourcePath, raw: await write("archive.json", archive), "package-a": outA, out: path.join(root, "archive-receipt.json") }));
+await refused("archive-capability", { "source-identity": sourcePath, raw: await write("archive-source.json", seal({ ...archiveBody, source_checkout_used: true }, "report_sha256")), "package-a": outA, out: path.join(root, "bad-archive.json") }, "source-checkout leakage");
 
 const mutation = {
   schema_version: "excel-inflow-mutation-adequacy/1.0", source_identity: { commit: COMMIT, worktree_dirty: false },
@@ -115,16 +129,16 @@ const mutation = {
   measurement_gaps: [{ test_id: "gap-a" }, { test_id: "gap-b" }],
 };
 const mutationPath = await write("mutation.json", mutation);
-await run("mutation-measurement", { "source-identity": sourcePath, raw: mutationPath, out: path.join(root, "mutation-receipt.json") });
-checks += 1;
-await run("mutation-measurement", { "source-identity": sourcePath, raw: await write("survivor.json", { ...mutation, score: { measured_mutations: 12, killed: 11, survived: 1 }, survivors: [{}] }), out: path.join(root, "bad-mutation.json") }, false);
+accepted("mutation-measurement job receipt compiles", await attempt("mutation-measurement", { "source-identity": sourcePath, raw: mutationPath, out: path.join(root, "mutation-receipt.json") }));
+await refused("mutation-measurement", { "source-identity": sourcePath, raw: await write("survivor.json", { ...mutation, score: { measured_mutations: 12, killed: 11, survived: 1 }, survivors: [{}] }), out: path.join(root, "bad-mutation.json") }, "mutation survivor admitted");
 
 const merge = { schema_version: "ci-merge-compatibility-identity/1.0", expected_role: "merge_test", candidate_source_commit: COMMIT, checked_out_commit: "3".repeat(40), checked_out_tree: "4".repeat(40), parent_commits: ["0".repeat(40), COMMIT], classification: "COMPATIBILITY_EVIDENCE_NOT_PACKAGE_SOURCE", errors: [], status: "PASS" };
-await run("synthetic-merge", { "source-identity": sourcePath, raw: await write("merge.json", merge), out: path.join(root, "merge-receipt.json") });
-checks += 1;
-await run("synthetic-merge", { "source-identity": sourcePath, raw: await write("bad-merge.json", { ...merge, parent_commits: ["0".repeat(40)] }), out: path.join(root, "bad-merge-receipt.json") }, false);
+accepted("synthetic-merge job receipt compiles", await attempt("synthetic-merge", { "source-identity": sourcePath, raw: await write("merge.json", merge), out: path.join(root, "merge-receipt.json") }));
+await refused("synthetic-merge", { "source-identity": sourcePath, raw: await write("bad-merge.json", { ...merge, parent_commits: ["0".repeat(40)] }), out: path.join(root, "bad-merge-receipt.json") }, "rewritten merge parents");
 
-assert.equal(projectedA.archive_sha256, rawA.archive.sha256);
-checks += 1;
+run.check("projected package receipt preserves the archive sha", () => {
+  assert.equal(projectedA.archive_sha256, rawA.archive.sha256);
+  return true;
+});
 await fs.rm(root, { recursive: true, force: true });
-console.log(JSON.stringify({ status: "PASS", checks, mutations_caught: mutations }));
+run.finish({ mutations_caught: mutations });
