@@ -193,6 +193,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "az-incident-replay",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_az_replay_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
       "id": "behavioural-goldens",
       "phase": "cohort",
       "runtime": "node",
