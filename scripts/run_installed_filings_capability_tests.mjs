@@ -45,6 +45,8 @@ const EXPECTED_MUTATIONS_BASE = Object.freeze([
   "installed-inline-xbrl-missing-worker",
   "installed-inline-xbrl-timeout",
   "installed-extractor-byte-drift",
+  "packaged-html-tables-route",
+  "packaged-html-tables-worker-missing",
   "invalid-temp-root",
   "invalid-work-root",
   "missing-fixture",
@@ -297,12 +299,64 @@ async function authorInlineXbrlControllerInput({ clean, name, factSpecs }) {
   return { requestPath, responsePath, out };
 }
 
+function plainHtmlTablesDocument() {
+  // Deliberately marker-free: no ix:nonFraction anywhere, so only the
+  // html-tables lane can own these printed <table> facts.
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Annual Report</title></head>
+<body>
+<h2>Consolidated Statements of Operations</h2>
+<table>
+  <caption>In thousands</caption>
+  <tr><th>Line item</th><th>Year ended December 31, 2025</th><th>Year ended December 31, 2024</th><th>Year ended December 31, 2023</th></tr>
+  <tr><td>Total revenue</td><td>$4,321</td><td>$4,000</td><td>$3,750</td></tr>
+  <tr><td>Net cash provided by operating activities</td><td>(169)</td><td>150</td><td>121</td></tr>
+</table>
+</body>
+</html>
+`;
+}
+
+// The packaged plain-HTML route exercises the pipeline's extraction phase
+// itself: no caller-supplied response exists, so face-statement authority is
+// genuinely owed back to adjudication after the lane binds its fact table.
+async function authorHtmlTablesControllerInput({ clean, name }) {
+  const fixtureRoot = path.join(scratch, `packaged-html-tables-${name}`);
+  await fs.mkdir(fixtureRoot, { recursive: true });
+  const rawPath = path.join(fixtureRoot, "annual-report.html");
+  await fs.writeFile(rawPath, plainHtmlTablesDocument(), "utf8");
+  const {
+    face_statement_manifests: _manifests,
+    income_statement: _income,
+    cash_flow: _cash,
+    ...filingFacts
+  } = clean.filings;
+  const request = {
+    schema_version: "filings-extraction-request/1.0",
+    run_id: `packaged-html-tables-${name}`,
+    documents: [{
+      document_id: "annual-report",
+      attachment_id: "annual-report",
+      source_id: "annual_report",
+      path: rawPath,
+      media_type: "text/html",
+      expected_sha256: createHash("sha256").update(await fs.readFile(rawPath)).digest("hex"),
+    }],
+    filing_facts: filingFacts,
+  };
+  const requestPath = path.join(fixtureRoot, "request.json");
+  const out = path.join(fixtureRoot, "run");
+  await fs.writeFile(requestPath, `${JSON.stringify(request, null, 2)}\n`, "utf8");
+  return { requestPath, responsePath: null, out };
+}
+
 async function runPackagedFilings(packageRoot, fixture, env) {
   return execute(process.execPath, [
     path.join(packageRoot, "scripts", "run_filings_pipeline.mjs"),
     fixture.requestPath,
     "--out", fixture.out,
-    "--responses", fixture.responsePath,
+    ...(fixture.responsePath ? ["--responses", fixture.responsePath] : []),
   ], {
     cwd: packageRoot,
     env,
@@ -868,6 +922,95 @@ try {
     "deleting the packaged inline-XBRL worker did not break the exercised route",
   );
   mutations.push("packaged-inline-xbrl-worker-missing");
+
+  // Packaged plain-HTML route proof: a filing whose printed <table> cells
+  // carry NO Inline XBRL must flow through the packaged html-tables lane
+  // (scripts/extract_html_tables.py) and land bound html-table-facts/1.0 fact
+  // tables in the run state — while still failing closed into selected
+  // face-statement adjudication, because a fallback lane extracts facts, it
+  // never mints face-statement authority.
+  const packagedHtmlFixture = await authorHtmlTablesControllerInput({
+    clean: cleanEvidence,
+    name: "positive",
+  });
+  const packagedHtml = await runPackagedFilings(
+    unpackedPackage,
+    packagedHtmlFixture,
+    archiveEnv,
+  );
+  const packagedHtmlStateExists = await fs.stat(
+    path.join(packagedHtmlFixture.out, "filings-run-state.json"),
+  ).then(() => true, () => false);
+  check(
+    packagedHtml.code === 2 && packagedHtmlStateExists === true,
+    `packaged html-tables route did not end in typed adjudication (exit ${packagedHtml.code}): ` +
+      `${packagedHtml.stderr?.slice(-2000) || packagedHtml.stdout?.slice(-2000)}`,
+  );
+  const packagedHtmlState = JSON.parse(
+    await fs.readFile(path.join(packagedHtmlFixture.out, "filings-run-state.json"), "utf8"),
+  );
+  check(
+    packagedHtmlState.pipeline_status === "NEEDS_EXTRACTION_REVIEW" &&
+      packagedHtmlState.blocker_class === "INTERNAL_WORK" &&
+      packagedHtmlState.user_blocking === false &&
+      packagedHtmlState.tasks?.[0]?.task_kind === "filing_extraction_adjudication" &&
+      Array.isArray(packagedHtmlState.tasks[0].html_table_document_ids) &&
+      packagedHtmlState.summary?.html_table_bound_count === 1 &&
+      typeof packagedHtmlState.artifacts?.html_table_facts === "string",
+    "packaged html-tables run state did not name the html_tables route",
+  );
+  const packagedHtmlFactFiles = await fs.readdir(packagedHtmlState.artifacts.html_table_facts);
+  check(
+    packagedHtmlFactFiles.length === 1 &&
+      packagedHtmlFactFiles[0].endsWith(".html-table-facts.json"),
+    "packaged html-tables route emitted no per-document fact table",
+  );
+  const packagedHtmlFacts = JSON.parse(await fs.readFile(
+    path.join(packagedHtmlState.artifacts.html_table_facts, packagedHtmlFactFiles[0]),
+    "utf8",
+  ));
+  check(
+    packagedHtmlFacts.schema_version === "html-table-facts/1.0" &&
+      packagedHtmlFacts.ixbrl_present === false &&
+      packagedHtmlFacts.source_sha256 ===
+        JSON.parse(await fs.readFile(packagedHtmlFixture.requestPath, "utf8"))
+          .documents[0].expected_sha256 &&
+      packagedHtmlFacts.fact_count >= 4 &&
+      packagedHtmlFacts.facts.every((fact) => fact.provenance?.lane === "html_table_fallback") &&
+      packagedHtmlFacts.facts.some((fact) => fact.period?.start && fact.period?.end),
+    "packaged html-tables output is not source-bound html-table-facts/1.0 provenance",
+  );
+  mutations.push("packaged-html-tables-route");
+
+  // Physical red proof: delete only the packaged html-tables worker. The
+  // declared runtime closure must refuse to run at all — a typed failure
+  // naming the missing member and no run state, never a silent fall-through
+  // to PDF geometry or an unexplained crash.
+  const missingHtmlWorkerPackage = await clonePackage(
+    unpackedPackage,
+    "unpacked-html-worker-missing",
+  );
+  await fs.rm(path.join(missingHtmlWorkerPackage, "scripts", "extract_html_tables.py"));
+  const missingHtmlWorkerFixture = await authorHtmlTablesControllerInput({
+    clean: cleanEvidence,
+    name: "html-worker-missing",
+  });
+  const missingHtmlWorker = await runPackagedFilings(
+    missingHtmlWorkerPackage,
+    missingHtmlWorkerFixture,
+    archiveEnv,
+  );
+  const missingHtmlWorkerStateExists = await fs.stat(
+    path.join(missingHtmlWorkerFixture.out, "filings-run-state.json"),
+  ).then(() => true, () => false);
+  check(
+    missingHtmlWorker.code !== 0 &&
+      missingHtmlWorkerStateExists === false &&
+      `${missingHtmlWorker.stderr}\n${missingHtmlWorker.stdout}`
+        .includes("extract_html_tables.py"),
+    "deleting the packaged html-tables worker did not break the exercised route",
+  );
+  mutations.push("packaged-html-tables-worker-missing");
 
   const rawCanary = await execute(process.execPath, [
     path.join(unpackedPackage, "scripts", "run_raw_input_black_box_canary.mjs"),

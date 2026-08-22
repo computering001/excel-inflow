@@ -22,6 +22,16 @@ the same failure reproduced at head for the next flip.)
   receipt is `test-fixtures/real-filings-custody-v1/corpus-extraction-outcomes.json`.
   The iXBRL lane passes inside its harness and probe suites while its production wiring is
   still in progress elsewhere; no installed-host claim rests on it yet.
+- The filings extraction ladder's text-born routes are packaged: documents carrying Inline
+  XBRL go to the structured lane and marker-free HTML goes to the plain-HTML table lane
+  (`scripts/extract_html_tables.py`, emitting bound `html-table-facts/1.0` fact tables).
+  Both workers are declared members of `assets/filings-runtime-members.json`, the packaged
+  `run_filings_pipeline.mjs` routes to them, and the installed-filings capability suite
+  proves each packaged route plus its delete-the-worker typed refusal. A fallback-lane fact
+  table never mints face-statement authority: it always ends in selected face-statement
+  adjudication before any row can bind a model case. Raster/OCR filing extraction remains
+  declared-unavailable — no OCR lane is implemented or packaged, and scanned-image filings
+  stay unsupported instead of being silently routed to another lane.
 - The reviewed five-house broker pack reaches `PASS_DEGRADED`: stale responses are quarantined, and no broker authority or mappings are silently retained.
 - `broker_case: "Forecast Waterfall"` has no per-row waterfall composition to draw on, so its broker rows compose from the compatible-house consensus basis; the selection discloses this as `source_kind: forecast_waterfall` with a DEGRADE finding rather than posing as Model Consensus (mp2-E5).
 - The source branch is intentionally not merged to `main`; `main` remains on the prior v3.7.0 line until the held Rogo/native gates are completed.

@@ -868,6 +868,7 @@
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
     "extract_inline_xbrl.py",
+    "extract_html_tables.py",
     "propose_dcs_crosswalk.py",
     "workflow_state.py",
     "extract_broker_evidence.py",
@@ -1056,6 +1057,10 @@
         "lxml"
       ],
       "reason": "The inline-XBRL reconciler uses native lxml to bind structured concepts and periods to visible filing rows under the shipped crosswalk and taxonomy."
+    },
+    "extract_html_tables.py": {
+      "may_import_third_party": [],
+      "reason": "The plain-HTML fallback lane parses printed <table> cells with the Python standard library alone (html.parser), so the packaged filings route closes on the locked host toolchain without any new dependency."
     },
     "propose_dcs_crosswalk.py": {
       "may_import_third_party": [],
