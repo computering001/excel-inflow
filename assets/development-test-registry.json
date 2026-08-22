@@ -2796,6 +2796,15 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
+    },
+    {
+      "id": "invariant-fx-positivity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_fx_positivity_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     }
   ]
 }
