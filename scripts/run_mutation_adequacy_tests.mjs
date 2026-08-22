@@ -7,11 +7,14 @@
  * that make the score mean something. It VALIDATES; it never repairs the artifact
  * and never lowers any suite's mutation assertion.
  *
- * Three adversarial mutation families are applied to a COPY of the real artifact
- * and each must be REJECTED:
+ * Eleven adversarial mutation families are applied to a COPY of the real
+ * artifact and each must be REJECTED:
  *   A. a survivor omitted from the register            -> UNREGISTERED_SURVIVOR
  *   B. a P0 gate member with a survivor still PASSing  -> P0_SURVIVOR_DID_NOT_FAIL_THE_GATE
  *   C. a self-fixture kill counted as production       -> SELF_FIXTURE_COUNTED_AS_PRODUCTION
+ *   G-I. F3 survivor-honesty: a suite_failed flag that contradicts its row, a
+ *        deflated suite_health, and a mutation_score re-widened past the
+ *        product-only/suite-failure-exclusive contract.
  * plus the register's retirement rule (a registered survivor that no longer
  * reproduces must be RETIRED, not left standing) and the no-invented-population
  * rule (a suite reporting no count may not carry killed/survived numbers).
@@ -122,10 +125,26 @@ const survived = artifact.suites.reduce((total, row) => total + row.survived, 0)
 check(artifact.score.killed === killed, `published killed ${artifact.score.killed} disagrees with the rows (${killed})`);
 check(artifact.score.survived === survived, `published survived ${artifact.score.survived} disagrees with the rows (${survived})`);
 check(artifact.score.measured_mutations === killed + survived, "measured_mutations must be killed + survived");
+// F3 survivor honesty: the published mutation_score ranges over PRODUCT
+// mutants only (never self-fixture) and excludes crashed suites'
+// pseudo-survivors, which are reported once as suite_health instead.
+const poolForScore = artifact.suites;
+const productKilled = poolForScore.filter((row) => row.mutation_scope !== MUTATION_SCOPES.SELF_FIXTURE).reduce((total, row) => total + row.killed, 0);
+const productEscapedSurvived = poolForScore
+  .filter((row) => row.mutation_scope !== MUTATION_SCOPES.SELF_FIXTURE && row.status !== "FAIL")
+  .reduce((total, row) => total + row.survived, 0);
+const productMeasured = productKilled + productEscapedSurvived;
 check(
-  artifact.score.mutation_score === null ||
-    Math.abs(artifact.score.mutation_score - killed / (killed + survived)) < 1e-4,
-  "mutation_score must be the computed ratio, never a literal",
+  productMeasured === 0
+    ? artifact.score.mutation_score === null
+    : artifact.score.mutation_score !== null &&
+        Math.abs(artifact.score.mutation_score - productKilled / productMeasured) < 1e-4,
+  "mutation_score must be the product-only, suite-failure-exclusive ratio computed from the rows, never a literal",
+);
+const crashedSuites = artifact.suites.concat(artifact.p0_gate_adjunct_suites ?? []).filter((row) => row.status === "FAIL").length;
+check(
+  artifact.score.suite_health === crashedSuites,
+  `suite_health ${artifact.score.suite_health} must equal the number of crashed suites (${crashedSuites})`,
 );
 check(/UPPER_BOUND/.test(artifact.score.production_mutation_score_qualifier), "production_mutation_score must declare itself an upper bound");
 
@@ -161,6 +180,15 @@ checks += 1;
 for (const entry of artifact.survivors ?? []) {
   const row = artifact.suites.concat(artifact.p0_gate_adjunct_suites ?? []).find((candidate) => candidate.test_id === entry.test_id);
   assert.ok(row && row.survived > 0, `registered survivor ${entry.survivor_id} no longer reproduces and must be RETIRED`);
+  // F3: a register entry must classify itself — crashed suite (custody debt,
+  // counted in suite_health) or escaped product mutant (mutation_score) — and
+  // the classification must agree with the row's terminal status.
+  assert.ok(typeof entry.suite_failed === "boolean", `survivor ${entry.survivor_id} carries no boolean suite_failed flag`);
+  assert.equal(
+    entry.suite_failed,
+    row.status === "FAIL",
+    `survivor ${entry.survivor_id} suite_failed=${entry.suite_failed} contradicts its row status ${row.status}`,
+  );
 }
 checks += 1;
 check(/RETIRED|retire/i.test(artifact.survivor_doctrine), "the survivor doctrine must state the retirement rule");
@@ -439,6 +467,49 @@ mutationMustBeRejected(
   "GATE_FAILED_WITHOUT_A_P0_SURVIVOR",
 );
 
+// G. a register entry whose suite_failed flag lies about its row: a crashed
+//    suite repainted as a completing suite (or vice versa) conflates custody
+//    debt with escaped product behaviour.
+mutationMustBeRejected(
+  "suite_failed_flag_contradicts_the_row",
+  (candidate) => {
+    if (candidate.survivors.length > 0) {
+      candidate.survivors[0].suite_failed = !candidate.survivors[0].suite_failed;
+      return;
+    }
+    const row = candidate.suites[0];
+    row.survived = Math.max(1, row.survived);
+    row.measurement = "SURVIVOR";
+    resyncBuckets(candidate);
+    candidate.survivors = [
+      { survivor_id: `${row.test_id}::x`, test_id: row.test_id, pointer: row.script, owner: row.owner || "release-proof", survived_mutations: 1, count_basis: "UNKNOWN_POPULATION_FLOORED_AT_1", suite_failed: row.status !== "FAIL", disposition: "OPEN" },
+    ];
+  },
+  "SUITE_FAILED_FLAG_CONTRADICTS_ROW_STATUS",
+);
+
+// H. suite_health quietly deflated so crashing suites disappear from the
+//    health ledger while their floored pseudo-survivors stay out of the score.
+mutationMustBeRejected(
+  "suite_health_deflated",
+  (candidate) => {
+    candidate.score.suite_health = Math.max(0, candidate.score.suite_health - 1);
+  },
+  "SUITE_HEALTH_COUNT_MISMATCH",
+);
+
+// I. mutation_score re-widened past its product-only, suite-failure-exclusive
+//    contract (e.g. back to the old all-bucket ratio that let crashed suites
+//    drag product coverage).
+mutationMustBeRejected(
+  "mutation_score_rewidenened_past_product_exclusive_contract",
+  (candidate) => {
+    candidate.score.mutation_score =
+      candidate.score.mutation_score === null ? 0 : Math.max(0, candidate.score.mutation_score - 0.0002);
+  },
+  "MUTATION_SCORE_NOT_PRODUCT_EXCLUSIVE",
+);
+
 function resyncBuckets(candidate) {
   const recompute = (predicate) => {
     const rows = candidate.suites.filter(predicate);
@@ -462,7 +533,7 @@ function resyncBuckets(candidate) {
   );
 }
 
-check(Object.keys(mutationsCaught).length === 8, `all eight adversarial mutations must be caught; caught ${Object.keys(mutationsCaught).length}`);
+check(Object.keys(mutationsCaught).length === 11, `all eleven adversarial mutations must be caught; caught ${Object.keys(mutationsCaught).length}`);
 
 // ---------------------------------------------------------------------------
 // 10. Negative self-test: the audit must not be vacuously green

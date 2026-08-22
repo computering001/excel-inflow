@@ -68,6 +68,7 @@
         "measured_mutations",
         "killed",
         "survived",
+        "suite_health",
         "production_mutation_score",
         "production_mutation_score_qualifier",
         "breakdown"
@@ -77,11 +78,18 @@
           "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1,
-          "description": "killed / (killed + survived) over MEASURED mutations only. null when nothing was measured — never 0, which would assert a total-escape result that was not observed."
+          "description": "Survivor-honest aggregate: killed / (killed + survived) over PRODUCT mutants only (production + oracle-matrix scopes, never self-fixture), excluding crashed suites' pseudo-survivors. null when nothing was measured — never 0, which would assert a total-escape result that was not observed."
         },
+        "mutation_score_basis": { "type": "string", "minLength": 1 },
         "measured_mutations": { "type": "integer", "minimum": 0 },
         "killed": { "type": "integer", "minimum": 0 },
         "survived": { "type": "integer", "minimum": 0 },
+        "suite_health": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of mutation-class or gate-adjunct suites that CRASHED during this compilation. Crashes are health debt reported here; they are excluded from mutation_score."
+        },
+        "suite_health_meaning": { "type": "string", "minLength": 1 },
         "production_mutation_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "production_mutation_score_qualifier": {
           "type": "string",
@@ -191,7 +199,7 @@
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["survivor_id", "test_id", "owner", "pointer", "survived_mutations", "count_basis", "disposition"],
+        "required": ["survivor_id", "test_id", "owner", "pointer", "survived_mutations", "count_basis", "suite_failed", "disposition"],
         "properties": {
           "survivor_id": { "type": "string", "minLength": 1 },
           "test_id": { "type": "string", "minLength": 1 },
@@ -200,6 +208,10 @@
           "survived_mutations": { "type": "integer", "minimum": 1 },
           "count_basis": { "enum": ["suite_reported_population", "UNKNOWN_POPULATION_FLOORED_AT_1"] },
           "reproduced_serially": { "type": "boolean", "description": "A survivor claim must reproduce when the suite is run alone; a pool-only failure is a measurement gap, not a survivor." },
+          "suite_failed": {
+            "type": "boolean",
+            "description": "True when the SUITE itself crashed: its floored pseudo-survivors are custody debt counted once in score.suite_health, never escaped-product evidence. False when a completing suite registered an escaped product mutant."
+          },
           "disposition": { "const": "OPEN" }
         }
       }
