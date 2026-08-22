@@ -161,10 +161,6 @@
         "fatal_reason": "equation_system_unsolved",
         "domain": "equation_graph"
       },
-      "forecast_plan_blocked": {
-        "fatal_reason": "equation_system_unsolved",
-        "domain": "equation_graph"
-      },
       "decision_graph_blocked": {
         "fatal_reason": "equation_system_unsolved",
         "domain": "equation_graph"

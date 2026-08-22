@@ -44,7 +44,10 @@
       "process_exit_code": 0,
       "contract_user_blocking": false,
       "rationale": "The product route did not execute; control is handed to the human operator at the company screen session.",
-      "required_receipt_fields": ["status", "stage"]
+      "required_receipt_fields": [
+        "status",
+        "stage"
+      ]
     },
     "PAUSED": {
       "class": "REVIEW_GATE",
@@ -519,6 +522,27 @@
         "handoff_reason",
         "handoff_detail"
       ]
+    },
+    "forecast_plan_blocked": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "stage": "decisions",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "equation_system_unsolved",
+      "blocker_domain": "forecast_plan",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "E1 semantic gate: a material forecast state is BLOCKED (unresolved+blocking). Capability debt owned internally — resumes automatically after repair; never a user-facing delivery block.",
+      "required_receipt_fields": [
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "forecast_plan",
+        "forecast_plan_status",
+        "reused_stages"
+      ],
+      "reason_code_key": "DECISIONS.forecast_plan_blocked"
     }
   },
   "non_terminal_status_literals": {

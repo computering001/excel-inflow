@@ -3,13 +3,34 @@
   "work_package": "P0.5",
   "invariant": "Every possible terminal reason has an owner and a legal terminal-state mapping.",
   "declared_terminal_states": {
-    "DELIVERED_VERIFIED": { "owner": "system", "meaning": "Workbook delivered with all required evidence and release-grade validations." },
-    "DELIVERED_DEGRADED": { "owner": "system", "meaning": "Workbook delivered with a disclosed lawful fallback or optional evidence omission." },
-    "ACTION_REQUIRED": { "owner": "user", "meaning": "A material economic choice genuinely belongs to the user." },
-    "SOURCE_REQUIRED": { "owner": "user_or_source_provider", "meaning": "Mandatory evidence is absent and no lawful lower authority exists." },
-    "UNSUPPORTED_PROFILE": { "owner": "product_contract", "meaning": "The company is outside the versioned support envelope, determined early." },
-    "INTERNAL_FAILURE": { "owner": "engineering", "meaning": "A compiler, graph, runtime or workbook defect occurred; evidence and checkpoint are preserved." },
-    "CANCELLED": { "owner": "user_or_system", "meaning": "The run was deliberately stopped and is safely resumable or terminal." }
+    "DELIVERED_VERIFIED": {
+      "owner": "system",
+      "meaning": "Workbook delivered with all required evidence and release-grade validations."
+    },
+    "DELIVERED_DEGRADED": {
+      "owner": "system",
+      "meaning": "Workbook delivered with a disclosed lawful fallback or optional evidence omission."
+    },
+    "ACTION_REQUIRED": {
+      "owner": "user",
+      "meaning": "A material economic choice genuinely belongs to the user."
+    },
+    "SOURCE_REQUIRED": {
+      "owner": "user_or_source_provider",
+      "meaning": "Mandatory evidence is absent and no lawful lower authority exists."
+    },
+    "UNSUPPORTED_PROFILE": {
+      "owner": "product_contract",
+      "meaning": "The company is outside the versioned support envelope, determined early."
+    },
+    "INTERNAL_FAILURE": {
+      "owner": "engineering",
+      "meaning": "A compiler, graph, runtime or workbook defect occurred; evidence and checkpoint are preserved."
+    },
+    "CANCELLED": {
+      "owner": "user_or_system",
+      "meaning": "The run was deliberately stopped and is safely resumable or terminal."
+    }
   },
   "action_required_legality_predicate": {
     "all_of": [
@@ -20,9 +41,14 @@
       "the question is worded economically, never in compiler/runtime vocabulary"
     ],
     "explicitly_illegal_causes": [
-      "schema drift", "parse ambiguity with a lawful fallback", "role omission",
-      "graph failure", "workbook emission error", "package mismatch",
-      "runtime timeout", "validator disagreement"
+      "schema drift",
+      "parse ambiguity with a lawful fallback",
+      "role omission",
+      "graph failure",
+      "workbook emission error",
+      "package mismatch",
+      "runtime timeout",
+      "validator disagreement"
     ]
   },
   "internal_failure_payload_requirements": [
@@ -43,7 +69,9 @@
       "source_action": "provide a filing with resolvable identity",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["SOURCE_REQUIRED"]
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ]
     },
     "SOURCE.lease_declared_on_debt_register": {
       "owner_layer": "debt_reconciliation",
@@ -55,7 +83,9 @@
       "source_action": "report lease liabilities in the lease note rather than as a borrowings register row",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["SOURCE_REQUIRED"],
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ],
       "registered_by": "P7.11 (defect D12). A debt note that lists lease liabilities among borrowings projects straight into instruments[].class (attachment_ingress.mjs), and the register cannot carry a lease: the support envelope declares lease_liability on the lease_policy lane, and rolling it forward as an ordinary amortising instrument would count the obligation twice under the wrong interest convention. The refusal was reported as INTERNAL.compiler_or_graph_defect, which told the user engineering had failed when the resolvable fact is that the lease disclosure is the evidence the lease lane needs. Reachable path proven in scripts/run_declared_value_typed_outcome_tests.mjs from a schema-valid, envelope-declared case."
     },
     "SOURCE.instrument_class_unresolved": {
@@ -68,7 +98,9 @@
       "source_action": "name a debt class the declared ontology resolves (assets/debt-class-ontology-v1.json: a canonical class or a declared legacy alias)",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["SOURCE_REQUIRED"],
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ],
       "registered_by": "P7.11 (defect D12 sweep). migrateLegacyDebtClasses maps a source class the ontology cannot resolve to the review sentinel `unclassified`, which model-case-v2.schema.json admits, so the case is schema-valid and reaches the compiler, where an unresolved class has no forecast economics to roll and is refused. That refusal carried INTERNAL.compiler_or_graph_defect: the product told the user its own engineering had failed when what actually happened is that the SOURCE named an instrument the declared vocabulary does not cover. Reachable path proven in scripts/run_declared_value_typed_outcome_tests.mjs: migrateLegacyDebtClasses({instruments:[{class:'mystery facility'}]}) -> unclassified -> validateCaseShape zero errors -> compileInstrumentPeriodState refuses with this code."
     },
     "SOURCE.opening_debt_unresolved": {
@@ -81,7 +113,9 @@
       "source_action": "provide reconcilable opening debt",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["SOURCE_REQUIRED"]
+      "allowed_terminal_states": [
+        "SOURCE_REQUIRED"
+      ]
     },
     "INTERNAL.equation_system_unsolved": {
       "owner_layer": "solver",
@@ -93,7 +127,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
     },
     "INTERNAL.workbook_delivery_failed": {
       "owner_layer": "workbook_emitter",
@@ -105,7 +141,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
     },
     "USER.material_economic_choice": {
       "owner_layer": "terminal_outcome_compiler",
@@ -117,7 +155,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["ACTION_REQUIRED"]
+      "allowed_terminal_states": [
+        "ACTION_REQUIRED"
+      ]
     },
     "PROFILE.financial_institution": {
       "owner_layer": "support_envelope_preflight",
@@ -129,7 +169,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.irreconcilable_entity_perimeter": {
       "owner_layer": "support_envelope_preflight",
@@ -141,7 +183,9 @@
       "source_action": "provide identity-consistent sources",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.unadapted_language": {
       "owner_layer": "support_envelope_preflight",
@@ -153,7 +197,9 @@
       "source_action": "provide an English or structured filing",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.insufficient_history": {
       "owner_layer": "support_envelope_preflight",
@@ -165,7 +211,9 @@
       "source_action": "provide at least two comparatives plus prior-filing support",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.cash_flow_absent": {
       "owner_layer": "support_envelope_preflight",
@@ -177,7 +225,9 @@
       "source_action": "provide the complete statement set",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.unsupported_accounting_framework": {
       "owner_layer": "support_envelope_preflight",
@@ -189,7 +239,9 @@
       "source_action": "provide a filing reported under IFRS or US GAAP",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "PROFILE.unsupported_dimension_profile": {
       "owner_layer": "support_envelope_preflight",
@@ -201,7 +253,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ]
     },
     "DEGRADED.broker_evidence_unavailable": {
       "owner_layer": "broker_pipeline",
@@ -213,7 +267,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["DELIVERED_DEGRADED"]
+      "allowed_terminal_states": [
+        "DELIVERED_DEGRADED"
+      ]
     },
     "DEGRADED.optional_evidence_omitted": {
       "owner_layer": "evidence_authority",
@@ -225,7 +281,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["DELIVERED_DEGRADED"]
+      "allowed_terminal_states": [
+        "DELIVERED_DEGRADED"
+      ]
     },
     "CANCELLED.user_or_system_stop": {
       "owner_layer": "run_controller",
@@ -237,7 +295,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["CANCELLED"]
+      "allowed_terminal_states": [
+        "CANCELLED"
+      ]
     },
     "INTERNAL.runtime_budget_overrun": {
       "owner_layer": "runtime_governance",
@@ -249,7 +309,10 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE", "CANCELLED"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE",
+        "CANCELLED"
+      ]
     },
     "INTERNAL.host_precondition_unsatisfied": {
       "owner_layer": "runtime_governance",
@@ -261,7 +324,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
     },
     "INTERNAL.runtime_bootstrap_failed": {
       "owner_layer": "runtime_bootstrap",
@@ -273,7 +338,9 @@
       "source_action": "none",
       "checkpoint_required": false,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"],
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ],
       "registered_by": "Phase 1 standard-library public bootstrap. It owns package inventory, child-instantiation and pre-product-start failures before repository modules can establish their own terminal handler."
     },
     "INTERNAL.forecast_completion_escalated": {
@@ -286,7 +353,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
     },
     "INTERNAL.forecast_ownership_blocked": {
       "owner_layer": "forecast_ownership_resolver",
@@ -298,7 +367,9 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
     },
     "INTERNAL.compiler_or_graph_defect": {
       "owner_layer": "case_compiler_or_graph",
@@ -310,33 +381,114 @@
       "source_action": "none",
       "checkpoint_required": true,
       "evidence_preserved": true,
-      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+      "allowed_terminal_states": [
+        "INTERNAL_FAILURE"
+      ]
+    },
+    "forecast_plan_blocked": {
+      "owner_layer": "forecast_candidate_compiler",
+      "category": "internal",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_internal_repair",
+      "user_action": "none — capability debt owned by the compiler team",
+      "source_action": "extend the forecast compiler to resolve the blocking row",
+      "checkpoint_required": true,
+      "evidence": [
+        "forecast-plan-status.json",
+        "row_plan"
+      ]
     }
   },
   "category_to_user_owned_terminals": {
     "note": "the misclassification firewall: internal categories may NEVER map to user-owned terminals",
-    "internal": ["INTERNAL_FAILURE", "CANCELLED"],
-    "source": ["SOURCE_REQUIRED"],
-    "user_decision": ["ACTION_REQUIRED"],
-    "support_envelope": ["UNSUPPORTED_PROFILE"],
-    "degradation": ["DELIVERED_DEGRADED"],
-    "cancellation": ["CANCELLED"]
+    "internal": [
+      "INTERNAL_FAILURE",
+      "CANCELLED"
+    ],
+    "source": [
+      "SOURCE_REQUIRED"
+    ],
+    "user_decision": [
+      "ACTION_REQUIRED"
+    ],
+    "support_envelope": [
+      "UNSUPPORTED_PROFILE"
+    ],
+    "degradation": [
+      "DELIVERED_DEGRADED"
+    ],
+    "cancellation": [
+      "CANCELLED"
+    ]
   },
   "legacy_status_migration": {
     "note": "current public statuses -> v3.7.7 terminal model; classification per pack: preserve | rename | split | remove",
-    "NEEDS_INTERNAL_WORK": { "action": "rename", "target": "INTERNAL_FAILURE", "detail": "the euphemism hid engineering ownership; the payload requirements make it honest" },
-    "BLOCKED": { "action": "split", "target": "SOURCE_REQUIRED | ACTION_REQUIRED | INTERNAL_FAILURE | CANCELLED", "detail": "generic BLOCKED is banned at the public boundary; each blocked_outcome in the workflow-state contract maps to one typed reason code" },
-    "PASS_PENDING_MANUAL": { "action": "rename", "target": "DELIVERED_DEGRADED", "detail": "pending human visual certification is a disclosed degradation of verification depth, not a pass with an asterisk" },
-    "ACTION_REQUIRED": { "action": "preserve", "target": "ACTION_REQUIRED", "detail": "subject to the strict legality predicate from this registry" },
-    "NEEDS_USER_INPUT": { "action": "rename", "target": "ACTION_REQUIRED", "detail": "single vocabulary for user-owned choices" },
-    "INTERNAL_WORK (quality_mode)": { "action": "rename", "target": "INTERNAL_FAILURE", "detail": "quality modes collapse into the terminal model plus reason codes" },
-    "FATAL_SOURCE (blocker_class)": { "action": "rename", "target": "SOURCE_REQUIRED", "detail": "the two SOURCE.* fatal reasons carry the detail" },
-    "USER_DECISION (blocker_class)": { "action": "rename", "target": "ACTION_REQUIRED", "detail": "" },
-    "USER_EVIDENCE (blocker_class)": { "action": "rename", "target": "SOURCE_REQUIRED", "detail": "" },
-    "PASS_DEGRADED": { "action": "preserve", "target": "DELIVERED_DEGRADED", "detail": "already the lawful degraded delivery" },
-    "DELIVERED_PENDING_NATIVE_EXCEL": { "action": "rename", "target": "DELIVERED_DEGRADED", "detail": "native-Excel certification pending is a disclosed verification degradation" },
-    "BLOCKED_RESUMABLE": { "action": "rename", "target": "CANCELLED", "detail": "a safe resumable stop" },
-    "UNSUPPORTED": { "action": "rename", "target": "UNSUPPORTED_PROFILE", "detail": "" }
+    "NEEDS_INTERNAL_WORK": {
+      "action": "rename",
+      "target": "INTERNAL_FAILURE",
+      "detail": "the euphemism hid engineering ownership; the payload requirements make it honest"
+    },
+    "BLOCKED": {
+      "action": "split",
+      "target": "SOURCE_REQUIRED | ACTION_REQUIRED | INTERNAL_FAILURE | CANCELLED",
+      "detail": "generic BLOCKED is banned at the public boundary; each blocked_outcome in the workflow-state contract maps to one typed reason code"
+    },
+    "PASS_PENDING_MANUAL": {
+      "action": "rename",
+      "target": "DELIVERED_DEGRADED",
+      "detail": "pending human visual certification is a disclosed degradation of verification depth, not a pass with an asterisk"
+    },
+    "ACTION_REQUIRED": {
+      "action": "preserve",
+      "target": "ACTION_REQUIRED",
+      "detail": "subject to the strict legality predicate from this registry"
+    },
+    "NEEDS_USER_INPUT": {
+      "action": "rename",
+      "target": "ACTION_REQUIRED",
+      "detail": "single vocabulary for user-owned choices"
+    },
+    "INTERNAL_WORK (quality_mode)": {
+      "action": "rename",
+      "target": "INTERNAL_FAILURE",
+      "detail": "quality modes collapse into the terminal model plus reason codes"
+    },
+    "FATAL_SOURCE (blocker_class)": {
+      "action": "rename",
+      "target": "SOURCE_REQUIRED",
+      "detail": "the two SOURCE.* fatal reasons carry the detail"
+    },
+    "USER_DECISION (blocker_class)": {
+      "action": "rename",
+      "target": "ACTION_REQUIRED",
+      "detail": ""
+    },
+    "USER_EVIDENCE (blocker_class)": {
+      "action": "rename",
+      "target": "SOURCE_REQUIRED",
+      "detail": ""
+    },
+    "PASS_DEGRADED": {
+      "action": "preserve",
+      "target": "DELIVERED_DEGRADED",
+      "detail": "already the lawful degraded delivery"
+    },
+    "DELIVERED_PENDING_NATIVE_EXCEL": {
+      "action": "rename",
+      "target": "DELIVERED_DEGRADED",
+      "detail": "native-Excel certification pending is a disclosed verification degradation"
+    },
+    "BLOCKED_RESUMABLE": {
+      "action": "rename",
+      "target": "CANCELLED",
+      "detail": "a safe resumable stop"
+    },
+    "UNSUPPORTED": {
+      "action": "rename",
+      "target": "UNSUPPORTED_PROFILE",
+      "detail": ""
+    }
   },
   "migration_wiring_status": "registry sealed in P0.5; the outcome-compiler rewiring of run_excel_inflow_vnext statuses onto this registry is Phase 6 work (runtime fault isolation) - declared, not silent"
 }
