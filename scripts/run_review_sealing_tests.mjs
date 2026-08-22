@@ -1,33 +1,23 @@
 #!/usr/bin/env node
 //
-// Contract tests for the SEALED-BRIEFING review gate (scripts/lib/flow_review.mjs
-// and the review-gate block of scripts/run_user_flow.mjs):
-//
-//   1. no-re-solve proof  — flow_review.mjs contains no solver reference at all,
-//      and the briefing's headline numbers are byte-equal to the forecast rows
-//      Build persisted in the workbook's solution sidecar.
-//   2. tamper refusal     — a build result edited after the briefing was sealed
-//      is refused at reply time (fail-closed), never re-solved over.
-//   3. briefing drift     — a solution sidecar that no longer renders the sealed
-//      briefing is refused the same way.
-//   4. user-review-receipt/1.0 — one chained receipt per reply in both reply
-//      paths: deliver carries no change_class; change carries the classified
-//      change types and chains to the previous receipt's hash.
-//
-// Synthetic integration: a throwaway run directory with a hand-written build
-// result and solution sidecar; the case comes from the standard fixture set.
+// Full-custody contract tests for the display-only Review gate. The fixture is
+// synthetic, but every sealed item is a real file and every expected digest is
+// computed from that file's exact raw bytes. Mutations deliberately target
+// fields the visible briefing does not read, so these tests cannot pass through
+// the old "hash only what happened to render" implementation.
 
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   canonicalJsonBytes,
   compileReviewBriefing,
   recordUserReviewReceipt,
   resolveReviewReply,
+  reverifyReviewSeal,
   ReviewSealRefusal,
   sealReviewBriefing,
   sha256Hex,
@@ -40,28 +30,44 @@ function pass(name) {
   console.log(`ok ${checks} - ${name}`);
 }
 
-// ── 1. static no-re-solve proof ────────────────────────────────────────────
-const flowReviewSource = await fs.readFile(
-  path.join(here, "lib", "flow_review.mjs"),
-  "utf8",
-);
-assert.ok(
-  !flowReviewSource.includes("solveCase"),
-  "flow_review.mjs still references solveCase — the gate must not re-solve",
-);
-assert.ok(
-  !/from "\.\/solver\.mjs"/.test(flowReviewSource),
-  "flow_review.mjs still imports the solver",
-);
-pass("flow_review.mjs carries no solver reference (static no-re-solve proof)");
+function prettyBytes(value) {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
 
-// ── fixture run directory: what Build persists, nothing more ───────────────
-const runDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-seal-"));
+async function writeAndHash(target, bytes) {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, bytes);
+  return sha256Hex(bytes);
+}
+
+async function expectTamperRefusal({ context, target, mutate, label }) {
+  const original = await fs.readFile(target);
+  const changed = await mutate(original);
+  assert.notEqual(
+    sha256Hex(changed),
+    sha256Hex(original),
+    `${label} mutation must really change the file bytes`,
+  );
+  await fs.writeFile(target, changed);
+  await assert.rejects(
+    () => reverifyReviewSeal(context),
+    (error) =>
+      error instanceof ReviewSealRefusal &&
+      /Build-stage receipt|changed after|payload bytes changed/.test(error.message),
+    `${label} tamper must fail closed`,
+  );
+  await fs.writeFile(target, original);
+  await reverifyReviewSeal(context);
+}
+
+const runDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-seal-full-"));
 const buildChecksDir = path.join(runDir, "stages", "build_checks");
-await fs.mkdir(buildChecksDir, { recursive: true });
-const buildResultPath = path.join(buildChecksDir, "build-result.json");
 const workbookPath = path.join(runDir, "build-abc123def456", "model.xlsx");
-await fs.mkdir(path.dirname(workbookPath), { recursive: true });
+const modelCasePath = path.join(runDir, "stages", "decisions", "model-case.json");
+const buildResultPath = path.join(buildChecksDir, "build-result.json");
+const solutionPath = `${workbookPath}.solution.json`;
+const rowPlanPath = `${workbookPath}.plan.json`;
+const rowMapPath = `${workbookPath}.row-map.json`;
 
 const forecastRows = [
   {
@@ -109,36 +115,74 @@ const buildResult = {
   status: "PASS_PENDING_MANUAL",
   message: "The workbook cleared every automated gate.",
 };
-const buildResultBytes = Buffer.from(`${JSON.stringify(buildResult, null, 2)}\n`, "utf8");
-await fs.writeFile(buildResultPath, buildResultBytes);
-await fs.writeFile(
-  `${workbookPath}.solution.json`,
-  `${JSON.stringify(solution, null, 2)}\n`,
-  "utf8",
+const rowPlan = {
+  schema_version: "review-test-row-plan/1.0",
+  sections: [{ id: "summary", rows: [10, 11, 12] }],
+};
+const rowMap = {
+  schema_version: "review-test-row-map/1.0",
+  rows: { net_debt: 10, net_leverage: 11 },
+};
+const modelCaseBytes = await fs.readFile(
+  path.join(here, "..", "test-fixtures", "cases", "standard-maximal-v2.json"),
 );
+const modelCase = JSON.parse(modelCaseBytes.toString("utf8"));
+const workbookBytes = Buffer.from("synthetic-xlsx-bytes\u0000review-custody\n", "utf8");
+const buildResultBytes = prettyBytes(buildResult);
+const solutionBytes = prettyBytes(solution);
+const rowPlanBytes = prettyBytes(rowPlan);
+const rowMapBytes = prettyBytes(rowMap);
 
-const modelCase = JSON.parse(
-  await fs.readFile(
-    path.join(here, "..", "test-fixtures", "cases", "standard-maximal-v2.json"),
-    "utf8",
-  ),
-);
+const buildReceipt = {
+  stage_id: "build_checks",
+  status: "success",
+  input_hashes: {
+    model_case: await writeAndHash(modelCasePath, modelCaseBytes),
+  },
+  output_hashes: {
+    build_result: await writeAndHash(buildResultPath, buildResultBytes),
+    solution: await writeAndHash(solutionPath, solutionBytes),
+    plan: await writeAndHash(rowPlanPath, rowPlanBytes),
+    row_map: await writeAndHash(rowMapPath, rowMapBytes),
+    workbook: await writeAndHash(workbookPath, workbookBytes),
+  },
+};
+const quality = {
+  mode: "NOT ASSESSED",
+  detail: "No broker research was supplied.",
+};
+const context = {
+  runDir,
+  workbookPath,
+  modelCasePath,
+  buildReceipt,
+  quality,
+};
 
-const quality = { mode: "NOT ASSESSED", detail: "No broker research was supplied." };
-
-// ── first seal ─────────────────────────────────────────────────────────────
-const first = await sealReviewBriefing({ runDir, workbookPath, modelCase, quality });
-const sealedDoc = JSON.parse(await fs.readFile(first.seal.path, "utf8"));
+// First seal: all Build-admitted artifacts and exact briefing bytes are bound.
+const first = await sealReviewBriefing(context);
+const sealedDocBytes = await fs.readFile(first.seal.path);
+const sealedDoc = JSON.parse(sealedDocBytes.toString("utf8"));
 assert.equal(sealedDoc.schema_version, "sealed-review-briefing/1.0");
-assert.equal(
-  sealedDoc.build_result_sha256,
-  sha256Hex(buildResultBytes),
-  "seal must hash the build result bytes on disk",
-);
-assert.ok(sealedDoc.briefing && typeof sealedDoc.briefing === "object");
-pass("first seal persists sealed-review-briefing/1.0 with the artifact hash");
+const expectedHashes = {
+  build_result_sha256: sha256Hex(buildResultBytes),
+  solution_sha256: sha256Hex(solutionBytes),
+  row_plan_sha256: sha256Hex(rowPlanBytes),
+  row_map_sha256: sha256Hex(rowMapBytes),
+  model_case_sha256: sha256Hex(modelCaseBytes),
+  workbook_sha256: sha256Hex(workbookBytes),
+};
+for (const [field, expected] of Object.entries(expectedHashes)) {
+  assert.equal(sealedDoc[field], expected, `${field} must bind exact raw bytes`);
+  assert.equal(first.seal[field], expected, `${field} must be returned to the caller`);
+}
+const briefingPayloadBytes = await fs.readFile(first.seal.payload_path);
+assert.equal(sealedDoc.briefing_sha256, sha256Hex(briefingPayloadBytes));
+assert.ok(briefingPayloadBytes.equals(canonicalJsonBytes(first.briefing)));
+assert.ok(briefingPayloadBytes.equals(canonicalJsonBytes(sealedDoc.briefing)));
+pass("first seal binds the complete Build custody set and exact briefing bytes");
 
-// ── byte-equality: briefing numbers ARE Build's persisted numbers ──────────
+// Headline values are still exactly the already-solved standalone forecast.
 const expectedHeadline = forecastRows.map((row) => ({
   period: row.period.slice(0, 4),
   net_debt: row.net_debt,
@@ -147,124 +191,170 @@ const expectedHeadline = forecastRows.map((row) => ({
   rcf_drawn: row.ending_rcf,
   currency: modelCase.issuer.reporting_currency,
 }));
-assert.equal(
-  JSON.stringify(first.briefing.headline),
-  JSON.stringify(expectedHeadline),
-  "briefing headline must be byte-equal to the persisted solution rows",
-);
-assert.equal(first.briefing.read.length > 0, true, "briefing keeps its plain-English read");
-assert.equal(
-  sha256Hex(canonicalJsonBytes(first.briefing)),
-  sealedDoc.briefing_sha256,
-  "briefing hash must be reproducible from the rendered briefing",
-);
-pass("briefing numbers are byte-equal to Build's persisted solution rows");
+assert.deepEqual(first.briefing.headline, expectedHeadline);
+assert.ok(first.briefing.read.length > 0);
+pass("review headline is byte-derived from Build's persisted standalone forecast");
 
-// ── untouched artifacts re-seal to the identical briefing ──────────────────
-const again = await sealReviewBriefing({ runDir, workbookPath, modelCase, quality });
-assert.equal(
-  JSON.stringify(again.briefing),
-  JSON.stringify(first.briefing),
-  "an unchanged run must re-seal to the identical briefing",
-);
-pass("re-sealing an untouched run reproduces the sealed briefing exactly");
+const again = await sealReviewBriefing(context);
+assert.deepEqual(again.briefing, first.briefing);
+assert.equal(again.seal.briefing_sha256, first.seal.briefing_sha256);
+pass("unchanged artifacts reverify to the identical sealed briefing");
 
-// ── 2. tamper test: build result edited after sealing ──────────────────────
-const tampered = JSON.parse(await fs.readFile(buildResultPath, "utf8"));
-tampered.message = "tampered after the user saw the briefing";
-await fs.writeFile(buildResultPath, `${JSON.stringify(tampered, null, 2)}\n`, "utf8");
+await expectTamperRefusal({
+  context,
+  target: buildResultPath,
+  label: "build result",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.message = "tampered after display";
+    return prettyBytes(value);
+  },
+});
+pass("tampered build-result bytes are refused");
+
+// Non-vacuous: neither field is consumed by compileReviewBriefing, so only a
+// full-sidecar byte seal can catch these mutations.
+await expectTamperRefusal({
+  context,
+  target: solutionPath,
+  label: "unused solution field",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.all_checks_pass = false;
+    return prettyBytes(value);
+  },
+});
+pass("unused full-solution field tamper is refused even when briefing is unchanged");
+
+await expectTamperRefusal({
+  context,
+  target: solutionPath,
+  label: "pro-forma-only solution field",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.pro_forma.forecast[0].net_debt += 999;
+    return prettyBytes(value);
+  },
+});
+pass("pro-forma-only tamper is refused while standalone headline stays unchanged");
+
+await expectTamperRefusal({
+  context,
+  target: rowPlanPath,
+  label: "row plan",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.sections[0].rows.push(99);
+    return prettyBytes(value);
+  },
+});
+pass("row-plan tamper is refused");
+
+await expectTamperRefusal({
+  context,
+  target: rowMapPath,
+  label: "row map",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.rows.net_debt = 999;
+    return prettyBytes(value);
+  },
+});
+pass("row-map tamper is refused");
+
+await expectTamperRefusal({
+  context,
+  target: modelCasePath,
+  label: "unused model-case field",
+  mutate: async (bytes) => {
+    const value = JSON.parse(bytes.toString("utf8"));
+    value.review_test_unused = "tampered";
+    return prettyBytes(value);
+  },
+});
+pass("model-case tamper is refused even when the rendered fields are unchanged");
+
+await expectTamperRefusal({
+  context,
+  target: workbookPath,
+  label: "workbook",
+  mutate: async (bytes) => Buffer.concat([bytes, Buffer.from("tampered")]),
+});
+pass("workbook byte tamper is refused");
+
+await expectTamperRefusal({
+  context,
+  target: first.seal.payload_path,
+  label: "briefing payload",
+  mutate: async (bytes) => Buffer.concat([bytes, Buffer.from(" ")]),
+});
+pass("exact briefing-payload byte tamper is refused");
+
+// Receipt-time reverification and full hash propagation, in both reply paths.
+const deliverReply = await recordUserReviewReceipt({
+  ...context,
+  reply: "deliver",
+});
+assert.equal(deliverReply.receipt.schema_version, "user-review-receipt/1.0");
+for (const field of [...Object.keys(expectedHashes), "briefing_sha256"]) {
+  assert.equal(deliverReply.receipt[field], first.seal[field]);
+}
+assert.equal(deliverReply.receipt.reply, "deliver");
+assert.equal(deliverReply.receipt.change_class, undefined);
+assert.equal(deliverReply.receipt.previous_receipt_hash, null);
+pass("deliver receipt carries the complete reverified seal");
+
+const changeReply = await recordUserReviewReceipt({
+  ...context,
+  reply: "change",
+  changeClass: ["assumption"],
+});
+assert.deepEqual(changeReply.receipt.change_class, ["assumption"]);
+assert.equal(changeReply.receipt.previous_receipt_hash, deliverReply.receipt_hash);
+assert.match(path.basename(changeReply.path), /^user-review-receipt-02\.json$/);
+pass("change receipt carries the complete seal and chains to exact prior bytes");
+
+const workbookBeforeReplyTamper = await fs.readFile(workbookPath);
+await fs.writeFile(workbookPath, Buffer.concat([workbookBeforeReplyTamper, Buffer.from("x")]));
 await assert.rejects(
-  () => sealReviewBriefing({ runDir, workbookPath, modelCase, quality }),
-  (error) =>
-    error instanceof ReviewSealRefusal &&
-    /changed after the review briefing was sealed/.test(error.message),
+  () => recordUserReviewReceipt({ ...context, reply: "deliver" }),
+  ReviewSealRefusal,
 );
-pass("tampered build result is refused at reply time (hash mismatch)");
+await fs.writeFile(workbookPath, workbookBeforeReplyTamper);
+pass("receipt path independently reverifies artifacts immediately before reply");
 
-// restore the exact bytes; the seal must accept them again.
-await fs.writeFile(buildResultPath, buildResultBytes);
-const restored = await sealReviewBriefing({ runDir, workbookPath, modelCase, quality });
-assert.equal(JSON.stringify(restored.briefing), JSON.stringify(first.briefing));
-pass("restored artifact bytes re-verify against the existing seal");
-
-// ── 3. drift refusal: solution sidecar no longer renders the same briefing ─
-const driftedSolution = JSON.parse(
-  await fs.readFile(`${workbookPath}.solution.json`, "utf8"),
-);
-driftedSolution.standalone.forecast[0].net_debt += 1;
-await fs.writeFile(
-  `${workbookPath}.solution.json`,
-  `${JSON.stringify(driftedSolution, null, 2)}\n`,
-  "utf8",
-);
 await assert.rejects(
-  () => sealReviewBriefing({ runDir, workbookPath, modelCase, quality }),
-  (error) =>
-    error instanceof ReviewSealRefusal &&
-    /no longer renders the same numbers/.test(error.message),
+  () => recordUserReviewReceipt({ ...context, reply: "maybe" }),
+  /records a real reply/,
 );
-pass("drifted solution sidecar is refused (briefing hash mismatch)");
-await fs.writeFile(
-  `${workbookPath}.solution.json`,
-  `${JSON.stringify(solution, null, 2)}\n`,
-  "utf8",
-);
+pass("receipts refuse fabricated reply values");
 
-// ── compileReviewBriefing refuses to brief from non-passing or empty state ─
+// Real execution proof: copy the module graph, physically remove solver.mjs,
+// import Review from that graph, and execute a complete seal verification.
+const isolatedRoot = await fs.mkdtemp(path.join(os.tmpdir(), "review-no-solver-"));
+const isolatedLib = path.join(isolatedRoot, "scripts", "lib");
+await fs.cp(path.join(here, "lib"), isolatedLib, { recursive: true });
+await fs.cp(path.join(here, "..", "assets"), path.join(isolatedRoot, "assets"), {
+  recursive: true,
+});
+await fs.rm(path.join(isolatedLib, "solver.mjs"));
+const isolatedReview = await import(
+  `${pathToFileURL(path.join(isolatedLib, "flow_review.mjs")).href}?proof=${Date.now()}`
+);
+const isolatedResult = await isolatedReview.sealReviewBriefing(context);
+assert.deepEqual(isolatedResult.briefing.headline, expectedHeadline);
+pass("Review executes successfully with solver.mjs physically unavailable");
+
 assert.throws(
   () => compileReviewBriefing({ modelCase, buildResult: { status: "BLOCKED" }, solution }),
   ReviewSealRefusal,
-  "a build that did not clear its gates cannot be briefed",
 );
 assert.throws(
   () => compileReviewBriefing({ modelCase, buildResult, solution: {} }),
   ReviewSealRefusal,
-  "a missing forecast sidecar cannot be briefed",
 );
-pass("compileReviewBriefing refuses non-passing builds and empty sidecars");
+pass("briefing refuses non-passing builds and empty sidecars");
 
-// ── 4. user-review receipts: one per reply, chained, both paths ────────────
-const deliverReply = await recordUserReviewReceipt({
-  runDir,
-  reply: "deliver",
-  seal: first.seal,
-});
-assert.equal(deliverReply.receipt.schema_version, "user-review-receipt/1.0");
-assert.equal(deliverReply.receipt.build_result_sha256, first.seal.build_result_sha256);
-assert.equal(deliverReply.receipt.briefing_sha256, first.seal.briefing_sha256);
-assert.equal(deliverReply.receipt.reply, "deliver");
-assert.equal(deliverReply.receipt.change_class, undefined);
-assert.equal(deliverReply.receipt.previous_receipt_hash, null);
-assert.ok(!Number.isNaN(Date.parse(deliverReply.receipt.replied_at)));
-pass("deliver reply writes receipt/01 bound to the sealed briefing");
-
-const changeReply = await recordUserReviewReceipt({
-  runDir,
-  reply: "change",
-  changeClass: ["assumption"],
-  seal: first.seal,
-});
-assert.equal(changeReply.receipt.reply, "change");
-assert.deepEqual(changeReply.receipt.change_class, ["assumption"]);
-assert.equal(
-  changeReply.receipt.previous_receipt_hash,
-  deliverReply.receipt_hash,
-  "the second receipt must chain to the first receipt's hash",
-);
-assert.match(path.basename(changeReply.path), /^user-review-receipt-02\.json$/);
-pass("change reply writes receipt/02 carrying the change class and chain hash");
-
-await assert.rejects(
-  () => recordUserReviewReceipt({ runDir, reply: "maybe", seal: first.seal }),
-  /records a real reply/,
-);
-await assert.rejects(
-  () => recordUserReviewReceipt({ runDir, reply: "deliver", seal: {} }),
-  /artifact hashes/,
-);
-pass("receipts refuse fabricated replies and unsealed briefings");
-
-// ── the reply resolver is unchanged and fail-closed ────────────────────────
 assert.deepEqual(resolveReviewReply({}), { mode: "blocked" });
 assert.deepEqual(resolveReviewReply({ reviewDeliver: true }), { mode: "deliver" });
 assert.deepEqual(resolveReviewReply({ reviewChange: "lower FY3 growth" }), {
@@ -273,6 +363,8 @@ assert.deepEqual(resolveReviewReply({ reviewChange: "lower FY3 growth" }), {
 });
 assert.throws(() => resolveReviewReply({ reviewDeliver: true, reviewChange: "x" }));
 assert.throws(() => resolveReviewReply({ reviewChange: true }));
-pass("resolveReviewReply keeps its fail-closed two-exit contract");
+pass("reply resolver keeps its fail-closed two-exit contract");
 
+await fs.rm(isolatedRoot, { recursive: true, force: true });
+await fs.rm(runDir, { recursive: true, force: true });
 console.log(`\nREVIEW SEALING CONTRACTS: ${checks} checks passed.`);

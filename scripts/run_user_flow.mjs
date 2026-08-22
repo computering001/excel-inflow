@@ -2626,10 +2626,11 @@ async function main() {
   });
   // SEALED BRIEFING, VERIFIED AT REPLY TIME. Every arrival at the gate —
   // pausing, delivering, or requesting a change — renders the briefing from
-  // the artifacts Build persisted (stages/build_checks/build-result.json and
-  // the workbook's solution sidecar) and re-verifies the seal against those
-  // bytes as they are now. A build result edited after the briefing was
-  // sealed is a refusal: the gate never re-solves the case to look past it.
+  // the full custody set Build admitted (build result, solution, row plan and
+  // row map, compiled model case, and workbook) and re-verifies every exact
+  // byte hash before display and again before recording a reply. Any artifact
+  // edited after sealing is a refusal: the gate never re-solves the case to
+  // look past it.
   const reviewDir = path.join(runDir, "stages", "review");
   await fs.mkdir(reviewDir, { recursive: true });
   let reviewBrokerPreview = brokerPreview;
@@ -2640,14 +2641,16 @@ async function main() {
       reviewBrokerPreview = null;
     }
   }
+  const reviewSealContext = {
+    runDir,
+    workbookPath: workbook,
+    modelCasePath: answeredCasePath,
+    buildReceipt: receipt4,
+    quality: reviewQualityFrom({ brokerPreview: reviewBrokerPreview }),
+  };
   let sealedReview;
   try {
-    sealedReview = await sealReviewBriefing({
-      runDir,
-      workbookPath: workbook,
-      modelCase: await readJson(answeredCasePath, "Compiled decision case"),
-      quality: reviewQualityFrom({ brokerPreview: reviewBrokerPreview }),
-    });
+    sealedReview = await sealReviewBriefing(reviewSealContext);
   } catch (error) {
     if (!(error instanceof ReviewSealRefusal)) throw error;
     const refusalScreen = renderFailure({
@@ -2656,7 +2659,7 @@ async function main() {
         "The review gate refuses to brief from, or take a reply against, the recorded build artifacts.",
       why: error.message,
       what_would_fix_it: [
-        "Re-run the build stage so stages/build_checks/build-result.json and the workbook's solution sidecar are exactly what this run sealed.",
+        "Re-run the build stage so its result, full solution, row plan and row map, compiled model case, and workbook are exactly what the Build receipt admitted.",
         "Never repair the gate by editing a recorded artifact or by recomputing the numbers — the briefing must stay byte-identical to what Build checked in.",
       ],
     });
@@ -2733,10 +2736,9 @@ async function main() {
     // chained to the previous receipt this run recorded, bound to the exact
     // sealed briefing it was made against.
     await recordUserReviewReceipt({
-      runDir,
+      ...reviewSealContext,
       reply: REVIEW_CHANGE_REPLY,
       changeClass: reviewChangeRecord.change_types,
-      seal: sealedReview.seal,
     });
     return finish({
       runDir,
@@ -2758,9 +2760,8 @@ async function main() {
   // The deliver reply: receipted against the sealed briefing, then the run
   // continues into the ordinary delivery stage unchanged.
   await recordUserReviewReceipt({
-    runDir,
+    ...reviewSealContext,
     reply: REVIEW_DELIVER_REPLY,
-    seal: sealedReview.seal,
   });
 
   // The chat host is not an authority. Before Stage 5 can expose any workbook,

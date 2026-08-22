@@ -18,14 +18,14 @@
 //
 // SEALED, NOT RE-SOLVED: the briefing is assembled exclusively from the
 // artifacts Build already persisted under the run directory (the stage-4
-// build result and the workbook's solution sidecar). This module never
-// imports the solver and never re-runs the case: the numbers the user
-// reviews must be byte-identical to the numbers Build checked in, so a
-// briefing that drifted from the sealed artifacts is a refusal, not a
+// result, full solution, row plan and row map, compiled case, and workbook).
+// This module never imports the solver and never re-runs the case: the numbers
+// the user reviews must be byte-identical to the numbers Build checked in, so
+// a briefing that drifted from any sealed artifact is a refusal, not a
 // re-computation. The seal is verified again at reply time — artifacts that
 // changed after the briefing was sealed fail closed.
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -43,6 +43,53 @@ export const REVIEW_RECEIPT_SCHEMA_VERSION = "user-review-receipt/1.0";
 
 const REVIEW_DIR = path.join("stages", "review");
 const SEALED_BRIEFING_FILENAME = "review-briefing.json";
+const SEALED_BRIEFING_PAYLOAD_FILENAME = "review-briefing-payload.json";
+
+// Flat names are deliberate: every receipt can be inspected without resolving
+// a second manifest, and a missing custody link is therefore visible rather
+// than hidden behind an open-ended object.
+const REVIEW_ARTIFACT_BINDINGS = Object.freeze([
+  Object.freeze({
+    hashField: "build_result_sha256",
+    receiptSection: "output_hashes",
+    receiptField: "build_result",
+    label: "build result",
+  }),
+  Object.freeze({
+    hashField: "solution_sha256",
+    receiptSection: "output_hashes",
+    receiptField: "solution",
+    label: "full solution sidecar",
+  }),
+  Object.freeze({
+    hashField: "row_plan_sha256",
+    receiptSection: "output_hashes",
+    receiptField: "plan",
+    label: "row plan",
+  }),
+  Object.freeze({
+    hashField: "row_map_sha256",
+    receiptSection: "output_hashes",
+    receiptField: "row_map",
+    label: "row map",
+  }),
+  Object.freeze({
+    hashField: "model_case_sha256",
+    receiptSection: "input_hashes",
+    receiptField: "model_case",
+    label: "compiled model case",
+  }),
+  Object.freeze({
+    hashField: "workbook_sha256",
+    receiptSection: "output_hashes",
+    receiptField: "workbook",
+    label: "workbook",
+  }),
+]);
+const REVIEW_SEAL_HASH_FIELDS = Object.freeze([
+  ...REVIEW_ARTIFACT_BINDINGS.map(({ hashField }) => hashField),
+  "briefing_sha256",
+]);
 
 /**
  * Thrown when the gate refuses to brief from — or reply against — the
@@ -69,6 +116,128 @@ export function canonicalJsonBytes(value) {
     return nested;
   };
   return Buffer.from(`${JSON.stringify(sorted(value))}\n`, "utf8");
+}
+
+async function writeBytesAtomic(target, bytes) {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
+  try {
+    await fs.writeFile(temporary, bytes, { flag: "wx" });
+    await fs.rename(temporary, target);
+  } finally {
+    await fs.rm(temporary, { force: true }).catch(() => {});
+  }
+}
+
+async function readRequiredBytes(target, label) {
+  try {
+    return await fs.readFile(target);
+  } catch {
+    throw new ReviewSealRefusal(
+      `The review gate cannot read the ${label} at ${target}; it refuses to show or receipt an incomplete Build custody set.`,
+    );
+  }
+}
+
+function parseRequiredJson(bytes, label) {
+  try {
+    return JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new ReviewSealRefusal(
+      `The recorded ${label} is not readable JSON; the review gate refuses to brief from it.`,
+    );
+  }
+}
+
+function artifactPaths({ runDir, workbookPath, modelCasePath }) {
+  return Object.freeze({
+    build_result_sha256: path.join(
+      runDir,
+      "stages",
+      "build_checks",
+      "build-result.json",
+    ),
+    solution_sha256: `${workbookPath}.solution.json`,
+    row_plan_sha256: `${workbookPath}.plan.json`,
+    row_map_sha256: `${workbookPath}.row-map.json`,
+    model_case_sha256: modelCasePath,
+    workbook_sha256: workbookPath,
+  });
+}
+
+async function captureReviewArtifacts(context) {
+  const paths = artifactPaths(context);
+  const bytes = {};
+  const hashes = {};
+  for (const binding of REVIEW_ARTIFACT_BINDINGS) {
+    const target = paths[binding.hashField];
+    if (typeof target !== "string" || target.trim() === "") {
+      throw new ReviewSealRefusal(
+        `The review gate was not given the ${binding.label}'s path; it cannot establish custody.`,
+      );
+    }
+    bytes[binding.hashField] = await readRequiredBytes(target, binding.label);
+    hashes[binding.hashField] = sha256Hex(bytes[binding.hashField]);
+  }
+  return Object.freeze({
+    paths,
+    bytes,
+    hashes: Object.freeze(hashes),
+    buildResult: parseRequiredJson(bytes.build_result_sha256, "build result"),
+    solution: parseRequiredJson(bytes.solution_sha256, "full solution sidecar"),
+    modelCase: parseRequiredJson(bytes.model_case_sha256, "compiled model case"),
+  });
+}
+
+function assertBuildReceiptBinding(buildReceipt, hashes) {
+  if (
+    !buildReceipt ||
+    typeof buildReceipt !== "object" ||
+    buildReceipt.stage_id !== "build_checks" ||
+    buildReceipt.status !== "success"
+  ) {
+    throw new ReviewSealRefusal(
+      "The review gate requires the successful Build-stage receipt that admitted these artifacts.",
+    );
+  }
+  for (const binding of REVIEW_ARTIFACT_BINDINGS) {
+    const admitted = buildReceipt?.[binding.receiptSection]?.[binding.receiptField];
+    const observed = hashes[binding.hashField];
+    if (admitted !== observed) {
+      throw new ReviewSealRefusal(
+        `The ${binding.label} is not the artifact admitted by the Build-stage receipt (receipt ${String(admitted ?? "absent").slice(0, 12)}, on disk ${observed.slice(0, 12)}).`,
+      );
+    }
+  }
+}
+
+async function readExistingSeal(sealedPath) {
+  let bytes;
+  try {
+    bytes = await fs.readFile(sealedPath);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw new ReviewSealRefusal(
+      `The review gate cannot read its existing seal at ${sealedPath}.`,
+    );
+  }
+  const seal = parseRequiredJson(bytes, "review briefing seal");
+  if (seal?.schema_version !== SEALED_BRIEFING_SCHEMA_VERSION) {
+    throw new ReviewSealRefusal(
+      `The existing review briefing seal has unsupported schema ${JSON.stringify(seal?.schema_version ?? null)}; it will not be overwritten or reinterpreted.`,
+    );
+  }
+  return seal;
+}
+
+function publicSeal(seal, sealedPath, payloadPath) {
+  return {
+    ...Object.fromEntries(
+      REVIEW_SEAL_HASH_FIELDS.map((field) => [field, seal[field]]),
+    ),
+    path: sealedPath,
+    payload_path: payloadPath,
+  };
 }
 
 function headlineRows(forecastRows, currency) {
@@ -135,134 +304,223 @@ export function compileReviewBriefing({
 }
 
 /**
- * Seal the review briefing against the run's persisted build artifacts.
- *
- * Reads `stages/build_checks/build-result.json` and the workbook's
- * `.solution.json` sidecar, hashes both, and renders the briefing from them.
- * If a sealed briefing already exists it is re-verified against the artifacts
- * as they are NOW: any drift — a build result edited after the briefing was
- * sealed, a solution sidecar that no longer renders the same briefing — is a
- * ReviewSealRefusal. First seal persists
- * `stages/review/review-briefing.json` so later replies verify against the
- * exact bytes the user was shown.
+ * Re-verify the complete Build custody set and the exact briefing payload.
+ * This is called immediately before display and again immediately before a
+ * reply is receipted. No parsed object supplied by an earlier call is trusted.
  */
-export async function sealReviewBriefing({
+export async function reverifyReviewSeal({
   runDir,
   workbookPath,
-  modelCase,
+  modelCasePath,
+  buildReceipt,
   quality = null,
 }) {
-  const buildResultPath = path.join(runDir, "stages", "build_checks", "build-result.json");
-  let buildResultBytes;
-  try {
-    buildResultBytes = await fs.readFile(buildResultPath);
-  } catch {
-    throw new ReviewSealRefusal(
-      `The review gate cannot read the recorded build result at ${buildResultPath}; there is nothing sealed to brief from.`,
-    );
-  }
-  const buildResultSha256 = sha256Hex(buildResultBytes);
-  let buildResult;
-  try {
-    buildResult = JSON.parse(buildResultBytes.toString("utf8"));
-  } catch {
-    throw new ReviewSealRefusal(
-      "The recorded build result is not readable JSON; the review gate refuses to brief from it.",
-    );
-  }
-
-  const solutionPath = `${workbookPath}.solution.json`;
-  let solution;
-  try {
-    solution = JSON.parse(await fs.readFile(solutionPath, "utf8"));
-  } catch {
-    throw new ReviewSealRefusal(
-      `The review gate cannot read the workbook's solution sidecar at ${solutionPath}; the headline numbers must come from what Build persisted.`,
-    );
-  }
-
-  const briefing = compileReviewBriefing({ modelCase, buildResult, solution, quality });
-  const briefingSha256 = sha256Hex(canonicalJsonBytes(briefing));
+  const artifacts = await captureReviewArtifacts({
+    runDir,
+    workbookPath,
+    modelCasePath,
+  });
+  assertBuildReceiptBinding(buildReceipt, artifacts.hashes);
 
   const reviewDir = path.join(runDir, REVIEW_DIR);
   const sealedPath = path.join(reviewDir, SEALED_BRIEFING_FILENAME);
-  let existing = null;
-  try {
-    existing = JSON.parse(await fs.readFile(sealedPath, "utf8"));
-  } catch {
-    existing = null;
+  const payloadPath = path.join(reviewDir, SEALED_BRIEFING_PAYLOAD_FILENAME);
+  const seal = await readExistingSeal(sealedPath);
+  if (!seal) {
+    throw new ReviewSealRefusal(
+      "The review briefing has not been sealed; it cannot be displayed or replied to.",
+    );
   }
-  if (existing && existing?.schema_version === SEALED_BRIEFING_SCHEMA_VERSION) {
-    if (existing.build_result_sha256 !== buildResultSha256) {
+  if (seal.briefing_payload !== SEALED_BRIEFING_PAYLOAD_FILENAME) {
+    throw new ReviewSealRefusal(
+      "The review briefing seal does not name the fixed briefing payload; it refuses a redirected custody path.",
+    );
+  }
+  for (const binding of REVIEW_ARTIFACT_BINDINGS) {
+    const sealedHash = seal[binding.hashField];
+    const observedHash = artifacts.hashes[binding.hashField];
+    if (sealedHash !== observedHash) {
       throw new ReviewSealRefusal(
-        `The build result changed after the review briefing was sealed (sealed ${String(existing.build_result_sha256 ?? "").slice(0, 12)}, on disk ${buildResultSha256.slice(0, 12)}). A reply against a briefing whose artifacts moved would not be a reply against the run that was built.`,
+        `The ${binding.label} changed after the review briefing was sealed (sealed ${String(sealedHash ?? "absent").slice(0, 12)}, on disk ${observedHash.slice(0, 12)}). A reply against moved artifacts would not be a reply against the run that was built.`,
       );
     }
-    if (existing.briefing_sha256 !== briefingSha256) {
-      throw new ReviewSealRefusal(
-        "The sealed briefing no longer renders the same numbers from the recorded artifacts. The gate refuses to show — or take a reply against — a briefing that drifted.",
-      );
-    }
-  } else {
-    await fs.mkdir(reviewDir, { recursive: true });
-    await fs.writeFile(
-      sealedPath,
-      `${JSON.stringify(
-        {
-          schema_version: SEALED_BRIEFING_SCHEMA_VERSION,
-          build_result_sha256: buildResultSha256,
-          briefing_sha256: briefingSha256,
-          sealed_at: new Date().toISOString(),
-          briefing,
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
+  }
+
+  const payloadBytes = await readRequiredBytes(payloadPath, "sealed briefing payload");
+  const payloadHash = sha256Hex(payloadBytes);
+  if (seal.briefing_sha256 !== payloadHash) {
+    throw new ReviewSealRefusal(
+      `The exact briefing payload bytes changed after sealing (sealed ${String(seal.briefing_sha256 ?? "absent").slice(0, 12)}, on disk ${payloadHash.slice(0, 12)}).`,
+    );
+  }
+  const briefing = parseRequiredJson(payloadBytes, "sealed briefing payload");
+  if (!Buffer.from(canonicalJsonBytes(briefing)).equals(payloadBytes)) {
+    throw new ReviewSealRefusal(
+      "The sealed briefing payload is not its canonical exact-byte representation.",
+    );
+  }
+  if (
+    !seal.briefing ||
+    !Buffer.from(canonicalJsonBytes(seal.briefing)).equals(payloadBytes)
+  ) {
+    throw new ReviewSealRefusal(
+      "The briefing embedded in the custody seal differs from its exact sealed payload.",
+    );
+  }
+  const expectedBriefing = compileReviewBriefing({
+    modelCase: artifacts.modelCase,
+    buildResult: artifacts.buildResult,
+    solution: artifacts.solution,
+    quality,
+  });
+  if (!Buffer.from(canonicalJsonBytes(expectedBriefing)).equals(payloadBytes)) {
+    throw new ReviewSealRefusal(
+      "The sealed briefing no longer compiles byte-identically from the Build-admitted artifacts. The gate refuses to show — or take a reply against — a briefing that drifted.",
     );
   }
   return {
     briefing,
-    seal: {
-      build_result_sha256: buildResultSha256,
-      briefing_sha256: briefingSha256,
-      path: sealedPath,
-    },
+    seal: publicSeal(seal, sealedPath, payloadPath),
   };
 }
 
 /**
- * Record one user-review receipt under `stages/review/`, chained to the
- * previous receipt in the run. Exactly one receipt per reply, in either
- * reply path: `reply` is "deliver" or "change"; change replies carry the
- * classified `change_class`. Returns the receipt and its own hash (the
- * next receipt's `previous_receipt_hash`).
+ * Seal the review briefing against every persisted artifact that determines
+ * what the user sees: Build result, full solution sidecar (including unused
+ * and pro-forma fields), row plan, row map, compiled model case and workbook.
+ * Each raw-byte hash must first match the successful Build-stage receipt.
+ */
+export async function sealReviewBriefing({
+  runDir,
+  workbookPath,
+  modelCasePath,
+  buildReceipt,
+  quality = null,
+}) {
+  const artifacts = await captureReviewArtifacts({
+    runDir,
+    workbookPath,
+    modelCasePath,
+  });
+  assertBuildReceiptBinding(buildReceipt, artifacts.hashes);
+  const briefing = compileReviewBriefing({
+    modelCase: artifacts.modelCase,
+    buildResult: artifacts.buildResult,
+    solution: artifacts.solution,
+    quality,
+  });
+  const briefingBytes = canonicalJsonBytes(briefing);
+  const reviewDir = path.join(runDir, REVIEW_DIR);
+  const sealedPath = path.join(reviewDir, SEALED_BRIEFING_FILENAME);
+  const payloadPath = path.join(reviewDir, SEALED_BRIEFING_PAYLOAD_FILENAME);
+  const existing = await readExistingSeal(sealedPath);
+  if (!existing) {
+    const seal = {
+      schema_version: SEALED_BRIEFING_SCHEMA_VERSION,
+      ...artifacts.hashes,
+      briefing_sha256: sha256Hex(briefingBytes),
+      briefing_payload: SEALED_BRIEFING_PAYLOAD_FILENAME,
+      sealed_at: new Date().toISOString(),
+      // Kept inline for a self-contained human-readable record; verification
+      // still binds the separate exact-byte payload and requires equality.
+      briefing,
+    };
+    await writeBytesAtomic(payloadPath, briefingBytes);
+    await writeBytesAtomic(
+      sealedPath,
+      Buffer.from(`${JSON.stringify(seal, null, 2)}\n`, "utf8"),
+    );
+  }
+  return reverifyReviewSeal({
+    runDir,
+    workbookPath,
+    modelCasePath,
+    buildReceipt,
+    quality,
+  });
+}
+
+async function verifyReviewReceiptChain(reviewDir, names, seal) {
+  let previousReceiptHash = null;
+  for (let index = 0; index < names.length; index += 1) {
+    const expectedName = `user-review-receipt-${String(index + 1).padStart(2, "0")}.json`;
+    if (names[index] !== expectedName) {
+      throw new ReviewSealRefusal(
+        `The user-review receipt chain is not contiguous at ${names[index]}; a new reply will not be appended to an ambiguous chain.`,
+      );
+    }
+    const receiptPath = path.join(reviewDir, names[index]);
+    const bytes = await readRequiredBytes(receiptPath, "user-review receipt");
+    const receipt = parseRequiredJson(bytes, "user-review receipt");
+    if (receipt?.schema_version !== REVIEW_RECEIPT_SCHEMA_VERSION) {
+      throw new ReviewSealRefusal(
+        `The user-review receipt ${names[index]} has an unsupported schema.`,
+      );
+    }
+    for (const field of REVIEW_SEAL_HASH_FIELDS) {
+      if (receipt[field] !== seal[field]) {
+        throw new ReviewSealRefusal(
+          `The user-review receipt ${names[index]} is not bound to the current ${field}.`,
+        );
+      }
+    }
+    if (receipt.previous_receipt_hash !== previousReceiptHash) {
+      throw new ReviewSealRefusal(
+        `The user-review receipt chain is broken at ${names[index]}.`,
+      );
+    }
+    if (
+      ![REVIEW_DELIVER_REPLY, REVIEW_CHANGE_REPLY].includes(receipt.reply) ||
+      Number.isNaN(Date.parse(receipt.replied_at))
+    ) {
+      throw new ReviewSealRefusal(
+        `The user-review receipt ${names[index]} is not a valid recorded reply.`,
+      );
+    }
+    previousReceiptHash = sha256Hex(bytes);
+  }
+  return previousReceiptHash;
+}
+
+/**
+ * Record one user-review receipt after freshly re-verifying every artifact and
+ * the exact briefing payload. Every receipt carries the complete seal and is
+ * chained to the raw bytes of the preceding, already-verified receipt.
  */
 export async function recordUserReviewReceipt({
   runDir,
+  workbookPath,
+  modelCasePath,
+  buildReceipt,
+  quality = null,
   reply,
   changeClass = null,
-  seal,
 }) {
   if (reply !== REVIEW_DELIVER_REPLY && reply !== REVIEW_CHANGE_REPLY) {
     throw new Error(`A user-review receipt records a real reply, not ${JSON.stringify(reply)}.`);
   }
-  if (!seal?.build_result_sha256 || !seal?.briefing_sha256) {
-    throw new Error("A user-review receipt must carry the sealed briefing's artifact hashes.");
-  }
+  const verified = await reverifyReviewSeal({
+    runDir,
+    workbookPath,
+    modelCasePath,
+    buildReceipt,
+    quality,
+  });
   const reviewDir = path.join(runDir, REVIEW_DIR);
   await fs.mkdir(reviewDir, { recursive: true });
   const names = (await fs.readdir(reviewDir))
     .filter((name) => /^user-review-receipt-\d+\.json$/.test(name))
     .sort();
-  let previousReceiptHash = null;
-  if (names.length > 0) {
-    previousReceiptHash = sha256Hex(await fs.readFile(path.join(reviewDir, names[names.length - 1])));
-  }
+  const previousReceiptHash = await verifyReviewReceiptChain(
+    reviewDir,
+    names,
+    verified.seal,
+  );
   const receipt = {
     schema_version: REVIEW_RECEIPT_SCHEMA_VERSION,
-    build_result_sha256: seal.build_result_sha256,
-    briefing_sha256: seal.briefing_sha256,
+    ...Object.fromEntries(
+      REVIEW_SEAL_HASH_FIELDS.map((field) => [field, verified.seal[field]]),
+    ),
     reply,
     ...(changeClass !== null && changeClass !== undefined
       ? { change_class: changeClass }
@@ -276,7 +534,7 @@ export async function recordUserReviewReceipt({
     `user-review-receipt-${String(nextIndex).padStart(2, "0")}.json`,
   );
   const bytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
-  await fs.writeFile(receiptPath, bytes);
+  await writeBytesAtomic(receiptPath, bytes);
   return { receipt, path: receiptPath, receipt_hash: sha256Hex(bytes) };
 }
 
