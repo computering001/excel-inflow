@@ -2814,6 +2814,15 @@
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-typed-unresolved",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_typed_unresolved_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     }
   ]
 }
