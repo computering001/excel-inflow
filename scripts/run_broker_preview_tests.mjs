@@ -549,6 +549,25 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
     "FORECAST_WATERFALL",
   );
   const zeroAuthorityModelCase = clone(modelCase);
+  zeroAuthorityModelCase.broker_pack = {
+    metrics: {
+      revenue: {
+        brokers: {
+          "Stale House A": [100, 110, 120],
+          "Stale House B": [102, 112, 122],
+        },
+      },
+    },
+  };
+  sealCaseMemberships(zeroAuthorityModelCase);
+  assert(
+    resolveBrokerForecastSelection(
+      zeroAuthorityModelCase,
+      "revenue",
+      0,
+    ).value === 101,
+    "negative control did not expose the stale selectable broker values",
+  );
   applyBrokerPreviewSelection(
     zeroAuthorityModelCase,
     zeroAuthorityPreview,
@@ -560,6 +579,14 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
       zeroAuthorityModelCase.statement_structure.income_statement[0]
         .forecast_treatment !== "broker",
     "zero-broker selection erased the rejected metric evidence binding or left it as live authority",
+  );
+  assert(
+    resolveBrokerForecastSelection(
+      zeroAuthorityModelCase,
+      "revenue",
+      0,
+    ).value === null,
+    "zero-broker transition left stale pack values selectable",
   );
   assert(
     resolveBrokerForecastSelection(modelCase, "revenue", 0).value === null,
@@ -634,8 +661,14 @@ await test("forecast-waterfall mode consumes compatible broker evidence when it 
   const selection = resolveBrokerForecastSelection(modelCase, "revenue", 0);
   assert(selection.value === 101, `forecast waterfall rejected compatible broker evidence: ${selection.value}`);
   assert(
-    selection.source_kind === "model_consensus",
+    selection.source_kind === "forecast_waterfall",
     `forecast waterfall did not disclose its broker authority: ${selection.source_kind}`,
+  );
+  assert(
+    (selection.findings ?? []).some(
+      (finding) => finding.severity === "DEGRADE" && /consensus/i.test(finding.message ?? ""),
+    ),
+    "forecast waterfall hid the consensus basis it fell back to",
   );
   const anchor = selectBrokerAnchor(modelCase);
   assert(anchor.supported, "forecast-waterfall label disabled a fully supported broker anchor");

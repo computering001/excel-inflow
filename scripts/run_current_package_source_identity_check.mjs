@@ -1,19 +1,14 @@
 #!/usr/bin/env node
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import { classifyCiIdentityRoles } from "./lib/release_identity_governance.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const exec = promisify(execFile);
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-function option(name, fallback = null) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index >= 0 ? process.argv[index + 1] : fallback;
-}
+const run = createRunner({ name: "current_package_source_identity_check", importMetaUrl: import.meta.url });
+const { option, exec } = run.runCli();
+const root = run.ROOT;
 const out = option("out");
 if (!out) throw new Error("Usage: run_current_package_source_identity_check.mjs --out <report.json> [--expected-source-commit <sha>] [--expected-source-tree <tree>] [--merge-test-commit <sha>] [--merge-test-tree <tree>] [--python <python>] [--soffice <soffice>]");
 const [{ stdout: commit }, { stdout: tree }, { stdout: status }] = await Promise.all([

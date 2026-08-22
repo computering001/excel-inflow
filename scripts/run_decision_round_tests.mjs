@@ -101,6 +101,22 @@ const maturityQuestions = (plan.detected ?? []).filter((entry) => entry.kind ===
 run.ok(maturityQuestions.length === 0, "toggle-covered maturities still produced questions");
 run.ok(!(plan.survivors ?? []).some((entry) => entry.kind === "refinance_at_maturity"), "toggle-covered maturities survived deterministic pruning");
 run.ok(!(plan.pending_questions ?? []).some((id) => id.startsWith("refinance_at_maturity:")), "toggle-covered maturities leaked into a second decision round");
+
+const malformedLeaseFixture = structuredClone(fixture);
+delete malformedLeaseFixture.draft_case.lease_policy.include_in_leverage;
+malformedLeaseFixture.draft_case.lease_policy.historical_liabilities[2] = "";
+malformedLeaseFixture.intake.filings.leverage_basis = null;
+sealForecastAuthorityLedger(malformedLeaseFixture.draft_case);
+run.throws(
+  () => planQuestions({
+    draftCase: malformedLeaseFixture.draft_case,
+    intake: malformedLeaseFixture.intake,
+    reconciliation: malformedLeaseFixture.reconciliation ?? null,
+    limit: 5,
+  }),
+  /historical_liabilities must contain three finite financial numbers/,
+  "lease decision detector refuses a blank reported liability instead of treating it as zero",
+);
 run.finish({
   maturity_question_count: 0,
   pending_maturity_question_count: 0,

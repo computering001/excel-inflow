@@ -3940,12 +3940,29 @@ export function compileCase(caseSource, evidence = {}) {
       report.add("forecast_plan.parity", "BLOCK", message, "Report this as a compiler defect; a minted plan must always be in parity with its case.");
     }
   } catch (error) {
-    report.add(
-      "forecast_plan.crash",
-      "BLOCK",
-      `compileForecastPlan failed: ${error.message}`,
-      "Resolve the declaration gaps the message names; the forecast compiler needs a complete broker and answers surface.",
-    );
+    if (
+      typeof error?.message === "string" &&
+      error.message.includes("blocked forecast plan cannot be materialized")
+    ) {
+      // A semantically BLOCKED plan is not an intake defect: it is exactly
+      // the shape the controller's decisions-stage semantic-status gate (E1)
+      // owns. Defer materialisation — leave the case unmateriaised so the
+      // gate can fire with its typed stop, rather than crashing stage-1 and
+      // shadowing that gate behind a bad_evidence refusal.
+      report.add(
+        "forecast_plan.blocked_deferred",
+        "LOG",
+        "The compiled forecast plan carries material BLOCKED states; materialisation deferred to the controller's forecast semantic-status gate.",
+        "No user action: resolving the blocking rows is compiler capability debt.",
+      );
+    } else {
+      report.add(
+        "forecast_plan.crash",
+        "BLOCK",
+        `compileForecastPlan failed: ${error.message}`,
+        "Resolve the declaration gaps the message names; the forecast compiler needs a complete broker and answers surface.",
+      );
+    }
   }
   Object.assign(modelCase, materialized);
   // Checkpoint B is an executable ownership transformation, not a terminal

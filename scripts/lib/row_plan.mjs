@@ -3454,6 +3454,51 @@ function assignDisplayAndFormulaRoles(rows) {
   }
 }
 
+/**
+ * Legacy cases represented an absent revolver movement row as an empty SUM
+ * carrying three zero caches.  Those caches preserve arithmetic compatibility,
+ * but they are not evidence that a schedule ran in history.  Make the absence
+ * explicit at the first canonical statement-row boundary so downstream typed
+ * consumers can distinguish structural blanks from genuine economic zeros.
+ *
+ * An explicit historical authority always wins, and any non-zero observation
+ * keeps the row model-projected.  The rule is therefore limited to the exact
+ * legacy shell shape; it cannot erase a sourced zero or an active RCF period.
+ */
+function classifyAbsentRevolverHistory(rows) {
+  for (const row of rows) {
+    if (
+      row.historical_authority !== undefined &&
+      row.historical_authority !== null
+    ) {
+      continue;
+    }
+    if (!REVOLVER_MOVEMENT_TYPES.has(inferMovementType(row))) continue;
+    if (
+      row.calculation?.operator !== "sum" ||
+      (row.calculation?.refs ?? []).length !== 0
+    ) {
+      continue;
+    }
+    const historical = [0, 1, 2].map((index) => row.values?.[index]);
+    if (
+      historical.every(
+        (value) =>
+          value === null ||
+          value === undefined ||
+          (typeof value === "number" && Number.isFinite(value) && value === 0),
+      )
+    ) {
+      row.historical_authority = "not_applicable";
+      row.historical_value_states = [
+        "not_applicable",
+        "not_applicable",
+        "not_applicable",
+      ];
+    }
+  }
+}
+
 export function normaliseStatementRows(
   modelCase,
   section,
@@ -3480,6 +3525,7 @@ export function normaliseStatementRows(
   migrateMultiHopCaptureCertificates(rows);
   reconcileSealedForecastAuthorities(rows);
   repairCompiledReportedDerivedParents(rows);
+  classifyAbsentRevolverHistory(rows);
   if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
     materializeStatementPresentationTree(rows, section);
     assignDisplayAndFormulaRoles(rows);

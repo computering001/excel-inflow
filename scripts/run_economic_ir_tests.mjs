@@ -204,6 +204,99 @@ const maximal = await compileFixture("standard-maximal-v2");
 }
 
 // ---------------------------------------------------------------------------
+// (2c) An empty legacy revolver shell is a structural historical absence, not
+//      six economic zeroes.  The negative cases prove the classifier cannot
+//      swallow either real activity or an explicitly sourced zero.
+// ---------------------------------------------------------------------------
+{
+  const netCash = await compileFixture("standard-net-cash-v2");
+  const netCashIr = compileEconomicIr({ ...netCash });
+  const revolverRoles = new Set(["rcf_draw", "rcf_repayment"]);
+  const netCashRows = netCash.rowPlan.statement_rows.cash_flow.filter((row) =>
+    revolverRoles.has(row.semantic_role),
+  );
+  const netCashNodes = netCashIr.nodes.filter((node) =>
+    revolverRoles.has(node.semantic_role),
+  );
+  check(
+    netCashRows.length === 2 &&
+      netCashRows.every(
+        (row) =>
+          row.historical_authority === "not_applicable" &&
+          row.historical_value_states?.every(
+            (state) => state === "not_applicable",
+          ),
+      ),
+    "empty legacy RCF shells acquire explicit not_applicable historical authority",
+  );
+  check(
+    netCashNodes.length === 2 &&
+      netCashNodes
+        .flatMap((node) => node.historical)
+        .every(
+          (slot) =>
+            slot.value.state === "not_applicable" &&
+            numericValueOf(slot.value) === null,
+        ),
+    "the six absent net-cash RCF cells type as null not_applicable, never derived zero",
+  );
+
+  const compileMutation = (mutate) => {
+    const modelCase = structuredClone(netCash.modelCase);
+    const rows = modelCase.statement_structure.cash_flow.filter((row) =>
+      revolverRoles.has(row.semantic_role),
+    );
+    mutate(rows);
+    const instrumentPeriodState = compileInstrumentPeriodState(modelCase);
+    const rowPlan = compileRowPlan(modelCase, { instrumentPeriodState });
+    const semanticManifest = compileSemanticManifest(modelCase, rowPlan, {
+      instrumentPeriodState,
+    });
+    const modelIr = compileModelIrV3({
+      modelCase,
+      rowPlan,
+      semanticManifest,
+      sourceCrosswalk: [],
+    });
+    return {
+      rowPlan,
+      ir: compileEconomicIr({ modelCase, rowPlan, semanticManifest, modelIr }),
+    };
+  };
+
+  const active = compileMutation(([draw]) => {
+    draw.values = [0, 25, 0, ...draw.values.slice(3)];
+  });
+  const activeDraw = active.rowPlan.statement_rows.cash_flow.find(
+    (row) => row.semantic_role === "rcf_draw",
+  );
+  const activeDrawNode = active.ir.nodes.find(
+    (node) => node.semantic_role === "rcf_draw",
+  );
+  check(
+    activeDraw.historical_authority !== "not_applicable" &&
+      activeDrawNode.historical.map((slot) => numericValueOf(slot.value)).join(",") ===
+        "0,25,0",
+    "one real RCF movement defeats structural-absence typing and preserves its surrounding economic zeroes",
+  );
+
+  const sourcedZero = compileMutation(([draw]) => {
+    draw.historical_authority = "source_input";
+  });
+  const sourcedZeroNode = sourcedZero.ir.nodes.find(
+    (node) => node.semantic_role === "rcf_draw",
+  );
+  check(
+    sourcedZeroNode.historical.every(
+      (slot) =>
+        slot.value.state === "reported_zero" &&
+        numericValueOf(slot.value) === 0,
+    ),
+    "explicit source authority preserves a reported historical zero instead of blanking it",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // (3) Typed-value coverage: every economic slot is a typed value, never a bare
 //     number, and the validator REFUSES a bare number rather than repairing it.
 // ---------------------------------------------------------------------------

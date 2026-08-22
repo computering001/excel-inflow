@@ -27,8 +27,22 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CANONICAL = 'SKILL.md';
+
+export const GENERATED_DOC_BANNER_BEGIN = '<!-- generated-document:instruction-mirror/1.0 BEGIN -->';
+export const GENERATED_DOC_BANNER_END = '<!-- generated-document:instruction-mirror/1.0 END -->';
+
+export function instructionMirrorBanner(targetPath) {
+  return [
+    GENERATED_DOC_BANNER_BEGIN,
+    `<!-- DERIVED DOCUMENT: ${targetPath} is generated from SKILL.md. -->`,
+    '<!-- Writer: node scripts/generate_instruction_docs.mjs -->',
+    '<!-- Read-only check: node scripts/generate_instruction_docs.mjs --check -->',
+    '<!-- Do not hand-edit. Drift remedy: edit SKILL.md, then run the writer. -->',
+    GENERATED_DOC_BANNER_END,
+  ].join('\n');
+}
 
 /**
  * Declared per-file transforms applied to the canonical body, in order.
@@ -83,23 +97,50 @@ export function applyTransforms(body, transforms) {
   return out;
 }
 
+function insertBannerAfterFirstH1(body, banner) {
+  const nl = body.indexOf('\n');
+  if (nl === -1 || !body.slice(0, nl).startsWith('# ')) {
+    throw new Error('generated instruction body must start with an H1');
+  }
+  return `${body.slice(0, nl)}\n\n${banner}${body.slice(nl)}`;
+}
+
+export function removeInstructionMirrorBanner(body) {
+  const begin = body.indexOf(GENERATED_DOC_BANNER_BEGIN);
+  const end = body.indexOf(GENERATED_DOC_BANNER_END);
+  if (begin === -1 || end === -1 || end < begin) return body;
+  const after = end + GENERATED_DOC_BANNER_END.length;
+  return `${body.slice(0, begin)}${body.slice(after)}`.replace(/\n{3,}/, '\n\n');
+}
+
 export function generateAll(canonicalContent) {
   const body = stripFrontmatter(canonicalContent);
   return TARGETS.map((target) => ({
     path: target.path,
-    content: applyTransforms(body, target.transforms),
+    content: insertBannerAfterFirstH1(
+      applyTransforms(body, target.transforms),
+      instructionMirrorBanner(target.path),
+    ),
   }));
 }
 
 function main() {
-  const checkOnly = process.argv.includes('--check');
-  const canonicalPath = join(REPO_ROOT, CANONICAL);
+  const args = process.argv.slice(2);
+  const checkOnly = args.includes('--check');
+  const rootIndex = args.indexOf('--root');
+  const repoRoot = rootIndex === -1 ? DEFAULT_REPO_ROOT : args[rootIndex + 1];
+  const supported = new Set(['--check', '--root', repoRoot]);
+  const unsupported = args.filter((arg) => !supported.has(arg));
+  if (!repoRoot || unsupported.length > 0) {
+    throw new Error(`usage: generate_instruction_docs.mjs [--check] [--root <repo-root>]`);
+  }
+  const canonicalPath = join(repoRoot, CANONICAL);
   const canonicalContent = readFileSync(canonicalPath, 'utf8');
   const generated = generateAll(canonicalContent);
 
   const mismatches = [];
   for (const { path, content } of generated) {
-    const fullPath = join(REPO_ROOT, path);
+    const fullPath = join(repoRoot, path);
     let disk;
     try {
       disk = readFileSync(fullPath, 'utf8');
@@ -125,7 +166,7 @@ function main() {
   }
 
   for (const { path, content } of generated) {
-    const fullPath = join(REPO_ROOT, path);
+    const fullPath = join(repoRoot, path);
     let before;
     try {
       before = readFileSync(fullPath, 'utf8');

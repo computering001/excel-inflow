@@ -234,6 +234,9 @@ function typedFiledValue(raw, precision) {
 
 /** A model-projected historical cache: derived, or unresolved — never zero. */
 function typedProjectedValue(raw, planRow) {
+  if (planRow?.historical_authority === "not_applicable") {
+    return typedValue("not_applicable");
+  }
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
     return typedValue("unresolved");
   }

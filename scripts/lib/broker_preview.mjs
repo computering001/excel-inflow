@@ -1145,6 +1145,30 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
     verified.selection.house_id === "FORECAST_WATERFALL" &&
     preview.broker_authority_policy === "zero_broker"
   ) {
+    const brokerPack = modelCase.broker_pack;
+    if (brokerPack && typeof brokerPack === "object") {
+      brokerPack.metrics = Object.fromEntries(
+        Object.entries(brokerPack.metrics ?? {}).map(([metricId, metric]) => {
+          const {
+            provider_consensus: _providerConsensus,
+            provider_consensus_source: _providerConsensusSource,
+            ...withoutProviderConsensus
+          } = metric;
+          return [
+            metricId,
+            {
+              ...withoutProviderConsensus,
+              brokers: Object.fromEntries(
+                Object.keys(metric.brokers ?? {}).map((houseName) => [
+                  houseName,
+                  [null, null, null],
+                ]),
+              ),
+            },
+          ];
+        }),
+      );
+    }
     for (const section of ["income_statement", "cash_flow"]) {
       for (const row of modelCase.statement_structure?.[section] ?? []) {
         if (row.forecast_treatment === "broker") {

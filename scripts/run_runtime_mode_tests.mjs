@@ -19,6 +19,8 @@ import { deriveRuntimeMode, RUNTIME_MODES } from "./lib/runtime_mode.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const SCRATCH = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-runtime-mode-"));
+const FIXTURE_VERSION = "0.0.0";
+const FIXTURE_RELEASE_TAG = `v${FIXTURE_VERSION}`;
 const SHA = (seed) => identitySha256({ seed });
 const GIT = (character) => character.repeat(40);
 const passed = [];
@@ -84,7 +86,12 @@ async function refuses(work, code) {
   });
 }
 
-async function basePackage({ mode, checkout = false }) {
+async function basePackage({
+  mode,
+  checkout = false,
+  channel = null,
+  releaseTag = null,
+} = {}) {
   const packageRoot = path.join(SCRATCH, `package-${mode}-${passed.length}-${Date.now()}-${Math.random()}`);
   await fs.mkdir(path.join(packageRoot, "assets"), { recursive: true });
   await fs.mkdir(path.join(packageRoot, "scripts"), { recursive: true });
@@ -106,9 +113,12 @@ async function basePackage({ mode, checkout = false }) {
     vendored_dependencies: [],
   });
   await writeJson(path.join(packageRoot, "assets", "runtime-manifest.json"), {
-    skill_version: "fixture",
+    skill_version: FIXTURE_VERSION,
     status: checkout ? "v2_development" : "compiled_fixture",
     package_mode: checkout ? "development" : mode,
+    // MP2 Phase A (A4): the release channel rides beside the version; a
+    // source checkout is inherently a dev-channel build.
+    release_channel: checkout ? "dev" : (channel ?? "stable"),
     deployment_status: "not_installed",
   });
   if (checkout) {
@@ -122,7 +132,8 @@ async function basePackage({ mode, checkout = false }) {
     schemaVersion: 2,
     releaseName: "fixture",
     packageMode: mode,
-    skillVersion: "fixture",
+    skillVersion: FIXTURE_VERSION,
+    releaseTag,
     identity: {
       schema_version: "product-identity/2.0",
       source: {
@@ -167,8 +178,17 @@ async function basePackage({ mode, checkout = false }) {
   };
 }
 
-async function installFixture({ mode = "development", production = false } = {}) {
-  const fixture = await basePackage({ mode });
+async function installFixture({
+  mode = "development",
+  production = false,
+  channel = null,
+  tagged = production,
+} = {}) {
+  const fixture = await basePackage({
+    mode,
+    channel,
+    releaseTag: tagged ? FIXTURE_RELEASE_TAG : null,
+  });
   const installedAt = new Date(Date.now() - 120_000).toISOString();
   const activatedAt = new Date(Date.now() - 60_000).toISOString();
   const installationBody = {
@@ -360,6 +380,20 @@ await test("certified package with exact pointer promotion and rollback derives 
   assert.equal(result.installed_placement.previous_slot_id, "slot-previous-good");
 });
 
+await test("tagged candidate with exact production receipts derives production active", async () => {
+  const fixture = await installFixture({
+    mode: "certified",
+    production: true,
+    channel: "candidate",
+  });
+  const placement = await resolveInstalledRuntimeIdentity({
+    skillRoot: fixture.packageRoot,
+    installStateRoot: fixture.stateRoot,
+  });
+  assert.equal(placement.placement, "production_active");
+  assert.equal(placement.source_identity_overrides.deployment_status, "production_promoted");
+});
+
 await test("MUTATION — compiled package without installation receipt refuses", async () => {
   const fixture = await basePackage({ mode: "development" });
   await refuses(
@@ -535,6 +569,60 @@ await test("MUTATION — caller cannot provide mode status or installation ident
       "UNTRUSTED_RUNTIME_MODE_INPUT",
     );
   }
+});
+
+await test("MUTATION — dev-channel build with production receipts refuses at the installer ingress", async () => {
+  // Every receipt join is honest; the refusal is purely the declared channel
+  // (dev) not being installable_as_stable.
+  const fixture = await installFixture({ mode: "certified", production: true, channel: "dev" });
+  await refuses(
+    () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
+    "RELEASE_CHANNEL_REFUSAL_DEV_BUILD_AS_STABLE",
+  );
+});
+
+await test("MUTATION — untagged candidate with valid production receipts refuses at ingress", async () => {
+  const fixture = await installFixture({
+    mode: "certified",
+    production: true,
+    channel: "candidate",
+    tagged: false,
+  });
+  await refuses(
+    () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
+    "RELEASE_CHANNEL_REFUSAL_UNTAGGED_CANDIDATE",
+  );
+});
+
+await test("MUTATION — untagged stable build with valid production receipts also refuses", async () => {
+  const fixture = await installFixture({
+    mode: "certified",
+    production: true,
+    channel: "stable",
+    tagged: false,
+  });
+  await refuses(
+    () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
+    "RELEASE_CHANNEL_REFUSAL_UNTAGGED_STABLE",
+  );
+});
+
+await test("untagged candidate remains valid in the inactive installed slot", async () => {
+  const fixture = await installFixture({ channel: "candidate", tagged: false });
+  const placement = await resolveInstalledRuntimeIdentity({
+    skillRoot: fixture.packageRoot,
+    installStateRoot: fixture.stateRoot,
+  });
+  assert.equal(placement.placement, "installed_candidate");
+});
+
+await test("dev-channel build resolves installed_candidate in an inactive slot", async () => {
+  const fixture = await installFixture({ channel: "dev" });
+  const placement = await resolveInstalledRuntimeIdentity({
+    skillRoot: fixture.packageRoot,
+    installStateRoot: fixture.stateRoot,
+  });
+  assert.equal(placement.placement, "installed_candidate");
 });
 
 await fs.rm(SCRATCH, { recursive: true, force: true });

@@ -1,0 +1,573 @@
+{
+  "schema_version": "terminal-outcome-taxonomy/1.0",
+  "title": "Terminal-outcome taxonomy v1 (audit section 10, step 6)",
+  "doctrine": "Every user-flow invocation-ending exit classifies into EXACTLY ONE of the four declared classes. The class answers what ended this invocation and is a different axis from blocker_class ownership. INTERNAL_WORK is a hidden, automatically resumable invocation stop and can never enter the terminal delivery-blocker constitution; terminal delivery blocks remain human decisions or constitutional review gates.",
+  "classes": {
+    "USER_DECISION": {
+      "definition": "Review gate that requires a human: the run stopped because a person must decide, answer, or supply something only they hold.",
+      "requires_human": true,
+      "automatic_continuation": false
+    },
+    "INTERNAL_WORK": {
+      "definition": "Missing inputs or capability debt owned by the controller: an internal defect, budget exhaustion or bootstrap failure that must resume or be repaired internally and is never a user question.",
+      "requires_human": false,
+      "automatic_continuation": true
+    },
+    "FIXTURE_INCOMPLETE": {
+      "definition": "External custody or approval absent: a fixture, installed capability, or signed handoff living outside the controller's custody was not provided, so the run cannot lawfully start or continue.",
+      "requires_human": true,
+      "automatic_continuation": false
+    },
+    "REVIEW_GATE": {
+      "definition": "Constitutional pause: a sealed boundary (run-case integrity seal, equation system, workbook integrity, manual review gate, staged checkpoint) halts the run for review instead of proceeding; nothing was invented to get past it.",
+      "requires_human": true,
+      "automatic_continuation": false
+    }
+  },
+  "class_names_must_match_exactly": [
+    "USER_DECISION",
+    "INTERNAL_WORK",
+    "FIXTURE_INCOMPLETE",
+    "REVIEW_GATE"
+  ],
+  "sources_of_truth": {
+    "controller_script": "scripts/run_user_flow.mjs",
+    "workflow_state_contract": "assets/workflow-state-contract-v1.json",
+    "terminal_reason_registry": "assets/terminal-reason-registry-v1.json",
+    "controller_handoff": "scripts/lib/controller_handoff.mjs",
+    "workflow_state_library": "scripts/lib/workflow_state.mjs"
+  },
+  "terminal_statuses": {
+    "SCREEN": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_screen",
+      "process_exit_code": 0,
+      "contract_user_blocking": false,
+      "rationale": "The product route did not execute; control is handed to the human operator at the company screen session.",
+      "required_receipt_fields": [
+        "status",
+        "stage"
+      ]
+    },
+    "PAUSED": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_paused",
+      "process_exit_code": 0,
+      "contract_user_blocking": false,
+      "rationale": "A staged checkpoint or review-gate pause (stop-after, review seal refusal, review gate reply, change request): the constitution halts the run instead of proceeding unreviewed.",
+      "required_receipt_fields": [
+        "run_id",
+        "status",
+        "stage",
+        "next_stage",
+        "reused_stages"
+      ]
+    },
+    "ACTION_REQUIRED": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_action_required",
+      "process_exit_code": 0,
+      "contract_user_blocking": true,
+      "rationale": "The flow asked a consolidated human question (displayed questions, incomplete answer file, unresolved forecast authority) and requires an explicit reply.",
+      "required_receipt_fields": [
+        "run_id",
+        "status",
+        "stage",
+        "blocker_class",
+        "receipt",
+        "reused_stages"
+      ]
+    },
+    "NEEDS_INTERNAL_WORK": {
+      "class": "INTERNAL_WORK",
+      "surface": "user_flow_internal_work",
+      "process_exit_code": 0,
+      "contract_user_blocking": false,
+      "rationale": "Controller-owned capability work remains. The carrier is preserved, no human reply is requested, and the workflow resumes automatically after the internal repair.",
+      "required_receipt_fields": [
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "reused_stages"
+      ]
+    },
+    "BLOCKED": {
+      "class_source": "outcome_code",
+      "surface": "user_flow_blocked",
+      "process_exit_code": 1,
+      "contract_user_blocking": null,
+      "rationale": "A terminal delivery block. The status itself owns no class: the termination's class comes from exactly one outcome_codes entry, bound by normaliseUserFlowResult to the delivery-blocker constitution's fatal_reason and blocker_domain.",
+      "required_receipt_fields": [
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "fatal_reason",
+        "blocker_domain",
+        "reused_stages"
+      ]
+    },
+    "PASS_PENDING_MANUAL": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_pass_pending_manual",
+      "process_exit_code": 0,
+      "contract_user_blocking": false,
+      "rationale": "The workbook cleared every automated gate and was delivered, but delivery remains pending MANUAL verification: a constitutional review gate on the completion claim itself.",
+      "required_receipt_fields": [
+        "run_id",
+        "status",
+        "stage",
+        "workbook",
+        "delivery_file",
+        "delivery_file_sha256",
+        "carrier",
+        "reused_stages"
+      ]
+    }
+  },
+  "outcome_codes": {
+    "bad_inputs": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "inputs",
+      "blocker_class": "USER_EVIDENCE",
+      "fatal_reason": "issuer_or_reporting_period_unresolved",
+      "blocker_domain": "issuer_period",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The supplied inputs could not establish the issuer/period basis; a human must supply better inputs.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "filings_incomplete": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "evidence_review",
+      "blocker_class": "USER_EVIDENCE",
+      "fatal_reason": "issuer_or_reporting_period_unresolved",
+      "blocker_domain": "issuer_period",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The filing corpus the human holds is incomplete; only they can complete it.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "entity_stop": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "evidence_review",
+      "blocker_class": "USER_EVIDENCE",
+      "fatal_reason": "issuer_or_reporting_period_unresolved",
+      "blocker_domain": "issuer_period",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "Issuer identity stayed unresolved after controlled acquisition; a human must settle who is being modelled.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "reconciliation_stop": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "evidence_review",
+      "blocker_class": "USER_EVIDENCE",
+      "fatal_reason": "opening_debt_unresolved",
+      "blocker_domain": "opening_debt",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "No defensible opening-debt position remains after every lawful source is exhausted; a human must supply the reconciling instrument.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "awaiting_reexport": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "evidence_review",
+      "blocker_class": "USER_EVIDENCE",
+      "fatal_reason": "opening_debt_unresolved",
+      "blocker_domain": "opening_debt",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The run waits on a re-export that only the document's human custodian can perform.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "bad_evidence": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_blocked",
+      "stage": "inputs",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "workbook_delivery_failed",
+      "blocker_domain": "workflow_integrity",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "Supplied evidence failed validation; a human must provide evidence that validates. (Controller-owned blocker_class records repair ownership, not the termination's kind.)",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "answers_incomplete": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_action_required",
+      "stage": "decisions",
+      "blocker_class": "USER_DECISION",
+      "declared_in": "scripts/run_user_flow.mjs",
+      "rationale": "The answer file does not settle every displayed question; the human must finish answering.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages"
+      ]
+    },
+    "forecast_authority_unresolved": {
+      "class": "USER_DECISION",
+      "surface": "user_flow_action_required",
+      "stage": "decisions",
+      "blocker_class": "USER_DECISION",
+      "declared_in": "scripts/run_user_flow.mjs",
+      "rationale": "Material forecast states remain unresolved after the authority waterfall; one consolidated user decision is required (INPUT_REQUIRED quality mode).",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "forecast_plan",
+        "receipt",
+        "reused_stages"
+      ]
+    },
+    "run_case_mutated_during_pause": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "inputs",
+      "stage_note": "also emitted at build_checks on resume",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "workbook_delivery_failed",
+      "blocker_domain": "workflow_integrity",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The integrity seal found the paused case mutated; the constitution refuses continuation until a human reviews and starts a fresh run.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "decision_replay_blocked": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "decisions",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "equation_system_unsolved",
+      "blocker_domain": "equation_graph",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The recorded decisions cannot be replayed against the freshly compiled case without inventing an input: the equation-system boundary pauses the run for review rather than fabricating.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "typed_internal_outcome",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "decision_graph_blocked": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "decisions",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "equation_system_unsolved",
+      "blocker_domain": "equation_graph",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The decision graph cannot solve within its constitution; the boundary is a review gate, never an invented answer.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "typed_internal_outcome",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "case_recompile_blocked": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "decisions",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "equation_system_unsolved",
+      "blocker_domain": "equation_graph",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "Recorded decisions did not recompile into a clean case: an internal compiler finding at a constitutional boundary, held for review.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "workbook_build_blocked": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "build_checks",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "workbook_delivery_failed",
+      "blocker_domain": "workbook_build",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The workbook cannot be emitted or validated without corruption: the workbook-integrity boundary halts delivery.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "controller_status",
+        "message",
+        "receipt",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "delivery_attestation_blocked": {
+      "class": "REVIEW_GATE",
+      "surface": "user_flow_blocked",
+      "stage": "delivery",
+      "blocker_class": "INTERNAL_WORK",
+      "fatal_reason": "workbook_delivery_failed",
+      "blocker_domain": "delivery_attestation",
+      "declared_in": "workflow-state-contract-v1.json#delivery_blocker_constitution.blocked_outcomes",
+      "rationale": "The delivered artifact cannot be attested: the attestation boundary refuses the completion claim.",
+      "required_receipt_fields": [
+        "schema_version",
+        "controller_version",
+        "run_id",
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "reused_stages",
+        "fatal_reason",
+        "blocker_domain"
+      ]
+    },
+    "INTERNAL.compiler_or_graph_defect": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "A thrown run carrying no more specific typed outcome: capability debt owned and repaired internally.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.runtime_budget_overrun": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "The compute ceiling ended the invocation: internal resource debt, charged and resumable.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.runtime_bootstrap_failed": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "Runtime bootstrap failed before the product route: internal capability debt.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.forecast_completion_escalated": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "Forecast completion escalated past its internal authority: owned internally, never surfaced as a user question.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.forecast_ownership_blocked": {
+      "class": "INTERNAL_WORK",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "Forecast ownership preflight blocked: internal capability debt.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.host_precondition_unsatisfied": {
+      "class": "FIXTURE_INCOMPLETE",
+      "surface": "internal_failure",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "A declared host capability (workbook engine, python, custody fixture) is absent from the environment: external custody absent, not an internal defect.",
+      "required_receipt_fields": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "downstream_invalidation_scope",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes"
+      ]
+    },
+    "INTERNAL.controller_handoff_refused": {
+      "class": "FIXTURE_INCOMPLETE",
+      "surface": "controller_handoff",
+      "declared_in": "scripts/lib/controller_handoff.mjs",
+      "rationale": "The parent controller's signed handoff token is absent, expired or invalid: the approval custody needed to start a child run is missing, so the run refuses before executing any product route.",
+      "required_receipt_fields": [
+        "code",
+        "handoff_reason",
+        "handoff_detail"
+      ]
+    },
+    "forecast_plan_blocked": {
+      "class": "INTERNAL_WORK",
+      "surface": "user_flow_internal_work",
+      "stage": "decisions",
+      "blocker_class": "INTERNAL_WORK",
+      "declared_in": "assets/terminal-reason-registry-v1.json",
+      "rationale": "E1 semantic gate: a material forecast state is BLOCKED (unresolved+blocking). Capability debt owned internally — resumes automatically after repair; never a user-facing delivery block.",
+      "required_receipt_fields": [
+        "status",
+        "stage",
+        "outcome",
+        "blocker_class",
+        "message",
+        "forecast_plan",
+        "forecast_plan_status",
+        "reused_stages"
+      ],
+      "reason_code_key": "DECISIONS.forecast_plan_blocked"
+    }
+  },
+  "non_terminal_status_literals": {
+    "PASS": {
+      "context": "skill-integrity-evidence/1.0 closing receipt written inside finish(); an artifact status, never a user-flow termination",
+      "terminal": false
+    }
+  },
+  "static_extraction_contracts": {
+    "status_literal_pattern": "\\bstatus:\\s*\"([A-Z_]+)\" (applied to scripts/run_user_flow.mjs; result set must equal terminal_statuses keys plus non_terminal_status_literals keys, both directions)",
+    "outcome_emission_pattern": "\\boutcome:\\s*\"([a-z_]+)\" (applied to scripts/run_user_flow.mjs; result set must be a subset of outcome_codes keys)",
+    "outcome_coverage_rule": "every outcome_codes key with surface user_flow_* must appear as a string literal in scripts/run_user_flow.mjs",
+    "exit_zero_rule": "terminal_statuses whose process_exit_code is 0 must equal the zero-exit status list asserted in guardedMain().then()"
+  }
+}

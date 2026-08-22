@@ -18,10 +18,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  RELEASE_IDENTITY_FILE,
+  RELEASE_IDENTITY_WRITER_COMMAND,
+  verifyDerivedReleaseSurfaces,
+} from "./lib/release_identity.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const WRITE = process.argv.includes("--write");
+const mapPathIndex = process.argv.indexOf("--map-path");
+const MAP_PATH_OVERRIDE = mapPathIndex === -1 ? null : process.argv[mapPathIndex + 1];
+if (mapPathIndex !== -1 && !MAP_PATH_OVERRIDE) throw new Error("--map-path needs a file path");
 
 let checks = 0;
 function check(condition, message) {
@@ -49,6 +57,7 @@ const FILE_OWNERSHIP = {
   "lib/case_source_proposer.mjs": { role: "canonical_writer", concern: "statement map proposal", target_owner: "Statement Authority compiler (Phase 2)" },
   "lib/forecast_candidate_compiler.mjs": { role: "canonical_writer", concern: "forecast candidates + authority selection", target_owner: "Authority selector (Phase 3)" },
   "lib/forecast_ownership_resolver.mjs": { role: "canonical_writer", concern: "family/capture ownership", target_owner: "Family ownership compiler (Phase 3)" },
+  "lib/forecast_plan_status.mjs": { role: "canonical_writer", concern: "forecast plan semantic status classification (E1 gate)", target_owner: "Authority selector (Phase 3)" },
   "lib/capture_transition.mjs": { role: "canonical_writer", concern: "the single legal capture writer", target_owner: "Family ownership compiler (Phase 3)" },
   "lib/row_plan.mjs": { role: "mixed_legacy_writer", concern: "presentation compiler that ALSO mutates forecast state (waterfall, consolidation rewires, capture marks) - a second writer over forecast concerns", target_owner: "split: Workbook planner (Phase 5) + Authority selector (Phase 3); duplicate forecast writes deleted in Phase 9" },
   "lib/solver.mjs": { role: "canonical_writer", concern: "economic solution", target_owner: "Schedule/solver layer (Phase 4)" },
@@ -124,6 +133,7 @@ const FILE_OWNERSHIP = {
   "lib/external_ci_evidence.mjs": { role: "canonical_writer", concern: "externally retained exact-head CI receipts and non-promotional release-candidate attestation", target_owner: "Release/package compiler (Phase 8)" },
   "lib/release_dossier.mjs": { role: "canonical_writer", concern: "P8.7 portable dossier assembly (typed absences; refuses to mint a manifest naming fewer than five classes)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/skill_version_declaration.mjs": { role: "validator", concern: "P8.9 freeze criterion 9 — the single skill-version declaration and the enumerated hard-coded-literal scan; READS the declaration and reports, never writes a version", target_owner: "Release/package compiler (Phase 8)" },
+  "lib/release_identity.mjs": { role: "canonical_writer", concern: "MP2 Phase A — the release-identity leaf: reads the ONE hand-edited declaration, writes every derived release surface (runtime-manifest skill_version/release_channel, doc banners) and verifies them; its writer ingress is compile_skill_release.mjs --write-release-identity", target_owner: "Release/package compiler (Phase 8)" },
   "lib/certified_runtime_code_closure.mjs": { role: "validator", concern: "P8.9 freeze criterion 11 — the certified runtime CODE closure walked from the shipped entry points; computes and compares, never writes the manifest (only the suite's --record flag does)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/solve_order.mjs": { role: "validator", concern: "P4.7 Tarjan + topological derivation; checks the hand-written solve order against the case graph, never reorders it", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/canonical_model_modules.mjs": { role: "validator", concern: "P4.4 nine-module boundary register + the sealed per-module boundary digest; validates the declared contract against real solver output, never reorders or extracts", target_owner: "Schedule/solver layer (Phase 4)" },
@@ -185,16 +195,18 @@ const census = {
 };
 
 const censusPath = path.join(ROOT, "architecture", "ownership_census.json");
-const mapPath = path.join(ROOT, "architecture", "current_mutation_map.md");
-if (WRITE) {
-  await fs.mkdir(path.dirname(censusPath), { recursive: true });
-  await fs.writeFile(censusPath, `${JSON.stringify(census, null, 2)}\n`, "utf8");
-  const rows = Object.entries(census.files)
-    .map(([file, data]) => `| ${file} | ${data.classification} | ${data.count} | ${Object.entries(data.families).map(([f, n]) => `${f}:${n}`).join(", ")} |`)
-    .join("\n");
-  await fs.writeFile(mapPath, `# Current mutation map (P0.7 static census)
+const mapPath = MAP_PATH_OVERRIDE ?? path.join(ROOT, "architecture", "current_mutation_map.md");
+const rows = Object.entries(census.files)
+  .map(([file, data]) => `| ${file} | ${data.classification} | ${data.count} | ${Object.entries(data.families).map(([f, n]) => `${f}:${n}`).join(", ")} |`)
+  .join("\n");
+const mapText = `# Current mutation map (P0.7 static census)
 
-Generated by \`scripts/run_ownership_census_tests.mjs --write\`. Do not edit by hand.
+<!-- generated-document:ownership-mutation-map/1.0 BEGIN -->
+<!-- DERIVED DOCUMENT: generated from the static source scan and architecture/ownership_census.json. -->
+<!-- Writer: node scripts/run_ownership_census_tests.mjs --write -->
+<!-- Read-only check: node scripts/run_ownership_census_tests.mjs -->
+<!-- Do not hand-edit. Drift remedy: update the source ownership classification, then run the writer. -->
+<!-- generated-document:ownership-mutation-map/1.0 END -->
 
 | File | Classification | Sites | Families |
 |---|---|---|---|
@@ -203,7 +215,11 @@ ${rows}
 ## Duplicate-writer findings
 
 ${census.duplicate_writer_findings.map((finding) => `- ${finding}`).join("\n")}
-`, "utf8");
+`;
+if (WRITE) {
+  await fs.mkdir(path.dirname(censusPath), { recursive: true });
+  await fs.writeFile(censusPath, `${JSON.stringify(census, null, 2)}\n`, "utf8");
+  await fs.writeFile(mapPath, mapText, "utf8");
 }
 
 // Verification: committed census matches the source scan (byte-stable modulo
@@ -213,6 +229,9 @@ const committed = JSON.parse(await fs.readFile(censusPath, "utf8").catch(() => "
 check(committed !== null, "architecture/ownership_census.json is missing — run with --write first");
 check(JSON.stringify(committed) === JSON.stringify(census),
   "the committed census no longer matches the source — regenerate with --write and review the diff");
+const committedMap = await fs.readFile(mapPath, "utf8").catch(() => null);
+check(committedMap === mapText,
+  "architecture/current_mutation_map.md is stale or hand-edited — regenerate with: node scripts/run_ownership_census_tests.mjs --write");
 check(census.unknown_writer_gate.unclassified_files.length === 0,
   `UNCLASSIFIED mutation files: ${census.unknown_writer_gate.unclassified_files.join(", ")}`);
 for (const giant of ["lib/row_plan.mjs", "lib/case_compiler.mjs", "build_dynamic_model.mjs"]) {
@@ -247,4 +266,26 @@ check(sites.length > 100, "the scan must find a substantial mutation surface (sa
     `raw forecast_capture_* writes outside capture_transition: ${offenders.join(", ")}`);
 }
 
-console.log(JSON.stringify({ status: "PASS", checks, mutation_sites: sites.length, files: Object.keys(byFile).length }));
+// MP2 Phase A (A2) — THE DRIFT GATE. Every derived release surface
+// (runtime-manifest skill_version/release_channel, the RELEASE_NOTES banner,
+// the KNOWN_LIMITATIONS header) must equal what the writer derives from the
+// one hand-edited declaration. A hand edit to any of them fails the census
+// naming the writer command, so a stale or forged surface can never reach CI
+// green. This is why the gate lives in the census: the census already owns the
+// "committed artifacts match their generators" invariant, and release identity
+// is now one of those generated surfaces.
+const drift = verifyDerivedReleaseSurfaces(ROOT);
+check(
+  drift.status === "PASS",
+  `derived release surfaces drifted from ${RELEASE_IDENTITY_FILE}:\n` +
+    drift.violations.map((violation) => `  - ${violation.path}: ${violation.detail}`).join("\n") +
+    `\n  Repair: run ${RELEASE_IDENTITY_WRITER_COMMAND} and commit the stamped surfaces; never hand-edit a derived surface.`,
+);
+
+console.log(JSON.stringify({
+  status: "PASS",
+  checks,
+  mutation_sites: sites.length,
+  files: Object.keys(byFile).length,
+  release_identity_drift: drift.status,
+}));

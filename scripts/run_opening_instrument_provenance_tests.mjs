@@ -587,7 +587,13 @@ check("the maintained fixture opening totals are pinned", () => {
     ),
   );
   // Pinned pre-change: adding provenance may not move one cent of opening debt.
-  assert.equal(maximal.reporting_total, 9335.505999999998);
+  // RE-AGREED by E9 (D36 canonicalisation): the naive register-order fold gave
+  // 9335.505999999998; canonical summation gives exactly the figure the
+  // fixture itself declares (reported_opening_gross_debt, 9335.506) and the
+  // bridge's canonical explained_total already carried. The pin moves TO the
+  // declared value — toward exactness — not away from it. See
+  // references/order-dependence-root-cause.md §5.
+  assert.equal(maximal.reporting_total, 9335.506);
   assert.equal(maximal.as_of, "2025-12-31");
   assert.equal(maximal.rows.length, 12);
 });

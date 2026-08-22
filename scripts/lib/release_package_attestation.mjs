@@ -123,8 +123,10 @@ export async function createDeterministicPackageArchive({ packageRoot, archivePa
   const root = path.resolve(packageRoot);
   const target = assertExternalArtifactPath(root, archivePath, "Package archive");
   const chunks = [];
+  const members = [];
   for (const file of await walkPackageFiles(root)) {
     const name = path.relative(root, file).split(path.sep).join("/");
+    members.push(name);
     const bytes = await fs.readFile(file);
     chunks.push(tarHeader(name, bytes.length), bytes);
     const padding = (512 - (bytes.length % 512)) % 512;
@@ -134,12 +136,17 @@ export async function createDeterministicPackageArchive({ packageRoot, archivePa
   const archive = Buffer.concat(chunks);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, archive, { flag: "wx", mode: 0o644 });
-  return Object.freeze({
+  const result = {
     identity_kind: "archive",
     format: "ustar",
     sha256: sha256(archive),
     bytes: archive.length,
+  };
+  Object.defineProperty(result, "members", {
+    value: Object.freeze(members),
+    enumerable: false,
   });
+  return Object.freeze(result);
 }
 
 function attestationBody({

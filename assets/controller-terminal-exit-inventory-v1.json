@@ -8,7 +8,7 @@
   "source_exit_counts": {
     "scripts/run_excel_inflow_bootstrap.mjs": 8,
     "scripts/run_excel_inflow_vnext.mjs": 12,
-    "scripts/run_user_flow.mjs": 22
+    "scripts/run_user_flow.mjs": 24
   },
   "source_exit_kinds": {
     "scripts/run_excel_inflow_bootstrap.mjs": {
@@ -21,58 +21,344 @@
       "generated_child_failure_refusal": 1,
       "outer_refusal": 1
     },
-    "scripts/run_excel_inflow_vnext.mjs": { "model_finish": 9, "presentation": 2, "outer_internal_failure": 1 },
-    "scripts/run_user_flow.mjs": { "model_finish": 20, "presentation": 1, "outer_internal_failure": 1 }
+    "scripts/run_excel_inflow_vnext.mjs": {
+      "model_finish": 9,
+      "presentation": 2,
+      "outer_internal_failure": 1
+    },
+    "scripts/run_user_flow.mjs": {
+      "model_finish": 22,
+      "presentation": 1,
+      "outer_internal_failure": 1
+    }
   },
   "phase_0_source_exit_counts": {
     "scripts/run_excel_inflow_vnext.mjs": 6,
     "scripts/run_user_flow.mjs": 18
   },
   "exits": [
-    { "id": "bootstrap.artifact_boundary_refusal", "controller": "bootstrap", "signature": "bootstrap artifact directory resolves inside the immutable package", "owner": "BLOCK", "broker_safe": true },
-    { "id": "bootstrap.inventory_integrity_refusal", "controller": "bootstrap", "signature": "if (verification.findings.length > 0)", "owner": "BLOCK", "broker_safe": true },
-    { "id": "bootstrap.company_screen", "controller": "bootstrap", "signature": "if (companyScreenComplete(result.stdout, result.stderr, result.code, result.overflowed))", "owner": "LOG", "broker_safe": true },
-    { "id": "bootstrap.company_screen_refusal", "controller": "bootstrap", "signature": "company_screen_child_failed_or_incomplete", "owner": "BLOCK", "broker_safe": true },
-    { "id": "bootstrap.child_success_passthrough", "controller": "bootstrap", "signature": "if (result.code === 0) return 0", "owner": "LOG", "broker_safe": true },
-    { "id": "bootstrap.child_failure_passthrough", "controller": "bootstrap", "signature": "return Number.isInteger(result.code) ? result.code : 1", "owner": "BLOCK", "broker_safe": true },
-    { "id": "bootstrap.generated_child_failure_refusal", "controller": "bootstrap", "signature": "child_exited_nonzero:exit=${result.code}", "owner": "BLOCK", "broker_safe": true },
-    { "id": "bootstrap.outer_refusal", "controller": "bootstrap", "signature": "process.exitCode = 1", "owner": "BLOCK", "broker_safe": true },
-
-    { "id": "vnext.company_screen", "controller": "vnext", "signature": "const screen = await runUserFlow(screenArgs", "owner": "LOG", "broker_safe": true },
-    { "id": "vnext.presentation_screen", "controller": "vnext", "signature": "Unable to render ${options.screen} screen.", "owner": "LOG", "broker_safe": true },
-    { "id": "vnext.outer_internal_failure", "controller": "vnext", "signature": "INTERNAL_FAILURE ${reasonCode}: ${summaryLine}", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.raw_evidence_not_closed", "controller": "vnext", "signature": "A fatal raw-source boundary remains.", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.support_envelope_unsupported", "controller": "vnext", "signature": "The case is outside the versioned support envelope: ", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.delegate_failed_before_result", "controller": "vnext", "signature": "The model decision delegate failed before writing a sealed result", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.user_decision", "controller": "vnext", "signature": "One consolidated set of genuine model decisions remains.", "owner": "ASK", "broker_safe": true },
-    { "id": "vnext.delegate_boundary_not_reached", "controller": "vnext", "signature": "The existing model controller did not reach the build boundary.", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.demand_binding_failed", "controller": "vnext", "signature": "The filings-derived demand graph did not survive intact", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.build_delegate_failed_before_fresh_result", "controller": "vnext", "signature": "The build delegate failed before writing a fresh sealed delivery result", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.build_or_delivery_not_closed", "controller": "vnext", "signature": "Workbook build or delivery validation did not close.", "owner": "BLOCK", "broker_safe": true },
-    { "id": "vnext.delivered", "controller": "vnext", "signature": "The model was built and independently validated", "owner": "DELIVER", "broker_safe": true },
-
-    { "id": "delegate.presentation_screen", "controller": "delegate", "signature": "return normaliseUserFlowResult({ status: \"SCREEN\", stage })", "owner": "LOG", "broker_safe": true },
-    { "id": "delegate.outer_internal_failure", "controller": "delegate", "signature": "process.stderr.write(`${error.stack ?? String(error)}\\n`)", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.resume_mutation", "controller": "delegate", "signature": "run_case_mutated_during_pause", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.bad_evidence", "controller": "delegate", "signature": "bad_evidence", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.pause_inputs", "controller": "delegate", "signature": "nextStageId(\"inputs\")", "owner": "LOG", "broker_safe": true },
-    { "id": "delegate.intake_stopped", "controller": "delegate", "signature": "const result = {", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.intake_decision", "controller": "delegate", "signature": "status: \"ACTION_REQUIRED\",\n          stage: \"decisions\",\n          outcome: intakeResult.outcome", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.intake_evidence_block", "controller": "delegate", "signature": "status: \"BLOCKED\",\n        stage: \"evidence_review\"", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.pause_evidence", "controller": "delegate", "signature": "nextStageId(\"evidence_review\")", "owner": "LOG", "broker_safe": true },
-    { "id": "delegate.questions", "controller": "delegate", "signature": "question_count: intakeResult.plan.questions.length", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.answers_incomplete", "controller": "delegate", "signature": "answers_incomplete", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.case_recompile", "controller": "delegate", "signature": "case_recompile_blocked", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.more_questions", "controller": "delegate", "signature": "remaining_question_count: replayedIntake.plan.remaining_question_count", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.forecast_unresolved", "controller": "delegate", "signature": "forecast_authority_unresolved", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.pause_decisions", "controller": "delegate", "signature": "nextStageId(\"decisions\")", "owner": "LOG", "broker_safe": true },
-    { "id": "delegate.build_resume_mutation", "controller": "delegate", "signature": "pause_time_model_case", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.workbook_build", "controller": "delegate", "signature": "workbook_build_blocked", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.pause_build", "controller": "delegate", "signature": "nextStageId(\"build_checks\")", "owner": "LOG", "broker_safe": true },
-    { "id": "delegate.review_gate_await_reply", "controller": "delegate", "signature": "awaiting: \"review_gate_reply\",", "owner": "ASK", "broker_safe": true },
-    { "id": "delegate.review_change_stop", "controller": "delegate", "signature": "schema_version: \"flow-review-change/1.0\",", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.delivery_attestation", "controller": "delegate", "signature": "delivery_attestation_blocked", "owner": "BLOCK", "broker_safe": true },
-    { "id": "delegate.delivered", "controller": "delegate", "signature": "manual_gate: \"native_excel_restoration_and_visual_review\"", "owner": "DELIVER", "broker_safe": true }
+    {
+      "id": "bootstrap.artifact_boundary_refusal",
+      "controller": "bootstrap",
+      "signature": "bootstrap artifact directory resolves inside the immutable package",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.inventory_integrity_refusal",
+      "controller": "bootstrap",
+      "signature": "if (verification.findings.length > 0)",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.company_screen",
+      "controller": "bootstrap",
+      "signature": "if (companyScreenComplete(result.stdout, result.stderr, result.code, result.overflowed))",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.company_screen_refusal",
+      "controller": "bootstrap",
+      "signature": "company_screen_child_failed_or_incomplete",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.child_success_passthrough",
+      "controller": "bootstrap",
+      "signature": "if (result.code === 0) return 0",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.child_failure_passthrough",
+      "controller": "bootstrap",
+      "signature": "return Number.isInteger(result.code) ? result.code : 1",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.generated_child_failure_refusal",
+      "controller": "bootstrap",
+      "signature": "child_exited_nonzero:exit=${result.code}",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "bootstrap.outer_refusal",
+      "controller": "bootstrap",
+      "signature": "process.exitCode = 1",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.company_screen",
+      "controller": "vnext",
+      "signature": "const screen = await runUserFlow(screenArgs",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.presentation_screen",
+      "controller": "vnext",
+      "signature": "Unable to render ${options.screen} screen.",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.outer_internal_failure",
+      "controller": "vnext",
+      "signature": "INTERNAL_FAILURE ${reasonCode}: ${summaryLine}",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.raw_evidence_not_closed",
+      "controller": "vnext",
+      "signature": "A fatal raw-source boundary remains.",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.support_envelope_unsupported",
+      "controller": "vnext",
+      "signature": "The case is outside the versioned support envelope: ",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.delegate_failed_before_result",
+      "controller": "vnext",
+      "signature": "The model decision delegate failed before writing a sealed result",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.user_decision",
+      "controller": "vnext",
+      "signature": "One consolidated set of genuine model decisions remains.",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.delegate_boundary_not_reached",
+      "controller": "vnext",
+      "signature": "The existing model controller did not reach the build boundary.",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.demand_binding_failed",
+      "controller": "vnext",
+      "signature": "The filings-derived demand graph did not survive intact",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.build_delegate_failed_before_fresh_result",
+      "controller": "vnext",
+      "signature": "The build delegate failed before writing a fresh sealed delivery result",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.build_or_delivery_not_closed",
+      "controller": "vnext",
+      "signature": "Workbook build or delivery validation did not close.",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "vnext.delivered",
+      "controller": "vnext",
+      "signature": "The model was built and independently validated",
+      "owner": "DELIVER",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.presentation_screen",
+      "controller": "delegate",
+      "signature": "return normaliseUserFlowResult({ status: \"SCREEN\", stage })",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.outer_internal_failure",
+      "controller": "delegate",
+      "signature": "process.stderr.write(`${error.stack ?? String(error)}\\n`)",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.resume_mutation",
+      "controller": "delegate",
+      "signature": "run_case_mutated_during_pause",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.bad_evidence",
+      "controller": "delegate",
+      "signature": "bad_evidence",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.pause_inputs",
+      "controller": "delegate",
+      "signature": "nextStageId(\"inputs\")",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.intake_stopped",
+      "controller": "delegate",
+      "signature": "const result = {",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.intake_decision",
+      "controller": "delegate",
+      "signature": "status: \"ACTION_REQUIRED\",\n          stage: \"decisions\",\n          outcome: intakeResult.outcome",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.intake_evidence_block",
+      "controller": "delegate",
+      "signature": "status: \"BLOCKED\",\n        stage: \"evidence_review\"",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.pause_evidence",
+      "controller": "delegate",
+      "signature": "nextStageId(\"evidence_review\")",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.questions",
+      "controller": "delegate",
+      "signature": "question_count: intakeResult.plan.questions.length",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.answers_incomplete",
+      "controller": "delegate",
+      "signature": "answers_incomplete",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.case_recompile",
+      "controller": "delegate",
+      "signature": "case_recompile_blocked",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.more_questions",
+      "controller": "delegate",
+      "signature": "remaining_question_count: replayedIntake.plan.remaining_question_count",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.forecast_unresolved",
+      "controller": "delegate",
+      "signature": "forecast_authority_unresolved",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.pause_decisions",
+      "controller": "delegate",
+      "signature": "nextStageId(\"decisions\")",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.build_resume_mutation",
+      "controller": "delegate",
+      "signature": "pause_time_model_case",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.workbook_build",
+      "controller": "delegate",
+      "signature": "workbook_build_blocked",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.pause_build",
+      "controller": "delegate",
+      "signature": "nextStageId(\"build_checks\")",
+      "owner": "LOG",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.review_gate_await_reply",
+      "controller": "delegate",
+      "signature": "awaiting: \"review_gate_reply\",",
+      "owner": "ASK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.review_change_stop",
+      "controller": "delegate",
+      "signature": "schema_version: \"flow-review-change/1.0\",",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.review_seal_refusal",
+      "controller": "delegate",
+      "signature": "awaiting: \"review_seal_refusal\",",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.delivery_attestation",
+      "controller": "delegate",
+      "signature": "delivery_attestation_blocked",
+      "owner": "BLOCK",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.delivered",
+      "controller": "delegate",
+      "signature": "manual_gate: \"native_excel_restoration_and_visual_review\"",
+      "owner": "DELIVER",
+      "broker_safe": true
+    },
+    {
+      "id": "delegate.forecast_plan_blocked",
+      "controller": "delegate",
+      "signature": "outcome: \"forecast_plan_blocked\"",
+      "owner": "BLOCK",
+      "broker_safe": true
+    }
   ],
-  "broker_invariant": "No exit may assign BLOCK or ASK solely because optional broker capture, OCR, reconciliation, semantics, preview or optional-close failed."
+  "broker_invariant": "No exit may assign BLOCK or ASK solely because optional broker capture, OCR, reconciliation, semantics, preview or optional-close failed.",
+  "_generated_bindings": {
+    "schema_version": "hand-owned-artifact-bindings/1.0",
+    "body_sha256": "f7bf702d3eb7436ecd843131071b12d6757944254248a0fb015870d5ad649a20",
+    "source_sha256": {
+      "scripts/run_excel_inflow_bootstrap.mjs": "38b47ad9bbac6241c424cd0fad34f1e2f5b1aed54372f2ff8edf9609162b6fc7",
+      "scripts/run_excel_inflow_vnext.mjs": "3f97dc0c3855959a475f839b8a2a5736b6e5de83cd5e26e3f393820940fbd308",
+      "scripts/run_user_flow.mjs": "bf46b0b367bbdd7f11d414f55031d8cae6c6ce0b6c129af0cc8f40bcbc44ace8"
+    },
+    "verifier_path": "scripts/run_controller_exit_inventory_tests.mjs",
+    "verifier_sha256": "5550ecfd5e538e98fcdd680e3ae077090b7d2276113b767eda9b032500850f11",
+    "writer": "node scripts/write_hand_owned_artifact_bindings.mjs --write",
+    "check": "node scripts/write_hand_owned_artifact_bindings.mjs --check",
+    "policy": "The body is hand-curated authority. Any body, governed-source or independent-verifier change makes this binding stale until the sanctioned writer is run deliberately."
+  }
 }

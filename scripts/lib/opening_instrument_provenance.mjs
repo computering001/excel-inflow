@@ -38,6 +38,7 @@
  *  - this module VALIDATES; it never repairs and never substitutes a number.
  */
 
+import { canonicalSum } from "./canonical_sum.mjs";
 import { canonicalJson, hashValue } from "./run_store.mjs";
 import { numericValueOf, typedValue } from "./typed_financial_value.mjs";
 
@@ -358,9 +359,16 @@ export function replayOpeningInstrumentSelection(inventory) {
       include_in_gross_debt: selection.include_in_gross_debt === true,
     });
   }
-  const reportingTotal = rows
-    .filter((row) => row.include_in_gross_debt)
-    .reduce((total, row) => total + row.reporting_amount, 0);
+  // E9 (D36): the replayed total accumulates in the SAME canonical order as
+  // compileOpeningInstrumentState's reporting_total, so the two sites stay
+  // bit-identical by construction and neither can drift under a register
+  // permutation. See references/order-dependence-root-cause.md.
+  const reportingTotal = canonicalSum(
+    rows
+      .filter((row) => row.include_in_gross_debt)
+      .map((row) => row.reporting_amount),
+    "replayed opening instrument reporting_amount",
+  );
   return { rows, reporting_total: reportingTotal };
 }
 

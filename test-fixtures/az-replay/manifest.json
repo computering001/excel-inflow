@@ -1,0 +1,35 @@
+{
+  "schema_version": "az-replay-manifest/1.0",
+  "fixture_id": "blocked-wc-carrier",
+  "classification": "sanitised_incident_derived_semantic_carrier",
+  "lineage": {
+    "completion_base_commit": "83aa0f0171f6a42b3a5c024b992bb44fb82e89b4",
+    "preserved_recovery_commit": "0bed1f5fe9740a0fbff9ce31eed1e9fede3a575f",
+    "preserved_fixture_sha256": "9725f540c9bf25e81c15b1126cc52c31925f0476a9983fafff3868a7ab943644",
+    "preserved_harness_sha256": "309d7451ff2d4dcb1f0f3ab6a44f88fe90d13d31bf4ec911aa0928ffc8f28e97",
+    "sanitisation_note": "No client-identifying source bytes were available in the preserved handover. This fixture preserves only the incident's semantic failure shape: material working-capital authority exists at intake, is removed by the zero-broker transition, and has no lawful historical fallback."
+  },
+  "carrier": {
+    "path": "scripts/flow-fixtures/blocked-wc-carrier.json",
+    "sha256": "fa89df367c353b54559481fa2ebdc22a1b490d8ea0a59eabce3a5a4f03bd777a"
+  },
+  "expected_earliest_stop": {
+    "status": "NEEDS_INTERNAL_WORK",
+    "stage": "decisions",
+    "outcome": "forecast_plan_blocked",
+    "reason_code": "forecast_plan_blocked",
+    "blocker_class": "INTERNAL_WORK",
+    "user_blocking": false,
+    "blocked_state_ids": [
+      "cash_flow.change_in_working_capital.fy1",
+      "cash_flow.change_in_working_capital.fy2",
+      "cash_flow.change_in_working_capital.fy3"
+    ]
+  },
+  "forbidden_outputs": [
+    "selected-authority-contract.json",
+    "question-result.json",
+    "question-screen.txt"
+  ],
+  "maximum_stage": "decisions"
+}

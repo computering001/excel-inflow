@@ -27,7 +27,7 @@ export const RUN_CARRIER_FILE = "run-carrier.json";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT_ID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
-const STAGES = Object.freeze(["inputs", "evidence_review", "decisions", "build_checks", "delivery"]);
+const STAGES = Object.freeze(["inputs", "evidence_review", "decisions", "build_checks", "review", "delivery"]);
 const RESUME_IDENTITY_DIMENSIONS = Object.freeze([
   "source_commit",
   "source_tree",
@@ -227,6 +227,7 @@ export async function writeRunCarrier({
   answersPath = null,
   brokerIntakeChoicePath = null,
   brokerConfirmationPath = null,
+  reviewChangePath = null,
   status,
   artifacts = {},
   sourceIdentity = null,
@@ -254,6 +255,7 @@ export async function writeRunCarrier({
   }
   let brokerConfirmationSnapshot = null;
   let brokerIntakeChoiceSnapshot = null;
+  let reviewChangeSnapshot = null;
   if (brokerIntakeChoicePath) {
     brokerIntakeChoiceSnapshot = await snapshotFile(
       brokerIntakeChoicePath,
@@ -265,6 +267,15 @@ export async function writeRunCarrier({
       brokerConfirmationPath,
       path.join(snapshotDirectory, "broker-confirmation.json"),
     );
+  }
+  if (reviewChangePath) {
+    const canonicalReviewChange = await canonicalPathThroughExistingAncestor(reviewChangePath);
+    reviewChangeSnapshot = isEqualToOrInside(canonicalReviewChange, canonicalRunRoot)
+      ? canonicalReviewChange
+      : await snapshotFile(
+          reviewChangePath,
+          path.join(snapshotDirectory, "review-change.json"),
+        );
   }
 
   const files = {};
@@ -285,6 +296,15 @@ export async function writeRunCarrier({
       "broker_confirmation",
       canonicalRunRoot,
       brokerConfirmationSnapshot,
+    );
+  }
+  if (reviewChangeSnapshot) {
+    await addExistingFile(
+      files,
+      "review_change",
+      canonicalRunRoot,
+      reviewChangeSnapshot,
+      { required: true },
     );
   }
   await addExistingFile(
@@ -353,6 +373,7 @@ export async function writeRunCarrier({
     broker_intake_state: brokerIntakeChoiceSnapshot
       ? "choice_recorded"
       : "awaiting_choice",
+    review_change_state: reviewChangeSnapshot ? "pending_resume" : null,
     files: canonicalise(files),
     new_chat_policy: "Use this carrier and the matching workspace/session token; never use chat memory or Stage-4 internals as state.",
   };
@@ -538,6 +559,16 @@ export async function verifyRunCarrier({
   if (!carrier.files || typeof carrier.files !== "object" || Array.isArray(carrier.files)) {
     throw new Error("Run carrier files must be an object.");
   }
+  const reviewChangeState = carrier.review_change_state ?? null;
+  if (![null, "pending_resume"].includes(reviewChangeState)) {
+    throw new Error("Run carrier review-change state is invalid.");
+  }
+  if (reviewChangeState === "pending_resume" && !carrier.files.review_change) {
+    throw new Error("Run carrier claims a pending review change without its sealed record.");
+  }
+  if (reviewChangeState === null && carrier.files.review_change) {
+    throw new Error("Run carrier carries a review-change record without declaring it pending.");
+  }
   for (const required of ["run_identity", "evidence_run"]) {
     if (!carrier.files[required]) throw new Error(`Run carrier is missing required file ${required}.`);
   }
@@ -602,6 +633,9 @@ export async function verifyRunCarrier({
     files,
     identity,
     broker_intake_state: brokerIntakeState,
+    review_change_state: reviewChangeState,
+    review_change_path:
+      reviewChangeState === "pending_resume" ? files.review_change : null,
     active_source_identity: activeSourceIdentity,
     migration,
     stage_invalidation: migration?.stage_invalidation ?? null,

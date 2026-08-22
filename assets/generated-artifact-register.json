@@ -1,0 +1,108 @@
+{
+  "schema_version": "generated-artifact-register/1.0",
+  "invariant": "every generated artifact names its writer and the check that proves it agrees with that writer; mp2-D",
+  "artifacts": [
+    {
+      "artifact_path": "architecture/ownership_census.json",
+      "writer_script": "node scripts/run_ownership_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ownership_census_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/runtime-manifest.json",
+      "writer_script": "certified-runtime closure digest fields: node scripts/run_certified_code_closure_tests.mjs --record (the only writer); manifest identity incl. skill_version written by the MP2-A release_identity chain (scripts/compile_skill_release.mjs)",
+      "check_invocation": "node scripts/run_certified_code_closure_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/controller-terminal-exit-inventory-v1.json",
+      "hand_owned": true,
+      "writer_script": "node scripts/write_hand_owned_artifact_bindings.mjs --write --artifact assets/controller-terminal-exit-inventory-v1.json (generated bindings only; body remains hand-curated)",
+      "check_invocation": "node scripts/write_hand_owned_artifact_bindings.mjs --check --artifact assets/controller-terminal-exit-inventory-v1.json, then independent node scripts/run_controller_exit_inventory_tests.mjs"
+    },
+    {
+      "artifact_path": "ci/test_registry_census.json",
+      "writer_script": "node scripts/compile_test_registry_census.mjs --out ci/test_registry_census.json",
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (recompiles to a scratch path and byte-compares against the committed census)"
+    },
+    {
+      "artifact_path": "ci/execution_test_census.json",
+      "writer_script": "node scripts/run_ci_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ci_census_tests.mjs (read-only substantive exact regeneration; source commit/tree and observed toolchain remain declared run-provenance fields), independently mutation- and side-effect-verified by node scripts/run_gate_side_effect_tests.mjs"
+    },
+    {
+      "artifact_path": "ci/coercion_inventory.json",
+      "writer_script": "node scripts/run_coercion_ban_tests.mjs --write",
+      "check_invocation": "node scripts/run_coercion_ban_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/critical-invariant-oracle-matrix-v1.json",
+      "writer_script": "python3 scripts/run_critical_invariant_oracle_matrix_tests.py --record-bindings (bindings only; matrix body hand-curated)",
+      "check_invocation": "python3 scripts/run_critical_invariant_oracle_matrix_tests.py --verify-bindings"
+    },
+    {
+      "artifact_path": "assets/workflow-state-contract-v1.json",
+      "hand_owned": true,
+      "writer_script": "node scripts/write_hand_owned_artifact_bindings.mjs --write --artifact assets/workflow-state-contract-v1.json (generated bindings only; body remains hand-curated)",
+      "check_invocation": "node scripts/write_hand_owned_artifact_bindings.mjs --check --artifact assets/workflow-state-contract-v1.json, then independent node scripts/run_workflow_state_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/filings-ladder-corpus-rehearsal-v1.json",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check; independently mutation- and route-forcing-verified by python3 scripts/run_filings_ladder_corpus_rehearsal_tests.py"
+    },
+    {
+      "artifact_path": "README.md#filings-ladder-claims",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
+      "artifact_path": "RELEASE_NOTES.md#filings-ladder-claims",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
+      "artifact_path": "KNOWN_LIMITATIONS.md#filings-ladder-rehearsal",
+      "writer_script": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --record",
+      "check_invocation": "python3 scripts/run_filings_ladder_corpus_rehearsal.py --check"
+    },
+    {
+      "artifact_path": "assets/runtime-manifest.json#skill_version",
+      "writer_script": "MP2-A release_identity writer (scripts/compile_skill_release.mjs) — declared here because no mp2-D-local writer regenerates the field",
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (exact equality to assets/release-identity.json#/version and #/channel), plus independent node scripts/run_skill_version_declaration_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/document-ownership-register.json",
+      "writer_script": "node scripts/generate_document_ownership_register.mjs --write",
+      "check_invocation": "node scripts/generate_document_ownership_register.mjs --check, plus node scripts/run_derived_document_governance_tests.mjs"
+    },
+    {
+      "artifact_path": "central-instructions.md",
+      "writer_script": "node scripts/generate_instruction_docs.mjs",
+      "check_invocation": "node scripts/generate_instruction_docs.mjs --check, plus node scripts/run_doc_single_source_tests.mjs"
+    },
+    {
+      "artifact_path": "references/runtime-core.md",
+      "writer_script": "node scripts/generate_instruction_docs.mjs",
+      "check_invocation": "node scripts/generate_instruction_docs.mjs --check, plus node scripts/run_doc_single_source_tests.mjs"
+    },
+    {
+      "artifact_path": "architecture/current_mutation_map.md",
+      "writer_script": "node scripts/run_ownership_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ownership_census_tests.mjs (exact JSON and Markdown regeneration)"
+    },
+    {
+      "artifact_path": "audit/v379/D52_CLOSURE_SUMMARY.md",
+      "writer_script": "node scripts/generate_d52_closure_summary.mjs",
+      "check_invocation": "node scripts/generate_d52_closure_summary.mjs --check, plus node scripts/run_derived_document_governance_tests.mjs"
+    },
+    {
+      "artifact_path": "RELEASE_NOTES.md#release-identity-banner",
+      "writer_script": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check_invocation": "node scripts/run_release_identity_governance_tests.mjs; prose outside the generated block is hand-owned"
+    },
+    {
+      "artifact_path": "KNOWN_LIMITATIONS.md#release-identity-header",
+      "writer_script": "node scripts/compile_skill_release.mjs --write-release-identity",
+      "check_invocation": "node scripts/run_release_identity_governance_tests.mjs; limitation prose outside the generated header is hand-owned"
+    }
+  ]
+}

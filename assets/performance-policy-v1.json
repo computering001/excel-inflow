@@ -36,8 +36,8 @@
     },
     "enforced_envelope": {
       "hard_ceiling_ms": 1500000,
-      "bounded_floor_allowance_ms": 360000,
-      "maximum_grantable_compute_ms": 1860000,
+      "bounded_floor_allowance_ms": 420000,
+      "maximum_grantable_compute_ms": 1920000,
       "floor_allowance_source": "scripts/lib/run_deadline.mjs#STAGE_FLOOR_TOTAL_ALLOWANCE_MS",
       "note": "P6.1 bounded the stage floor instead of removing it, so the ceiling is enforced as an ENVELOPE: a run may be granted at most the ceiling plus a finite, ledger-recorded floor allowance, after which every further grant collapses to 1 ms. Declaring the envelope here keeps it from becoming a fourth, hidden declaration.",
       "in_process_preemption": false,

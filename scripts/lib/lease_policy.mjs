@@ -3,16 +3,58 @@
 export const LEASE_POLICY_ID = "lease_policy";
 export const LEASE_POLICY_VERSION = "1.0";
 
+/**
+ * A normalized financial value is a real JSON number, not merely something
+ * JavaScript's Number constructor can turn into one. In particular, null,
+ * blank strings, whitespace and booleans must never acquire economic meaning
+ * as zero at a downstream consumer.
+ */
+export function isFiniteFinancialNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 function series3(value, label, fallback = null) {
   if (value === undefined && fallback !== null) return [...fallback];
   if (
     !Array.isArray(value) ||
     value.length !== 3 ||
-    value.some((item) => !Number.isFinite(Number(item)))
+    value.some((item) => !isFiniteFinancialNumber(item))
   ) {
-    throw new Error(`${label} must contain three numeric values.`);
+    throw new Error(`${label} must contain three finite financial numbers.`);
   }
-  return value.map(Number);
+  return [...value];
+}
+
+/** D1/D2 (mp2-D): the lease opening liability as a TYPED state, replacing the
+ * bare `[0, 0, Number(policy.opening_liability ?? 0)]` coercion. Exactly one
+ * of three states, mirroring the schedule-typed-states vocabulary:
+ *   declared   — the policy states historical_liabilities or
+ *                opening_liability; value is the finite opening total it
+ *                asserts (a non-finite declaration is refused, not coerced);
+ *   carried    — the policy declares no lease liability anywhere, so the
+ *                zero is a structural carried-forward absence (nothing to
+ *                carry), never a blank silently mapped onto zero;
+ *   unresolved — unreachable here (declared-but-non-finite throws), kept in
+ *                the vocabulary so callers can exhaustive-match.
+ */
+export function leaseOpeningLiabilityState(policy = {}) {
+  if (policy.historical_liabilities !== undefined) {
+    const series = series3(
+      policy.historical_liabilities,
+      "lease_policy.historical_liabilities",
+    );
+    return { state: "declared", value: series[2] };
+  }
+  if (policy.opening_liability !== undefined) {
+    const value = policy.opening_liability;
+    if (!isFiniteFinancialNumber(value)) {
+      throw new Error(
+        `lease_policy.opening_liability must be a finite number; received ${JSON.stringify(policy.opening_liability)}. Blank/nil never coerce to zero — declare the liability or omit the field.`,
+      );
+    }
+    return { state: "declared", value };
+  }
+  return { state: "carried", value: 0 };
 }
 
 export function resolvedLeaseInterestBasis(modelCase) {
@@ -99,12 +141,15 @@ export function leaseForecast(modelCase) {
   const policy = modelCase.lease_policy;
   const basis = resolvedLeaseInterestBasis(modelCase);
   const interestEnabled = modelCase?.controls?.circularity !== 0;
-  const historicalTotal = policy.historical_liabilities
+  // mp2-D typed state: declared | carried — see leaseOpeningLiabilityState.
+  const openingLiability = leaseOpeningLiabilityState(policy);
+  const historicalTotal =
+    policy.historical_liabilities !== undefined
     ? series3(
         policy.historical_liabilities,
         "lease_policy.historical_liabilities",
       )
-    : [0, 0, Number(policy.opening_liability ?? 0)];
+    : [0, 0, openingLiability.value];
   const principal = series3(
     policy.principal_repayment,
     "lease_policy.principal_repayment",
@@ -218,12 +263,15 @@ export function leaseProjectionErrors(
     "lease_policy.effective_rate",
     [0, 0, 0],
   );
-  const historicalTotal = policy.historical_liabilities
+  // mp2-D typed state: declared | carried — see leaseOpeningLiabilityState.
+  const openingLiability = leaseOpeningLiabilityState(policy);
+  const historicalTotal =
+    policy.historical_liabilities !== undefined
     ? series3(
         policy.historical_liabilities,
         "lease_policy.historical_liabilities",
       )
-    : [0, 0, Number(policy.opening_liability ?? 0)];
+    : [0, 0, openingLiability.value];
   const historicalInterestBearing =
     basis === "separately_supplied"
       ? series3(
@@ -231,10 +279,17 @@ export function leaseProjectionErrors(
           "lease_policy.historical_interest_bearing_liabilities",
         )
       : historicalTotal;
+  const forecastInterestBearing =
+    basis === "separately_supplied"
+      ? series3(
+          policy.forecast_interest_bearing_liabilities,
+          "lease_policy.forecast_interest_bearing_liabilities",
+        )
+      : null;
   const errors = [];
   const tolerance = 1e-8;
   const near = (left, right) =>
-    Math.abs(Number(left) - Number(right)) <= tolerance;
+    Math.abs(left - right) <= tolerance;
 
   if (!Array.isArray(projection) || projection.length !== 3) {
     return ["lease projection must contain exactly three forecast periods."];
@@ -255,8 +310,8 @@ export function leaseProjectionErrors(
       "ending_interest_bearing",
       "interest",
     ]) {
-      if (!Number.isFinite(Number(period[field]))) {
-        errors.push(`${prefix} ${field} must be numeric.`);
+      if (!isFiniteFinancialNumber(period[field])) {
+        errors.push(`${prefix} ${field} must be a finite financial number.`);
       }
     }
     if (errors.some((message) => message.startsWith(prefix))) continue;
@@ -283,11 +338,11 @@ export function leaseProjectionErrors(
       }
     } else {
       const expectedEnding =
-        Number(period.opening_total) +
-        Number(period.additions) +
-        Number(period.interest) +
-        Number(period.other_movements) -
-        Number(period.principal_repayment);
+        period.opening_total +
+        period.additions +
+        period.interest +
+        period.other_movements -
+        period.principal_repayment;
       if (!near(period.ending_total, expectedEnding)) {
         errors.push(
           `${prefix} closing liability does not equal opening + additions + interest + other movements - principal.`,
@@ -297,16 +352,16 @@ export function leaseProjectionErrors(
         basis === "none"
           ? 0
           : basis === "separately_supplied"
-            ? Number(policy.forecast_interest_bearing_liabilities[index])
-            : Number(period.ending_total);
+            ? forecastInterestBearing[index]
+            : period.ending_total;
       if (!near(period.ending_interest_bearing, expectedEndingInterestBearing)) {
         errors.push(`${prefix} closing interest-bearing basis is inconsistent with ${basis}.`);
       }
       const expectedInterest =
         basis === "none" || !interestEnabled
           ? 0
-          : ((Number(period.opening_interest_bearing) +
-              Number(period.ending_interest_bearing)) /
+          : ((period.opening_interest_bearing +
+              period.ending_interest_bearing) /
               2) *
             rates[index];
       if (!near(period.interest, expectedInterest)) {
@@ -314,8 +369,8 @@ export function leaseProjectionErrors(
       }
     }
 
-    expectedOpeningTotal = Number(period.ending_total);
-    expectedOpeningInterestBearing = Number(period.ending_interest_bearing);
+    expectedOpeningTotal = period.ending_total;
+    expectedOpeningInterestBearing = period.ending_interest_bearing;
   }
   return errors;
 }
@@ -339,26 +394,61 @@ export function leaseInterestCashSplitErrors(
 ) {
   if (
     cashInterestPaid === null ||
-    cashInterestPaid === undefined ||
-    !Number.isFinite(Number(cashInterestPaid))
+    cashInterestPaid === undefined
   ) {
     // Nothing was published under this role (supplied-absent or unresolvable):
     // there is no split claim to verify.
     return [];
   }
+  if (!isFiniteFinancialNumber(cashInterestPaid)) {
+    return [
+      `cash_interest_paid must be a finite financial number when published; ` +
+        `received ${JSON.stringify(cashInterestPaid)}. Blank, boolean and ` +
+        `non-finite values never coerce to zero.`,
+    ];
+  }
+  // mp2-D typed leg resolution: a leg the producer never published (null,
+  // undefined, or not a finite number) is UNRESOLVED — never zero. Verifying
+  // the identity against fabricated zeros would both mint a drift claim built
+  // on numbers nobody asserted and, when the fabricated identity happens to
+  // match a published zero outflow, let the split PASS vacuously. An
+  // unresolved leg while cash_interest_paid is published therefore refuses
+  // with the named legs instead of computing.
+  const legs = [
+    ["gross_interest", grossInterest],
+    ["lease_interest", leaseInterest],
+    ["non_cash_interest", nonCashInterest],
+    ["non_cash_instrument_interest", nonCashInstrumentInterest],
+  ];
+  const unresolvedLegs = legs
+    .filter(
+      ([, raw]) =>
+        !isFiniteFinancialNumber(raw),
+    )
+    .map(([name]) => name);
+  if (unresolvedLegs.length > 0) {
+    return [
+      `cash_interest_paid=${cashInterestPaid} is published but the ` +
+        `cash-interest split cannot be verified: ${unresolvedLegs.join(", ")} ` +
+        `unresolved (blank/nil/missing never coerce to zero). Publish every ` +
+        `leg of the gross build-up to verify the split.`,
+    ];
+  }
+  const [grossDeclared, leaseDeclared, nonCashDeclared, nonCashInstrumentDeclared] =
+    legs.map(([, raw]) => raw);
   const expected =
-    -(Number(grossInterest ?? 0) -
-      Number(leaseInterest ?? 0) -
-      Number(nonCashInterest ?? 0) -
-      Number(nonCashInstrumentInterest ?? 0));
+    -(grossDeclared -
+      leaseDeclared -
+      nonCashDeclared -
+      nonCashInstrumentDeclared);
   const errors = [];
-  if (Math.abs(Number(cashInterestPaid) - expected) > tolerance) {
+  if (Math.abs(cashInterestPaid - expected) > tolerance) {
     errors.push(
-      `cash_interest_paid=${Number(cashInterestPaid)} does not equal ` +
-        `-(gross interest ${Number(grossInterest ?? 0)} - lease interest ` +
-        `${Number(leaseInterest ?? 0)} - non-cash interest ` +
-        `${Number(nonCashInterest ?? 0)} - non-cash instrument interest ` +
-        `${Number(nonCashInstrumentInterest ?? 0)}) = ${expected}; the accreted ` +
+      `cash_interest_paid=${cashInterestPaid} does not equal ` +
+        `-(gross interest ${grossDeclared} - lease interest ` +
+        `${leaseDeclared} - non-cash interest ` +
+        `${nonCashDeclared} - non-cash instrument interest ` +
+        `${nonCashInstrumentDeclared}) = ${expected}; the accreted ` +
         `lease share must stay out of cash interest paid.`,
     );
   }

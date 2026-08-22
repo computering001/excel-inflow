@@ -132,7 +132,7 @@ try {
   assert.equal(migration.receipt.stage_invalidation.earliest_stage, "inputs");
   assert.deepEqual(migration.receipt.stage_invalidation.reusable_stages, []);
   assert.deepEqual(migration.receipt.stage_invalidation.invalidated_stages, [
-    "inputs", "evidence_review", "decisions", "build_checks", "delivery",
+    "inputs", "evidence_review", "decisions", "build_checks", "review", "delivery",
   ]);
   const migrated = await verifyRunCarrier({
     skillRoot: ROOT, runRoot, carrierPath: forgedV3Path, controllerVersion, workspaceToken,
@@ -234,7 +234,7 @@ try {
   assert.deepEqual(deploymentMigration.receipt.stage_invalidation.reusable_stages, [
     "inputs", "evidence_review", "decisions",
   ]);
-  assert.deepEqual(deploymentMigration.receipt.stage_invalidation.invalidated_stages, ["build_checks", "delivery"]);
+  assert.deepEqual(deploymentMigration.receipt.stage_invalidation.invalidated_stages, ["build_checks", "review", "delivery"]);
   const deploymentMigrated = await verifyRunCarrier({
     skillRoot: ROOT, runRoot, carrierPath: deploymentV3Path, controllerVersion,
     workspaceToken, migrationReceiptPath: deploymentMigration.path,

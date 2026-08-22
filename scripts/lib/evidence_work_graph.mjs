@@ -20,29 +20,59 @@
  * 4's `{ ok, receipt, reused }`. Reusing the shape means an operator who can
  * read a stage-4 checkpoint receipt can read an evidence-node receipt.
  *
- * WHAT THIS GRAPH DOES NOT DO, AND WHY
- * ------------------------------------
- * It does not ENACT reuse. `ENACT_EVIDENCE_REUSE = false`: a node's action runs
- * on every pass, and a HIT means "the cache key agreed", not "the work was
- * skipped". Two reasons, and the second is the stronger one:
+ * WHAT ENACTMENT MEANS HERE, AND WHAT IT COSTS
+ * --------------------------------------------
+ * `ENACT_EVIDENCE_REUSE = true`: a node that declares `reuse_enactable` and
+ * lands on a clean hit (`hit.inputs_unchanged`, success receipt, same run,
+ * receipt hash intact) replays its prior receipt instead of re-running its
+ * action. Enactment is opt-in PER NODE, never global: only the four pure,
+ * acyclic compile nodes declare it (`statement_normalisation`,
+ * `forecast_behavior_map`, `model_demand_graph`, `forecast_plan`) — work whose
+ * value is a deterministic function of keyed inputs. Every other node keeps
+ * P6.3's always-execute semantics unchanged.
  *
- *  1. Skipping upstream work changes WHAT IS COMPUTED. P6.3 is additive by
- *     constitution — no run's outcome or emitted number may change. Hoisting
- *     the evidence-half work behind its cache keys is differential invalidation,
- *     which is P6.4's package, sequenced after this one precisely because it
- *     changes behaviour.
- *  2. Because the action always runs, every HIT is CHECKED against a real
- *     recomputation: the freshly computed output is digested and compared with
- *     the digest the receipt recorded. A cache key that agreed while the output
- *     moved is a DISHONEST key, and it is recorded as
- *     `invalid.output_digest_mismatch`. An enacting cache cannot notice that at
- *     all — it would silently serve the stale answer. This graph therefore
- *     spends the work to earn the right to skip it later, and P6.4 inherits
- *     cache keys whose honesty has been measured rather than assumed.
+ * Two gates stand between a clean hit and a skip, because an enacting cache
+ * must not serve what is no longer there:
+ *
+ *  1. BYTE IDENTITY: every file-backed declared output path must still exist
+ *     and its current hash must equal the hash sealed in the prior receipt.
+ *     A vanished or modified artifact is not a hit; the node falls through
+ *     and does the work again. (This composes naturally with downstream
+ *     invalidation: moved output ⇒ recompute this node and its dependants.)
+ *  2. A RECORDED VALUE: the prior receipt must carry the `recorded_value` the
+ *     successful action produced (sealed into the receipt body by
+ *     `receipt_hash`). Without one — a legacy receipt written before this
+ *     field existed — there is nothing lawful to return, so the node executes
+ *     and writes a replayable receipt for next time.
+ *
+ * THE COST, STATED PLAINLY: a skipped node is no longer re-computed, so
+ * P6.3's dishonest-key detector (`invalid.output_digest_mismatch`) cannot fire
+ * for it — a key that agreed while truth moved is now served stale rather than
+ * caught. That risk is accepted deliberately, and bounded: the replayed value
+ * is the receipt-sealed bytes the honest execution produced, the input key
+ * covers the controller version, the runtime closure and every dependency's
+ * output digest, and the four opted-in nodes are pure functions of those keys.
+ * Non-enactable nodes keep spending the work to earn the right to skip, and
+ * their hits stay CHECKED.
  *
  * A validator validates. Nothing here repairs a receipt, rewrites a key, or
  * changes a value the controller computed. A node that throws is RECORDED and
  * then RETHROWN unchanged.
+ *
+ * WHAT A SUCCESS RECEIPT PROMISES (MP2 E2)
+ * ----------------------------------------
+ * A node receipt with status "success" is a claim that the node's DECLARED
+ * OUTPUTS exist on disk. `runNode` checks that claim on every executed pass:
+ * after the action completes, each declared output path the call site named
+ * is hashed, and any path that hashes `absent` refuses success — the node is
+ * sealed with status "BLOCKED", blocker_class "INTERNAL_WORK" and reason
+ * `invalid.declared_output_absent`, naming the missing files, and a typed
+ * `EvidenceWorkOutputAbsentError` is thrown so callers fail loudly instead of
+ * building downstream work on artifacts that were never written. The same
+ * honesty governs reuse claims: `reuseStage` re-verifies that a previously
+ * successful node's recorded output paths still exist BEFORE it records a
+ * stage-level hit for that node; an output that has vanished since is
+ * recorded as `invalid.declared_output_absent`, never as a clean hit.
  *
  * RELATION TO P6.2
  * ----------------
@@ -66,10 +96,12 @@ export const EVIDENCE_WORK_DECISION_FILE = "decisions.json";
 export const EVIDENCE_WORK_RECEIPT_FILE = "_receipt.json";
 
 /**
- * P6.3 does not enact reuse; see the header. The suite pins this constant, so
- * flipping it is a deliberate, reviewed behaviour change and not a drift.
+ * Enactment is LIVE, but scoped: see "WHAT ENACTMENT MEANS HERE" in the header.
+ * Only nodes declaring `reuse_enactable` replay their receipts, and only past
+ * an existence-verified clean hit. The suite pins this constant, so its value
+ * is a deliberate, reviewed behaviour change and not a drift.
  */
-export const ENACT_EVIDENCE_REUSE = false;
+export const ENACT_EVIDENCE_REUSE = true;
 
 /**
  * The closed reason vocabulary. Three categories, and every reason names the
@@ -93,6 +125,7 @@ export const EVIDENCE_WORK_REASONS = Object.freeze([
   "invalid.receipt_tampered",
   "invalid.output_digest_mismatch",
   "invalid.output_not_hashable",
+  "invalid.declared_output_absent",
   "invalid.node_threw",
 ]);
 
@@ -101,6 +134,28 @@ const DECISION_OF_REASON = Object.freeze({
   miss: "MISS",
   invalid: "INVALID",
 });
+
+/**
+ * Thrown by `runNode` when a node's action completed but did not write one or
+ * more of the output paths the call site declared. A success receipt would be
+ * a lie about artifacts that do not exist, so the node is sealed BLOCKED and
+ * this typed error is thrown instead — callers fail loudly, never silently
+ * onward over work that produced nothing.
+ */
+export class EvidenceWorkOutputAbsentError extends Error {
+  constructor(nodeId, missing) {
+    super(
+      `Evidence work node ${nodeId} completed without writing its declared output(s): ${missing
+        .map((entry) => `${entry.name} (${entry.path ?? "no path declared"})`)
+        .join(", ")}`,
+    );
+    this.name = "EvidenceWorkOutputAbsentError";
+    this.code = "invalid.declared_output_absent";
+    this.blocker_class = "INTERNAL_WORK";
+    this.node_id = nodeId;
+    this.missing_outputs = missing;
+  }
+}
 
 /**
  * The declared evidence-half work DAG.
@@ -190,6 +245,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["intake_replay"]),
     key_components: Object.freeze(["answered_case"]),
     outputs: Object.freeze(["statement_structure", "source_coverage"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the answered case whose income-statement and cash-flow rows are normalised, or in the decision replay that settled it",
   }),
@@ -200,6 +256,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation"]),
     key_components: Object.freeze(["planning_case"]),
     outputs: Object.freeze(["forecast_behavior_map"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, or in the normalised statement structure the behaviour map is compiled against",
   }),
@@ -210,6 +267,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation"]),
     key_components: Object.freeze(["planning_case"]),
     outputs: Object.freeze(["model_demand_graph"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, or in the normalised statement structure the demand graph is compiled against",
   }),
@@ -220,6 +278,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation", "forecast_behavior_map"]),
     key_components: Object.freeze(["planning_case", "observation_ledger", "source_inventory"]),
     outputs: Object.freeze(["forecast_plan"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, the forecast observation ledger or the source inventory, or in the behaviour map the plan is compiled from",
   }),
@@ -368,6 +427,7 @@ export function reuseClaimLedger(decisions, claimedStages, nodes = EVIDENCE_WORK
       stage,
       claimed: claimed.has(stage),
       skipped: [],
+      enacted_nodes: [],
       verified: [],
       degraded: [],
       unrecorded: [],
@@ -378,8 +438,15 @@ export function reuseClaimLedger(decisions, claimedStages, nodes = EVIDENCE_WORK
   for (const record of decisions ?? []) {
     const bucket = byStage.get(record.stage);
     if (!bucket) continue;
+    // Two ways a node can be skipped, and only one of them speaks for a STAGE
+    // claim. A stage-receipt reuse (`hit.stage_receipt_reused`) is evidence the
+    // stage's claimed work was not entered. A node-receipt replay
+    // (`executed: false` with any other reason) is node-level enactment, which
+    // is lawful whether or not the stage was claimed — so it is reported in its
+    // own bucket and never fabricated into an unclaimed-stage violation.
     if (record.executed === false) {
-      bucket.skipped.push(record.node);
+      if (record.reason === "hit.stage_receipt_reused") bucket.skipped.push(record.node);
+      else bucket.enacted_nodes.push(record.node);
       continue;
     }
     bucket.executed_ms += Number(record.duration_ms ?? 0);
@@ -506,6 +573,21 @@ function safeOutputDigest(value) {
   }
 }
 
+/**
+ * The replayable form of a successful action's value: the same JSON round-trip
+ * `safeOutputDigest` applies, so what is recorded is exactly what was digested.
+ * A value that cannot survive the round-trip records as undefined, and a
+ * receipt without a recorded value is never replayed — the node re-executes
+ * rather than serve something it cannot account for.
+ */
+function safeRecordedValue(value) {
+  try {
+    return JSON.parse(JSON.stringify(value ?? null, (_key, item) => (typeof item === "function" ? undefined : item)));
+  } catch {
+    return undefined;
+  }
+}
+
 function receiptBodyHash(receipt) {
   const { receipt_hash: _ignored, ...body } = receipt ?? {};
   return hashValue(body);
@@ -601,6 +683,8 @@ export function createEvidenceWorkGraph({
     durationMs = null,
     priorOutputDigest = null,
     outputAgreed = null,
+    executed = true,
+    enactedReuse = false,
   }) {
     if (!EVIDENCE_WORK_REASONS.includes(reason)) {
       throw new Error(`Evidence work node ${node.id} recorded a reason outside the vocabulary: ${reason}`);
@@ -614,13 +698,13 @@ export function createEvidenceWorkGraph({
       moved: [...moved],
       key_components: [...node.key_components],
       invalidated_by: node.invalidated_by,
-      enacted_reuse: false,
+      enacted_reuse: enactedReuse,
       // P6.4: a decision record now says whether the node's ACTION RAN, and if
       // it did, whether what it produced is what the prior receipt recorded.
       // Without these two fields a claim of stage reuse cannot be checked at
       // all — a stage whose nodes all re-ran looked exactly like one whose
       // nodes were all skipped.
-      executed: true,
+      executed,
       prior_output_digest: priorOutputDigest,
       output_agreed: outputAgreed,
       duration_ms: durationMs,
@@ -669,6 +753,37 @@ export function createEvidenceWorkGraph({
       }
     }
     return hashes;
+  }
+
+  /**
+   * The declared output paths the call site named as REAL filesystem targets.
+   * A null target declares a name without a file — the unit suites drive nodes
+   * that way — so only string targets can be checked for existence, and the
+   * absence gate below deliberately applies to them alone.
+   */
+  function declaredPathTargets(outputs) {
+    return Object.entries(outputs ?? {})
+      .filter(([, target]) => typeof target === "string")
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([name, target]) => ({ name, path: target }));
+  }
+
+  /**
+   * The declared string targets that are not readable files right now. A
+   * directory is absent too: an output is something `hashFile` can digest, and
+   * that is exactly what the success receipt will claim about it.
+   */
+  async function absentDeclaredPaths(targets) {
+    const missing = [];
+    for (const entry of targets) {
+      try {
+        const stat = await fs.stat(entry.path);
+        if (!stat.isFile()) missing.push(entry);
+      } catch {
+        missing.push(entry);
+      }
+    }
+    return missing;
   }
 
   async function runNode({ id, recipe, inputs, outputs, action }) {
@@ -756,8 +871,83 @@ export function createEvidenceWorkGraph({
       reason = "hit.inputs_unchanged";
     }
 
-    // ENACT_EVIDENCE_REUSE is false: the action runs on every pass, so a HIT is
-    // CHECKED rather than trusted. See the module header.
+    // ENACTMENT. An opted-in node on a clean hit may replay its prior receipt
+    // instead of re-running its action — but only past both gates: every
+    // file-backed declared output must still be byte-identical to the hash in
+    // the receipt, and the receipt must carry a recorded value to serve.
+    // Anything less falls through and does the work; a cache that cannot
+    // account for the exact bytes it returns has not earned the right to
+    // return them.
+    if (
+      ENACT_EVIDENCE_REUSE &&
+      node.reuse_enactable === true &&
+      reason === "hit.inputs_unchanged"
+    ) {
+      const outputFilesNow = await hashDeclaredPaths(declaredOutputs);
+      const recordedOutputFiles = prior.receipt.output_files ?? {};
+      const missingOutputs = Object.entries(outputFilesNow)
+        .filter(([, fileHash]) => fileHash === "absent")
+        .map(([name]) => name);
+      const movedOutputs = Object.entries(outputFilesNow)
+        .filter(
+          ([name, fileHash]) =>
+            fileHash !== "absent" && recordedOutputFiles[name] !== fileHash,
+        )
+        .map(([name, fileHash]) => ({
+          name,
+          recorded: recordedOutputFiles[name] ?? "absent",
+          current: fileHash,
+        }));
+      const outputsByteIdentical =
+        missingOutputs.length === 0 && movedOutputs.length === 0;
+      if (outputsByteIdentical && prior.receipt.recorded_value !== undefined) {
+        timingsMs[id] = 0;
+        outputDigests.set(id, prior.receipt.output_digest);
+        nodeReceipts[id] = prior.receipt.receipt_hash;
+        await record({
+          node,
+          reason,
+          moved: [],
+          detail: { reuse: "node_receipt_replayed" },
+          durationMs: 0,
+          priorOutputDigest: prior.receipt.output_digest,
+          outputAgreed: null,
+          executed: false,
+          enactedReuse: true,
+        });
+        reusedNodes.push(id);
+        return {
+          ok: true,
+          receipt: prior.receipt,
+          reused: true,
+          decision: "REUSED",
+          reason,
+          moved: [],
+          output_digest: prior.receipt.output_digest,
+          duration_ms: 0,
+          value: prior.receipt.recorded_value,
+        };
+      }
+      if (missingOutputs.length > 0) {
+        reason = "invalid.declared_output_absent";
+        moved = missingOutputs.map(
+          (name) => `declared_output ${name}: absent (${declaredOutputs[name]})`,
+        );
+      } else if (movedOutputs.length > 0) {
+        reason = "invalid.output_digest_mismatch";
+        moved = movedOutputs.map(
+          ({ name, recorded, current }) =>
+            `declared_output ${name}: ${String(recorded).slice(0, 12)} -> ${String(current).slice(0, 12)}`,
+        );
+      }
+      // No replayable value (legacy), vanished output, or byte-moved output:
+      // fall through and recompute honestly with the invalidation reason
+      // preserved in the new decision receipt.
+    }
+
+    // The action runs on every pass that reaches here: for non-enactable nodes
+    // always, so a HIT is CHECKED rather than trusted; for enactable nodes on
+    // any miss, invalid, or unplayable hit. See the module header.
     const started = process.hrtime.bigint();
     let value;
     try {
@@ -783,6 +973,56 @@ export function createEvidenceWorkGraph({
     timingsMs[id] = durationMs;
     const { digest: outputDigest, hashable } = safeOutputDigest(value);
     const outputFiles = await hashDeclaredPaths(declaredOutputs);
+
+    // MP2 E2 — THE ABSENCE GATE. The action has run; before anything may claim
+    // success, every output path the call site declared as a real file must
+    // exist. A success receipt is a claim about artifacts, and sealing one over
+    // a file that was never written would poison every downstream key that
+    // digests this node's outputs. So the node is sealed BLOCKED instead — same
+    // body, honest status — the decision is recorded, the value digest is NOT
+    // published to dependents (a missing artifact must not look like input for
+    // the next node's key), and a typed error is thrown so the caller fails
+    // loudly rather than building on nothing.
+    const pathTargets = declaredPathTargets(declaredOutputs);
+    const missingOutputs = await absentDeclaredPaths(pathTargets);
+    if (missingOutputs.length > 0) {
+      executedNodes.push(id);
+      const blockedBody = {
+        schema_version: EVIDENCE_WORK_NODE_SCHEMA,
+        node: id,
+        stage: node.stage,
+        run_id: runId,
+        controller_version: controllerVersion,
+        recipe,
+        status: "BLOCKED",
+        blocker_class: "INTERNAL_WORK",
+        key_components: [...node.key_components],
+        invalidated_by: node.invalidated_by,
+        depends_on: [...node.depends_on],
+        input_components: digest,
+        input_digest: inputDigest,
+        output_names: [...node.outputs],
+        output_paths: Object.fromEntries(pathTargets.map((entry) => [entry.name, entry.path])),
+        output_files: outputFiles,
+        output_digest: outputDigest,
+        decision: "INVALID",
+        reason: "invalid.declared_output_absent",
+        moved: missingOutputs.map((entry) => `declared_output ${entry.name}: absent (${entry.path})`),
+        missing_outputs: missingOutputs,
+      };
+      const blockedReceipt = { ...blockedBody, receipt_hash: hashValue(blockedBody) };
+      await atomicWrite(receiptPath(id), `${canonicalJson(blockedReceipt)}\n`);
+      nodeReceipts[id] = blockedReceipt.receipt_hash;
+      await record({
+        node,
+        reason: "invalid.declared_output_absent",
+        moved: blockedBody.moved,
+        detail: { missing_outputs: missingOutputs },
+        durationMs,
+      });
+      throw new EvidenceWorkOutputAbsentError(id, missingOutputs);
+    }
+    const outputPaths = Object.fromEntries(pathTargets.map((entry) => [entry.name, entry.path]));
     outputDigests.set(id, outputDigest);
 
     // P6.4: the prior recorded output digest, and whether this run's real
@@ -828,11 +1068,21 @@ export function createEvidenceWorkGraph({
       input_components: digest,
       input_digest: inputDigest,
       output_names: [...node.outputs],
+      output_paths: outputPaths,
       output_files: outputFiles,
       output_digest: outputDigest,
       decision,
       reason,
     };
+    // Enactment's enabler: an opted-in node seals WHAT its action produced into
+    // the receipt body — inside `receipt_hash` like every other field — so a
+    // later existence-verified clean hit can replay this exact value instead of
+    // recomputing it. A value that cannot survive the round-trip records no
+    // value, and a receipt without one is never replayed.
+    if (ENACT_EVIDENCE_REUSE && node.reuse_enactable === true && hashable) {
+      const recordedValue = safeRecordedValue(value);
+      if (recordedValue !== undefined) body.recorded_value = recordedValue;
+    }
     const receipt = { ...body, receipt_hash: hashValue(body) };
     await atomicWrite(receiptPath(id), `${canonicalJson(receipt)}\n`);
     nodeReceipts[id] = receipt.receipt_hash;
@@ -863,10 +1113,46 @@ export function createEvidenceWorkGraph({
    * A stage whose receipt was reused never enters its nodes' actions, so those
    * nodes record the stage-level hit instead. A node that already recorded a
    * decision for ITSELF this run is never overwritten — the finer reason wins.
+   *
+   * MP2 E2 — a stage-level hit is a claim about ARTIFACTS, not only about keys,
+   * so before the hit is recorded each node's receipt is re-verified against
+   * the filesystem: every output path its success receipt named must still
+   * exist. An output that has vanished since refuses the hit — the node is
+   * recorded INVALID at `invalid.declared_output_absent` (executed:false, the
+   * action did not run; the CLAIM was false), it is excluded from the returned
+   * reuse list, and it never reaches `reusedNodes`.
    */
   async function reuseStage(stageId) {
     const pending = nodes.filter((node) => node.stage === stageId && !decided.has(node.id));
+    const verified = [];
     for (const node of pending) {
+      const prior = await readReceipt(node.id);
+      const recordedPaths = Object.entries(prior.receipt?.output_paths ?? {}).filter(
+        ([, target]) => typeof target === "string",
+      );
+      const missingOutputs = await absentDeclaredPaths(
+        recordedPaths.map(([name, target]) => ({ name, path: target })),
+      );
+      if (missingOutputs.length > 0) {
+        decisions.push({
+          node: node.id,
+          stage: node.stage,
+          recipe: node.recipe,
+          decision: "INVALID",
+          reason: "invalid.declared_output_absent",
+          moved: missingOutputs.map((entry) => `declared_output ${entry.name}: absent (${entry.path})`),
+          key_components: [...node.key_components],
+          invalidated_by: node.invalidated_by,
+          enacted_reuse: false,
+          executed: false,
+          prior_output_digest: null,
+          output_agreed: null,
+          duration_ms: 0,
+          detail: { stage: stageId, missing_outputs: missingOutputs },
+        });
+        decided.add(node.id);
+        continue;
+      }
       decisions.push({
         node: node.id,
         stage: node.stage,
@@ -885,9 +1171,10 @@ export function createEvidenceWorkGraph({
       });
       decided.add(node.id);
       reusedNodes.push(node.id);
+      verified.push(node.id);
     }
     if (pending.length > 0) await flush();
-    return pending.map((node) => node.id);
+    return verified;
   }
 
   async function close() {

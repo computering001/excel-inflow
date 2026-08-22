@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "skill_name": "excel-inflow",
-  "skill_version": "3.7.9",
+  "skill_version": "3.7.11",
   "template_version": "4.0.0-dynamic",
   "model_case_schema_version": 2,
   "row_taxonomy_version": 3,
@@ -19,17 +19,18 @@
     "visual_review",
     "installed_fresh_session_test"
   ],
-  "certified_runtime_code_closure_sha256": "1e463ee6d35775be224cc6005dc88add7f97c1bf9e778c5860fcfac878861c34",
+  "certified_runtime_code_closure_sha256": "7d0e82c9a5675a427910739deb6080394b15256d669c79bed2830d2421af3dfa",
   "certified_runtime_code_closure": {
     "definition": "certified-runtime-code-closure/1.1",
     "roots": "assets/deployment-profile.json#/(script_entry_points+script_private_roots+*-runtime-members.json JavaScript roots)",
     "membership_rule": "the transitive ES-module import graph under scripts/, walked from every public, private and runtime-manifest JavaScript root; assets, references, resources, vendored bytes and Python modules are NOT members",
-    "module_count": 171,
+    "module_count": 154,
     "publisher": "assets/runtime-manifest.json",
     "publisher_is_a_member": false,
     "self_reference_note": "The publisher is an ASSET and this closure admits only modules, so the artifact that records the digest is structurally outside the set the digest is taken over. No file list is recorded here: a verifier that read a member list out of this artifact would be checking the artifact against itself.",
     "recorded_by": "scripts/run_certified_code_closure_tests.mjs --record",
     "verified_by": "node scripts/run_certified_code_closure_tests.mjs",
     "certification_claim": false
-  }
+  },
+  "release_channel": "candidate"
 }

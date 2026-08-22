@@ -1,0 +1,23 @@
+{
+  "schema_version": "release-identity/1.0",
+  "version": "3.7.11",
+  "channel": "candidate",
+  "channel_semantics": {
+    "stable": {
+      "installable_as_stable": true,
+      "description": "Production-certified line. Installable into the active production slot."
+    },
+    "candidate": {
+      "installable_as_stable": true,
+      "description": "Release candidate. Installable into an inactive slot and promotable to production after its gates pass; not yet the production line."
+    },
+    "dev": {
+      "installable_as_stable": false,
+      "description": "Development build. May be installed only as an inactive candidate for testing; installing it as stable is refused at the installer ingress."
+    }
+  },
+  "_commit": "Filled at build time in the STAMPED copies this file's writer emits (packaged release-identity.json, doc banners). Null here: the hand-edited source never carries build output.",
+  "_generated_at": "Filled at build time from the deterministic build clock (EXCEL_INFLOW_BUILD_TIMESTAMP / SOURCE_DATE_EPOCH / HEAD committer date), so a rebuild of one commit stays byte-identical.",
+  "commit": null,
+  "generated_at": null
+}

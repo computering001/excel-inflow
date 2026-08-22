@@ -31,8 +31,16 @@ import {
   assertRcfAverageFxUsable,
   detectTwoCycle,
   initMonotoneBoundaryBracket,
+  leaseHistoricalLiabilities,
+  leaseOpeningLiability,
   solveCase,
 } from "./lib/solver.mjs";
+import {
+  isFiniteFinancialNumber,
+  leaseInterestCashSplitErrors,
+  leaseOpeningLiabilityState,
+} from "./lib/lease_policy.mjs";
+import { selectStandardisedProfile } from "./lib/design_contract.mjs";
 import { validateRcfSweep } from "./lib/fixed_point_constitution.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +75,116 @@ check("detectTwoCycle ignores a settled sweep", () => {
 check("detectTwoCycle tolerates missing history", () => {
   assert.equal(detectTwoCycle(null, [2], [1], 1e-8), false);
 });
+
+// ---------------------------------------------------------------------------
+// mp2-D1 — normalized financial numbers must be genuine finite numbers.
+// JavaScript's Number(null), Number("") and Number(false) are all zero; none
+// of those representations is a declared economic zero.
+// ---------------------------------------------------------------------------
+
+const caught = (action) => {
+  try {
+    action();
+    return null;
+  } catch (error) {
+    return error;
+  }
+};
+const invalidFinancialValues = [
+  undefined,
+  null,
+  "",
+  "   ",
+  "0",
+  false,
+  true,
+  [],
+  {},
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+  Number.NEGATIVE_INFINITY,
+];
+const financialValueLabel = (value) => {
+  if (typeof value === "number" && Number.isNaN(value)) return "NaN";
+  if (value === Number.POSITIVE_INFINITY) return "+Infinity";
+  if (value === Number.NEGATIVE_INFINITY) return "-Infinity";
+  if (value === undefined) return "undefined";
+  return JSON.stringify(value);
+};
+
+for (const value of invalidFinancialValues) {
+  const label = financialValueLabel(value);
+  check(
+    !isFiniteFinancialNumber(value),
+    `D1: ${label} is not a finite financial number`,
+  );
+  check(
+    caught(() => leaseHistoricalLiabilities({
+      lease_policy: { historical_liabilities: [1, 2, value] },
+    })) instanceof Error,
+    `D1: historical lease series refuses ${label}`,
+  );
+  check(
+    caught(() => selectStandardisedProfile({
+      instruments: [],
+      lease_policy: { historical_liabilities: [0, 0, value] },
+      cash_policy: { opening_cash: 0, eligible_cash_percentage: 1 },
+      acquisition: { enabled: 0 },
+    })) instanceof Error,
+    `D1: design profile refuses lease ${label}`,
+  );
+  const splitErrors = leaseInterestCashSplitErrors({
+    cash_interest_paid: 0,
+    gross_interest: 0,
+    lease_interest: value,
+    non_cash_interest: 0,
+    non_cash_instrument_interest: 0,
+  });
+  check(
+    splitErrors.length === 1 && /unresolved/.test(splitErrors[0]),
+    `D1: cash-interest split refuses lease leg ${label}`,
+  );
+  if (value !== undefined) {
+    check(
+      caught(() => leaseOpeningLiabilityState({ opening_liability: value })) instanceof Error,
+      `D1: scalar lease opening refuses ${label}`,
+    );
+  }
+  if (value !== undefined && value !== null) {
+    const publishedErrors = leaseInterestCashSplitErrors({
+      cash_interest_paid: value,
+      gross_interest: 0,
+      lease_interest: 0,
+      non_cash_interest: 0,
+      non_cash_instrument_interest: 0,
+    });
+    check(
+      publishedErrors.length === 1 && /must be a finite financial number/.test(publishedErrors[0]),
+      `D1: published cash-interest value refuses ${label}`,
+    );
+  }
+}
+
+check(isFiniteFinancialNumber(0), "D1: numeric zero remains a declared financial number");
+check(
+  leaseOpeningLiabilityState({ opening_liability: 0 }).state === "declared" &&
+    Object.is(leaseOpeningLiabilityState({ opening_liability: 0 }).value, 0),
+  "D1: explicit numeric-zero opening liability remains declared",
+);
+check(
+  leaseOpeningLiability({ lease_policy: {} }) === 0,
+  "D1: omitted optional lease opening remains the typed carried state",
+);
+check(
+  leaseInterestCashSplitErrors({
+    cash_interest_paid: 0,
+    gross_interest: 0,
+    lease_interest: 0,
+    non_cash_interest: 0,
+    non_cash_instrument_interest: 0,
+  }).length === 0,
+  "D1: an all-declared numeric-zero cash-interest split remains valid",
+);
 
 // ---------------------------------------------------------------------------
 // B3(sign) — the lease leg of cash_interest_paid.

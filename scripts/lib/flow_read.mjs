@@ -15,7 +15,7 @@
 // It is non-blocking. It reports and does not wait, so a batch of ten does not
 // stall overnight.
 
-import { leaseOpeningLiability } from "./solver.mjs";
+import { leaseOpeningLiabilityState } from "./lease_policy.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
 import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
 import { resolveForecastAuthority } from "./forecast_authority.mjs";
@@ -197,7 +197,7 @@ export function openingPosition(modelCase) {
       )
       .reduce((total, instrument) => total + translated(instrument), 0) +
     openingDraw;
-  const lease = leaseOpeningLiability(modelCase);
+  const lease = leaseOpeningLiabilityState(modelCase?.lease_policy ?? {}).value;
   const policy = modelCase.lease_policy ?? {};
   const leaseActive = policy.mode !== "exclude";
   const cash = Number(modelCase.cash_policy?.opening_cash ?? 0);

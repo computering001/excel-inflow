@@ -4,6 +4,8 @@
     "scripts/run_filings_pipeline.mjs",
     "scripts/extract_filing_statements.py",
     "scripts/extract_inline_xbrl.py",
+    "scripts/extract_html_tables.py",
+    "scripts/broker_numeric.py",
     "scripts/lib/filings_acquisition.mjs",
     "scripts/lib/extraction_cache.mjs",
     "scripts/lib/source_ingress_security.mjs",

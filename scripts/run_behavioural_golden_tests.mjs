@@ -501,12 +501,15 @@ async function assertFrozenSetAtFullStrength(goldensDir, label) {
     ledger.records.every((record) => record.record_hash === goldenApprovalRecordHash(record)),
     `${label}: every ledger record's hash covers its own body`,
   );
+  const latestMaterialisation = [...ledger.records]
+    .reverse()
+    .find((record) => record.event_type === "freeze" || record.event_type === "regenerate");
   check(
-    ledger.records[0].goldens.length === certified.length &&
-      ledger.records[0].goldens.every(
-        (entry) => entry.record_sha256 === records.get(entry.fixture_id).record_sha256,
+    latestMaterialisation?.goldens.length === certified.length &&
+      latestMaterialisation.goldens.every(
+        (entry) => entry.record_sha256 === records.get(entry.fixture_id)?.record_sha256,
       ),
-    `${label}: the genesis freeze binds the record_sha256 of every golden it froze`,
+    `${label}: the latest freeze or approved regeneration binds the record_sha256 of every current golden`,
   );
   check(
     ledger.records[0].reason.length >= 40 && ledger.records[0].actor.kind === "human",

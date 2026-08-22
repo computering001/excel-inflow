@@ -30,7 +30,7 @@
 import { createHash } from "node:crypto";
 
 import { PERFORMANCE_POLICY, PERFORMANCE_POLICY_REF, PERFORMANCE_POLICY_SHA256 } from "./experience_trace.mjs";
-import { STAGE_FLOOR_TOTAL_ALLOWANCE_MS, RUNTIME_BUDGET_OVERRUN_REASON, validateRunDeadlineLedger } from "./run_deadline.mjs";
+import { STAGE_FLOOR_TOTAL_ALLOWANCE_MS, STAGE_FLOOR_SPAWN_TOKEN_MS, RUNTIME_BUDGET_OVERRUN_REASON, validateRunDeadlineLedger } from "./run_deadline.mjs";
 import { DEFAULT_RUNTIME_BUDGETS_MS } from "./runtime_budget_policy.mjs";
 
 export const RUNTIME_SLO_SCHEMA = "excel-inflow-runtime-slo/1.0";
@@ -581,7 +581,13 @@ export function hardCeilingEnforcementReport({ ledger, declaration = RUNTIME_SLO
     const grant = Number(record?.granted_ms ?? 0);
     const availableDebt = Math.max(0, allowance - debtSpent);
     if (grant < 1) violations.push(`grant_zero:${record?.stage}`);
-    if (grant > remaining + availableDebt) violations.push(`grant_exceeds_envelope:${record?.stage}`);
+    // E3 requires every grant to be at least the single-millisecond spawn
+    // token (zero means "no timeout" at a spawn), so once BOTH the ceiling
+    // and the allowance are spent the envelope must still admit exactly that
+    // token — and nothing larger. E1 stays absolute above it.
+    const envelopeMax = remaining + availableDebt
+      + (remaining <= 0 && availableDebt === 0 ? STAGE_FLOOR_SPAWN_TOKEN_MS : 0);
+    if (grant > envelopeMax) violations.push(`grant_exceeds_envelope:${record?.stage}`);
     const debt = Math.max(0, Math.min(grant - remaining, availableDebt));
     if (remaining <= 0) {
       if (previousPastCeilingGrant !== null && grant > previousPastCeilingGrant && availableDebt < grant) {

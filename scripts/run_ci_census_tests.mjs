@@ -25,7 +25,10 @@ function option(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
-const outPath = option("out", path.join(ROOT, "ci", "test_registry_census.json"));
+// The execution census and registry-classification census are different
+// generated contracts. They must never share a path: otherwise one sanctioned
+// writer can overwrite the artifact owned by the other.
+const outPath = option("out", path.join(ROOT, "ci", "execution_test_census.json"));
 
 let checks = 0;
 function check(condition, message) {
@@ -50,6 +53,9 @@ const DISPOSITIONS = {
   "run_excel_inflow_bootstrap.mjs": "PIPELINE_ENTRYPOINT",
   "run_excel_inflow_vnext.mjs": "PIPELINE_ENTRYPOINT",
   "run_filings_pipeline.mjs": "PIPELINE_ENTRYPOINT",
+  // MP2-B3/B4: sanctioned generated-evidence/doc writer. Its live route and
+  // mutation harness is registered separately as filings-ladder-corpus-rehearsal.
+  "run_filings_ladder_corpus_rehearsal.py": "GENERATED_ARTIFACT_WRITER",
   "run_user_flow.mjs": "PIPELINE_ENTRYPOINT",
   "run_structural_ownership_preflight.mjs": "PIPELINE_ENTRYPOINT",
   "run_frozen_cohort.mjs": "PIPELINE_ENTRYPOINT",

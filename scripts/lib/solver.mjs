@@ -10,8 +10,10 @@ import {
   validateBalancingRcf,
 } from "./rcf_policy.mjs";
 import {
+  isFiniteFinancialNumber,
   leaseForecast,
   leaseInterestCashSplitErrors,
+  leaseOpeningLiabilityState,
   validateLeasePolicy,
 } from "./lease_policy.mjs";
 import {
@@ -308,6 +310,31 @@ export function convergenceFloatNoiseFloor(previous, current) {
 }
 
 /**
+ * E6b — WHICH iteration node put the state outside the declared envelope.
+ * Returns the L-infinity argmax across BOTH iterates being compared, so it
+ * names exactly the quantity `convergenceStateScale` measures, plus the node
+ * carrying it. Purely diagnostic: nothing numeric reads it.
+ */
+export function convergenceWorstStateNode(declaration, previous, current) {
+  const nodes = Array.isArray(declaration?.state_vector)
+    ? declaration.state_vector.map((component) => component.node_id)
+    : [];
+  let worstNodeId = null;
+  let worstMagnitude = 0;
+  for (const snapshot of [previous, current]) {
+    if (!Array.isArray(snapshot)) continue;
+    for (const [position, value] of snapshot.entries()) {
+      const magnitude = Math.abs(Number(value));
+      if (Number.isFinite(magnitude) && magnitude > worstMagnitude) {
+        worstMagnitude = magnitude;
+        worstNodeId = nodes[position] ?? `state_vector[${position}]`;
+      }
+    }
+  }
+  return { node_id: worstNodeId, magnitude: worstMagnitude };
+}
+
+/**
  * The criterion, published rather than left implicit: a reader can recompute
  * every term, see which one bound, and see whether the declared scale envelope
  * was the thing that decided.
@@ -386,8 +413,17 @@ function asSeries3(value, fallback = 0) {
  */
 export function leaseHistoricalLiabilities(modelCase) {
   const series = modelCase?.lease_policy?.historical_liabilities;
-  if (!Array.isArray(series) || series.length !== 3) return null;
-  return series.map(Number);
+  if (series === undefined) return null;
+  if (
+    !Array.isArray(series) ||
+    series.length !== 3 ||
+    series.some((value) => !isFiniteFinancialNumber(value))
+  ) {
+    throw new Error(
+      "lease_policy.historical_liabilities must contain three finite financial numbers.",
+    );
+  }
+  return [...series];
 }
 
 /**
@@ -396,8 +432,8 @@ export function leaseHistoricalLiabilities(modelCase) {
  */
 export function leaseOpeningLiability(modelCase) {
   const historical = leaseHistoricalLiabilities(modelCase);
-  if (historical) return Number(historical[2]);
-  return Number(modelCase?.lease_policy?.opening_liability ?? 0);
+  if (historical) return historical[2];
+  return leaseOpeningLiabilityState(modelCase?.lease_policy ?? {}).value;
 }
 
 function metricSeries(modelCase, metricId) {
@@ -1852,10 +1888,10 @@ export function validateCaseShape(modelCase) {
     } else if (
       !Array.isArray(historicalLiabilities) ||
       historicalLiabilities.length !== 3 ||
-      historicalLiabilities.some((value) => !Number.isFinite(Number(value)))
+      historicalLiabilities.some((value) => !isFiniteFinancialNumber(value))
     ) {
       errors.push(
-        "lease_policy.historical_liabilities must be three numeric period-end balances.",
+        "lease_policy.historical_liabilities must be three finite financial period-end balances.",
       );
     }
     if (
@@ -3931,6 +3967,51 @@ export function solveCase(
       order: observedOrder,
       agreement: orderAgreement,
     });
+
+    // E6b — THE ENVELOPE BOUNDARY IS DISCLOSED, NEVER SILENT. The criterion
+    // above already publishes `within_declared_envelope: false` when the
+    // state's L-infinity magnitude sits above REFERENCE_STATE_MAGNITUDE (1e3
+    // reporting units) and the DECLARED ABSOLUTE CEILING — not the scale-free
+    // term — decided the verdict. But that disclosure lived only inside the
+    // criterion object; the typed findings ledger a reviewer actually reads
+    // said nothing. Beyond the reference magnitude the applied tolerance stops
+    // shrinking with the state and is LOOSER than the scale-free term would
+    // have been, which is exactly the clamp shape the DEGRADE vocabulary
+    // exists for: the solve stays lawful inside the ceiling, but convergence
+    // was accepted by a constant rather than by proportionality, and the
+    // ledger must say so on every period it binds. The finding names the
+    // envelope constant, the binding term, and the offending period plus the
+    // iteration node that carries the largest magnitude (with the RCF
+    // instrument identified when that node is the revolver's). Deduped per
+    // (code, severity, period, scope) like every other finding, so the
+    // per-iteration re-evaluation cannot flood it.
+    if (
+      solverDeclaration.required &&
+      lastConvergenceCriterion &&
+      lastConvergenceCriterion.within_declared_envelope === false
+    ) {
+      const worst = convergenceWorstStateNode(
+        solverDeclaration,
+        previousPreviousIterationSnapshot,
+        previousIterationSnapshot,
+      );
+      const worstScope = `node:${worst.node_id ?? "unknown"}`;
+      recordSolverFinding("scale_envelope_exceeded", "DEGRADE", {
+        period: period.date,
+        scope: worstScope,
+        ...(String(worst.node_id ?? "").startsWith("rcf.") && rcfInstrument
+          ? { instrument_id: rcfInstrument.instrument_id }
+          : {}),
+        quantity: worst.node_id,
+        reference_state_magnitude:
+          lastConvergenceCriterion.reference_state_magnitude,
+        envelope_ceiling: lastConvergenceCriterion.envelope_ceiling,
+        binding_term: lastConvergenceCriterion.binding_term,
+        state_scale: lastConvergenceCriterion.state_scale,
+        scale_free_tolerance: lastConvergenceCriterion.scale_free_tolerance,
+        applied_tolerance: lastConvergenceCriterion.applied_tolerance,
+      });
+    }
 
     const finalCashBucketSnapshot = cashBucketSnapshot(endingCash);
     const eligibleCash = finalCashBucketSnapshot.net_debt_eligible_cash;

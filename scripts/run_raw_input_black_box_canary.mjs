@@ -263,7 +263,11 @@ if (options["real-filings-request"]) {
       "maximum_residual_percentage", "restricted_cash", "leverage_basis",
       "minimum_operating_cash", "announced_acquisition",
     ]
-      .filter((key) => clean.filings[key] !== undefined)
+      .filter((key) =>
+        clean.filings[key] !== undefined &&
+        (key !== "reported_lease_liability" ||
+          Number.isFinite(clean.filings[key]))
+      )
       .map((key) => [key, structuredClone(clean.filings[key])]),
   );
   filingFacts.historical_gross_debt = [80, 80, 80];
@@ -871,8 +875,14 @@ try {
   result = JSON.parse(executed.stdout);
 } catch (error) {
   const stdout = String(error.stdout ?? "");
+  const stderr = String(error.stderr ?? error.message ?? "");
   result = stdout.trim().startsWith("{") ? JSON.parse(stdout) : null;
-  throw new Error(`Raw-input public controller failed: ${JSON.stringify(result ?? { stderr: error.stderr ?? error.message }).slice(0, 6000)}`);
+  throw new Error(
+    `Raw-input public controller failed: ${JSON.stringify({
+      ...(result ? { result } : {}),
+      stderr,
+    }).slice(0, 12000)}`,
+  );
 }
 if (result.status !== "PASS_PENDING_MANUAL" || !result.artifacts?.delivery_file) {
   throw new Error(`Raw-input public controller did not deliver: ${JSON.stringify(result).slice(0, 6000)}`);

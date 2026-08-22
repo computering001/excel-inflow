@@ -20,7 +20,7 @@
   },
   "visible_journey": {
     "schema_version": "visible-journey/1.0",
-    "display_rule": "Only this six-milestone journey is user-visible. Five-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
+    "display_rule": "Only this six-milestone journey is user-visible. Six-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
     "milestones": [
       {
         "id": "company",
@@ -72,6 +72,12 @@
         "active_milestone": "build",
         "next_milestone": "deliver"
       },
+      "review": {
+        "label": "REVIEW",
+        "completed_milestones": 5,
+        "active_milestone": null,
+        "next_milestone": "deliver"
+      },
       "delivery": {
         "label": "DELIVERY",
         "completed_milestones": 5,
@@ -93,6 +99,11 @@
         "automatic_continuation": true
       },
       "BLOCKED_INTERNAL": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true,
+        "user_visible": false
+      },
+      "NEEDS_INTERNAL_WORK": {
         "requires_explicit_reply": false,
         "automatic_continuation": true,
         "user_visible": false
@@ -558,6 +569,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -570,7 +582,8 @@
             "inputs",
             "evidence_review",
             "decisions",
-            "build_checks"
+            "build_checks",
+            "review"
           ]
         },
         "ACTION_REQUIRED": {
@@ -581,6 +594,20 @@
           "stages": [
             "inputs",
             "decisions"
+          ]
+        },
+        "NEEDS_INTERNAL_WORK": {
+          "blocker_classes": [
+            "INTERNAL_WORK"
+          ],
+          "user_blocking": false,
+          "stages": [
+            "inputs",
+            "evidence_review",
+            "decisions",
+            "build_checks",
+            "review",
+            "delivery"
           ]
         },
         "BLOCKED": {
@@ -596,6 +623,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -616,23 +644,34 @@
         "PAUSED": [
           "PAUSED",
           "ACTION_REQUIRED",
+          "NEEDS_INTERNAL_WORK",
           "BLOCKED",
           "PASS_PENDING_MANUAL"
         ],
         "ACTION_REQUIRED": [
           "ACTION_REQUIRED",
           "PAUSED",
+          "NEEDS_INTERNAL_WORK",
+          "BLOCKED",
+          "PASS_PENDING_MANUAL"
+        ],
+        "NEEDS_INTERNAL_WORK": [
+          "NEEDS_INTERNAL_WORK",
+          "PAUSED",
+          "ACTION_REQUIRED",
           "BLOCKED",
           "PASS_PENDING_MANUAL"
         ],
         "BLOCKED": [
           "BLOCKED",
+          "NEEDS_INTERNAL_WORK",
           "PAUSED",
           "ACTION_REQUIRED",
           "PASS_PENDING_MANUAL"
         ],
         "PASS_PENDING_MANUAL": [
           "PASS_PENDING_MANUAL",
+          "NEEDS_INTERNAL_WORK",
           "PAUSED"
         ]
       }
@@ -645,6 +684,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -659,16 +699,31 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
         "failed": {
           "stages": [
             "build_checks",
+            "review",
             "delivery"
           ]
         }
       }
     }
+  },
+  "_generated_bindings": {
+    "schema_version": "hand-owned-artifact-bindings/1.0",
+    "body_sha256": "5460b9a01ea0d04ea1c79a16cb3723f50875f0be34244a58dba5f4afc148d3a6",
+    "source_sha256": {
+      "scripts/lib/workflow_state.mjs": "826aadcfb72d3b40f01259857149553e09910826ccab40a133d719f8c2080e1c",
+      "scripts/workflow_state.py": "e0ae54366274896af0166e8e25987a6fdc5b7f4ca108045e9e2f4b54dc48acbd"
+    },
+    "verifier_path": "scripts/run_workflow_state_tests.mjs",
+    "verifier_sha256": "39409abe5e75c8b6c8a61bbd7476d0a118059bceeceac01789dacf3ea03c87ad",
+    "writer": "node scripts/write_hand_owned_artifact_bindings.mjs --write",
+    "check": "node scripts/write_hand_owned_artifact_bindings.mjs --check",
+    "policy": "The body is hand-curated authority. Any body, governed-source or independent-verifier change makes this binding stale until the sanctioned writer is run deliberately."
   }
 }

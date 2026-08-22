@@ -225,8 +225,8 @@ await test("bootstrap is the single public Company-screen controller", async () 
 });
 
 await test("production controller owns one canonical six-milestone visible journey", async () => {
-  const stages = ["inputs", "evidence_review", "decisions", "build_checks", "delivery"];
-  const expectedCompleted = [0, 4, 4, 4, 5];
+  const stages = ["inputs", "evidence_review", "decisions", "build_checks", "review", "delivery"];
+  const expectedCompleted = [0, 4, 4, 4, 5, 5];
   for (const [index, stage] of stages.entries()) {
     const result = await command("run_user_flow.mjs", ["--screen", stage]);
     const screen = result.stdout.replace(/\n$/, "");

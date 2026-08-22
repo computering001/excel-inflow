@@ -874,6 +874,25 @@ function buildCleanEvidenceRun(baseCase, fixture) {
     declarations: authored.caseSource,
     caseEvidence: authored.evidence,
   });
+  for (const [section, patches] of Object.entries(
+    fixture.case_source_statement_patch ?? {},
+  )) {
+    for (const [rowId, patch] of Object.entries(patches ?? {})) {
+      const entryIndex = (run.case_source.statement_map?.[section] ?? [])
+        .findIndex(
+          (entry) => entry.row_id === rowId || entry.source_line_id === rowId,
+        );
+      if (entryIndex < 0) {
+        throw new Error(
+          `Case-source fixture patch row is absent: ${section}.${rowId}`,
+        );
+      }
+      run.case_source.statement_map[section][entryIndex] = merge(
+        run.case_source.statement_map[section][entryIndex],
+        patch,
+      );
+    }
+  }
   installProposerNativeProvenance({
     caseSource: run.case_source,
     caseEvidence: authored.evidence,

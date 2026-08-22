@@ -20,6 +20,8 @@ const ROOT = path.resolve(HERE, "..");
 const SCRATCH = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-phase3-integration-"));
 const GIT = (character) => character.repeat(40);
 const SHA = (seed) => identitySha256({ seed });
+const FIXTURE_VERSION = "0.0.0";
+const FIXTURE_RELEASE_TAG = `v${FIXTURE_VERSION}`;
 const NOW = "2026-08-21T12:00:00.000Z";
 const VERIFY_AT = new Date("2026-08-21T12:00:01.000Z");
 const DOCTOR_SHA = SHA("runtime-doctor");
@@ -98,7 +100,8 @@ async function buildPackage(mode = "development") {
     python_module_allowlist: [], resource_directory_allowlist: [], vendored_dependencies: [],
   });
   await writeJson(path.join(packageRoot, "assets", "runtime-manifest.json"), {
-    skill_version: "phase3-fixture", status: "compiled_fixture", package_mode: mode,
+    skill_version: FIXTURE_VERSION, status: "compiled_fixture", package_mode: mode,
+    release_channel: "stable",
     deployment_status: "not_installed",
   });
   const closure = (await captureRuntimeIntegrity(packageRoot)).runtime_code_closure.sha256;
@@ -106,7 +109,8 @@ async function buildPackage(mode = "development") {
     schemaVersion: 2,
     releaseName: "phase3-fixture",
     packageMode: mode,
-    skillVersion: "phase3-fixture",
+    skillVersion: FIXTURE_VERSION,
+    releaseTag: FIXTURE_RELEASE_TAG,
     identity: {
       schema_version: "product-identity/2.0",
       source: { identity_kind: "source_tree", repository: "fixture/repository", commit_sha: GIT("a"), tree_sha: GIT("b") },

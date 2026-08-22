@@ -3,7 +3,92 @@
   "release_name": "Excel Inflow",
   "central_instruction_source": "compiled",
   "default_reference_policy": "central-only-first",
-  "instruction_strip_rules_runtime": [],
+  "instruction_strip_rules_runtime": [
+    {
+      "id": "source-only-public-test-route",
+      "kind": "regex",
+      "find": "### Autonomous public-company test route[\\s\\S]*?(?=\\nWhen raw broker documents are supplied)",
+      "occurrences": "exactly_one",
+      "reason": "The autonomous public-company route and its compiler are source-only development capabilities, not installed production commands."
+    },
+    {
+      "id": "source-only-evidence-resolution-test-command",
+      "kind": "regex",
+      "find": "The source-owned contract and adversarial test is runnable as:\\n\\n```text\\nnode scripts/run_evidence_resolution_v2_tests\\.mjs\\n```\\n",
+      "occurrences": "exactly_one",
+      "reason": "The adversarial suite runs from the source-owned development registry."
+    },
+    {
+      "id": "source-only-statement-classifier-test-command",
+      "find": "node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-forecast-observation-test-command",
+      "find": "node scripts/run_forecast_observation_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-forecast-behavior-test-command",
+      "find": "node scripts/run_forecast_behavior_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-instrument-period-state-test-command",
+      "find": "node scripts/run_instrument_period_state_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-equation-graph-test-command",
+      "find": "node scripts/run_equation_graph_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-run-constitution-test-command",
+      "find": "node scripts/run_run_constitution_graph_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-product-constitution-test-command",
+      "find": "node scripts/run_product_constitution_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-delivery-constitution-test-command",
+      "find": "node scripts/run_delivery_constitution_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-controller-exit-test-command",
+      "find": "node scripts/run_controller_exit_inventory_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-broker-dynamic-concept-test-command",
+      "find": "node scripts/run_broker_dynamic_concept_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-broker-fault-injection-command",
+      "find": "node scripts/run_broker_exit_fault_injection_tests.mjs\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-universal-broker-matrix-command",
+      "find": "node scripts/run_universal_broker_delivery_matrix.mjs <degraded-delivery-report.json> <usable-broker-workbook.xlsx>\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-fixed-point-test-command",
+      "find": "node scripts/run_fixed_point_constitution_tests.mjs --manifest <fixed-point-cases.json>\n",
+      "occurrences": "exactly_one"
+    },
+    {
+      "id": "source-only-release-convergence-test-command",
+      "find": "node scripts/test_release_convergence_seam.mjs\n",
+      "occurrences": "exactly_one"
+    }
+  ],
   "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of public entry points, private controller roots and JavaScript roots declared by every *-runtime-members.json manifest, and is verified against a freshly computed closure on every compile. python_module_allowlist is the same statement for public Python entry points plus private Python roots declared by runtime-member manifests, computed by an ast walk rather than a regex. A disagreement fails the build rather than shipping a package that cannot resolve.",
   "reference_allowlist": [
     "runtime-core.md",
@@ -111,7 +196,6 @@
     "forecast-observation-ledger-v1.schema.json",
     "forecast-behavior-map-v1.schema.json",
     "forecast-plan-v2.schema.json",
-    "instrument-period-state-v1.schema.json",
     "lineage-exceptions.json",
     "model-case-v2.schema.json",
     "model-demand-graph-v1.schema.json",
@@ -127,11 +211,11 @@
     "plan.schema.json",
     "product-identity-v2.schema.json",
     "production-contract-v2.json",
-    "public-test-run-v1.schema.json",
     "release-package-attestation-v1.schema.json",
     "release-package-attestation-v2.schema.json",
     "local-workbook-review-evidence-v1.schema.json",
     "deployment-profile.json",
+    "release-identity.json",
     "runtime-manifest.json",
     "row-taxonomy-v2.json",
     "source-ingress-authority-v1.json",
@@ -241,6 +325,7 @@
     "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
     "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
     "deployment-profile.json": "Package provenance and exact allowlists. It is compiler input rather than runtime-loaded content, but ships so release-manifest.json never points to an absent profile.",
+    "release-identity.json": "The single declared release version and channel consumed by the release writer and production admission policy. It ships so an installed package retains the declaration from which its stamped runtime identity was derived.",
     "runtime-manifest.json": "Version and certification-state identity consumed by the release compiler and read back by the installed host. It must ship so runtime and release manifests cannot disagree after a versioned update.",
     "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script.",
     "broker-metric-dictionary.schema.json": "Contract for assets/broker-metric-dictionary.json. The dictionary itself is read at runtime by compile_broker_pack.py and scripts/lib/broker_metric_dictionary.mjs, which pin its digest; the schema is the review-time check on the asset's own shape.",
@@ -288,7 +373,6 @@
     "compile_evidence_run.mjs",
     "compile_declared_evidence_run.mjs",
     "compile_evidence_resolution_v2.mjs",
-    "compile_public_test_run.mjs",
     "flow_cli.mjs",
     "inspect_workbook_semantics.mjs",
     "validate_local_workbook_review.mjs",
@@ -297,25 +381,10 @@
     "run_excel_inflow_bootstrap.mjs",
     "run_runtime_doctor.mjs",
     "run_structural_ownership_preflight.mjs",
-    "run_evidence_resolution_v2_tests.mjs",
     "run_filings_pipeline.mjs",
     "run_broker_intake.mjs",
-    "run_statement_classifier_tests.mjs",
-    "run_forecast_observation_tests.mjs",
-    "run_forecast_behavior_tests.mjs",
-    "run_instrument_period_state_tests.mjs",
-    "run_equation_graph_tests.mjs",
-    "run_run_constitution_graph_tests.mjs",
-    "run_product_constitution_tests.mjs",
-    "run_delivery_constitution_tests.mjs",
-    "run_controller_exit_inventory_tests.mjs",
-    "run_broker_dynamic_concept_tests.mjs",
-    "run_broker_exit_fault_injection_tests.mjs",
-    "run_universal_broker_delivery_matrix.mjs",
     "run_raw_input_black_box_canary.mjs",
-    "run_fixed_point_constitution_tests.mjs",
     "debt-model-economics.mjs",
-    "test_release_convergence_seam.mjs",
     "validate_cache_parity.mjs",
     "validate_source_parity.mjs",
     "validate_structure.mjs",
@@ -324,18 +393,62 @@
     "compile_case.mjs",
     "propose_case_source.mjs"
   ],
+  "development_test_profile": {
+    "source_only": true,
+    "entry_points": [
+      "compile_public_test_run.mjs",
+      "run_evidence_resolution_v2_tests.mjs",
+      "run_statement_classifier_tests.mjs",
+      "run_forecast_observation_tests.mjs",
+      "run_forecast_behavior_tests.mjs",
+      "run_instrument_period_state_tests.mjs",
+      "run_equation_graph_tests.mjs",
+      "run_run_constitution_graph_tests.mjs",
+      "run_product_constitution_tests.mjs",
+      "run_delivery_constitution_tests.mjs",
+      "run_controller_exit_inventory_tests.mjs",
+      "run_broker_dynamic_concept_tests.mjs",
+      "run_broker_exit_fault_injection_tests.mjs",
+      "run_universal_broker_delivery_matrix.mjs",
+      "run_fixed_point_constitution_tests.mjs",
+      "test_release_convergence_seam.mjs"
+    ],
+    "excluded_members": [
+      "scripts/lib/test_harness.mjs",
+      "scripts/lib/broker_supervisor.mjs",
+      "scripts/lib/public_test_run.mjs",
+      "assets/instrument-period-state-v1.schema.json",
+      "assets/public-test-run-v1.schema.json",
+      "scripts/compile_public_test_run.mjs",
+      "scripts/run_evidence_resolution_v2_tests.mjs",
+      "scripts/run_statement_classifier_tests.mjs",
+      "scripts/run_forecast_observation_tests.mjs",
+      "scripts/run_forecast_behavior_tests.mjs",
+      "scripts/run_instrument_period_state_tests.mjs",
+      "scripts/run_equation_graph_tests.mjs",
+      "scripts/run_run_constitution_graph_tests.mjs",
+      "scripts/run_product_constitution_tests.mjs",
+      "scripts/run_delivery_constitution_tests.mjs",
+      "scripts/run_controller_exit_inventory_tests.mjs",
+      "scripts/run_broker_dynamic_concept_tests.mjs",
+      "scripts/run_broker_exit_fault_injection_tests.mjs",
+      "scripts/run_universal_broker_delivery_matrix.mjs",
+      "scripts/run_fixed_point_constitution_tests.mjs",
+      "scripts/test_release_convergence_seam.mjs"
+    ],
+    "reason": "Development and release-proof commands run from the source-owned test registry. They and the shared test harness are forbidden from every deployment package, including uncertified development candidates."
+  },
   "script_private_roots": [
     "run_excel_inflow_vnext.mjs",
     "run_user_flow.mjs"
   ],
-  "_entry_point_note": "Thirty-nine public JavaScript entry points plus two private controller delegates. run_excel_inflow_bootstrap.mjs is the sole public product route and uses Node built-ins only; it verifies compiled-package custody before spawning the private vNext controller. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_user_flow.mjs is its private spawned workbook-stage delegate. run_runtime_doctor.mjs remains an independently runnable diagnostic capability route. run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; run_structural_ownership_preflight.mjs is the installed pre-descendant topology gate invoked by the attachment controller before broker or debt work. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "_entry_point_note": "Twenty-three public production-safe JavaScript entry points plus two private controller delegates. run_excel_inflow_bootstrap.mjs is the sole public product route and uses Node built-ins only; it verifies compiled-package custody before spawning the private vNext controller. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_user_flow.mjs is its private spawned workbook-stage delegate. run_runtime_doctor.mjs remains an independently runnable diagnostic capability route. run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; run_structural_ownership_preflight.mjs is the installed pre-descendant topology gate invoked by the attachment controller before broker or debt work. The raw-input black-box canary remains an installed post-activation proof route required by the release discipline. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Test suites, fault injection, universal matrices and the public-test compiler are source-only development roots declared by development_test_profile and are forbidden from deployment packages. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
   "script_allowlist": [
     "build_dynamic_model.mjs",
     "compile_case.mjs",
     "compile_declared_evidence_run.mjs",
     "compile_evidence_resolution_v2.mjs",
     "compile_evidence_run.mjs",
-    "compile_public_test_run.mjs",
     "debt-model-economics.mjs",
     "flow_cli.mjs",
     "inspect_workbook_semantics.mjs",
@@ -347,7 +460,6 @@
     "lib/broker_intake_choice.mjs",
     "lib/broker_metric_dictionary.mjs",
     "lib/broker_preview.mjs",
-    "lib/broker_supervisor.mjs",
     "lib/canonical_sum.mjs",
     "lib/capture_transition.mjs",
     "lib/case_compiler.mjs",
@@ -393,6 +505,7 @@
     "lib/forecast_completion_constitution.mjs",
     "lib/forecast_observation.mjs",
     "lib/forecast_ownership_resolver.mjs",
+    "lib/forecast_plan_status.mjs",
     "lib/forecast_producer_contract.mjs",
     "lib/formula_ast.mjs",
     "lib/formula_dsl.mjs",
@@ -429,10 +542,10 @@
     "lib/pre_broker_demand.mjs",
     "lib/process_tree.mjs",
     "lib/progress_heartbeat.mjs",
-    "lib/public_test_run.mjs",
     "lib/raw_canary_fixture.mjs",
     "lib/rcf_policy.mjs",
     "lib/release_checkpoint_store.mjs",
+    "lib/release_identity.mjs",
     "lib/release_module_registry.mjs",
     "lib/release_nodes.mjs",
     "lib/release_package_attestation.mjs",
@@ -462,7 +575,6 @@
     "lib/statement_topology.mjs",
     "lib/support_envelope.mjs",
     "lib/tax_rate_policy.mjs",
-    "lib/test_harness.mjs",
     "lib/typed_financial_value.mjs",
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",
@@ -472,29 +584,14 @@
     "migrate_run_carrier.mjs",
     "orchestrate_release.mjs",
     "propose_case_source.mjs",
-    "run_broker_dynamic_concept_tests.mjs",
-    "run_broker_exit_fault_injection_tests.mjs",
     "run_broker_intake.mjs",
-    "run_controller_exit_inventory_tests.mjs",
-    "run_delivery_constitution_tests.mjs",
-    "run_equation_graph_tests.mjs",
-    "run_evidence_resolution_v2_tests.mjs",
     "run_excel_inflow_bootstrap.mjs",
     "run_excel_inflow_vnext.mjs",
     "run_filings_pipeline.mjs",
-    "run_fixed_point_constitution_tests.mjs",
-    "run_forecast_behavior_tests.mjs",
-    "run_forecast_observation_tests.mjs",
-    "run_instrument_period_state_tests.mjs",
-    "run_product_constitution_tests.mjs",
     "run_raw_input_black_box_canary.mjs",
-    "run_run_constitution_graph_tests.mjs",
     "run_runtime_doctor.mjs",
-    "run_statement_classifier_tests.mjs",
     "run_structural_ownership_preflight.mjs",
-    "run_universal_broker_delivery_matrix.mjs",
     "run_user_flow.mjs",
-    "test_release_convergence_seam.mjs",
     "validate_cache_parity.mjs",
     "validate_local_workbook_review.mjs",
     "validate_source_parity.mjs",
@@ -868,6 +965,7 @@
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
     "extract_inline_xbrl.py",
+    "extract_html_tables.py",
     "propose_dcs_crosswalk.py",
     "workflow_state.py",
     "extract_broker_evidence.py",
@@ -1056,6 +1154,10 @@
         "lxml"
       ],
       "reason": "The inline-XBRL reconciler uses native lxml to bind structured concepts and periods to visible filing rows under the shipped crosswalk and taxonomy."
+    },
+    "extract_html_tables.py": {
+      "may_import_third_party": [],
+      "reason": "The plain-HTML fallback lane parses printed <table> cells with the Python standard library alone (html.parser), so the packaged filings route closes on the locked host toolchain without any new dependency."
     },
     "propose_dcs_crosswalk.py": {
       "may_import_third_party": [],

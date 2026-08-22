@@ -193,6 +193,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "az-incident-replay",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_az_replay_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
       "id": "behavioural-goldens",
       "phase": "cohort",
       "runtime": "node",
@@ -681,6 +690,24 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "review-lifecycle",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_review_lifecycle_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "review-sealing-contracts",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_review_sealing_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "critical-invariant-independent-oracle-matrix",
       "phase": "proof",
       "runtime": "python",
@@ -863,6 +890,15 @@
       "test_class": "unit"
     },
     {
+      "id": "derived-document-governance",
+      "phase": "release",
+      "runtime": "node",
+      "script": "run_derived_document_governance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "dual-read-migration",
       "phase": "evidence",
       "runtime": "node",
@@ -906,6 +942,15 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
+    },
+    {
+      "id": "economic-ir-parity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_economic_ir_parity_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     },
     {
       "id": "emitted-candidate-independent-oracle",
@@ -1193,6 +1238,15 @@
       "test_class": "unit"
     },
     {
+      "id": "forecast-semantic-stop",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "test_forecast_semantic_stop.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "forecast-observation-ledger",
       "phase": "forecast",
       "runtime": "node",
@@ -1265,6 +1319,15 @@
       "test_class": "cross_layer_integration"
     },
     {
+      "id": "generated-artifact-checks",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_generated_artifact_checks.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "generated-case-cohort",
       "phase": "cohort",
       "runtime": "node",
@@ -1299,6 +1362,15 @@
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
+    },
+    {
+      "id": "filings-ladder-corpus-rehearsal",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_filings_ladder_corpus_rehearsal_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "historical-normalisation",
@@ -2327,6 +2399,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "runtime-ceiling-absolute",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_ceiling_absolute_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "runtime-closure",
       "phase": "proof",
       "runtime": "node",
@@ -2644,6 +2725,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "terminal-outcome-taxonomy",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_taxonomy_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "terminal-reason-registry",
       "phase": "workflow",
       "runtime": "node",
@@ -2769,6 +2859,42 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
+    },
+    {
+      "id": "invariant-fx-positivity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_fx_positivity_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-debt-continuity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_debt_continuity_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-typed-unresolved",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_typed_unresolved_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-cash-flow-articulation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_cash_flow_articulation_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     }
   ]
 }

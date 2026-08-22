@@ -16,6 +16,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { declaredSkillVersion } from "./lib/skill_version_declaration.mjs";
 
 const exec = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -50,7 +51,11 @@ for (const [phase, packages] of [...byPhase].sort((a, b) => Number(a[0]) - Numbe
   const body = {
     schema_version: SCHEMA,
     phase: Number(phase),
-    release: "v3.7.7",
+    // MP2 Phase A (A3): the release line label is DERIVED from the one
+    // hand-edited declaration like every other current-release version site;
+    // it used to be a hand-typed literal that silently went stale on the
+    // next flip (it still said v3.7.7 while the candidate stood at 3.7.10).
+    release: `v${declaredSkillVersion(ROOT)}`,
     seal_status: "SEALED_PACKAGES_RECORDED",
     seal_status_note:
       "This records WHICH packages sealed and at which commit. It is NOT a phase PASS: a phase passes only when its exit gate is met, and the exit gates live in the execution pack. Derived from programme/index.json — never hand-typed.",

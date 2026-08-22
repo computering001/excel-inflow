@@ -437,7 +437,7 @@ export const SURVIVOR_DOCTRINE =
   "A survivor is a mutation the suite did not kill: a KNOWN OPEN HOLE in the mutation corpus, never accepted behaviour. Every survivor carries an owner and a pointer to the exact suite and reported field. The suite that reads this register FAILS when a survivor is present and unregistered, and FAILS when a registered survivor no longer reproduces, because a register entry kept past its repair asserts a hole that no longer exists. Retirement is compulsory, never optional; nothing in retired_survivors is read as a control input.";
 
 export const SCORE_DOCTRINE =
-  "The denominator is only what was MEASURED. A suite that reports no mutation count contributes to neither numerator nor denominator; it is a measurement gap with an owner. A self-fixture mutation is counted in its own bucket and can never raise production_mutation_score. production_mutation_score is an UPPER BOUND: static production reach proves a mutation COULD touch production code, not that it did.";
+  "The denominator is only what was MEASURED. A suite that reports no mutation count contributes to neither numerator nor denominator; it is a measurement gap with an owner. A self-fixture mutation is counted in its own bucket and can never raise production_mutation_score. production_mutation_score is an UPPER BOUND: static production reach proves a mutation COULD touch production code, not that it did. mutation_score is survivor-honest: it ranges over PRODUCT mutants only (production and oracle-matrix scopes, never self-fixture) and excludes the pseudo-survivors contributed by CRASHED suites — those are reported separately as suite_health, so a crashing suite can never masquerade as escaped product behaviour.";
 
 /**
  * RATCHET — minimum measurement coverage (fraction of registry mutation-class
@@ -551,6 +551,13 @@ export function compileMutationAdequacy({ registry, executions, scopes, matrixSp
       const count = evidence.reported && evidence.declared_mutations > 0 ? evidence.declared_mutations : 1;
       row.survived = count;
       row.measurement = "SURVIVOR";
+      // F3 survivor honesty: `suite_failed` separates a CRASHING SUITE (the
+      // harness died before it could judge its mutants — its floored count is
+      // a custody gap, not evidence of escaped product behaviour) from an
+      // ESCAPED PRODUCT MUTANT registered by a suite that ran to completion.
+      // The compiler only ever reaches this branch through a crash today, so
+      // the flag is true here; the schema keeps it boolean on every entry so
+      // the two cases can never be conflated by a reader of the register.
       survivors.push({
         survivor_id: `${test.id}::suite-failure`,
         test_id: test.id,
@@ -562,6 +569,7 @@ export function compileMutationAdequacy({ registry, executions, scopes, matrixSp
         exit_code: execution.exit_code ?? null,
         detail: String(execution.failure_detail ?? "").slice(0, 400) || "suite exited non-zero; see the suite's own output",
         reproduced_serially: execution.reverification?.serial_status === "FAIL",
+        suite_failed: true,
         disposition: "OPEN",
       });
     } else if (execution.status === "UNMEASURABLE") {
@@ -641,8 +649,22 @@ export function compileMutationAdequacy({ registry, executions, scopes, matrixSp
   const overallMeasured = production.measured_mutations + selfFixture.measured_mutations + mixed.measured_mutations;
   const overallKilled = production.killed + selfFixture.killed + mixed.killed;
 
-  // ---- zero-survivor gate over the P0 set -------------------------------
+  // ---- F3 survivor-honest aggregate ---------------------------------------
+  // mutation_score ranges over PRODUCT mutants only (production and
+  // oracle-matrix scopes — never self-fixture) and counts a survived mutant
+  // only when its suite ran to completion: a CRASHED suite's floored
+  // pseudo-survivors are excluded here and reported as suite_health instead,
+  // so a crashing harness can never be read as escaped product behaviour.
   const allRows = [...rows, ...adjunctRows];
+  const productRows = rows.filter((row) => row.mutation_scope !== MUTATION_SCOPES.SELF_FIXTURE);
+  const productKilled = productRows.reduce((total, row) => total + row.killed, 0);
+  const productEscapedSurvived = productRows
+    .filter((row) => row.status !== "FAIL")
+    .reduce((total, row) => total + row.survived, 0);
+  const productMeasured = productKilled + productEscapedSurvived;
+  const suiteHealth = allRows.filter((row) => row.status === "FAIL").length;
+
+  // ---- zero-survivor gate over the P0 set -------------------------------
   for (const gap of gaps) {
     gap.corpus_membership = adjunctSet.has(gap.test_id) ? "p0_gate_adjunct" : "registry_mutation_class";
   }
@@ -697,7 +719,14 @@ export function compileMutationAdequacy({ registry, executions, scopes, matrixSp
       observed_field_name_inventory: OBSERVED_MUTATION_COUNT_FIELDS,
     },
     score: {
-      mutation_score: overallMeasured === 0 ? null : round(overallKilled / overallMeasured),
+      // Survivor-honest aggregate (F3): product mutants only, crashed suites
+      // excluded and counted once in suite_health instead.
+      mutation_score: productMeasured === 0 ? null : round(productKilled / productMeasured),
+      mutation_score_basis:
+        "product mutants only (production + oracle-matrix scopes, never self-fixture); pseudo-survivors from crashed suites are excluded here and reported as suite_health",
+      suite_health: suiteHealth,
+      suite_health_meaning:
+        "count of mutation-class or gate-adjunct suites that CRASHED during this compilation. A crash is a custody failure with its survivors floored at an unknown population; it is health debt, never escaped-product evidence.",
       measured_mutations: overallMeasured,
       killed: overallKilled,
       survived: overallMeasured - overallKilled,
@@ -749,9 +778,44 @@ export function auditMutationAdequacy(report) {
   for (const entry of report.survivors ?? []) {
     if (!entry.owner || entry.owner === "UNOWNED") violations.push(`SURVIVOR_WITHOUT_OWNER: ${entry.survivor_id}`);
     if (!entry.pointer) violations.push(`SURVIVOR_WITHOUT_POINTER: ${entry.survivor_id}`);
+    // F3: every entry must say whether its suite CRASHED, and the flag must
+    // agree with the row's terminal status — a crashing suite is custody debt
+    // (suite_health), a completing suite's survivor is escaped product
+    // behaviour (mutation_score). Conflating them is how a red harness paints
+    // itself as a product hole, or hides one.
+    if (typeof entry.suite_failed !== "boolean") {
+      violations.push(`SURVIVOR_WITHOUT_SUITE_FAILED_FLAG: ${entry.survivor_id}`);
+    } else {
+      const row = allRows.find((candidate) => candidate.test_id === entry.test_id);
+      const crashed = row?.status === "FAIL";
+      if (entry.suite_failed !== crashed) {
+        violations.push(`SUITE_FAILED_FLAG_CONTRADICTS_ROW_STATUS: ${entry.survivor_id} says suite_failed=${entry.suite_failed} but the row status is ${row?.status ?? "absent"}`);
+      }
+    }
     const row = allRows.find((candidate) => candidate.test_id === entry.test_id);
     if (!row || row.survived === 0) {
       violations.push(`STALE_SURVIVOR_MUST_BE_RETIRED: ${entry.survivor_id} no longer reproduces`);
+    }
+  }
+
+  // F3 aggregate honesty: suite_health and mutation_score are recomputed from
+  // the rows, never trusted. Skipped when there is no score at all so the
+  // vacuous negative self-test still fails on MISSING_SCOPE_BUCKET first.
+  if (report.score && typeof report.score === "object") {
+    const crashedSuites = allRows.filter((row) => row.status === "FAIL").length;
+    if (report.score.suite_health !== crashedSuites) {
+      violations.push(`SUITE_HEALTH_COUNT_MISMATCH: score published ${report.score.suite_health}, rows give ${crashedSuites} crashed suites`);
+    }
+    const productRows = rows.filter((row) => row.mutation_scope !== MUTATION_SCOPES.SELF_FIXTURE);
+    const productKilled = productRows.reduce((total, row) => total + row.killed, 0);
+    const productEscapedSurvived = productRows
+      .filter((row) => row.status !== "FAIL")
+      .reduce((total, row) => total + row.survived, 0);
+    const productMeasured = productKilled + productEscapedSurvived;
+    const wantScore = productMeasured === 0 ? null : Math.round((productKilled / productMeasured) * 10000) / 10000;
+    const gotScore = report.score.mutation_score;
+    if (wantScore === null ? gotScore !== null : gotScore === null || Math.abs(gotScore - wantScore) >= 1e-4) {
+      violations.push(`MUTATION_SCORE_NOT_PRODUCT_EXCLUSIVE: score published ${gotScore}, product-only-excluding-suite-failures recomputation gives ${wantScore}`);
     }
   }
 

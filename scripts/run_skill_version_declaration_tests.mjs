@@ -4,7 +4,9 @@
  * everywhere else, and no new hard-coded literal can be introduced unseen.
  *
  * Invariant under test: a version flip is a one-field edit to
- * `assets/runtime-manifest.json#/skill_version`, and the tree stays green.
+ * `assets/release-identity.json#/version` followed by the writer
+ * (`scripts/compile_skill_release.mjs --write-release-identity`) stamping the
+ * derived surfaces, and the tree stays green.
  *
  * What this suite is careful NOT to be: a comparison of two copies. It holds no
  * expected version of its own — every expectation is read from the declaration
@@ -12,6 +14,7 @@
  * directory, so the suite never writes into the product tree (P0.9).
  */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -27,6 +30,10 @@ import {
   versionLiteralSearchSpace,
   versionValueSites,
 } from "./lib/skill_version_declaration.mjs";
+import {
+  releaseTagForCommit,
+  writeDerivedReleaseSurfaces,
+} from "./lib/release_identity.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
@@ -129,8 +136,36 @@ const writeText = (root, relative, value) => {
   fs.writeFileSync(target, value, "utf8");
 };
 
+/* The hand-edited declaration fixture. channel_semantics must mirror the fixed
+ * semantics in release_identity.mjs exactly — the writer validates it. */
+const FIXTURE_CHANNEL_SEMANTICS = Object.freeze({
+  stable: Object.freeze({
+    installable_as_stable: true,
+    description: "Production-certified line. Installable into the active production slot.",
+  }),
+  candidate: Object.freeze({
+    installable_as_stable: true,
+    description: "Release candidate. Installable into an inactive slot and promotable to production after its gates pass; not yet the production line.",
+  }),
+  dev: Object.freeze({
+    installable_as_stable: false,
+    description: "Development build. May be installed only as an inactive candidate for testing; installing it as stable is refused at the installer ingress.",
+  }),
+});
+const fixtureReleaseIdentity = (version) => ({
+  schema_version: "release-identity/1.0",
+  version,
+  channel: "stable",
+  channel_semantics: FIXTURE_CHANNEL_SEMANTICS,
+  commit: null,
+  generated_at: null,
+});
+
 function syntheticRoot(version) {
   const root = fs.mkdtempSync(path.join(scratch, "root-"));
+  // The single hand-edited declaration (MP2 Phase A): every other version
+  // surface in the synthetic root derives from this file.
+  writeJson(root, "assets/release-identity.json", fixtureReleaseIdentity(version));
   writeJson(root, "assets/runtime-manifest.json", { schema_version: 2, skill_name: "fixture", skill_version: version });
   writeJson(root, "assets/deployment-profile.json", {
     release_name: "Fixture Product",
@@ -138,7 +173,7 @@ function syntheticRoot(version) {
     script_allowlist: ["entry.mjs"],
     python_entry_points: [],
     python_module_allowlist: [],
-    asset_allowlist: ["runtime-manifest.json", "deployment-profile.json", "some-contract.json"],
+    asset_allowlist: ["runtime-manifest.json", "deployment-profile.json", "some-contract.json", "release-identity.json", "RELEASE_NOTES.md"],
     reference_allowlist: [],
     resource_directory_allowlist: [],
   });
@@ -151,6 +186,9 @@ function syntheticRoot(version) {
   writeText(root, "scripts/run_fixture_tests.mjs", "// a registered suite\n");
   writeText(root, "SKILL.md", "# fixture instructions\n");
   writeText(root, "KNOWN_LIMITATIONS.md", "# fixture limitations\n");
+  // The writer stamps a generated block into the release notes, so every
+  // synthetic root carries one for it to own.
+  writeText(root, "RELEASE_NOTES.md", "# fixture release notes\n");
   return root;
 }
 
@@ -165,16 +203,70 @@ check("the version is derived from the declaration, not held by the reader", () 
 });
 
 check("THE FLIP: editing one field moves every derived site, and the tree stays clean", () => {
+  // The declaration is the one hand-edited file; the derived surfaces are
+  // stamped by the writer (the same function the CLI command
+  // `compile_skill_release.mjs --write-release-identity` calls).
+  const identityPath = path.join(flipRoot, "assets", "release-identity.json");
+  const identity = JSON.parse(fs.readFileSync(identityPath, "utf8"));
+  identity.version = after;
+  fs.writeFileSync(identityPath, `${JSON.stringify(identity, null, 2)}\n`, "utf8");
+  const written = writeDerivedReleaseSurfaces(flipRoot);
+  assert.equal(written.status, "WRITTEN");
+  assert.equal(written.version, after);
   const manifestPath = path.join(flipRoot, "assets", "runtime-manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  manifest.skill_version = after;
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  assert.equal(manifest.skill_version, after);
+  assert.equal(manifest.release_channel, written.channel);
   assert.equal(declaredSkillVersion(flipRoot), after);
   assert.equal(declaredReleaseName(flipRoot), `Fixture Product v${after}`);
   const flipped = verifySingleVersionDeclaration(flipRoot);
   assert.equal(flipped.status, "PASS");
   assert.deepEqual(flipped.findings, []);
   assert.equal(flipped.release_name, `Fixture Product v${after}`);
+});
+
+check("the CLI writer honours an explicit --skill root", () => {
+  const root = syntheticRoot(before);
+  const run = spawnSync(
+    process.execPath,
+    [
+      path.join(ROOT, "scripts", "compile_skill_release.mjs"),
+      "--write-release-identity",
+      "--skill",
+      root,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, SOURCE_DATE_EPOCH: "0" },
+    },
+  );
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  const result = JSON.parse(run.stdout);
+  assert.equal(result.status, "WRITTEN");
+  assert.equal(result.version, before);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "runtime-manifest.json"), "utf8"));
+  assert.equal(manifest.skill_version, before);
+  assert.equal(manifest.release_channel, result.channel);
+});
+
+check("only the exact version tag on the source commit is release proof", () => {
+  const root = syntheticRoot(before);
+  const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  for (const args of [
+    ["init", "--quiet"],
+    ["config", "user.name", "Fixture"],
+    ["config", "user.email", "fixture@example.invalid"],
+    ["add", "."],
+    ["commit", "--quiet", "-m", "fixture"],
+  ]) {
+    const run = git(...args);
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+  }
+  assert.equal(releaseTagForCommit(root, before), null);
+  assert.equal(git("tag", "v0.0.1").status, 0);
+  assert.equal(releaseTagForCommit(root, before), null);
+  assert.equal(git("tag", `v${before}`).status, 0);
+  assert.equal(releaseTagForCommit(root, before), `v${before}`);
 });
 
 check("RED PROOF (rule A): a literal bound to skill_version in a shipped script is caught", () => {
@@ -213,10 +305,8 @@ check("RED PROOF (rule B): the derived release name in a document is caught", ()
 
 check("RED PROOF: a second whole-value declaration inside the declaration file is caught", () => {
   const root = syntheticRoot(before);
-  writeJson(root, "assets/runtime-manifest.json", {
-    schema_version: 2,
-    skill_name: "fixture",
-    skill_version: before,
+  writeJson(root, "assets/release-identity.json", {
+    ...fixtureReleaseIdentity(before),
     pinned_version: before,
   });
   const findings = verifySingleVersionDeclaration(root).findings;
