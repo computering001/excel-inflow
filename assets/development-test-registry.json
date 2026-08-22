@@ -908,6 +908,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "economic-ir-parity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_economic_ir_parity_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
       "id": "emitted-candidate-independent-oracle",
       "phase": "proof",
       "runtime": "python",
