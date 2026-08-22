@@ -648,6 +648,12 @@ const DIAGNOSTIC_KEYS = new Set([
   "solve_order_evidence",
   "convergence_trace",
   "scc_residuals",
+  // E6b — the typed findings ledger is additive disclosure, not economics:
+  // solver.mjs publishes it under B2/B7 with the contract "nothing numeric
+  // reads this list", and every consumer filters it by code. Pinning it here
+  // would make any lawful new finding (e.g. scale_envelope_exceeded) read as
+  // "an emitted number moved" when no number moved at all.
+  "solver_findings",
 ]);
 function economicsOnly(value) {
   if (Array.isArray(value)) return value.map(economicsOnly);
@@ -700,10 +706,21 @@ const economicSignature = (solution) =>
 // Re-certified post-B-series (488ea00 et al): B1 declared-tax
   // canonicalisation, B3 cash-interest identity and B6 PIK parity lawfully
   // moved emitted economics; each signature bisected to its first-mover.
+  //
+  // RE-CERTIFIED post-E6b (2026-08-22): `solver_findings` moved OUT of the
+  // projection (see DIAGNOSTIC_KEYS). It never belonged inside one — the
+  // ledger is additive typed disclosure under B2/B7 with the published
+  // contract "nothing numeric reads this list" — but the genesis constants
+  // were recorded while it was still hashed in, so excluding it re-based both
+  // pins. The movement was measured before anything was rewritten: the
+  // economicsOnly projection of BOTH certified fixtures is BIT-IDENTICAL
+  // before vs after the E6b solver change once the ledger is excluded (clean
+  // tree at f7d33ae hashes 6fd2c20c…/e12e294c… exactly as below), so no
+  // emitted number moved and no finding was laundered into economics.
   const CERTIFIED_ECONOMIC_SIGNATURES = Object.freeze({
     "standard-maximal-v2":
-      "15a29d14e953b5b3e1b54e458e1ae5a0c2e621212d7f20c0be159cb8ae7b728d",
-    "standard-net-cash-v2": "3e47ee2cb89ee228a9e7f3ed0990f8ac5044090b546593565afcc2c9a7054c83",
+      "6fd2c20cfa2f678678a003732e4da23a655032af45dba1a34466d2aa2b782e36",
+    "standard-net-cash-v2": "e12e294cbd8ec51dfb630fda5311abed410a3ff0fc1ba0b854b0d9937538d561",
   });
 
 check("HASH EQUALITY — neither certified fixture's economics moved", () => {
