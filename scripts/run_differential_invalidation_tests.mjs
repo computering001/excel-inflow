@@ -571,10 +571,10 @@ const skipped = [
   { node: "answered_case_recompile", stage: "decisions", executed: false, duration_ms: 0 },
   { node: "intake_replay", stage: "decisions", executed: false, duration_ms: 0 },
 ];
-const enacted = reuseClaimLedger(skipped, ["decisions"]);
-check(enacted.violations.length === 0, `a genuinely enacted reuse was reported dishonest: ${enacted.violations.join("; ")}`);
+const enactedReuseProbe = reuseClaimLedger(skipped, ["decisions"]);
+check(enactedReuseProbe.violations.length === 0, `a genuinely enacted reuse was reported dishonest: ${enactedReuseProbe.violations.join("; ")}`);
 check(
-  enacted.stages.find((entry) => entry.stage === "decisions").mode === "enacted",
+  enactedReuseProbe.stages.find((entry) => entry.stage === "decisions").mode === "enacted",
   "a stage whose nodes were all skipped is not reported as enacted",
 );
 const verified = reuseClaimLedger(
@@ -638,10 +638,21 @@ check(
 // disagreement between the ledger and the claim, and is caught in that
 // direction too.
 const unclaimed = reuseClaimLedger(
-  [{ node: "intake_plan", stage: "evidence_review", executed: false, duration_ms: 0 }],
+  [{ node: "intake_plan", stage: "evidence_review", executed: false, reason: "hit.stage_receipt_reused", duration_ms: 0 }],
   [],
 );
 check(unclaimed.violations.length === 1, "a stage-receipt reuse recorded outside any claim was accepted");
+// Node-level enactment (E3) is lawful outside any stage claim: it lands in its
+// own enacted_nodes bucket and never fabricates an unclaimed-stage violation.
+const enactedOutsideClaim = reuseClaimLedger(
+  [{ node: "intake_plan", stage: "evidence_review", executed: false, reason: "miss.enacted_reuse", duration_ms: 0, enactedReuse: true }],
+  [],
+);
+check(enactedOutsideClaim.violations.length === 0, "a node-level enactment outside any claim was treated as a violation");
+check(
+  enactedOutsideClaim.stages.find((entry) => entry.stage === "evidence_review").enacted_nodes.includes("intake_plan"),
+  "the node-level enactment is not reported in its enacted bucket",
+);
 
 // ---------------------------------------------------------------------------
 // PART G — END TO END: WARM EQUALS COLD.

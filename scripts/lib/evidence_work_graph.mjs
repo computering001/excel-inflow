@@ -20,25 +20,39 @@
  * 4's `{ ok, receipt, reused }`. Reusing the shape means an operator who can
  * read a stage-4 checkpoint receipt can read an evidence-node receipt.
  *
- * WHAT THIS GRAPH DOES NOT DO, AND WHY
- * ------------------------------------
- * It does not ENACT reuse. `ENACT_EVIDENCE_REUSE = false`: a node's action runs
- * on every pass, and a HIT means "the cache key agreed", not "the work was
- * skipped". Two reasons, and the second is the stronger one:
+ * WHAT ENACTMENT MEANS HERE, AND WHAT IT COSTS
+ * --------------------------------------------
+ * `ENACT_EVIDENCE_REUSE = true`: a node that declares `reuse_enactable` and
+ * lands on a clean hit (`hit.inputs_unchanged`, success receipt, same run,
+ * receipt hash intact) replays its prior receipt instead of re-running its
+ * action. Enactment is opt-in PER NODE, never global: only the four pure,
+ * acyclic compile nodes declare it (`statement_normalisation`,
+ * `forecast_behavior_map`, `model_demand_graph`, `forecast_plan`) — work whose
+ * value is a deterministic function of keyed inputs. Every other node keeps
+ * P6.3's always-execute semantics unchanged.
  *
- *  1. Skipping upstream work changes WHAT IS COMPUTED. P6.3 is additive by
- *     constitution — no run's outcome or emitted number may change. Hoisting
- *     the evidence-half work behind its cache keys is differential invalidation,
- *     which is P6.4's package, sequenced after this one precisely because it
- *     changes behaviour.
- *  2. Because the action always runs, every HIT is CHECKED against a real
- *     recomputation: the freshly computed output is digested and compared with
- *     the digest the receipt recorded. A cache key that agreed while the output
- *     moved is a DISHONEST key, and it is recorded as
- *     `invalid.output_digest_mismatch`. An enacting cache cannot notice that at
- *     all — it would silently serve the stale answer. This graph therefore
- *     spends the work to earn the right to skip it later, and P6.4 inherits
- *     cache keys whose honesty has been measured rather than assumed.
+ * Two gates stand between a clean hit and a skip, because an enacting cache
+ * must not serve what is no longer there:
+ *
+ *  1. EXISTENCE: every file-backed declared output path must still exist
+ *     (`hashDeclaredPaths`, no `absent`). A vanished artifact is not a hit;
+ *     the node falls through and does the work again. (This composes naturally
+ *     with any downstream absence gating: vanished output ⇒ no clean hit.)
+ *  2. A RECORDED VALUE: the prior receipt must carry the `recorded_value` the
+ *     successful action produced (sealed into the receipt body by
+ *     `receipt_hash`). Without one — a legacy receipt written before this
+ *     field existed — there is nothing lawful to return, so the node executes
+ *     and writes a replayable receipt for next time.
+ *
+ * THE COST, STATED PLAINLY: a skipped node is no longer re-computed, so
+ * P6.3's dishonest-key detector (`invalid.output_digest_mismatch`) cannot fire
+ * for it — a key that agreed while truth moved is now served stale rather than
+ * caught. That risk is accepted deliberately, and bounded: the replayed value
+ * is the receipt-sealed bytes the honest execution produced, the input key
+ * covers the controller version, the runtime closure and every dependency's
+ * output digest, and the four opted-in nodes are pure functions of those keys.
+ * Non-enactable nodes keep spending the work to earn the right to skip, and
+ * their hits stay CHECKED.
  *
  * A validator validates. Nothing here repairs a receipt, rewrites a key, or
  * changes a value the controller computed. A node that throws is RECORDED and
@@ -66,10 +80,12 @@ export const EVIDENCE_WORK_DECISION_FILE = "decisions.json";
 export const EVIDENCE_WORK_RECEIPT_FILE = "_receipt.json";
 
 /**
- * P6.3 does not enact reuse; see the header. The suite pins this constant, so
- * flipping it is a deliberate, reviewed behaviour change and not a drift.
+ * Enactment is LIVE, but scoped: see "WHAT ENACTMENT MEANS HERE" in the header.
+ * Only nodes declaring `reuse_enactable` replay their receipts, and only past
+ * an existence-verified clean hit. The suite pins this constant, so its value
+ * is a deliberate, reviewed behaviour change and not a drift.
  */
-export const ENACT_EVIDENCE_REUSE = false;
+export const ENACT_EVIDENCE_REUSE = true;
 
 /**
  * The closed reason vocabulary. Three categories, and every reason names the
@@ -190,6 +206,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["intake_replay"]),
     key_components: Object.freeze(["answered_case"]),
     outputs: Object.freeze(["statement_structure", "source_coverage"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the answered case whose income-statement and cash-flow rows are normalised, or in the decision replay that settled it",
   }),
@@ -200,6 +217,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation"]),
     key_components: Object.freeze(["planning_case"]),
     outputs: Object.freeze(["forecast_behavior_map"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, or in the normalised statement structure the behaviour map is compiled against",
   }),
@@ -210,6 +228,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation"]),
     key_components: Object.freeze(["planning_case"]),
     outputs: Object.freeze(["model_demand_graph"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, or in the normalised statement structure the demand graph is compiled against",
   }),
@@ -220,6 +239,7 @@ export const EVIDENCE_WORK_NODES = Object.freeze([
     depends_on: Object.freeze(["statement_normalisation", "forecast_behavior_map"]),
     key_components: Object.freeze(["planning_case", "observation_ledger", "source_inventory"]),
     outputs: Object.freeze(["forecast_plan"]),
+    reuse_enactable: true,
     invalidated_by:
       "a change in the planning case, the forecast observation ledger or the source inventory, or in the behaviour map the plan is compiled from",
   }),
@@ -368,6 +388,7 @@ export function reuseClaimLedger(decisions, claimedStages, nodes = EVIDENCE_WORK
       stage,
       claimed: claimed.has(stage),
       skipped: [],
+      enacted_nodes: [],
       verified: [],
       degraded: [],
       unrecorded: [],
@@ -378,8 +399,15 @@ export function reuseClaimLedger(decisions, claimedStages, nodes = EVIDENCE_WORK
   for (const record of decisions ?? []) {
     const bucket = byStage.get(record.stage);
     if (!bucket) continue;
+    // Two ways a node can be skipped, and only one of them speaks for a STAGE
+    // claim. A stage-receipt reuse (`hit.stage_receipt_reused`) is evidence the
+    // stage's claimed work was not entered. A node-receipt replay
+    // (`executed: false` with any other reason) is node-level enactment, which
+    // is lawful whether or not the stage was claimed — so it is reported in its
+    // own bucket and never fabricated into an unclaimed-stage violation.
     if (record.executed === false) {
-      bucket.skipped.push(record.node);
+      if (record.reason === "hit.stage_receipt_reused") bucket.skipped.push(record.node);
+      else bucket.enacted_nodes.push(record.node);
       continue;
     }
     bucket.executed_ms += Number(record.duration_ms ?? 0);
@@ -506,6 +534,21 @@ function safeOutputDigest(value) {
   }
 }
 
+/**
+ * The replayable form of a successful action's value: the same JSON round-trip
+ * `safeOutputDigest` applies, so what is recorded is exactly what was digested.
+ * A value that cannot survive the round-trip records as undefined, and a
+ * receipt without a recorded value is never replayed — the node re-executes
+ * rather than serve something it cannot account for.
+ */
+function safeRecordedValue(value) {
+  try {
+    return JSON.parse(JSON.stringify(value ?? null, (_key, item) => (typeof item === "function" ? undefined : item)));
+  } catch {
+    return undefined;
+  }
+}
+
 function receiptBodyHash(receipt) {
   const { receipt_hash: _ignored, ...body } = receipt ?? {};
   return hashValue(body);
@@ -601,6 +644,8 @@ export function createEvidenceWorkGraph({
     durationMs = null,
     priorOutputDigest = null,
     outputAgreed = null,
+    executed = true,
+    enactedReuse = false,
   }) {
     if (!EVIDENCE_WORK_REASONS.includes(reason)) {
       throw new Error(`Evidence work node ${node.id} recorded a reason outside the vocabulary: ${reason}`);
@@ -614,13 +659,13 @@ export function createEvidenceWorkGraph({
       moved: [...moved],
       key_components: [...node.key_components],
       invalidated_by: node.invalidated_by,
-      enacted_reuse: false,
+      enacted_reuse: enactedReuse,
       // P6.4: a decision record now says whether the node's ACTION RAN, and if
       // it did, whether what it produced is what the prior receipt recorded.
       // Without these two fields a claim of stage reuse cannot be checked at
       // all — a stage whose nodes all re-ran looked exactly like one whose
       // nodes were all skipped.
-      executed: true,
+      executed,
       prior_output_digest: priorOutputDigest,
       output_agreed: outputAgreed,
       duration_ms: durationMs,
@@ -756,8 +801,56 @@ export function createEvidenceWorkGraph({
       reason = "hit.inputs_unchanged";
     }
 
-    // ENACT_EVIDENCE_REUSE is false: the action runs on every pass, so a HIT is
-    // CHECKED rather than trusted. See the module header.
+    // ENACTMENT. An opted-in node on a clean hit may replay its prior receipt
+    // instead of re-running its action — but only past both gates: every
+    // file-backed declared output must still exist, and the receipt must carry
+    // a recorded value to serve. Anything less and the graph falls through and
+    // does the work; a cache that cannot account for what it returns has not
+    // earned the right to return it.
+    if (
+      ENACT_EVIDENCE_REUSE &&
+      node.reuse_enactable === true &&
+      reason === "hit.inputs_unchanged"
+    ) {
+      const outputFilesNow = await hashDeclaredPaths(declaredOutputs);
+      const outputsPresent =
+        Object.keys(outputFilesNow).length === 0 ||
+        Object.values(outputFilesNow).every((fileHash) => fileHash !== "absent");
+      if (outputsPresent && prior.receipt.recorded_value !== undefined) {
+        timingsMs[id] = 0;
+        outputDigests.set(id, prior.receipt.output_digest);
+        nodeReceipts[id] = prior.receipt.receipt_hash;
+        await record({
+          node,
+          reason,
+          moved: [],
+          detail: { reuse: "node_receipt_replayed" },
+          durationMs: 0,
+          priorOutputDigest: prior.receipt.output_digest,
+          outputAgreed: null,
+          executed: false,
+          enactedReuse: true,
+        });
+        reusedNodes.push(id);
+        return {
+          ok: true,
+          receipt: prior.receipt,
+          reused: true,
+          decision: "REUSED",
+          reason,
+          moved: [],
+          output_digest: prior.receipt.output_digest,
+          duration_ms: 0,
+          value: prior.receipt.recorded_value,
+        };
+      }
+      // No replayable receipt (legacy) or a declared artifact vanished: fall
+      // through and recompute honestly.
+    }
+
+    // The action runs on every pass that reaches here: for non-enactable nodes
+    // always, so a HIT is CHECKED rather than trusted; for enactable nodes on
+    // any miss, invalid, or unplayable hit. See the module header.
     const started = process.hrtime.bigint();
     let value;
     try {
@@ -833,6 +926,15 @@ export function createEvidenceWorkGraph({
       decision,
       reason,
     };
+    // Enactment's enabler: an opted-in node seals WHAT its action produced into
+    // the receipt body — inside `receipt_hash` like every other field — so a
+    // later existence-verified clean hit can replay this exact value instead of
+    // recomputing it. A value that cannot survive the round-trip records no
+    // value, and a receipt without one is never replayed.
+    if (ENACT_EVIDENCE_REUSE && node.reuse_enactable === true && hashable) {
+      const recordedValue = safeRecordedValue(value);
+      if (recordedValue !== undefined) body.recorded_value = recordedValue;
+    }
     const receipt = { ...body, receipt_hash: hashValue(body) };
     await atomicWrite(receiptPath(id), `${canonicalJson(receipt)}\n`);
     nodeReceipts[id] = receipt.receipt_hash;

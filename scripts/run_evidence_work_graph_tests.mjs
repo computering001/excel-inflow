@@ -321,7 +321,8 @@ check(
 );
 check(driven.validation.reused === false, "a cold node reported itself reused");
 
-// WARM, UNCHANGED — the node must HIT, and say why.
+// WARM, UNCHANGED — the non-enactable node must HIT and say why; the two
+// enactable compile nodes REUSE their receipts outright (see ENACTMENT below).
 graph = await openGraph(unitRun);
 driven = await driveTwoNodes(graph, { evidenceHash: "evidence-aaaa" });
 await graph.close();
@@ -330,7 +331,10 @@ check(
   driven.validation.reason === "hit.inputs_unchanged",
   `an unchanged node's hit carries no reason: ${driven.validation.reason}`,
 );
-check(driven.plan.decision === "HIT", `an unchanged downstream node did not HIT: ${driven.plan.decision}`);
+check(driven.behavior.decision === "REUSED" && driven.behavior.reason === "hit.inputs_unchanged",
+  `an unchanged enactable node was not served from its receipt: ${driven.behavior.decision} / ${driven.behavior.reason}`);
+check(driven.plan.decision === "REUSED" && driven.plan.reason === "hit.inputs_unchanged",
+  `an unchanged downstream enactable node was not served from its receipt: ${driven.plan.decision} / ${driven.plan.reason}`);
 
 // CHANGED INPUT — the node must MISS, and NAME the component that moved. The
 // change is confined to the evidence node and to the behaviour map, so the plan
@@ -589,11 +593,181 @@ check(
   "the decision log carries no hit/miss/invalid summary",
 );
 
-// The graph must NOT enact reuse in this release: a work DAG that skips work
-// changes what is computed, which is out of scope for P6.3 and is P6.4's.
+// Enactment is LIVE, and its scope is DECLARED: the constant must be flipped
+// on purpose (the header pins the semantics), and node-level opt-in confined
+// to the four pure compile nodes.
 check(
-  /enact:\s*false/.test(graphSource) || /ENACT_EVIDENCE_REUSE\s*=\s*false/.test(graphSource),
-  "the evidence work graph does not declare that it does not enact reuse",
+  /ENACT_EVIDENCE_REUSE\s*=\s*true/.test(graphSource),
+  "the evidence work graph does not declare that it enacts evidence reuse",
+);
+const enactableIds = EVIDENCE_WORK_NODES.filter((node) => node.reuse_enactable === true).map((node) => node.id);
+check(
+  JSON.stringify([...enactableIds].sort()) ===
+    JSON.stringify(["forecast_behavior_map", "forecast_plan", "model_demand_graph", "statement_normalisation"]),
+  `node-level enactment is not confined to the four pure compile nodes: ${JSON.stringify(enactableIds)}`,
+);
+
+// ---------------------------------------------------------------------------
+// ENACTMENT — an opted-in node on a clean, existence-verified hit replays its
+// prior receipt; everything else still executes. The action-invocation counter
+// is the proof of the skip: a decision alone could lie, a counter cannot.
+// ---------------------------------------------------------------------------
+const reuseDir = path.join(workspace, "reuse-a");
+await fs.mkdir(reuseDir, { recursive: true });
+const behaviorArtifact = path.join(reuseDir, "forecast-behavior-map.json");
+let behaviorInvocations = 0;
+function behaviorCall({ planningCase = "pc-aaaa" } = {}) {
+  return {
+    id: "forecast_behavior_map",
+    recipe: nodeById("forecast_behavior_map").recipe,
+    inputs: { planning_case: hashValue({ planning_case: planningCase }) },
+    outputs: { forecast_behavior_map: behaviorArtifact },
+    action: () => {
+      behaviorInvocations += 1;
+      return { map: `v1:${planningCase}` };
+    },
+  };
+}
+
+// (a) UNCHANGED INPUTS — cold run executes and records; warm run REUSES: no
+// second invocation, identical value, identical receipt, and a decision-log
+// record that says the work was skipped rather than re-done.
+const reuseColdGraph = await openGraph(reuseDir);
+const reuseCold = await reuseColdGraph.runNode(behaviorCall());
+await reuseColdGraph.close();
+check(
+  reuseCold.decision === "MISS" && reuseCold.reused === false,
+  `the cold enactable run did not MISS: ${reuseCold.decision}`,
+);
+check(behaviorInvocations === 1, `the cold enactable run invoked its action ${behaviorInvocations} time(s)`);
+await fs.writeFile(behaviorArtifact, `${JSON.stringify(reuseCold.value)}\n`, "utf8"); // as the controller does after the stage
+
+const reuseWarmGraph = await openGraph(reuseDir);
+const reuseWarm = await reuseWarmGraph.runNode(behaviorCall());
+await reuseWarmGraph.close();
+check(
+  reuseWarm.decision === "REUSED" && reuseWarm.reason === "hit.inputs_unchanged",
+  `an unchanged enactable node was not served from its receipt: ${reuseWarm.decision} / ${reuseWarm.reason}`,
+);
+check(
+  reuseWarm.reused === true && reuseWarm.duration_ms === 0,
+  `a replayed node did not present itself as enacted reuse: ${JSON.stringify({ reused: reuseWarm.reused, duration_ms: reuseWarm.duration_ms })}`,
+);
+check(behaviorInvocations === 1, `a REUSED node re-ran its action (${behaviorInvocations} invocation(s))`);
+assert.deepStrictEqual(reuseWarm.value, reuseCold.value, "a replayed node did not return the recorded value");
+check(
+  reuseWarm.receipt.receipt_hash === reuseCold.receipt.receipt_hash,
+  "a replayed node returned a receipt other than the one recorded",
+);
+const reuseLog = JSON.parse(
+  await fs.readFile(path.join(reuseDir, "stages", EVIDENCE_WORK_GRAPH_DIR, EVIDENCE_WORK_DECISION_FILE), "utf8"),
+);
+const reuseRecord = reuseLog.decisions.find((record) => record.node === "forecast_behavior_map");
+check(
+  reuseRecord?.executed === false && reuseRecord?.enacted_reuse === true && reuseRecord?.decision === "HIT",
+  `the decision log does not record the enacted node reuse: ${JSON.stringify(reuseRecord)}`,
+);
+
+// (c) DELETED OUTPUT — the declared artifact vanishes: the existence gate
+// fails the replay, the node re-executes on the same key, and the recomputed
+// output AGREES with what was served before. No false HIT.
+await fs.rm(behaviorArtifact, { force: true });
+const reuseDeletedGraph = await openGraph(reuseDir);
+const reuseDeleted = await reuseDeletedGraph.runNode(behaviorCall());
+await reuseDeletedGraph.close();
+check(
+  reuseDeleted.decision === "HIT" && reuseDeleted.reason === "hit.inputs_unchanged",
+  `a vanished artifact did not force honest re-execution: ${reuseDeleted.decision} / ${reuseDeleted.reason}`,
+);
+check(behaviorInvocations === 2, `a node whose output vanished did not re-run its action (${behaviorInvocations} invocation(s))`);
+const deletedLog = JSON.parse(
+  await fs.readFile(path.join(reuseDir, "stages", EVIDENCE_WORK_GRAPH_DIR, EVIDENCE_WORK_DECISION_FILE), "utf8"),
+);
+const deletedRecord = deletedLog.decisions.find((record) => record.node === "forecast_behavior_map");
+check(
+  deletedRecord?.executed === true && deletedRecord?.output_agreed === true,
+  `the re-execution after artifact loss did not verify against the record: ${JSON.stringify(deletedRecord)}`,
+);
+
+// (b) TOUCHED INPUT — the key moves, the receipt cannot be replayed, and the
+// miss names the component that moved.
+const reuseMovedGraph = await openGraph(reuseDir);
+const reuseMoved = await reuseMovedGraph.runNode(behaviorCall({ planningCase: "pc-bbbb" }));
+await reuseMovedGraph.close();
+check(
+  reuseMoved.decision === "MISS" && reuseMoved.reason === "miss.input_component_moved",
+  `a touched input did not force re-execution: ${reuseMoved.decision} / ${reuseMoved.reason}`,
+);
+check(behaviorInvocations === 3, `a touched-input node ran the wrong number of times (${behaviorInvocations})`);
+
+// The NO-FILE branch: statement_normalisation declares no file-backed outputs,
+// so enactment rests on the recorded value alone.
+let normInvocations = 0;
+function normCall() {
+  return {
+    id: "statement_normalisation",
+    recipe: nodeById("statement_normalisation").recipe,
+    inputs: { answered_case: hashValue({ answered_case: "c0" }) },
+    outputs: { statement_structure: null, source_coverage: null },
+    action: () => {
+      normInvocations += 1;
+      return { statement_structure: { rows: 3 }, source_coverage: { covered: true } };
+    },
+  };
+}
+const normDir = path.join(workspace, "reuse-n");
+await fs.mkdir(normDir, { recursive: true });
+const normColdGraph = await openGraph(normDir);
+const normCold = await normColdGraph.runNode(normCall());
+await normColdGraph.close();
+const normWarmGraph = await openGraph(normDir);
+const normWarm = await normWarmGraph.runNode(normCall());
+await normWarmGraph.close();
+check(
+  normWarm.decision === "REUSED" && normInvocations === 1,
+  `a value-only enactable node was not replayed: ${normWarm.decision} / ${normInvocations} invocation(s)`,
+);
+assert.deepStrictEqual(normWarm.value, normCold.value, "a value-only replay returned a different value");
+
+// (d) NON-ENACTABLE — always executes, even on byte-identical inputs. Its HIT
+// stays CHECKED: the log carries the recomputation proof enactment forgoes.
+const nonEnactableDir = path.join(workspace, "reuse-d");
+await fs.mkdir(nonEnactableDir, { recursive: true });
+let validationInvocations = 0;
+function validationCall() {
+  return {
+    id: "evidence_validation",
+    recipe: nodeById("evidence_validation").recipe,
+    inputs: { evidence_run: "evidence-aaaa" },
+    outputs: { evidence_validation: null },
+    action: () => {
+      validationInvocations += 1;
+      return { ok: true };
+    },
+  };
+}
+const dColdGraph = await openGraph(nonEnactableDir);
+const dCold = await dColdGraph.runNode(validationCall());
+await dColdGraph.close();
+const dWarmGraph = await openGraph(nonEnactableDir);
+const dWarm = await dWarmGraph.runNode(validationCall());
+await dWarmGraph.close();
+check(dCold.decision === "MISS", `the non-enactable cold control did not MISS: ${dCold.decision}`);
+check(
+  dWarm.decision === "HIT" && dWarm.reason === "hit.inputs_unchanged",
+  `the non-enactable warm control did not HIT: ${dWarm.decision} / ${dWarm.reason}`,
+);
+check(
+  validationInvocations === 2,
+  `a non-enactable node skipped work on identical inputs (${validationInvocations} invocation(s))`,
+);
+const dLog = JSON.parse(
+  await fs.readFile(path.join(nonEnactableDir, "stages", EVIDENCE_WORK_GRAPH_DIR, EVIDENCE_WORK_DECISION_FILE), "utf8"),
+);
+const dRecord = dLog.decisions.find((record) => record.node === "evidence_validation");
+check(
+  dRecord?.executed === true && dRecord?.enacted_reuse === false && dRecord?.output_agreed === true,
+  `a checked hit lost its recomputation proof: ${JSON.stringify(dRecord)}`,
 );
 
 // ---------------------------------------------------------------------------

@@ -1977,6 +1977,11 @@ async function main() {
         };
       },
     })).value;
+    // The action above installs `statement_structure` on the planning case as a
+    // side effect of executing. A REUSED node never runs its action, so both
+    // derived fields are installed from the returned value unconditionally —
+    // identical on an executed pass, load-bearing on a replayed one.
+    planningCase.statement_structure = normalisation.statement_structure;
     planningCase.source_coverage = normalisation.source_coverage;
     const behaviorMap = (await workGraph.runNode({
       id: "forecast_behavior_map",
