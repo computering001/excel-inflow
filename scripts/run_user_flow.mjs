@@ -982,22 +982,28 @@ async function main() {
         evidence_validation: stage1Validation,
         case_compile_report: stage1CompileReport,
       },
-      action: () => validateEvidenceRun(evidenceRun),
-    })).value;
-    await writeJsonAtomic(stage1Validation, serialisable(validation));
-    await writeJsonAtomic(
-      stage1CompileReport,
-      validation.case_compile_report ?? {
-        schema_version: "case-compile-report/1.0",
-        status: "findings",
-        counts: { total: 1, block: 1, warn: 0 },
-        findings: [{
-          id: "case_compile.not_run",
-          severity: "BLOCK",
-          message: "The case compiler did not produce a report.",
-        }],
+      action: async () => {
+        const validated = validateEvidenceRun(evidenceRun);
+        // The node's declared outputs are written INSIDE the action, so the
+        // work graph seals its receipt over artifacts that really exist
+        // (E2: a success receipt may never name an absent file).
+        await writeJsonAtomic(stage1Validation, serialisable(validated));
+        await writeJsonAtomic(
+          stage1CompileReport,
+          validated.case_compile_report ?? {
+            schema_version: "case-compile-report/1.0",
+            status: "findings",
+            counts: { total: 1, block: 1, warn: 0 },
+            findings: [{
+              id: "case_compile.not_run",
+              severity: "BLOCK",
+              message: "The case compiler did not produce a report.",
+            }],
+          },
+        );
+        return validated;
       },
-    );
+    })).value;
     if (!validation.ok) {
       const errors = validation.errors.map((entry) => entry.message);
       const screen = renderFailure({
@@ -1152,12 +1158,19 @@ async function main() {
           broker_crosswalk_receipt: brokerBindingHashes.broker_crosswalk_receipt_sha256,
         },
         outputs: { broker_preview: brokerPreviewPath },
-        action: () => compileBrokerPreview({
-          brokerPack: evidenceRun.broker_pack,
-          sourceTables: evidenceRun.broker_source_tables,
-          crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
-          bindingHashes: brokerBindingHashes,
-        }),
+        action: async () => {
+          const preview = compileBrokerPreview({
+            brokerPack: evidenceRun.broker_pack,
+            sourceTables: evidenceRun.broker_source_tables,
+            crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+            bindingHashes: brokerBindingHashes,
+          });
+          // Declared output written inside the action (E2). A later
+          // degradation may still overwrite this file below — visibly, and
+          // after the receipt has sealed a file that really existed.
+          await writeJsonAtomic(brokerPreviewPath, preview);
+          return preview;
+        },
       })).value;
     } catch (error) {
       brokerPreview = fallbackBrokerPreview([
@@ -1245,7 +1258,12 @@ async function main() {
           model_case: brokerSelectedCaseEvidencePath,
           case_compile_report: brokerSelectedCompileReportPath,
         },
-        action: () => compileCase(validation.handoff.case_source, activeCaseEvidence),
+        action: async () => {
+          const compiled = compileCase(validation.handoff.case_source, activeCaseEvidence);
+          await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
+          await writeJsonAtomic(brokerSelectedCompileReportPath, compiled.report);
+          return compiled;
+        },
       })).value;
       activeCaseCompileReport = brokerSelectedCompilation.report;
       activeModelCase = brokerSelectedCompilation.model_case;
@@ -1412,6 +1430,12 @@ async function main() {
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("decisions"),
   });
+  // E2: the cached stage-2 summary is read BEFORE the node runs — the action
+  // now persists the node's declared output itself, so the reuse check must
+  // compare against what the PRIOR run wrote, not what this action wrote.
+  const cachedIntakeSummary = cached2.reusable
+    ? await readJson(stage2Result, "cached intake result")
+    : null;
   const freshIntakeResult = (await workGraph.runNode({
     id: "intake_plan",
     recipe: "intake-decision-plan/1.0",
@@ -1420,33 +1444,34 @@ async function main() {
       draft_case: hashValue(serialisable(activeModelCase ?? null)),
     },
     outputs: { intake_result: stage2Result },
-    action: () => runIntake({
-      intake: validation.handoff.intake,
-      draftCase: activeModelCase,
-    }),
+    action: async () => {
+      const planned = runIntake({
+        intake: validation.handoff.intake,
+        draftCase: activeModelCase,
+      });
+      if (brokerConfirmationCheck?.valid && !stoppedOutcome(planned.outcome)) {
+        applyBrokerPreviewSelection(
+          planned.working_case,
+          brokerPreview,
+          brokerConfirmation,
+        );
+      }
+      await writeJsonAtomic(stage2Result, serialisable(planned));
+      return planned;
+    },
   })).value;
-  if (brokerConfirmationCheck?.valid && !stoppedOutcome(freshIntakeResult.outcome)) {
-    applyBrokerPreviewSelection(
-      freshIntakeResult.working_case,
-      brokerPreview,
-      brokerConfirmation,
-    );
-  }
   let intakeResult = freshIntakeResult;
   if (cached2.reusable) {
-    const cachedSummary = await readJson(stage2Result, "cached intake result");
-    if (hashValue(cachedSummary) === hashValue(serialisable(freshIntakeResult))) {
+    if (hashValue(cachedIntakeSummary) === hashValue(serialisable(freshIntakeResult))) {
       // Keep the fresh object because its option handlers are functions and
       // therefore cannot survive JSON. The receipt proves its serialisable
       // decision plan is byte-equivalent to the persisted prior run.
       receipt2 = cached2.receipt;
       reusedStages.push("evidence_review");
       await workGraph.reuseStage("evidence_review");
-    } else {
-      await writeJsonAtomic(stage2Result, serialisable(freshIntakeResult));
     }
-  } else {
-    await writeJsonAtomic(stage2Result, serialisable(freshIntakeResult));
+    // On a mismatch the action above has already replaced the stale file with
+    // the freshly computed plan; the stage simply does not reuse.
   }
   if (stoppedOutcome(intakeResult.outcome)) {
     const stoppedStage = stageForOutcome(intakeResult.outcome);
@@ -1789,10 +1814,13 @@ async function main() {
         model_case: answeredCaseSourcePath,
         case_compile_report: answeredCompileReportPath,
       },
-      action: () => compileCase(answeredCaseSource, activeCaseEvidence),
+      action: async () => {
+        const compiled = compileCase(answeredCaseSource, activeCaseEvidence);
+        await writeJsonAtomic(answeredCaseSourcePath, answeredCaseSource);
+        await writeJsonAtomic(answeredCompileReportPath, compiled.report);
+        return compiled;
+      },
     })).value;
-    await writeJsonAtomic(answeredCaseSourcePath, answeredCaseSource);
-    await writeJsonAtomic(answeredCompileReportPath, recompilation.report);
     if (recompilation.report.status !== "clean") {
       const blocks = (recompilation.report.findings ?? []).filter(
         (entry) => entry.severity === "BLOCK",
@@ -1847,19 +1875,29 @@ async function main() {
         prior_answers: hashValue([...recordedDecisionMap(answeredCaseSource)]),
       },
       outputs: { intake_result: path.join(stage3Dir, "question-result.json") },
-      action: () => runIntake({
-        intake: validation.handoff.intake,
-        draftCase: recompilation.model_case,
-        priorAnswers: recordedDecisionMap(answeredCaseSource),
-      }),
+      action: async () => {
+        const replayed = runIntake({
+          intake: validation.handoff.intake,
+          draftCase: recompilation.model_case,
+          priorAnswers: recordedDecisionMap(answeredCaseSource),
+        });
+        if (brokerConfirmationCheck?.valid && !stoppedOutcome(replayed.outcome)) {
+          applyBrokerPreviewSelection(
+            replayed.working_case,
+            brokerPreview,
+            brokerConfirmation,
+          );
+        }
+        // E2: the replay's declared output is persisted whatever the outcome —
+        // a proceed result belongs in the artifact exactly as a questions
+        // result does. A success receipt may not seal over an absent file.
+        await writeJsonAtomic(
+          path.join(stage3Dir, "question-result.json"),
+          serialisable(replayed),
+        );
+        return replayed;
+      },
     })).value;
-    if (brokerConfirmationCheck?.valid && !stoppedOutcome(replayedIntake.outcome)) {
-      applyBrokerPreviewSelection(
-        replayedIntake.working_case,
-        brokerPreview,
-        brokerConfirmation,
-      );
-    }
     if (replayedIntake.outcome === "questions") {
       const pendingResult = path.join(stage3Dir, "question-result.json");
       const pendingScreen = path.join(stage3Dir, "question-screen.txt");
@@ -1983,10 +2021,14 @@ async function main() {
       recipe: "forecast-behavior-map/1.0",
       inputs: { planning_case: hashValue(serialisable(planningCase)) },
       outputs: { forecast_behavior_map: forecastBehaviorPath },
-      action: () => compileForecastBehaviorMap(
-        planningCase,
-        planningCase.statement_structure,
-      ),
+      action: async () => {
+        const compiledMap = compileForecastBehaviorMap(
+          planningCase,
+          planningCase.statement_structure,
+        );
+        await writeJsonAtomic(forecastBehaviorPath, compiledMap);
+        return compiledMap;
+      },
     })).value;
     const behaviorValidation = validateForecastBehaviorMap(behaviorMap);
     if (!behaviorValidation.valid) {
@@ -1999,7 +2041,11 @@ async function main() {
       recipe: "model-demand-graph/1.0",
       inputs: { planning_case: hashValue(serialisable(planningCase)) },
       outputs: { model_demand_graph: modelDemandGraphPath },
-      action: () => compileModelDemandGraph(planningCase),
+      action: async () => {
+        const compiledDemand = compileModelDemandGraph(planningCase);
+        await writeJsonAtomic(modelDemandGraphPath, compiledDemand);
+        return compiledDemand;
+      },
     })).value;
     const demandValidation = validateModelDemandGraph(modelDemandGraph);
     if (!demandValidation.valid) {
@@ -2018,16 +2064,20 @@ async function main() {
         source_inventory: hashValue(serialisable(evidenceRun?.source_inventory ?? [])),
       },
       outputs: { forecast_plan: forecastPlanJsonPath },
-      action: () => compileForecastPlan(
-        planningCase,
-        planningCase.statement_structure,
-        {
-          behaviorMap,
-          observationLedger:
-            validation.handoff?.forecast_observation_ledger ?? null,
-          sourceInventory: evidenceRun?.source_inventory ?? [],
-        },
-      ),
+      action: async () => {
+        const compiledPlan = compileForecastPlan(
+          planningCase,
+          planningCase.statement_structure,
+          {
+            behaviorMap,
+            observationLedger:
+              validation.handoff?.forecast_observation_ledger ?? null,
+            sourceInventory: evidenceRun?.source_inventory ?? [],
+          },
+        );
+        await writeJsonAtomic(forecastPlanJsonPath, compiledPlan);
+        return compiledPlan;
+      },
     })).value;
     const forecastPlanErrors = validateForecastPlan(
       forecastPlan,
@@ -2044,12 +2094,16 @@ async function main() {
         evidence_run: stage1Inputs.evidence_run,
       },
       outputs: { selected_authority_contract: selectedAuthorityContractPath },
-      action: () => compileSelectedAuthorityContract({
-        modelCase: planningCase,
-        forecastPlan,
-        modelDemandGraph,
-        evidenceRun,
-      }),
+      action: async () => {
+        const compiledContract = compileSelectedAuthorityContract({
+          modelCase: planningCase,
+          forecastPlan,
+          modelDemandGraph,
+          evidenceRun,
+        });
+        await writeJsonAtomic(selectedAuthorityContractPath, compiledContract);
+        return compiledContract;
+      },
     })).value;
     const authorityValidation = validateSelectedAuthorityContract(
       selectedAuthorityContract,
@@ -2068,13 +2122,17 @@ async function main() {
         evidence_run: stage1Inputs.evidence_run,
       },
       outputs: { run_constitution_graph: runConstitutionGraphPath },
-      action: () => compileRunConstitutionGraph({
-        evidenceRun,
-        modelCase: planningCase,
-        forecastPlan,
-        modelDemandGraph,
-        selectedAuthorityContract,
-      }),
+      action: async () => {
+        const compiledConstitution = compileRunConstitutionGraph({
+          evidenceRun,
+          modelCase: planningCase,
+          forecastPlan,
+          modelDemandGraph,
+          selectedAuthorityContract,
+        });
+        await writeJsonAtomic(runConstitutionGraphPath, compiledConstitution);
+        return compiledConstitution;
+      },
     })).value;
     const constitutionValidation = validateRunConstitutionGraph(runConstitutionGraph);
     if (!constitutionValidation.valid) {
@@ -2082,11 +2140,8 @@ async function main() {
         `Run constitution graph is invalid: ${constitutionValidation.errors[0] ?? "unknown violation"}`,
       );
     }
-    await writeJsonAtomic(forecastBehaviorPath, behaviorMap);
-    await writeJsonAtomic(forecastPlanJsonPath, forecastPlan);
-    await writeJsonAtomic(modelDemandGraphPath, modelDemandGraph);
-    await writeJsonAtomic(selectedAuthorityContractPath, selectedAuthorityContract);
-    await writeJsonAtomic(runConstitutionGraphPath, runConstitutionGraph);
+    // The five decisions-stage artifacts above were persisted INSIDE their
+    // node actions (E2): each receipt seals over a file that already exists.
     if (forecastPlan.status !== "PASS") {
       await writeTextAtomic(
         forecastPlanPath,
