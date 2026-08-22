@@ -115,6 +115,12 @@ const cases = path.resolve(
 );
 const python = await resolvePython(options.python);
 const soffice = await resolveSoffice(options.soffice);
+const interruptTimeoutMs = Number(options["interrupt-timeout-ms"] ?? 25_000);
+assert(
+  Number.isInteger(interruptTimeoutMs) && interruptTimeoutMs >= 5_000,
+  "--interrupt-timeout-ms must be an integer of at least 5000.",
+);
+const delayedSofficeSeconds = Math.ceil(interruptTimeoutMs / 1000) + 5;
 await fs.mkdir(out, { recursive: true });
 
 const evidence = path.join(out, "clean-evidence-run.json");
@@ -135,7 +141,7 @@ await fs.writeFile(slowSoffice, [
   "if [ \"$1\" = \"--version\" ]; then",
   `  exec ${shellQuote(soffice)} \"$@\"`,
   "fi",
-  "sleep 30",
+  `sleep ${delayedSofficeSeconds}`,
   `exec ${shellQuote(soffice)} \"$@\"`,
   "",
 ].join("\n"), "utf8");
@@ -144,11 +150,13 @@ await fs.chmod(slowSoffice, 0o755);
 const interrupted = await flow(evidence, runDir, [
   // This timeout measures the deliberately delayed recalculation boundary, not
   // plan/emitter speed. The current graph and provenance gates can legitimately
-  // consume more than twelve seconds on a loaded host, so leave 25 seconds for
-  // the deterministic pre-recalc checkpoints; the wrapper then sleeps for 30
-  // seconds and guarantees the outer controller is still interrupted inside
-  // recalculation rather than before a reusable receipt exists.
-  "--timeout", "25000",
+  // consume more than twelve seconds on a loaded host, so the default leaves
+  // 25 seconds for the deterministic pre-recalc checkpoints. The wrapper
+  // always sleeps five seconds beyond the selected test timeout, guaranteeing
+  // the outer controller is interrupted inside recalculation rather than
+  // before a reusable receipt exists. A shorter explicit value is useful only
+  // on a measured fast local host; hosted/default evidence retains 25 seconds.
+  "--timeout", String(interruptTimeoutMs),
   "--python", python,
   "--soffice", slowSoffice,
 ], { allowFailure: true });
@@ -227,6 +235,9 @@ assert(
 
 const workbook = recovered.workbook;
 const recoveredWorkbookHash = await sha256(workbook);
+const reviewDir = path.join(runDir, "stages", "review");
+const initialReviewSeal = path.join(reviewDir, "review-briefing.json");
+const initialReviewSealHash = await sha256(initialReviewSeal);
 const emittedWorkbook = path.join(buildDir, ".stage4", "work", "emit", "model.xlsx");
 await fs.rename(emittedWorkbook, `${emittedWorkbook}.missing-output-test`);
 const scratchReuse = await flow(evidence, runDir, [
@@ -239,6 +250,9 @@ assert(
   `Internal scratch loss invalidated a complete published closure: ${JSON.stringify(scratchReuse)}`,
 );
 assert(await sha256(workbook) === recoveredWorkbookHash, "Internal scratch loss changed the delivered workbook.");
+const preRepairReviewReceiptHash = await sha256(
+  path.join(reviewDir, "user-review-receipt-02.json"),
+);
 
 await fs.rename(workbook, `${workbook}.missing-output-test`);
 const repaired = await flow(evidence, runDir, [
@@ -246,7 +260,13 @@ const repaired = await flow(evidence, runDir, [
   "--soffice", soffice,
   "--review-deliver",
 ]);
-assert(repaired.status === "PASS_PENDING_MANUAL", `Missing-output repair did not deliver: ${JSON.stringify(repaired)}`);
+assert(
+  repaired.status === "PAUSED" &&
+    repaired.stage === "build_checks" &&
+    repaired.awaiting === "fresh_review_gate_reply" &&
+    repaired.review_generation === 2,
+  `Missing-output repair reused a review made before the repaired Build custody existed: ${JSON.stringify(repaired)}`,
+);
 const repairedBuild = JSON.parse(await fs.readFile(path.join(runDir, "stages", "build_checks", "build-result.json"), "utf8"));
 assert(
   repairedBuild.checkpointing.executed.join(",") === "emit,publish",
@@ -260,6 +280,46 @@ assert(
   `Unaffected checkpoints were not retained: ${JSON.stringify(repairedBuild.checkpointing)}`,
 );
 assert(await sha256(workbook) === recoveredWorkbookHash, "Targeted checkpoint repair changed the delivered workbook.");
+await fs.access(path.join(reviewDir, "user-review-receipt-g0002-01.json")).then(
+  () => { throw new Error("Missing-output repair recorded a reply against the new custody before the user could review it."); },
+  () => {},
+);
+const generation2Pointer = JSON.parse(
+  await fs.readFile(path.join(reviewDir, "review-active-generation.json"), "utf8"),
+);
+const generation2Seal = JSON.parse(
+  await fs.readFile(path.join(reviewDir, generation2Pointer.seal), "utf8"),
+);
+assert(
+  generation2Seal.generation === 2 &&
+    generation2Seal.previous_review_seal_sha256 === initialReviewSealHash &&
+    generation2Seal.previous_review_receipt_hash === preRepairReviewReceiptHash,
+  `The repaired custody did not preserve deterministic review lineage: ${JSON.stringify(generation2Seal)}`,
+);
+assert(
+  generation2Seal.workbook_sha256 === recoveredWorkbookHash,
+  "The replacement review generation did not bind the repaired workbook bytes.",
+);
+const repairedDelivery = await flow(evidence, runDir, [
+  "--python", python,
+  "--soffice", soffice,
+  "--review-deliver",
+]);
+assert(
+  repairedDelivery.status === "PASS_PENDING_MANUAL" && repairedDelivery.stage === "delivery",
+  `A fresh reply against the repaired custody did not deliver: ${JSON.stringify(repairedDelivery)}`,
+);
+const generation2Receipt = JSON.parse(
+  await fs.readFile(path.join(reviewDir, "user-review-receipt-g0002-01.json"), "utf8"),
+);
+assert(
+  generation2Receipt.reply === "deliver" &&
+    generation2Receipt.generation === 2 &&
+    generation2Receipt.previous_receipt_hash === preRepairReviewReceiptHash &&
+    generation2Receipt.build_result_sha256 === generation2Seal.build_result_sha256 &&
+    generation2Receipt.workbook_sha256 === generation2Seal.workbook_sha256,
+  `Fresh repaired-custody review receipt is not chained to exact prior bytes: ${JSON.stringify(generation2Receipt)}`,
+);
 
 // Damage one render leaf as well as the published workbook.  The controller
 // must rerun that sheet, the aggregate render index and publication, while
@@ -283,8 +343,11 @@ const renderLeafRepair = await flow(evidence, runDir, [
   "--review-deliver",
 ]);
 assert(
-  renderLeafRepair.status === "PASS_PENDING_MANUAL",
-  `Render-leaf repair did not deliver: ${JSON.stringify(renderLeafRepair)}`,
+  renderLeafRepair.status === "PAUSED" &&
+    renderLeafRepair.stage === "build_checks" &&
+    renderLeafRepair.awaiting === "fresh_review_gate_reply" &&
+    renderLeafRepair.review_generation === 3,
+  `Render-leaf repair reused a pre-repair review: ${JSON.stringify(renderLeafRepair)}`,
 );
 const renderLeafBuild = JSON.parse(
   await fs.readFile(
@@ -307,6 +370,30 @@ assert(
   await sha256(workbook) === recoveredWorkbookHash,
   "Render-leaf repair changed the delivered workbook.",
 );
+await fs.access(path.join(reviewDir, "user-review-receipt-g0003-01.json")).then(
+  () => { throw new Error("Render-leaf repair recorded a reply before the new review generation was shown."); },
+  () => {},
+);
+const generation2ReceiptHash = await sha256(
+  path.join(reviewDir, "user-review-receipt-g0002-01.json"),
+);
+const renderLeafDelivery = await flow(evidence, runDir, [
+  "--python", python,
+  "--soffice", soffice,
+  "--review-deliver",
+]);
+assert(
+  renderLeafDelivery.status === "PASS_PENDING_MANUAL" && renderLeafDelivery.stage === "delivery",
+  `A fresh reply against the render-repaired custody did not deliver: ${JSON.stringify(renderLeafDelivery)}`,
+);
+const generation3Receipt = JSON.parse(
+  await fs.readFile(path.join(reviewDir, "user-review-receipt-g0003-01.json"), "utf8"),
+);
+assert(
+  generation3Receipt.generation === 3 &&
+    generation3Receipt.previous_receipt_hash === generation2ReceiptHash,
+  `The render-repair review receipt did not extend the exact prior receipt chain: ${JSON.stringify(generation3Receipt)}`,
+);
 
 const finalReuse = await flow(evidence, runDir, [
   "--python", python,
@@ -328,7 +415,11 @@ const report = {
     { id: "resume-from-last-internal-success", status: "PASS", reused: recoveredBuild.checkpointing.reused },
     { id: "internal-scratch-loss-does-not-invalidate-published-closure", status: "PASS", reused: scratchReuse.reused_stages },
     { id: "missing-published-output-targeted-invalidation", status: "PASS", executed: repairedBuild.checkpointing.executed },
+    { id: "missing-published-output-refuses-stale-review", status: "PASS", generation: 2 },
+    { id: "missing-published-output-delivers-after-fresh-review", status: "PASS", receipt: "user-review-receipt-g0002-01.json" },
     { id: "single-render-leaf-targeted-invalidation", status: "PASS", executed: renderLeafBuild.checkpointing.executed },
+    { id: "render-repair-refuses-stale-review", status: "PASS", generation: 3 },
+    { id: "render-repair-delivers-after-fresh-review", status: "PASS", receipt: "user-review-receipt-g0003-01.json" },
     { id: "delivered-workbook-identity-after-repair", status: "PASS", sha256: recoveredWorkbookHash },
     { id: "five-user-stage-final-reuse", status: "PASS", reused: finalReuse.reused_stages },
   ],

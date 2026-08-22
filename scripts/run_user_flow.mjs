@@ -2712,7 +2712,13 @@ async function main() {
   };
   let sealedReview;
   try {
-    sealedReview = await sealReviewBriefing(reviewSealContext);
+    sealedReview = await sealReviewBriefing({
+      ...reviewSealContext,
+      // A legitimate Stage-4 checkpoint repair can re-admit a new complete
+      // Build custody set. Preserve the prior review generation and seal a new
+      // one; never reinterpret the old reply as approval of the moved bytes.
+      allowBuildCustodyReplacement: true,
+    });
   } catch (error) {
     if (!(error instanceof ReviewSealRefusal)) throw error;
     const refusalScreen = renderFailure({
@@ -2797,7 +2803,13 @@ async function main() {
       },
     });
   }
-  if (reviewReply.mode === "blocked") {
+  if (sealedReview.custody_resealed === true || reviewReply.mode === "blocked") {
+    // Even when a resealing invocation arrived with --review-deliver, that
+    // reply was made before the repaired Build custody and its new briefing
+    // existed. It is stale by construction. This shared pause branch shows
+    // the newly sealed briefing and requires a later invocation to record a
+    // fresh reply against this generation.
+    const custodyMoved = sealedReview.custody_resealed === true;
     const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
       model_case: answeredCasePath,
       workbook,
@@ -2813,9 +2825,16 @@ async function main() {
         status: "PAUSED",
         stage: "review",
         next_stage: nextStageId("review"),
-        awaiting: "review_gate_reply",
-        message:
-          'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
+        ...(custodyMoved
+          ? {
+            awaiting: "fresh_review_gate_reply",
+            message: "Build custody changed during checkpoint repair. Review the newly sealed briefing, then reply again to deliver or request a change.",
+            review_generation: sealedReview.generation,
+          }
+          : {
+            awaiting: "review_gate_reply",
+            message: 'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
+          }),
         carrier: carrier.path,
         model_case: answeredCasePath,
         receipt: receiptReview,

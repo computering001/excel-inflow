@@ -44,6 +44,8 @@ export const REVIEW_RECEIPT_SCHEMA_VERSION = "user-review-receipt/1.0";
 const REVIEW_DIR = path.join("stages", "review");
 const SEALED_BRIEFING_FILENAME = "review-briefing.json";
 const SEALED_BRIEFING_PAYLOAD_FILENAME = "review-briefing-payload.json";
+const ACTIVE_REVIEW_GENERATION_FILENAME = "review-active-generation.json";
+const ACTIVE_REVIEW_GENERATION_SCHEMA_VERSION = "review-active-generation/1.0";
 
 // Flat names are deliberate: every receipt can be inspected without resolving
 // a second manifest, and a missing custody link is therefore visible rather
@@ -90,6 +92,16 @@ const REVIEW_SEAL_HASH_FIELDS = Object.freeze([
   ...REVIEW_ARTIFACT_BINDINGS.map(({ hashField }) => hashField),
   "briefing_sha256",
 ]);
+const REVIEW_SEAL_LINEAGE_FIELDS = Object.freeze([
+  "generation",
+  "previous_review_seal_sha256",
+  "previous_review_receipt_hash",
+]);
+
+function sealLineageValue(seal, field) {
+  if (field === "generation") return seal?.generation ?? 1;
+  return seal?.[field] ?? null;
+}
 
 /**
  * Thrown when the gate refuses to brief from — or reply against — the
@@ -233,11 +245,107 @@ async function readExistingSeal(sealedPath) {
 function publicSeal(seal, sealedPath, payloadPath) {
   return {
     ...Object.fromEntries(
-      REVIEW_SEAL_HASH_FIELDS.map((field) => [field, seal[field]]),
+      [...REVIEW_SEAL_HASH_FIELDS, ...REVIEW_SEAL_LINEAGE_FIELDS]
+        .map((field) => [
+          field,
+          REVIEW_SEAL_LINEAGE_FIELDS.includes(field)
+            ? sealLineageValue(seal, field)
+            : seal[field],
+        ]),
     ),
     path: sealedPath,
     payload_path: payloadPath,
   };
+}
+
+function generationFilenames(generation) {
+  if (generation === 1) {
+    return Object.freeze({
+      seal: SEALED_BRIEFING_FILENAME,
+      payload: SEALED_BRIEFING_PAYLOAD_FILENAME,
+    });
+  }
+  const suffix = String(generation).padStart(4, "0");
+  return Object.freeze({
+    seal: `review-briefing-g${suffix}.json`,
+    payload: `review-briefing-payload-g${suffix}.json`,
+  });
+}
+
+function receiptFilename(generation, index) {
+  const sequence = String(index).padStart(2, "0");
+  if (generation === 1) return `user-review-receipt-${sequence}.json`;
+  return `user-review-receipt-g${String(generation).padStart(4, "0")}-${sequence}.json`;
+}
+
+function receiptNamePattern(generation) {
+  if (generation === 1) return /^user-review-receipt-\d+\.json$/;
+  return new RegExp(
+    `^user-review-receipt-g${String(generation).padStart(4, "0")}-\\d+\\.json$`,
+  );
+}
+
+async function activeReviewGeneration(reviewDir) {
+  const pointerPath = path.join(reviewDir, ACTIVE_REVIEW_GENERATION_FILENAME);
+  let pointerBytes;
+  try {
+    pointerBytes = await fs.readFile(pointerPath);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw new ReviewSealRefusal(
+        `The review gate cannot read its active-generation pointer at ${pointerPath}.`,
+      );
+    }
+    const filenames = generationFilenames(1);
+    return Object.freeze({
+      generation: 1,
+      sealFilename: filenames.seal,
+      payloadFilename: filenames.payload,
+      sealedPath: path.join(reviewDir, filenames.seal),
+      payloadPath: path.join(reviewDir, filenames.payload),
+      pointerPath,
+      pointer: null,
+    });
+  }
+  const pointer = parseRequiredJson(pointerBytes, "review active-generation pointer");
+  if (
+    pointer?.schema_version !== ACTIVE_REVIEW_GENERATION_SCHEMA_VERSION ||
+    !Number.isInteger(pointer?.generation) ||
+    pointer.generation < 2
+  ) {
+    throw new ReviewSealRefusal(
+      "The review active-generation pointer is unsupported or does not name a later review generation.",
+    );
+  }
+  const expected = generationFilenames(pointer.generation);
+  if (pointer.seal !== expected.seal || pointer.payload !== expected.payload) {
+    throw new ReviewSealRefusal(
+      "The review active-generation pointer redirects away from the deterministic generation filenames.",
+    );
+  }
+  const sealedPath = path.join(reviewDir, expected.seal);
+  const sealBytes = await readRequiredBytes(sealedPath, "active review briefing seal");
+  if (pointer.seal_sha256 !== sha256Hex(sealBytes)) {
+    throw new ReviewSealRefusal(
+      "The active review-generation pointer does not bind the exact active seal bytes.",
+    );
+  }
+  return Object.freeze({
+    generation: pointer.generation,
+    sealFilename: expected.seal,
+    payloadFilename: expected.payload,
+    sealedPath,
+    payloadPath: path.join(reviewDir, expected.payload),
+    pointerPath,
+    pointer,
+  });
+}
+
+async function reviewReceiptNames(reviewDir, generation) {
+  const pattern = receiptNamePattern(generation);
+  return (await fs.readdir(reviewDir))
+    .filter((name) => pattern.test(name))
+    .sort();
 }
 
 function headlineRows(forecastRows, currency) {
@@ -323,17 +431,20 @@ export async function reverifyReviewSeal({
   assertBuildReceiptBinding(buildReceipt, artifacts.hashes);
 
   const reviewDir = path.join(runDir, REVIEW_DIR);
-  const sealedPath = path.join(reviewDir, SEALED_BRIEFING_FILENAME);
-  const payloadPath = path.join(reviewDir, SEALED_BRIEFING_PAYLOAD_FILENAME);
+  const active = await activeReviewGeneration(reviewDir);
+  const { sealedPath, payloadPath } = active;
   const seal = await readExistingSeal(sealedPath);
   if (!seal) {
     throw new ReviewSealRefusal(
       "The review briefing has not been sealed; it cannot be displayed or replied to.",
     );
   }
-  if (seal.briefing_payload !== SEALED_BRIEFING_PAYLOAD_FILENAME) {
+  if (
+    sealLineageValue(seal, "generation") !== active.generation ||
+    seal.briefing_payload !== active.payloadFilename
+  ) {
     throw new ReviewSealRefusal(
-      "The review briefing seal does not name the fixed briefing payload; it refuses a redirected custody path.",
+      "The review briefing seal does not name its deterministic generation and fixed payload; it refuses a redirected custody path.",
     );
   }
   for (const binding of REVIEW_ARTIFACT_BINDINGS) {
@@ -381,7 +492,49 @@ export async function reverifyReviewSeal({
   return {
     briefing,
     seal: publicSeal(seal, sealedPath, payloadPath),
+    generation: active.generation,
   };
+}
+
+async function verifySealedGenerationHistory(reviewDir, active, seal) {
+  for (const field of REVIEW_SEAL_HASH_FIELDS) {
+    if (!/^[a-f0-9]{64}$/.test(String(seal?.[field] ?? ""))) {
+      throw new ReviewSealRefusal(
+        `The prior review generation has no valid ${field}; its custody history cannot be extended.`,
+      );
+    }
+  }
+  if (sealLineageValue(seal, "generation") !== active.generation) {
+    throw new ReviewSealRefusal(
+      "The prior review seal's generation does not match the active review generation.",
+    );
+  }
+  const payloadBytes = await readRequiredBytes(
+    active.payloadPath,
+    "prior sealed briefing payload",
+  );
+  if (seal.briefing_sha256 !== sha256Hex(payloadBytes)) {
+    throw new ReviewSealRefusal(
+      "The prior sealed briefing payload changed; a later Build custody will not erase or step over that break.",
+    );
+  }
+  const briefing = parseRequiredJson(payloadBytes, "prior sealed briefing payload");
+  if (
+    !Buffer.from(canonicalJsonBytes(briefing)).equals(payloadBytes) ||
+    !seal.briefing ||
+    !Buffer.from(canonicalJsonBytes(seal.briefing)).equals(payloadBytes)
+  ) {
+    throw new ReviewSealRefusal(
+      "The prior review generation no longer carries one canonical briefing payload.",
+    );
+  }
+  const names = await reviewReceiptNames(reviewDir, active.generation);
+  return verifyReviewReceiptChain(
+    reviewDir,
+    names,
+    seal,
+    active.generation,
+  );
 }
 
 /**
@@ -396,6 +549,7 @@ export async function sealReviewBriefing({
   modelCasePath,
   buildReceipt,
   quality = null,
+  allowBuildCustodyReplacement = false,
 }) {
   const artifacts = await captureReviewArtifacts({
     runDir,
@@ -411,15 +565,20 @@ export async function sealReviewBriefing({
   });
   const briefingBytes = canonicalJsonBytes(briefing);
   const reviewDir = path.join(runDir, REVIEW_DIR);
-  const sealedPath = path.join(reviewDir, SEALED_BRIEFING_FILENAME);
-  const payloadPath = path.join(reviewDir, SEALED_BRIEFING_PAYLOAD_FILENAME);
-  const existing = await readExistingSeal(sealedPath);
+  await fs.mkdir(reviewDir, { recursive: true });
+  let active = await activeReviewGeneration(reviewDir);
+  let { sealedPath, payloadPath } = active;
+  let existing = await readExistingSeal(sealedPath);
+  let custodyResealed = false;
   if (!existing) {
     const seal = {
       schema_version: SEALED_BRIEFING_SCHEMA_VERSION,
+      generation: 1,
+      previous_review_seal_sha256: null,
+      previous_review_receipt_hash: null,
       ...artifacts.hashes,
       briefing_sha256: sha256Hex(briefingBytes),
-      briefing_payload: SEALED_BRIEFING_PAYLOAD_FILENAME,
+      briefing_payload: active.payloadFilename,
       sealed_at: new Date().toISOString(),
       // Kept inline for a self-contained human-readable record; verification
       // still binds the separate exact-byte payload and requires equality.
@@ -430,20 +589,75 @@ export async function sealReviewBriefing({
       sealedPath,
       Buffer.from(`${JSON.stringify(seal, null, 2)}\n`, "utf8"),
     );
+    existing = seal;
+  } else {
+    const custodyMatches = REVIEW_ARTIFACT_BINDINGS.every(
+      ({ hashField }) => existing[hashField] === artifacts.hashes[hashField],
+    );
+    if (!custodyMatches && allowBuildCustodyReplacement) {
+      const previousReceiptHash = await verifySealedGenerationHistory(
+        reviewDir,
+        active,
+        existing,
+      );
+      const previousSealBytes = await readRequiredBytes(
+        active.sealedPath,
+        "prior review briefing seal",
+      );
+      const nextGeneration = active.generation + 1;
+      const filenames = generationFilenames(nextGeneration);
+      sealedPath = path.join(reviewDir, filenames.seal);
+      payloadPath = path.join(reviewDir, filenames.payload);
+      const seal = {
+        schema_version: SEALED_BRIEFING_SCHEMA_VERSION,
+        generation: nextGeneration,
+        previous_review_seal_sha256: sha256Hex(previousSealBytes),
+        previous_review_receipt_hash: previousReceiptHash,
+        ...artifacts.hashes,
+        briefing_sha256: sha256Hex(briefingBytes),
+        briefing_payload: filenames.payload,
+        sealed_at: new Date().toISOString(),
+        briefing,
+      };
+      await writeBytesAtomic(payloadPath, briefingBytes);
+      const sealBytes = Buffer.from(`${JSON.stringify(seal, null, 2)}\n`, "utf8");
+      await writeBytesAtomic(sealedPath, sealBytes);
+      const pointer = {
+        schema_version: ACTIVE_REVIEW_GENERATION_SCHEMA_VERSION,
+        generation: nextGeneration,
+        seal: filenames.seal,
+        payload: filenames.payload,
+        seal_sha256: sha256Hex(sealBytes),
+      };
+      await writeBytesAtomic(
+        active.pointerPath,
+        Buffer.from(`${JSON.stringify(pointer, null, 2)}\n`, "utf8"),
+      );
+      active = await activeReviewGeneration(reviewDir);
+      existing = seal;
+      custodyResealed = true;
+    }
   }
-  return reverifyReviewSeal({
+  const verified = await reverifyReviewSeal({
     runDir,
     workbookPath,
     modelCasePath,
     buildReceipt,
     quality,
   });
+  return {
+    ...verified,
+    custody_resealed: custodyResealed,
+  };
 }
 
-async function verifyReviewReceiptChain(reviewDir, names, seal) {
-  let previousReceiptHash = null;
+async function verifyReviewReceiptChain(reviewDir, names, seal, generation) {
+  let previousReceiptHash = sealLineageValue(
+    seal,
+    "previous_review_receipt_hash",
+  );
   for (let index = 0; index < names.length; index += 1) {
-    const expectedName = `user-review-receipt-${String(index + 1).padStart(2, "0")}.json`;
+    const expectedName = receiptFilename(generation, index + 1);
     if (names[index] !== expectedName) {
       throw new ReviewSealRefusal(
         `The user-review receipt chain is not contiguous at ${names[index]}; a new reply will not be appended to an ambiguous chain.`,
@@ -459,6 +673,15 @@ async function verifyReviewReceiptChain(reviewDir, names, seal) {
     }
     for (const field of REVIEW_SEAL_HASH_FIELDS) {
       if (receipt[field] !== seal[field]) {
+        throw new ReviewSealRefusal(
+          `The user-review receipt ${names[index]} is not bound to the current ${field}.`,
+        );
+      }
+    }
+    for (const field of REVIEW_SEAL_LINEAGE_FIELDS) {
+      const expected = sealLineageValue(seal, field);
+      const observed = receipt[field] ?? (field === "generation" ? 1 : null);
+      if (observed !== expected) {
         throw new ReviewSealRefusal(
           `The user-review receipt ${names[index]} is not bound to the current ${field}.`,
         );
@@ -508,18 +731,19 @@ export async function recordUserReviewReceipt({
   });
   const reviewDir = path.join(runDir, REVIEW_DIR);
   await fs.mkdir(reviewDir, { recursive: true });
-  const names = (await fs.readdir(reviewDir))
-    .filter((name) => /^user-review-receipt-\d+\.json$/.test(name))
-    .sort();
+  const active = await activeReviewGeneration(reviewDir);
+  const names = await reviewReceiptNames(reviewDir, active.generation);
   const previousReceiptHash = await verifyReviewReceiptChain(
     reviewDir,
     names,
     verified.seal,
+    active.generation,
   );
   const receipt = {
     schema_version: REVIEW_RECEIPT_SCHEMA_VERSION,
     ...Object.fromEntries(
-      REVIEW_SEAL_HASH_FIELDS.map((field) => [field, verified.seal[field]]),
+      [...REVIEW_SEAL_HASH_FIELDS, ...REVIEW_SEAL_LINEAGE_FIELDS]
+        .map((field) => [field, verified.seal[field]]),
     ),
     reply,
     ...(changeClass !== null && changeClass !== undefined
@@ -531,7 +755,7 @@ export async function recordUserReviewReceipt({
   const nextIndex = names.length + 1;
   const receiptPath = path.join(
     reviewDir,
-    `user-review-receipt-${String(nextIndex).padStart(2, "0")}.json`,
+    receiptFilename(active.generation, nextIndex),
   );
   const bytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
   await writeBytesAtomic(receiptPath, bytes);
