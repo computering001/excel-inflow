@@ -481,6 +481,16 @@
       "concern": "P8.7 portable dossier assembly (typed absences; refuses to mint a manifest naming fewer than five classes)",
       "target_owner": "Release/package compiler (Phase 8)"
     },
+    "lib/release_identity.mjs": {
+      "count": 6,
+      "families": {
+        "terminal_status": 2,
+        "release_identity": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "MP2 Phase A — the release-identity leaf: reads the ONE hand-edited declaration, writes every derived release surface (runtime-manifest skill_version/release_channel, doc banners) and verifies them; its writer ingress is compile_skill_release.mjs --write-release-identity",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
     "lib/release_identity_governance.mjs": {
       "count": 1,
       "families": {
@@ -586,9 +596,9 @@
       "target_owner": "Canonical graph compiler (Phase 3)"
     },
     "lib/skill_version_declaration.mjs": {
-      "count": 7,
+      "count": 5,
       "families": {
-        "release_identity": 7
+        "release_identity": 5
       },
       "classification": "validator",
       "concern": "P8.9 freeze criterion 9 — the single skill-version declaration and the enumerated hard-coded-literal scan; READS the declaration and reports, never writes a version",

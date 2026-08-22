@@ -80,6 +80,7 @@ import path from "node:path";
 import process from "node:process";
 import { builtinModules } from "node:module";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   sha256File,
   validateReleaseCertificationEvidence,
@@ -117,6 +118,9 @@ import {
 // The ONE runtime-code-closure membership definition, shared with the
 // runtime-isolation validator. This compiler must not carry its own rule.
 import { runtimeCodeClosureMembers } from "./lib/source_identity.mjs";
+// MP2 Phase A — the release-identity leaf: the writer this file exposes via
+// --write-release-identity and the drift checker the ownership census runs.
+import { writeDerivedReleaseSurfaces } from "./lib/release_identity.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -196,6 +200,25 @@ const portableCertifyNow = options["portable-certify"] === true;
 const attestNow = certifyNow || developmentNow || portableCertifyNow;
 const skipSmoke = options["skip-smoke"] === true;
 const certificationEvidencePath = options["certification-evidence"] ?? null;
+
+// MP2 Phase A (A2) — THE WRITER INGRESS, ahead of every other argument rule so
+// stamping never requires --skill/--out or a smoke case:
+//
+//   node scripts/compile_skill_release.mjs --write-release-identity [--skill <folder>]
+//
+// It stamps assets/runtime-manifest.json#/skill_version and #/release_channel,
+// the RELEASE_NOTES.md generated banner and the KNOWN_LIMITATIONS.md header
+// from assets/release-identity.json — the ONLY hand-edited identity source.
+// The ownership census runs verifyDerivedReleaseSurfaces() over exactly these
+// surfaces, so hand-editing one fails CI naming this command.
+if (options["write-release-identity"] === true) {
+  const identityRoot = path.resolve(
+    skillDir ?? path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+  );
+  process.stdout.write(`${JSON.stringify(writeDerivedReleaseSurfaces(identityRoot), null, 2)}\n`);
+  process.exit(0);
+}
 
 // P8.10 (D44): the release smoke input is DECLARED by the deployment profile,
 // on the same surface that names the Python entry points and their smoke

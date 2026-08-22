@@ -5,9 +5,12 @@
  * Everything else that states the release version is DERIVED from it by a
  * writer and enforced by a drift checker:
  *
- *   - `assets/runtime-manifest.json#/skill_version` is stamped by this module
- *     (it used to be the declaration itself; it is now a derived copy that the
- *     installed host keeps reading, so its consumers did not have to move);
+ *   - `assets/runtime-manifest.json#/skill_version` and
+ *     `#/release_channel` are stamped by this module (the manifest used to be
+ *     the declaration itself; it is now a derived copy that the installed host
+ *     keeps reading, so its consumers did not have to move — and the channel
+ *     rides beside the version so the installer ingress can admit or refuse a
+ *     package by its declared channel);
  *   - the RELEASE_NOTES.md banner and the KNOWN_LIMITATIONS.md header are
  *     generated blocks this module writes and re-writes;
  *   - the packaged copy of release-identity.json carries `commit` and
@@ -252,9 +255,9 @@ export function serialiseReleaseIdentity(identity) {
   return `${JSON.stringify(identity, null, 2)}\n`;
 }
 
-/** The derived manifest copy: every field preserved, skill_version stamped. */
+/** The derived manifest copy: version and channel stamped from the identity. */
 export function stampedRuntimeManifest(manifest, identity) {
-  return { ...manifest, skill_version: identity.version };
+  return { ...manifest, skill_version: identity.version, release_channel: identity.channel };
 }
 
 export function serialiseRuntimeManifest(manifest) {
@@ -313,6 +316,28 @@ function replaceLimitationsBanner(text, block) {
   return insertAfterHeading(text, block);
 }
 
+/**
+ * The banner's `commit=` and `generated_at=` tokens record WHEN the writer last
+ * ran, and they can never satisfy a byte-exact comparison across a commit:
+ * committing the stamped docs creates a HEAD newer than the one the banner
+ * names, so even an honest writer-then-commit-then-verify cycle drifts on
+ * exactly those two tokens. The drift comparison therefore normalises ONLY
+ * those two tokens on BOTH sides. Everything identity-bearing — the version,
+ * the channel, the markers and every other byte — is still compared exactly,
+ * so a hand edit to any of it is still a violation.
+ */
+const VOLATILE_BANNER_TOKENS = Object.freeze([
+  [/commit=(?:[0-9a-f]{40}|uncommitted)/g, "commit=<build-stamp>"],
+  [/generated_at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, "generated_at=<build-stamp>"],
+]);
+
+function comparableBannerText(text) {
+  return VOLATILE_BANNER_TOKENS.reduce(
+    (comparable, [pattern, replacement]) => comparable.replace(pattern, replacement),
+    text,
+  );
+}
+
 /** The three derived surfaces and how each is rendered from the identity. */
 function derivedSurfaces(root, identity, stamp) {
   const stamped = stampedReleaseIdentity(identity, stamp);
@@ -351,8 +376,10 @@ function derivedSurfaces(root, identity, stamp) {
     {
       path: "RELEASE_NOTES.md#release-identity-banner",
       expected: () =>
-        replaceGeneratedBlock(readText("RELEASE_NOTES.md", "RELEASE_NOTES.md"), releaseNotesBanner(stamped), RELEASE_NOTES_BEGIN, RELEASE_NOTES_END),
-      actual: () => readText("RELEASE_NOTES.md", "RELEASE_NOTES.md"),
+        comparableBannerText(
+          replaceGeneratedBlock(readText("RELEASE_NOTES.md", "RELEASE_NOTES.md"), releaseNotesBanner(stamped), RELEASE_NOTES_BEGIN, RELEASE_NOTES_END),
+        ),
+      actual: () => comparableBannerText(readText("RELEASE_NOTES.md", "RELEASE_NOTES.md")),
     },
     {
       path: "KNOWN_LIMITATIONS.md#release-identity-header",
