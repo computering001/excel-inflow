@@ -536,14 +536,23 @@ async function main() {
   const nativeArtifacts = {};
   // Lane detection happens once, up front: the Inline XBRL marker decides
   // which extraction lane each document owes. Documents carrying tagged
-  // facts go to the structured lane FIRST; PDF geometry is engaged only as
-  // the fallback for documents the structured lane could not bind.
+  // facts go to the structured lane FIRST; plain-HTML documents without
+  // markers go to the html-tables lane; PDF geometry is engaged only as the
+  // fallback for documents neither text lane could bind.
   const inlineXbrlDocumentIds = [];
+  const htmlTableDocumentIds = [];
   for (const document of request.documents) {
     const raw = await fs.readFile(resolveFrom(requestBase, document.path), "latin1");
-    if (XBRL_MARKER.test(raw)) inlineXbrlDocumentIds.push(document.document_id);
+    if (XBRL_MARKER.test(raw)) {
+      inlineXbrlDocumentIds.push(document.document_id);
+    } else if (
+      document.media_type === "text/html" || /\.x?html?$/i.test(document.path)
+    ) {
+      htmlTableDocumentIds.push(document.document_id);
+    }
   }
   const structuredLaneOutcomeById = new Map();
+  const htmlTableOutcomeById = new Map();
   if (!responsePath) {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
     const pythonExecutable = await resolveFilingsPython();
@@ -605,33 +614,124 @@ async function main() {
       };
       await writeRuntimeReceipt();
     }
+    // The plain-HTML table lane owns documents that carry no Inline XBRL but
+    // are still HTML: their facts exist only as printed <table> cells, which
+    // scripts/extract_html_tables.py parses with the standard library into
+    // the SAME fact-table shape the structured lane emits. Like the
+    // structured lane it runs per document under the process-tree guard,
+    // binds its output to the raw source bytes, and refuses to claim a
+    // document whose facts it did not bind — everything unbound falls
+    // through to PDF geometry, so a silent empty result can never pass.
+    if (htmlTableDocumentIds.length > 0) {
+      const htmlExtractionStarted = process.hrtime.bigint();
+      const htmlFactsRoot = path.join(nativeRoot, "html-table-facts");
+      await fs.mkdir(htmlFactsRoot, { recursive: true });
+      let htmlTimedOut = false;
+      let htmlTerminationVerified = true;
+      const htmlSurvivorPids = [];
+      for (const documentId of htmlTableDocumentIds) {
+        const declaration = request.documents.find((entry) => entry.document_id === documentId);
+        const target = resolveFrom(requestBase, declaration.path);
+        const factsPath = path.join(htmlFactsRoot, `${documentId}.html-table-facts.json`);
+        const attempt = await runProcessTree(
+          pythonExecutable,
+          [path.join(HERE, "extract_html_tables.py"), target, "--out", factsPath],
+          {
+            cwd: HERE,
+            maxBuffer: 32 * 1024 * 1024,
+            timeout: filingExtractionTimeoutMs,
+            env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+          },
+        );
+        htmlTimedOut = htmlTimedOut || attempt.timed_out === true;
+        if (attempt.timed_out) {
+          htmlTerminationVerified = htmlTerminationVerified && attempt.termination_verified === true;
+          htmlSurvivorPids.push(...(attempt.survivor_pids ?? []));
+        }
+        let bound = false;
+        const outcome = {
+          facts_path: factsPath,
+          exit_code: attempt.code,
+          timed_out: attempt.timed_out === true,
+        };
+        if (attempt.ok) {
+          try {
+            const factTable = await readJson(factsPath, "html table fact table");
+            bound = factTable.source_sha256 === sourceHashes[documentId] &&
+              factTable.ixbrl_present === false &&
+              factTable.schema_version === "html-table-facts/1.0" &&
+              factTable.fact_count > 0;
+            if (bound) outcome.fact_table_sha256 = await sha256File(factsPath);
+          } catch {
+            bound = false;
+          }
+        }
+        outcome.bound = bound;
+        htmlTableOutcomeById.set(documentId, outcome);
+      }
+      performance.html_table_filing_extraction_ms =
+        Number(process.hrtime.bigint() - htmlExtractionStarted) / 1e6;
+      const htmlPassed = htmlTableDocumentIds.every((documentId) =>
+        htmlTableOutcomeById.get(documentId)?.bound === true);
+      runtimeReceipt.stages.html_table_filing_extraction = {
+        budget_ms: filingExtractionTimeoutMs,
+        duration_ms: performance.html_table_filing_extraction_ms,
+        outcome: htmlTimedOut ? "TIMEOUT" : htmlPassed ? "PASS" : "FAIL",
+        process_tree_termination_verified: htmlTerminationVerified,
+        survivor_pids: htmlSurvivorPids,
+        documents: Object.fromEntries(htmlTableOutcomeById),
+      };
+      await writeRuntimeReceipt();
+    }
     // PDF geometry is the fallback lane: it receives only the documents the
-    // structured lane did not bind — all of them when none carry Inline
-    // XBRL, which preserves the historical single-subprocess behavior.
+    // structured or html-table lanes did not bind — all of them when none
+    // carry Inline XBRL or HTML tables, which preserves the historical
+    // single-subprocess behavior.
     const fallbackDocuments = request.documents.filter((document) =>
-      !(structuredLaneOutcomeById.get(document.document_id)?.bound === true));
+      !(structuredLaneOutcomeById.get(document.document_id)?.bound === true) &&
+      !(htmlTableOutcomeById.get(document.document_id)?.bound === true));
     if (fallbackDocuments.length === 0) {
-      // The structured lane bound every document. Geometry is not required,
-      // but selected face-statement authority is still owed before this run
-      // can compile — fail closed into review rather than laundering the
-      // fact tables into face-statement authority.
-      runtimeReceipt.status = runtimeReceipt.stages.structured_filing_extraction.outcome === "PASS" ? "PASS" : "FAIL";
+      // The structured/html-table lanes bound every document. Geometry is not
+      // required, but selected face-statement authority is still owed before
+      // this run can compile — fail closed into review rather than laundering
+      // the fact tables into face-statement authority.
+      runtimeReceipt.status = [
+        runtimeReceipt.stages.structured_filing_extraction?.outcome,
+        runtimeReceipt.stages.html_table_filing_extraction?.outcome,
+      ].every((outcome) => outcome === undefined || outcome === "PASS")
+        ? "PASS"
+        : "FAIL";
       await writeRuntimeReceipt();
       await writeState(statePath, {
         ...base,
         pipeline_status: "NEEDS_EXTRACTION_REVIEW",
         user_blocking: false,
         blocker_class: "INTERNAL_WORK",
-        artifacts: { structured_fact_tables: path.join(nativeRoot, "structured-facts") },
+        artifacts: {
+          ...(inlineXbrlDocumentIds.length > 0
+            ? { structured_fact_tables: path.join(nativeRoot, "structured-facts") }
+            : {}),
+          ...(htmlTableDocumentIds.length > 0
+            ? { html_table_facts: path.join(nativeRoot, "html-table-facts") }
+            : {}),
+        },
         tasks: [{
           task_kind: "filing_extraction_adjudication",
           request_path: effectiveRequestPath,
           structured_document_ids: inlineXbrlDocumentIds,
-          instruction: "The Inline XBRL structured lane bound every document's tagged facts; adjudicate selected face-statement authority from the structured fact tables. Do not rerun PDF geometry over structured-bound documents.",
+          ...(htmlTableDocumentIds.length > 0
+            ? { html_table_document_ids: htmlTableDocumentIds }
+            : {}),
+          instruction: htmlTableDocumentIds.length > 0 && inlineXbrlDocumentIds.length === 0
+            ? "The plain-HTML table lane bound every document's printed <table> facts as html-table-facts/1.0 fact tables; adjudicate selected face-statement authority from the html-table fact tables. Do not rerun PDF geometry over html-table-bound documents."
+            : "The Inline XBRL structured lane bound every document's tagged facts; adjudicate selected face-statement authority from the structured fact tables. Do not rerun PDF geometry over structured-bound documents.",
         }],
         summary: {
           document_count: request.documents.length,
           structured_bound_count: inlineXbrlDocumentIds.length,
+          ...(htmlTableDocumentIds.length > 0
+            ? { html_table_bound_count: htmlTableDocumentIds.length }
+            : {}),
           violations: [],
         },
       });
