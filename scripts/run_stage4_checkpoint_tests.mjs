@@ -246,7 +246,7 @@ const scratchReuse = await flow(evidence, runDir, [
   "--review-deliver",
 ]);
 assert(
-  scratchReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",
+  scratchReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,review",
   `Internal scratch loss invalidated a complete published closure: ${JSON.stringify(scratchReuse)}`,
 );
 assert(await sha256(workbook) === recoveredWorkbookHash, "Internal scratch loss changed the delivered workbook.");
@@ -262,7 +262,7 @@ const repaired = await flow(evidence, runDir, [
 ]);
 assert(
   repaired.status === "PAUSED" &&
-    repaired.stage === "build_checks" &&
+    repaired.stage === "review" &&
     repaired.awaiting === "fresh_review_gate_reply" &&
     repaired.review_generation === 2,
   `Missing-output repair reused a review made before the repaired Build custody existed: ${JSON.stringify(repaired)}`,
@@ -344,7 +344,7 @@ const renderLeafRepair = await flow(evidence, runDir, [
 ]);
 assert(
   renderLeafRepair.status === "PAUSED" &&
-    renderLeafRepair.stage === "build_checks" &&
+    renderLeafRepair.stage === "review" &&
     renderLeafRepair.awaiting === "fresh_review_gate_reply" &&
     renderLeafRepair.review_generation === 3,
   `Render-leaf repair reused a pre-repair review: ${JSON.stringify(renderLeafRepair)}`,
@@ -401,8 +401,8 @@ const finalReuse = await flow(evidence, runDir, [
   "--review-deliver",
 ]);
 assert(
-  finalReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",
-  `Identical final replay did not reuse all five user stages: ${JSON.stringify(finalReuse)}`,
+  finalReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,review",
+  `Identical final replay did not reuse every pre-delivery user stage: ${JSON.stringify(finalReuse)}`,
 );
 
 const report = {
@@ -421,7 +421,7 @@ const report = {
     { id: "render-repair-refuses-stale-review", status: "PASS", generation: 3 },
     { id: "render-repair-delivers-after-fresh-review", status: "PASS", receipt: "user-review-receipt-g0003-01.json" },
     { id: "delivered-workbook-identity-after-repair", status: "PASS", sha256: recoveredWorkbookHash },
-    { id: "five-user-stage-final-reuse", status: "PASS", reused: finalReuse.reused_stages },
+    { id: "pre-delivery-stage-final-reuse", status: "PASS", reused: finalReuse.reused_stages },
   ],
   evidence: {
     run_directory: runDir,
