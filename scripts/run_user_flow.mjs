@@ -2141,6 +2141,7 @@ async function main() {
           status: "BLOCKED",
           stage: "decisions",
           outcome: "forecast_plan_blocked",
+          reason_code: "forecast_plan_blocked",
           blocker_class: "INTERNAL_WORK",
           message,
           forecast_plan: forecastPlanJsonPath,
