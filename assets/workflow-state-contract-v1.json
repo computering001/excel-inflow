@@ -20,7 +20,7 @@
   },
   "visible_journey": {
     "schema_version": "visible-journey/1.0",
-    "display_rule": "Only this six-milestone journey is user-visible. Five-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
+    "display_rule": "Only this six-milestone journey is user-visible. Six-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
     "milestones": [
       {
         "id": "company",
@@ -70,6 +70,12 @@
         "label": "BUILD AND CHECKS",
         "completed_milestones": 4,
         "active_milestone": "build",
+        "next_milestone": "deliver"
+      },
+      "review": {
+        "label": "REVIEW",
+        "completed_milestones": 5,
+        "active_milestone": null,
         "next_milestone": "deliver"
       },
       "delivery": {
@@ -563,6 +569,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -575,7 +582,8 @@
             "inputs",
             "evidence_review",
             "decisions",
-            "build_checks"
+            "build_checks",
+            "review"
           ]
         },
         "ACTION_REQUIRED": {
@@ -598,6 +606,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -614,6 +623,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -674,6 +684,7 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
@@ -688,12 +699,14 @@
             "evidence_review",
             "decisions",
             "build_checks",
+            "review",
             "delivery"
           ]
         },
         "failed": {
           "stages": [
             "build_checks",
+            "review",
             "delivery"
           ]
         }

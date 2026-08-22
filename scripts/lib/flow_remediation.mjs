@@ -170,6 +170,36 @@ export function classifyChangeComplaint(text) {
 }
 
 /**
+ * Recompute and verify a persisted review-change record. The record is a
+ * complaint receipt, not authority over its own invalidation scope: stage and
+ * change types are always derived again from the complaint text.
+ */
+export function verifyReviewChangeRecord(record) {
+  const classification = classifyChangeComplaint(record?.complaint);
+  if (
+    !record ||
+    typeof record !== "object" ||
+    Array.isArray(record) ||
+    record.schema_version !== "flow-review-change/1.0" ||
+    record.delivered !== false ||
+    record.classified !== classification.classified ||
+    JSON.stringify(record.change_types ?? null) !==
+      JSON.stringify(classification.change_types) ||
+    record.invalidated_from_stage !== classification.stage_id ||
+    record.invalidated_from_milestone !== classification.milestone_label ||
+    record.revise_entry !== describeReviseEntry(classification)
+  ) {
+    throw new Error(
+      "Pending review-change record does not match the declared complaint classifier.",
+    );
+  }
+  return Object.freeze({
+    record: Object.freeze({ ...record }),
+    classification,
+  });
+}
+
+/**
  * The revise entry shown after delivery: where the flow re-enters for each
  * kind of complaint, in plain words. Ordered earliest-invalidated first so a
  * mixed complaint names its widest scope once.

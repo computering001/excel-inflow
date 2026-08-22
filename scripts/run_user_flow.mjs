@@ -40,6 +40,7 @@ import {
   FLOW_CONTROLLER_VERSION,
   earliestInvalidatedStage,
   nextStageId,
+  stageById,
 } from "./lib/flow_runtime.mjs";
 import {
   assertPublicStateOwnership,
@@ -59,8 +60,8 @@ import {
   renderStageStatus,
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
-// The REVIEW gate: the display-only pause between BUILD AND CHECKS and
-// DELIVERY, plus the plain-language translation of its change requests.
+// The REVIEW stage: the receipted pause between BUILD AND CHECKS and DELIVERY,
+// plus the plain-language translation of its change requests.
 import {
   REVIEW_CHANGE_REPLY,
   recordUserReviewReceipt,
@@ -73,6 +74,7 @@ import {
 import {
   classifyChangeComplaint,
   describeReviseEntry,
+  verifyReviewChangeRecord,
 } from "./lib/flow_remediation.mjs";
 import { deriveRuntimeMode } from "./lib/runtime_mode.mjs";
 import { verifyScreenSession } from "./lib/screen_session.mjs";
@@ -319,6 +321,11 @@ const PRESENTATION_SCREENS = Object.freeze({
     summary:
       "Solving the economic graph, building the workbook and running the deterministic checks. No response is required.",
   }),
+  review: Object.freeze({
+    status: "action required",
+    summary:
+      "NEXT ACTION: Reply deliver, or reply change <what to change> against the sealed workbook briefing.",
+  }),
   delivery: Object.freeze({
     status: "in progress",
     summary:
@@ -349,7 +356,7 @@ function renderPresentationScreen(stageId, companyPreflight = null) {
   const declaration = PRESENTATION_SCREENS[stageId];
   if (!declaration) {
     throw new Error(
-      `--screen must be one of company, brokers, inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
+      `--screen must be one of company, brokers, inputs, evidence_review, decisions, build_checks, review or delivery; got ${stageId}`,
     );
   }
   return renderStageStatus({ stageId, ...declaration });
@@ -361,7 +368,7 @@ function renderCompletionScreen(stageId) {
   return renderStageStatus({ stageId, status: "complete", summary });
 }
 
-// P6.2: the five user stages no longer carry a HAND-MAINTAINED membership list.
+// P6.2: the user stages no longer carry a HAND-MAINTAINED membership list.
 // The list that used to live here was not closed over the real import graph —
 // its `inputs` entry named 13 modules whose own transitive closure is 99 — so a
 // change to a module the stage genuinely executes (solver.mjs, run_deadline.mjs,
@@ -687,7 +694,7 @@ async function main() {
         "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--review-deliver | --review-change <text>] [--json], or " +
-        "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|delivery> " +
+        "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|review|delivery> " +
         "[private top-controller capability handoff]",
     );
   }
@@ -740,6 +747,7 @@ async function main() {
   }
   const workspaceToken = String(explicitWorkspaceToken ?? `workspace:${path.dirname(runDir)}`);
   let verifiedCarrier = null;
+  let pendingReviewChange = null;
   let evidencePath;
   if (options.carrier) {
     const carrierPath = path.resolve(String(options.carrier));
@@ -804,6 +812,18 @@ async function main() {
       });
     }
     evidencePath = verifiedCarrier.files.evidence_run;
+    if (verifiedCarrier.review_change_state === "pending_resume") {
+      const record = await readJson(
+        verifiedCarrier.review_change_path,
+        "review change",
+      );
+      const verifiedReviewChange = verifyReviewChangeRecord(record);
+      pendingReviewChange = Object.freeze({
+        path: verifiedCarrier.review_change_path,
+        sha256: verifiedCarrier.carrier.files.review_change.sha256,
+        ...verifiedReviewChange,
+      });
+    }
     if (!options.answers && verifiedCarrier.files.answers) options.answers = verifiedCarrier.files.answers;
     if (!options["broker-confirmation"] && verifiedCarrier.files.broker_confirmation) {
       options["broker-confirmation"] = verifiedCarrier.files.broker_confirmation;
@@ -908,6 +928,19 @@ async function main() {
   });
   const carrierMigrationInput = (stageId) =>
     runCarrierMigrationStageInput(verifiedCarrier, stageId);
+  const reviewChangeInvalidationInput = (stageId) => {
+    if (!pendingReviewChange) return {};
+    const stage = stageById(stageId);
+    const floor = stageById(pendingReviewChange.classification.stage_id);
+    if (!stage || !floor) {
+      throw new Error("Review-change invalidation names an undeclared stage.");
+    }
+    return stage.number >= floor.number
+      ? { review_change: pendingReviewChange.sha256 }
+      : {};
+  };
+  const reviewChangeStopsAt = (stageId) =>
+    pendingReviewChange?.classification?.stage_id === stageId;
   let brokerIntakeChoicePath = null;
   if (typeof options["broker-intake-choice"] === "string") {
     brokerIntakeChoicePath = path.resolve(options["broker-intake-choice"]);
@@ -936,7 +969,11 @@ async function main() {
   await writeTextAtomic(stage1Evidence, await fs.readFile(evidencePath, "utf8"));
   await writeJsonAtomic(stage1CaseSource, evidenceRun.case_source ?? {});
   await writeJsonAtomic(stage1CaseEvidence, evidenceRun.case_evidence ?? {});
-  async function persistCurrentCarrier(status, artifacts = {}) {
+  async function persistCurrentCarrier(
+    status,
+    artifacts = {},
+    { reviewChangePath = null } = {},
+  ) {
     return writeRunCarrier({
       skillRoot: ROOT,
       runRoot: runDir,
@@ -948,6 +985,7 @@ async function main() {
       answersPath: typeof options.answers === "string" ? path.resolve(options.answers) : null,
       brokerIntakeChoicePath,
       brokerConfirmationPath: stage2BrokerConfirmation,
+      reviewChangePath,
       status,
       artifacts,
     });
@@ -959,6 +997,7 @@ async function main() {
       : {}),
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("inputs"),
+    ...reviewChangeInvalidationInput("inputs"),
   };
   const stage1Outputs = {
     evidence_validation: stage1Validation,
@@ -1059,7 +1098,7 @@ async function main() {
       outputs: stage1Outputs,
     });
   }
-  if (options["stop-after"] === "inputs") {
+  if (options["stop-after"] === "inputs" || reviewChangeStopsAt("inputs")) {
     return finish({
       runDir,
       screen: renderEvidenceReviewProgress(evidenceRun),
@@ -1395,6 +1434,7 @@ async function main() {
         : hashValue({ pending: productionBrokerPreviewRequired }),
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("evidence_review"),
+    ...reviewChangeInvalidationInput("evidence_review"),
   };
   const stage2Outputs = {
     intake_result: stage2Result,
@@ -1438,6 +1478,7 @@ async function main() {
     answers,
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("decisions"),
+    ...reviewChangeInvalidationInput("decisions"),
   });
   // E2: the cached stage-2 summary is read BEFORE the node runs — the action
   // now persists the node's declared output itself, so the reuse check must
@@ -1640,7 +1681,10 @@ async function main() {
       outputs: stage2Outputs,
     });
   }
-  if (options["stop-after"] === "evidence_review") {
+  if (
+    options["stop-after"] === "evidence_review" ||
+    reviewChangeStopsAt("evidence_review")
+  ) {
     return finish({
       runDir,
       screen: renderCompletionScreen("evidence_review"),
@@ -2292,15 +2336,20 @@ async function main() {
       },
     });
   }
-  if (options["stop-after"] === "decisions") {
-    const carrier = await persistCurrentCarrier("READY_TO_BUILD", {
+  if (options["stop-after"] === "decisions" || reviewChangeStopsAt("decisions")) {
+    const carrier = await persistCurrentCarrier(
+      reviewChangeStopsAt("decisions")
+        ? "AWAITING_REVISED_DECISIONS"
+        : "READY_TO_BUILD",
+      {
       model_case: answeredCasePath,
       case_source: answeredCaseSourcePath,
       case_compile_report: answeredCompileReportPath,
       model_demand_graph: modelDemandGraphPath,
       selected_authority_contract: selectedAuthorityContractPath,
       run_constitution_graph: runConstitutionGraphPath,
-    });
+      },
+    );
     return finish({
       runDir,
       screen: renderForecastPlanScreen(answeredCase),
@@ -2318,6 +2367,9 @@ async function main() {
         model_demand_graph: modelDemandGraphPath,
         selected_authority_contract: selectedAuthorityContractPath,
         run_constitution_graph: runConstitutionGraphPath,
+        ...(pendingReviewChange
+          ? { review_change: pendingReviewChange.record }
+          : {}),
         reused_stages: reusedStages,
       },
     });
@@ -2342,6 +2394,7 @@ async function main() {
     run_constitution_graph: await hashFileOrAbsent(runConstitutionGraphPath),
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("build_checks"),
+    ...reviewChangeInvalidationInput("build_checks"),
   };
 
   // A paused run holds a position; it does not hand the case over for editing.
@@ -2586,7 +2639,10 @@ async function main() {
       detail: { automated_gate_status: buildResult.status },
     });
   }
-  if (options["stop-after"] === "build_checks") {
+  if (
+    options["stop-after"] === "build_checks" ||
+    reviewChangeStopsAt("build_checks")
+  ) {
     const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
       model_case: answeredCasePath,
       workbook,
@@ -2611,14 +2667,15 @@ async function main() {
     });
   }
 
-  // REVIEW GATE — the last look before delivery, display-only by construction.
-  // It writes no stage receipt and owns no milestone: it renders what the build
-  // already produced and blocks until the controller is told one of exactly
+  // REVIEW — a declared controller stage between Build and Delivery. It owns a
+  // stage receipt over the sealed briefing artifacts while remaining
+  // economically read-only, and blocks until the controller is told one of exactly
   // two replies. `--review-deliver` continues into the ordinary delivery stage
   // unchanged; `--review-change "<what to change>"` records the complaint,
   // classifies it onto the declared change types, and stops WITHOUT
   // delivering. No reply at all leaves the run paused here — the gate is
   // fail-closed by the same rule resolveReviewReply enforces.
+  await enterFlowStage("review");
   const reviewReply = resolveReviewReply({
     reviewDeliver:
       options["review-deliver"] !== undefined && options["review-deliver"] !== false,
@@ -2659,7 +2716,7 @@ async function main() {
   } catch (error) {
     if (!(error instanceof ReviewSealRefusal)) throw error;
     const refusalScreen = renderFailure({
-      stage: "build_checks",
+      stage: "review",
       what_failed:
         "The review gate refuses to brief from, or take a reply against, the recorded build artifacts.",
       why: error.message,
@@ -2681,7 +2738,7 @@ async function main() {
         controller_version: FLOW_CONTROLLER_VERSION,
         run_id: runId,
         status: "PAUSED",
-        stage: "build_checks",
+        stage: "review",
         next_stage: null,
         awaiting: "review_seal_refusal",
         message: error.message,
@@ -2691,10 +2748,55 @@ async function main() {
   }
   const reviewBriefing = sealedReview.briefing;
   const reviewScreen = renderReviewGateScreen(reviewBriefing);
+  const reviewSealPath = path.join(reviewDir, "review-briefing.json");
+  const reviewPayloadPath = path.join(
+    reviewDir,
+    "review-briefing-payload.json",
+  );
+  const reviewScreenPath = path.join(reviewDir, "review-gate.txt");
   await writeTextAtomic(
-    path.join(reviewDir, "review-gate.txt"),
+    reviewScreenPath,
     `${reviewScreen}\n`,
   );
+  const reviewInputs = {
+    build_receipt: receipt4.receipt_hash,
+    model_case: caseHash,
+    runtime: runtimeClosure.digest,
+    ...carrierMigrationInput("review"),
+    ...reviewChangeInvalidationInput("review"),
+  };
+  const reviewOutputs = {
+    sealed_briefing: reviewSealPath,
+    briefing_payload: reviewPayloadPath,
+    review_screen: reviewScreenPath,
+  };
+  const cachedReview = await readUsableStage({
+    runDir,
+    runId,
+    stageId: "review",
+    inputHashes: reviewInputs,
+    previousReceiptHash: receipt4.receipt_hash,
+    outputs: reviewOutputs,
+  });
+  let receiptReview;
+  if (cachedReview.reusable) {
+    receiptReview = cachedReview.receipt;
+    reusedStages.push("review");
+  } else {
+    receiptReview = await persistStage({
+      runDir,
+      runId,
+      stageId: "review",
+      status: "success",
+      inputHashes: reviewInputs,
+      previousReceiptHash: receipt4.receipt_hash,
+      outputs: reviewOutputs,
+      detail: {
+        awaiting: "deliver_or_change",
+        briefing_sha256: sealedReview.seal.briefing_sha256,
+      },
+    });
+  }
   if (reviewReply.mode === "blocked") {
     const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
       model_case: answeredCasePath,
@@ -2709,13 +2811,14 @@ async function main() {
         controller_version: FLOW_CONTROLLER_VERSION,
         run_id: runId,
         status: "PAUSED",
-        stage: "build_checks",
-        next_stage: nextStageId("build_checks"),
+        stage: "review",
+        next_stage: nextStageId("review"),
         awaiting: "review_gate_reply",
         message:
           'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
         carrier: carrier.path,
         model_case: answeredCasePath,
+        receipt: receiptReview,
         reused_stages: reusedStages,
       },
     });
@@ -2733,18 +2836,26 @@ async function main() {
       recorded_at: new Date().toISOString(),
       delivered: false,
     };
-    await writeJsonAtomic(
-      path.join(reviewDir, "review-change.json"),
-      reviewChangeRecord,
-    );
+    const reviewChangePath = path.join(reviewDir, "review-change.json");
+    await writeJsonAtomic(reviewChangePath, reviewChangeRecord);
     // The user's reply is evidence in its own right: one receipt per reply,
     // chained to the previous receipt this run recorded, bound to the exact
     // sealed briefing it was made against.
-    await recordUserReviewReceipt({
+    const changeReceipt = await recordUserReviewReceipt({
       ...reviewSealContext,
       reply: REVIEW_CHANGE_REPLY,
       changeClass: reviewChangeRecord.change_types,
     });
+    const carrier = await persistCurrentCarrier(
+      "REVIEW_CHANGE_REQUESTED",
+      {
+        model_case: answeredCasePath,
+        workbook,
+        review_change: reviewChangePath,
+        user_review_receipt: changeReceipt.path,
+      },
+      { reviewChangePath },
+    );
     return finish({
       runDir,
       screen: reviewScreen,
@@ -2754,22 +2865,26 @@ async function main() {
         controller_version: FLOW_CONTROLLER_VERSION,
         run_id: runId,
         status: "PAUSED",
-        stage: "build_checks",
-        next_stage: null,
+        stage: "review",
+        next_stage: reviewClassification.stage_id,
         review_change: reviewChangeRecord,
         message: `${describeReviseEntry(reviewClassification)} Nothing was delivered.`,
+        carrier: carrier.path,
+        receipt: receiptReview,
+        user_review_receipt: changeReceipt.path,
+        user_review_receipt_sha256: changeReceipt.receipt_hash,
         reused_stages: reusedStages,
       },
     });
   }
   // The deliver reply: receipted against the sealed briefing, then the run
   // continues into the ordinary delivery stage unchanged.
-  await recordUserReviewReceipt({
+  const deliveryReviewReceipt = await recordUserReviewReceipt({
     ...reviewSealContext,
     reply: REVIEW_DELIVER_REPLY,
   });
 
-  // The chat host is not an authority. Before Stage 5 can expose any workbook,
+  // The chat host is not an authority. Before Stage 6 can expose any workbook,
   // independently bind the exact file to this controller, its Stage-4 receipt,
   // the active design epoch and the physical workbook topology. An ad-hoc
   // compact workbook can be internally consistent; it still must never leave
@@ -2819,7 +2934,7 @@ async function main() {
     });
   }
 
-  // Stage 5 — deliver the workbook and concise read, while keeping the manual
+  // Stage 6 — deliver the workbook and concise read, while keeping the manual
   // native-Excel gate explicit. Delivery succeeds; production certification is
   // still PASS_PENDING_MANUAL until that external evidence is attached.
   await enterFlowStage("delivery");
@@ -2840,10 +2955,13 @@ async function main() {
   await fs.copyFile(workbook, deliveryFilePath);
   const stage5Inputs = {
     stage4_receipt: receipt4.receipt_hash,
+    review_receipt: receiptReview.receipt_hash,
+    user_review_receipt: deliveryReviewReceipt.receipt_hash,
     model_case: caseHash,
     live_delivery_attestation: await hashFile(deliveryAttestationPath),
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("delivery"),
+    ...reviewChangeInvalidationInput("delivery"),
   };
   const stage5Outputs = {
     delivery_result: deliveryResultPath,
@@ -2856,7 +2974,7 @@ async function main() {
     runId,
     stageId: "delivery",
     inputHashes: stage5Inputs,
-    previousReceiptHash: receipt4.receipt_hash,
+    previousReceiptHash: receiptReview.receipt_hash,
     outputs: stage5Outputs,
   });
   let deliveryResult;
@@ -2908,7 +3026,7 @@ async function main() {
       stageId: "delivery",
       status: "success",
       inputHashes: stage5Inputs,
-      previousReceiptHash: receipt4.receipt_hash,
+      previousReceiptHash: receiptReview.receipt_hash,
       outputs: stage5Outputs,
       detail: { overall_status: "PASS_PENDING_MANUAL" },
     });

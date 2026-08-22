@@ -93,6 +93,11 @@ pass("one visible progress scale maps internal checkpoints without leaking stage
   assert(build.completed === 4 && build.active_milestone === "build", "Build is not the fifth active milestone");
   const buildComplete = visibleJourneyProgress("build_checks", "complete");
   assert(buildComplete.completed === 5 && buildComplete.next_milestone === "deliver", "completed Build does not advance to Deliver");
+  const review = visibleJourneyProgress("review", "in progress");
+  assert(
+    review.completed === 5 && review.next_milestone === "deliver",
+    "Review does not own the declared checkpoint between Build and Deliver",
+  );
   const screen = renderStageStatus({
     stageId: "evidence_review",
     status: "in progress",
@@ -225,6 +230,14 @@ pass("legal resumable transitions are accepted", () => {
   assertWorkflowTransition("attachment", "BLOCKED_INPUT", "PASS", { reset: true });
   assertWorkflowTransition("filings", "NEEDS_EXTRACTION", "PASS");
   assertWorkflowTransition("user_flow", "ACTION_REQUIRED", "PAUSED");
+  assertWorkflowTransition("user_flow", "PASS_PENDING_MANUAL", "PAUSED");
+  assertWorkflowTransition("user_flow", "PAUSED", "PASS_PENDING_MANUAL");
+  assertWorkflowState("user_flow", {
+    status: "PAUSED",
+    blockerClass: null,
+    userBlocking: false,
+    stage: "review",
+  });
 });
 
 rejects(
@@ -287,6 +300,22 @@ pass("stage receipts enforce the same stage-state contract", () => {
     outputHashes: { output: HASH },
   });
   assert(verifyStageReceipt(receipt).ok, "valid receipt failed verification");
+  const reviewReceipt = createStageReceipt({
+    runId: "workflow-state-test",
+    stageId: "review",
+    status: "success",
+    inputHashes: { input: HASH },
+    outputHashes: { output: HASH },
+    previousReceiptHash: receipt.receipt_hash,
+  });
+  assert(
+    verifyStageReceipt(reviewReceipt, {
+      stageId: "review",
+      previousReceiptHash: receipt.receipt_hash,
+    }).ok,
+    "declared Review-stage receipt failed verification",
+  );
+  assert(reviewReceipt.next_stage === "delivery", "Review receipt does not advance to Delivery");
 });
 
 rejects(

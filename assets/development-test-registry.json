@@ -690,6 +690,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "review-lifecycle",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_review_lifecycle_tests.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "review-sealing-contracts",
       "phase": "workflow",
       "runtime": "node",

@@ -34,6 +34,7 @@ for (const stageId of [
   "evidence_review",
   "decisions",
   "build_checks",
+  "review",
   "delivery",
 ]) {
   if (!VISIBLE_JOURNEY_CONTRACT.checkpoints?.[stageId]) {

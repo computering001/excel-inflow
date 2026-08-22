@@ -551,7 +551,7 @@ try {
   // GROUP E — ONE input shape per stage, and an EXPLAINED miss.
   // ------------------------------------------------------------------
   const controllerSource = await fs.readFile(path.join(ROOT, "scripts", "run_user_flow.mjs"), "utf8");
-  const ALLOWED_INPUT_SHAPES = /^(stage[1-5]Inputs,|stage3InputsFor\()/;
+  const ALLOWED_INPUT_SHAPES = /^(stage[1-6]Inputs,|reviewInputs,|stage3InputsFor\()/;
   const inputShapeSites = [...controllerSource.matchAll(/inputHashes:\s*(\S.*)$/gm)].map(
     (match) => match[1].trim(),
   );

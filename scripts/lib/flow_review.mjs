@@ -1,9 +1,9 @@
-// The REVIEW gate: the last look before a workbook is delivered.
+// The REVIEW stage: the last look before a workbook is delivered.
 //
 // Position in the flow: after BUILD AND CHECKS clears its automated gates and
-// before the delivery stage runs. The gate is DISPLAY-ONLY by construction —
-// it writes no stage receipt, owns no milestone, and changes no artifact. It
-// renders what already exists (the plain-English read, the headline numbers,
+// before the delivery stage runs. Review owns its own controller-stage receipt
+// and checkpoint while remaining economically read-only. It renders what
+// already exists (the plain-English read, the headline numbers,
 // how much of the model is broker-sourced, the stated assumptions) and blocks
 // until the user replies exactly one of:
 //

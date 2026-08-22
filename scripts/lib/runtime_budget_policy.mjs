@@ -31,6 +31,9 @@ export const USER_FLOW_STAGE_BUDGET_KEYS = Object.freeze({
   evidence_review: "filing_extraction",
   decisions: "case_compilation_and_ownership",
   build_checks: "workbook_build",
+  // Review performs only bounded custody verification and screen compilation;
+  // it shares the validation allowance rather than minting a new budget.
+  review: "validation",
   delivery: "validation",
 });
 

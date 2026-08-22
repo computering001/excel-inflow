@@ -147,7 +147,7 @@ export function validateTaxonomySchema(t) {
       push(`outcome ${code} must declare where it is defined`);
     }
     if (USER_FLOW_SURFACES.has(spec.surface) && spec.stage !== undefined &&
-      !["company", "brokers", "inputs", "evidence_review", "decisions", "build_checks", "delivery"].includes(spec.stage)) {
+      !["company", "brokers", "inputs", "evidence_review", "decisions", "build_checks", "review", "delivery"].includes(spec.stage)) {
       push(`outcome ${code} declares unknown stage ${spec.stage}`);
     }
   }

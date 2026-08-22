@@ -77,6 +77,13 @@ export const STAGES = Object.freeze([
   }),
   Object.freeze({
     number: 5,
+    id: "review",
+    title: "REVIEW",
+    contact: "one explicit deliver or change reply",
+    artifact: "sealed briefing and user-review receipt chain",
+  }),
+  Object.freeze({
+    number: 6,
     id: "delivery",
     title: "DELIVERY",
     contact: "report",
