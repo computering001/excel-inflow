@@ -699,5 +699,18 @@
         }
       }
     }
+  },
+  "_generated_bindings": {
+    "schema_version": "hand-owned-artifact-bindings/1.0",
+    "body_sha256": "df06e937624a228e862ca3fe247e2af69a019a182bb840c92e54172dfd4d463e",
+    "source_sha256": {
+      "scripts/lib/workflow_state.mjs": "157507944fbc5f250f870e10426ce12264bc2e22aaf1d4de5a03e2da783b9af6",
+      "scripts/workflow_state.py": "e0ae54366274896af0166e8e25987a6fdc5b7f4ca108045e9e2f4b54dc48acbd"
+    },
+    "verifier_path": "scripts/run_workflow_state_tests.mjs",
+    "verifier_sha256": "c1f614f065226b1b85d68dc216ef2cb8f093236dd2d41c2913b7a8bc88a95d4d",
+    "writer": "node scripts/write_hand_owned_artifact_bindings.mjs --write",
+    "check": "node scripts/write_hand_owned_artifact_bindings.mjs --check",
+    "policy": "The body is hand-curated authority. Any body, governed-source or independent-verifier change makes this binding stale until the sanctioned writer is run deliberately."
   }
 }

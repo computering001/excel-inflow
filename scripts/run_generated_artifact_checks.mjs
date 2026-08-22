@@ -10,7 +10,8 @@
  * artifact and its regeneration command.
  *
  * Modes:
- *   node scripts/run_generated_artifact_checks.mjs   # verify (default)
+ *   node scripts/run_generated_artifact_checks.mjs --check   # read-only verify
+ *   node scripts/run_generated_artifact_checks.mjs           # same default
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -23,6 +24,11 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const REGISTER_PATH = path.join(ROOT, "assets", "generated-artifact-register.json");
+const unsupportedArgs = process.argv.slice(2).filter((arg) => arg !== "--check");
+if (unsupportedArgs.length > 0) {
+  console.error(`GENERATED_ARTIFACT_CHECKS_FAIL: unsupported arguments: ${unsupportedArgs.join(" ")}`);
+  process.exit(1);
+}
 
 function sha256Of(filePath) {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
@@ -66,9 +72,9 @@ for (const artifact of register.artifacts) {
     console.error("GENERATED_ARTIFACT_CHECKS_FAIL: every artifact needs artifact_path.");
     process.exit(1);
   }
-  if (!artifact.hand_owned && typeof artifact.writer_script !== "string") {
+  if (typeof artifact.writer_script !== "string" || artifact.writer_script.length === 0) {
     console.error(
-      `GENERATED_ARTIFACT_CHECKS_FAIL: ${artifact.artifact_path} needs writer_script or hand_owned:true.`,
+      `GENERATED_ARTIFACT_CHECKS_FAIL: ${artifact.artifact_path} needs a sanctioned writer; hand-owned artifacts must name their generated-bindings writer.`,
     );
     process.exit(1);
   }
@@ -86,10 +92,11 @@ function record(artifactPath, ok, detail) {
   console.log(`${ok ? "PASS" : "FAIL"}  ${artifactPath}${detail ? ` — ${detail}` : ""}`);
 }
 
-function suiteCheck(artifactPath, command, args, existsPath, timeoutMs = 600_000) {
+function suiteCheck(artifact, command, args, existsPath, timeoutMs = 600_000) {
+  const artifactPath = artifact.artifact_path;
   const target = path.join(ROOT, existsPath ?? artifactPath.split("#")[0]);
   if (!fs.existsSync(target)) {
-    record(artifactPath, false, `artifact missing at ${existsPath ?? artifactPath} — regenerate with the registered writer`);
+    record(artifactPath, false, `artifact missing at ${existsPath ?? artifactPath} — run the writer: ${artifact.writer_script}`);
     return;
   }
   const outcome = run(command, args, timeoutMs);
@@ -98,8 +105,153 @@ function suiteCheck(artifactPath, command, args, existsPath, timeoutMs = 600_000
     outcome.ok,
     outcome.ok
       ? `${command} ${args.join(" ")}`
-      : `exit ${outcome.status}${outcome.signal ? ` (${outcome.signal})` : ""}: ${outcome.output.slice(-400)}`,
+      : `exit ${outcome.status}${outcome.signal ? ` (${outcome.signal})` : ""}: ${outcome.output.slice(-400)} — run the writer: ${artifact.writer_script}`,
   );
+}
+
+function handOwnedBindingCheck(artifact, verifierArgs) {
+  const artifactPath = artifact.artifact_path;
+  const target = path.join(ROOT, artifactPath);
+  if (!fs.existsSync(target)) {
+    record(artifactPath, false, `artifact missing — run the writer: ${artifact.writer_script}`);
+    return;
+  }
+  const binding = run(process.execPath, [
+    "scripts/write_hand_owned_artifact_bindings.mjs",
+    "--check",
+    "--artifact",
+    artifactPath,
+  ], 120_000);
+  const verifier = binding.ok
+    ? run(process.execPath, verifierArgs, 600_000)
+    : { ok: false, status: null, signal: null, output: "independent verifier not run because generated bindings are stale" };
+  const ok = binding.ok && verifier.ok;
+  record(
+    artifactPath,
+    ok,
+    ok
+      ? `generated bindings exactly regenerate; independent verifier PASS (${verifierArgs.join(" ")})`
+      : `${binding.ok ? "bindings PASS" : `bindings FAIL: ${binding.output.slice(-350)}`}; ${verifier.ok ? "verifier PASS" : `verifier FAIL: ${verifier.output.slice(-350)}`} — run the writer: ${artifact.writer_script}`,
+  );
+}
+
+function executionCensusCheck(artifact) {
+  const primary = run(process.execPath, ["scripts/run_ci_census_tests.mjs"], 120_000);
+  const independent = primary.ok
+    ? run(process.execPath, ["scripts/run_gate_side_effect_tests.mjs"], 600_000)
+    : { ok: false, output: "independent verifier not run because exact regeneration failed" };
+  const ok = primary.ok && independent.ok;
+  record(
+    artifact.artifact_path,
+    ok,
+    ok
+      ? "read-only substantive regeneration PASS; independent side-effect and drift-mutation verifier PASS"
+      : `${primary.ok ? "regeneration PASS" : `regeneration FAIL: ${primary.output.slice(-350)}`}; ${independent.ok ? "independent verifier PASS" : `independent verifier FAIL: ${independent.output.slice(-350)}`} — run the writer: ${artifact.writer_script}`,
+  );
+}
+
+function releaseIdentityAgreement(root) {
+  const manifestPath = path.join(root, "assets", "runtime-manifest.json");
+  const identityPath = path.join(root, "assets", "release-identity.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const identity = JSON.parse(fs.readFileSync(identityPath, "utf8"));
+  return {
+    agrees:
+      manifest.skill_version === identity.version &&
+      manifest.release_channel === identity.channel,
+    manifest,
+    identity,
+  };
+}
+
+function exactReleaseIdentityCheck(artifact) {
+  try {
+    const { agrees, manifest, identity } = releaseIdentityAgreement(ROOT);
+    if (!agrees) {
+      record(
+        artifact.artifact_path,
+        false,
+        `runtime identity ${JSON.stringify({ version: manifest.skill_version, channel: manifest.release_channel })} disagrees with the single declaration ${JSON.stringify({ version: identity.version, channel: identity.channel })} — run the writer: ${artifact.writer_script}`,
+      );
+      return;
+    }
+    const independent = run(process.execPath, ["scripts/run_skill_version_declaration_tests.mjs"], 600_000);
+    record(
+      artifact.artifact_path,
+      independent.ok,
+      independent.ok
+        ? `exact version/channel equality to release-identity; independent declaration verifier PASS`
+        : `exact equality PASS but independent verifier failed: ${independent.output.slice(-400)} — run the writer: ${artifact.writer_script}`,
+    );
+  } catch (error) {
+    record(
+      artifact.artifact_path,
+      false,
+      `release identity surfaces are unreadable: ${error.message} — run the writer: ${artifact.writer_script}`,
+    );
+  }
+}
+
+function copyFileIntoRoot(sourceRoot, targetRoot, relative) {
+  const source = path.join(sourceRoot, ...relative.split("/"));
+  const target = path.join(targetRoot, ...relative.split("/"));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(source, target);
+}
+
+function runBindingMutationProof(artifactPath, sourcePaths, verifierPath) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "generated-binding-mutation-"));
+  try {
+    for (const relative of [artifactPath, ...sourcePaths, verifierPath]) {
+      copyFileIntoRoot(ROOT, scratch, relative);
+    }
+    const invoke = (...args) => run(process.execPath, [
+      path.join(ROOT, "scripts", "write_hand_owned_artifact_bindings.mjs"),
+      "--root",
+      scratch,
+      "--artifact",
+      artifactPath,
+      ...args,
+    ], 120_000);
+    if (!invoke("--check").ok) return false;
+
+    const target = path.join(scratch, artifactPath);
+    const handEdited = JSON.parse(fs.readFileSync(target, "utf8"));
+    handEdited._d4_mutation = "unauthorised hand edit";
+    fs.writeFileSync(target, `${JSON.stringify(handEdited, null, 2)}\n`, "utf8");
+    const staleBody = invoke("--check");
+    if (staleBody.ok || !/Run the writer/.test(staleBody.output)) return false;
+
+    if (!invoke("--write").ok || !invoke("--check").ok) return false;
+    const source = path.join(scratch, sourcePaths[0]);
+    fs.appendFileSync(source, "\n// D4 stale-source mutation\n", "utf8");
+    const staleSource = invoke("--check");
+    return !staleSource.ok && /Run the writer/.test(staleSource.output);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function runReleaseIdentityMutationProof() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "generated-release-identity-mutation-"));
+  try {
+    for (const relative of ["assets/release-identity.json", "assets/runtime-manifest.json"]) {
+      copyFileIntoRoot(ROOT, scratch, relative);
+    }
+    const identity = JSON.parse(fs.readFileSync(path.join(scratch, "assets", "release-identity.json"), "utf8"));
+    const manifestPath = path.join(scratch, "assets", "runtime-manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    manifest.skill_version = identity.version === "9.9.9" ? "8.8.8" : "9.9.9";
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    const mutated = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    return (
+      mutated.skill_version !== identity.version &&
+      /^\d+\.\d+\.\d+$/.test(mutated.skill_version) &&
+      releaseIdentityAgreement(scratch).agrees === false
+    );
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 // ---- Per-artifact checks -----------------------------------------------------
@@ -134,45 +286,73 @@ for (const artifact of register.artifacts) {
     continue;
   }
 
-  // The runtime-manifest identity field is checked structurally here; the
-  // closure digest fields are covered by the certified-closure suite entry.
+  // Identity is a generated leaf of the ONE release declaration. A second
+  // well-formed-but-different version is drift, not a structural PASS.
   if (artifactPath === "assets/runtime-manifest.json#skill_version") {
-    const manifestPath = path.join(ROOT, "assets", "runtime-manifest.json");
-    try {
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-      const skillVersion = manifest.skill_version;
-      const ok =
-        typeof skillVersion === "string" && /^\d+\.\d+(\.\d+)?/.test(skillVersion);
-      record(
-        artifactPath,
-        ok,
-        ok
-          ? `skill_version ${skillVersion} present and well-formed`
-          : `skill_version missing/malformed (${JSON.stringify(skillVersion)}) — regenerate via the MP2-A release_identity writer`,
-      );
-    } catch (error) {
-      record(artifactPath, false, `manifest unreadable: ${error.message}`);
-    }
+    exactReleaseIdentityCheck(artifact);
     continue;
   }
 
   if (artifactPath === "architecture/ownership_census.json") {
-    suiteCheck(artifactPath, process.execPath, ["scripts/run_ownership_census_tests.mjs"]);
+    suiteCheck(artifact, process.execPath, ["scripts/run_ownership_census_tests.mjs"]);
   } else if (artifactPath === "assets/runtime-manifest.json") {
-    suiteCheck(artifactPath, process.execPath, ["scripts/run_certified_code_closure_tests.mjs"]);
+    suiteCheck(artifact, process.execPath, ["scripts/run_certified_code_closure_tests.mjs"]);
   } else if (artifactPath === "assets/controller-terminal-exit-inventory-v1.json") {
-    suiteCheck(artifactPath, process.execPath, ["scripts/run_controller_exit_inventory_tests.mjs"]);
+    handOwnedBindingCheck(artifact, ["scripts/run_controller_exit_inventory_tests.mjs"]);
+  } else if (artifactPath === "ci/execution_test_census.json") {
+    executionCensusCheck(artifact);
   } else if (artifactPath === "ci/coercion_inventory.json") {
-    suiteCheck(artifactPath, process.execPath, ["scripts/run_coercion_ban_tests.mjs"]);
+    suiteCheck(artifact, process.execPath, ["scripts/run_coercion_ban_tests.mjs"]);
   } else if (artifactPath === "assets/critical-invariant-oracle-matrix-v1.json") {
-    suiteCheck(artifactPath, "python3", [
+    suiteCheck(artifact, "python3", [
       "scripts/run_critical_invariant_oracle_matrix_tests.py",
       "--verify-bindings",
     ]);
   } else if (artifactPath === "assets/workflow-state-contract-v1.json") {
-    suiteCheck(artifactPath, process.execPath, ["scripts/run_workflow_state_tests.mjs"]);
+    handOwnedBindingCheck(artifact, ["scripts/run_workflow_state_tests.mjs"]);
   } else {
     record(artifactPath, false, `no runner branch for this artifact — extend scripts/run_generated_artifact_checks.mjs`);
+  }
+}
+
+// Targeted non-vacuity: a hand edit and a governed-source edit must both make
+// the binding check red until the sanctioned writer is run. The version proof
+// uses a different, still-well-formed value so the former structural-only hole
+// can never reopen.
+const mutationProofs = [
+  {
+    id: "terminal-inventory-hand-and-source-drift",
+    passed: runBindingMutationProof(
+      "assets/controller-terminal-exit-inventory-v1.json",
+      [
+        "scripts/run_excel_inflow_bootstrap.mjs",
+        "scripts/run_excel_inflow_vnext.mjs",
+        "scripts/run_user_flow.mjs",
+      ],
+      "scripts/run_controller_exit_inventory_tests.mjs",
+    ),
+  },
+  {
+    id: "workflow-contract-hand-and-source-drift",
+    passed: runBindingMutationProof(
+      "assets/workflow-state-contract-v1.json",
+      ["scripts/lib/workflow_state.mjs", "scripts/workflow_state.py"],
+      "scripts/run_workflow_state_tests.mjs",
+    ),
+  },
+  {
+    id: "well-formed-foreign-skill-version-drift",
+    passed: runReleaseIdentityMutationProof(),
+  },
+];
+for (const mutation of mutationProofs) {
+  console.log(`${mutation.passed ? "PASS" : "FAIL"}  mutation:${mutation.id}`);
+  if (!mutation.passed) {
+    results.push({
+      artifact_path: `mutation:${mutation.id}`,
+      status: "FAIL",
+      detail: "the stale/hand-edit mutation survived the D4 check",
+    });
   }
 }
 
@@ -184,6 +364,11 @@ console.log(
     mode: "verify",
     register_sha256: sha256Of(REGISTER_PATH),
     artifacts_checked: results.length,
+    registered_surfaces: results.length,
+    physical_artifact_files: new Set(
+      register.artifacts.map((artifact) => artifact.artifact_path.split("#")[0]),
+    ).size,
+    mutation_proofs: mutationProofs.length,
     failures: failed.length,
   }),
 );

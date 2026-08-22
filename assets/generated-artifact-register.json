@@ -15,13 +15,18 @@
     {
       "artifact_path": "assets/controller-terminal-exit-inventory-v1.json",
       "hand_owned": true,
-      "writer_script": null,
-      "check_invocation": "node scripts/run_controller_exit_inventory_tests.mjs"
+      "writer_script": "node scripts/write_hand_owned_artifact_bindings.mjs --write --artifact assets/controller-terminal-exit-inventory-v1.json (generated bindings only; body remains hand-curated)",
+      "check_invocation": "node scripts/write_hand_owned_artifact_bindings.mjs --check --artifact assets/controller-terminal-exit-inventory-v1.json, then independent node scripts/run_controller_exit_inventory_tests.mjs"
     },
     {
       "artifact_path": "ci/test_registry_census.json",
       "writer_script": "node scripts/compile_test_registry_census.mjs --out ci/test_registry_census.json",
-      "check_invocation": "node scripts/run_generated_artifact_checks.mjs (recompiles to a scratch path and byte-compares against the committed census)"
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (recompiles to a scratch path and byte-compares against the committed census)"
+    },
+    {
+      "artifact_path": "ci/execution_test_census.json",
+      "writer_script": "node scripts/run_ci_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ci_census_tests.mjs (read-only substantive exact regeneration; source commit/tree and observed toolchain remain declared run-provenance fields), independently mutation- and side-effect-verified by node scripts/run_gate_side_effect_tests.mjs"
     },
     {
       "artifact_path": "ci/coercion_inventory.json",
@@ -36,13 +41,13 @@
     {
       "artifact_path": "assets/workflow-state-contract-v1.json",
       "hand_owned": true,
-      "writer_script": null,
-      "check_invocation": "node scripts/run_workflow_state_tests.mjs"
+      "writer_script": "node scripts/write_hand_owned_artifact_bindings.mjs --write --artifact assets/workflow-state-contract-v1.json (generated bindings only; body remains hand-curated)",
+      "check_invocation": "node scripts/write_hand_owned_artifact_bindings.mjs --check --artifact assets/workflow-state-contract-v1.json, then independent node scripts/run_workflow_state_tests.mjs"
     },
     {
       "artifact_path": "assets/runtime-manifest.json#skill_version",
       "writer_script": "MP2-A release_identity writer (scripts/compile_skill_release.mjs) — declared here because no mp2-D-local writer regenerates the field",
-      "check_invocation": "node scripts/run_generated_artifact_checks.mjs (structural field check; digest fields additionally covered by the certified-closure check above)"
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs --check (exact equality to assets/release-identity.json#/version and #/channel), plus independent node scripts/run_skill_version_declaration_tests.mjs"
     }
   ]
 }

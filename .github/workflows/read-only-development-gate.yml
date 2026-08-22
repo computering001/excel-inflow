@@ -56,6 +56,8 @@ jobs:
             --source-identity "${{ runner.temp }}/source/source-identity.json" \
             --registry assets/development-test-registry.json --scripts-root scripts \
             --out "${{ runner.temp }}/registry/registry-selection.json"
+      - name: Verify every source-owned generated artifact
+        run: node scripts/run_generated_artifact_checks.mjs --check
       - name: Retain immutable registry selection
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
