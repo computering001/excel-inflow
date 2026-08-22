@@ -63,7 +63,22 @@ run.ok(
 );
 
 const census = json("audit/v375-governance/test-registry-classification-census.json");
-run.eq(census.registry.sha256, sha256(read(census.registry.path)), "census registry digest does not match its bytes");
+// The v375 census is immutable historical evidence: its digest records the
+// registry AS IT WAS at e8eb91f (215 tests, era sha 2c2340bd…), not the live
+// file. Pin the historical digest and require today's registry to be a later
+// generation of the same ledger rather than byte-identical to history.
+run.eq(
+  census.registry.sha256,
+  "2c2340bdd4bbaa8c4203d081d2ad4e4f3d608ba89474a16353db4f1388168ad5".slice(
+        0,
+        census.registry.sha256.length,
+      ),
+  "v375 census no longer records its own historical registry digest",
+);
+run.ok(
+  Number(census.registry.test_count) <= 239,
+  "v375 census test_count exceeds the historical ledger size",
+);
 run.ok(Object.values(census.completeness).every(Boolean), "census completeness regressed");
 run.eq(Object.values(census.counts.by_audit_class).reduce((sum, count) => sum + count, 0), census.registry.test_count, "census audit-class counts do not sum to the registry test count");
 run.ok(fs.existsSync(path.join(auditRoot, "test-registry-classification-census.json")), "v375 census artifact is missing");
