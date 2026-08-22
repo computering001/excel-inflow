@@ -106,6 +106,7 @@
     "scripts/lib/statement_classifier.mjs",
     "scripts/lib/statement_topology.mjs",
     "scripts/lib/tax_rate_policy.mjs",
+    "scripts/lib/test_harness.mjs",
     "scripts/lib/typed_financial_value.mjs",
     "scripts/lib/validation_invariants.mjs",
     "scripts/lib/workflow_state.mjs",

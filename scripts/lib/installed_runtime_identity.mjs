@@ -183,6 +183,8 @@ async function localPackageIdentity(skillRoot, { inventoryRequired = false } = {
       skill_root: root,
       source_checkout: true,
       package_mode: "development",
+      skill_version: runtimeManifest.skill_version ?? null,
+      release_tag: null,
       source_commit: GIT_SHA.test(String(commit ?? "")) ? commit : null,
       source_tree: GIT_SHA.test(String(tree ?? "")) ? tree : null,
       runtime_closure_sha256: runtimeClosureSha256,
@@ -200,11 +202,15 @@ async function localPackageIdentity(skillRoot, { inventoryRequired = false } = {
   const certifiedClosure = identity?.package?.runtime_code_closure?.certified_sha256 ?? null;
   const sourceCommit = identity?.source?.commit_sha;
   const sourceTree = identity?.source?.tree_sha;
+  const skillVersion = runtimeManifest.skill_version;
+  const releaseTag = manifest?.releaseTag ?? null;
   if (
     manifest?.schemaVersion !== 2 || manifest?.packageMode !== packageMode ||
+    manifest?.skillVersion !== skillVersion ||
     !["development", "certified", "portable_certified"].includes(packageMode) ||
     !GIT_SHA.test(String(sourceCommit ?? "")) || !GIT_SHA.test(String(sourceTree ?? "")) ||
-    !SHA256.test(String(declaredClosure ?? "")) || declaredClosure !== runtimeClosureSha256
+    !SHA256.test(String(declaredClosure ?? "")) || declaredClosure !== runtimeClosureSha256 ||
+    !(releaseTag === null || typeof releaseTag === "string")
   ) {
     refuse("COMPILED_PACKAGE_IDENTITY_INVALID", "release manifest does not bind the exact live source and runtime closure");
   }
@@ -218,6 +224,8 @@ async function localPackageIdentity(skillRoot, { inventoryRequired = false } = {
     skill_root: root,
     source_checkout: false,
     package_mode: packageMode,
+    skill_version: skillVersion,
+    release_tag: releaseTag,
     source_commit: sourceCommit,
     source_tree: sourceTree,
     runtime_closure_sha256: runtimeClosureSha256,
@@ -246,6 +254,8 @@ function validTimestamp(value, label) {
  *   - only stable/candidate may take the PRODUCTION-ACTIVE placement — a
  *     dev-channel build is refused with the typed code
  *     RELEASE_CHANNEL_REFUSAL_DEV_BUILD_AS_STABLE;
+ *   - stable/candidate production placement also requires the exact
+ *     `v<skill_version>` tag sealed into release-manifest.json at compile time;
  *   - production-active additionally requires the field to EXIST (a package
  *     that predates channel stamping cannot prove what line it belongs to).
  * ------------------------------------------------------------------ */
@@ -262,7 +272,11 @@ async function declaredPackageChannel(skillRoot) {
   }
 }
 
-function admitChannelOrRefuse(channel, target_placement) {
+function admitChannelOrRefuse(
+  channel,
+  target_placement,
+  { version = null, releaseTag = null } = {},
+) {
   if (target_placement === INSTALLED_CANDIDATE_PLACEMENT && channel === null) {
     // A package that predates channel stamping may still occupy an inactive
     // candidate slot. It can never reach the production placement below,
@@ -277,7 +291,12 @@ function admitChannelOrRefuse(channel, target_placement) {
     );
   }
   try {
-    assertChannelAdmission({ channel, target_placement });
+    assertChannelAdmission({
+      channel,
+      target_placement,
+      version,
+      release_tag: releaseTag,
+    });
   } catch (error) {
     // Re-typed as this module's own error class so existing handlers keep
     // working, while preserving the typed code and findings verbatim.
@@ -515,7 +534,10 @@ export async function resolveInstalledRuntimeIdentity({
     }
     // MP2 Phase A (A4) — channel admission for the inactive candidate
     // placement: any declared channel is admitted, an unknown token is refused.
-    admitChannelOrRefuse(declaredChannel, INSTALLED_CANDIDATE_PLACEMENT);
+    admitChannelOrRefuse(declaredChannel, INSTALLED_CANDIDATE_PLACEMENT, {
+      version: local.skill_version,
+      releaseTag: local.release_tag,
+    });
     return resolvedPlacement({
       placement: "installed_candidate",
       local,
@@ -576,7 +598,10 @@ export async function resolveInstalledRuntimeIdentity({
   // MP2 Phase A (A4) — the ingress refusal: a dev-channel build can never be
   // installed/promoted as the stable production placement, no matter how
   // well-joined its receipts are.
-  admitChannelOrRefuse(declaredChannel, PRODUCTION_ACTIVE_PLACEMENT);
+  admitChannelOrRefuse(declaredChannel, PRODUCTION_ACTIVE_PLACEMENT, {
+    version: local.skill_version,
+    releaseTag: local.release_tag,
+  });
 
   return resolvedPlacement({
     placement: "production_active",

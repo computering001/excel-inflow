@@ -14,6 +14,7 @@
  * directory, so the suite never writes into the product tree (P0.9).
  */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -29,7 +30,10 @@ import {
   versionLiteralSearchSpace,
   versionValueSites,
 } from "./lib/skill_version_declaration.mjs";
-import { writeDerivedReleaseSurfaces } from "./lib/release_identity.mjs";
+import {
+  releaseTagForCommit,
+  writeDerivedReleaseSurfaces,
+} from "./lib/release_identity.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
@@ -219,6 +223,50 @@ check("THE FLIP: editing one field moves every derived site, and the tree stays 
   assert.equal(flipped.status, "PASS");
   assert.deepEqual(flipped.findings, []);
   assert.equal(flipped.release_name, `Fixture Product v${after}`);
+});
+
+check("the CLI writer honours an explicit --skill root", () => {
+  const root = syntheticRoot(before);
+  const run = spawnSync(
+    process.execPath,
+    [
+      path.join(ROOT, "scripts", "compile_skill_release.mjs"),
+      "--write-release-identity",
+      "--skill",
+      root,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, SOURCE_DATE_EPOCH: "0" },
+    },
+  );
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  const result = JSON.parse(run.stdout);
+  assert.equal(result.status, "WRITTEN");
+  assert.equal(result.version, before);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "assets", "runtime-manifest.json"), "utf8"));
+  assert.equal(manifest.skill_version, before);
+  assert.equal(manifest.release_channel, result.channel);
+});
+
+check("only the exact version tag on the source commit is release proof", () => {
+  const root = syntheticRoot(before);
+  const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  for (const args of [
+    ["init", "--quiet"],
+    ["config", "user.name", "Fixture"],
+    ["config", "user.email", "fixture@example.invalid"],
+    ["add", "."],
+    ["commit", "--quiet", "-m", "fixture"],
+  ]) {
+    const run = git(...args);
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+  }
+  assert.equal(releaseTagForCommit(root, before), null);
+  assert.equal(git("tag", "v0.0.1").status, 0);
+  assert.equal(releaseTagForCommit(root, before), null);
+  assert.equal(git("tag", `v${before}`).status, 0);
+  assert.equal(releaseTagForCommit(root, before), `v${before}`);
 });
 
 check("RED PROOF (rule A): a literal bound to skill_version in a shipped script is caught", () => {

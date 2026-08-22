@@ -26,10 +26,10 @@
       "target_owner": "Workbook planner + emitter (Phase 5); late rewrites become plan-time facts"
     },
     "compile_skill_release.mjs": {
-      "count": 5,
+      "count": 6,
       "families": {
         "terminal_status": 1,
-        "release_identity": 4
+        "release_identity": 5
       },
       "classification": "canonical_writer",
       "concern": "package closure + release identity",
@@ -346,9 +346,9 @@
       "target_owner": "Runtime governance (Phase 6)"
     },
     "lib/installed_runtime_identity.mjs": {
-      "count": 5,
+      "count": 10,
       "families": {
-        "release_identity": 5
+        "release_identity": 10
       },
       "classification": "validator",
       "concern": "read-only installed slot, active-pointer, promotion and rollback identity verification",

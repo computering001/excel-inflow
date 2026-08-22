@@ -1,7 +1,7 @@
 # Excel Inflow current development candidate
 
 <!-- release-identity:generated/1.0 BEGIN -->
-<!-- release-version=3.7.10 release-channel=candidate commit=e2ce9cc40d16048311014c268dd3cb803b96ae75 generated_at=2026-08-22T07:48:07.000Z -->
+<!-- release-version=3.7.10 release-channel=candidate commit=3003cf83fe4e81696f37711584f131c2e696637b generated_at=2026-08-22T16:04:20.000Z -->
 <!-- Written by scripts/compile_skill_release.mjs --write-release-identity from assets/release-identity.json. Hand edits are a drift violation and are reverted by the writer. -->
 <!-- release-identity:generated/1.0 END -->
 

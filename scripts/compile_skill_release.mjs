@@ -120,7 +120,10 @@ import {
 import { runtimeCodeClosureMembers } from "./lib/source_identity.mjs";
 // MP2 Phase A — the release-identity leaf: the writer this file exposes via
 // --write-release-identity and the drift checker the ownership census runs.
-import { writeDerivedReleaseSurfaces } from "./lib/release_identity.mjs";
+import {
+  releaseTagForCommit,
+  writeDerivedReleaseSurfaces,
+} from "./lib/release_identity.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -212,10 +215,11 @@ const certificationEvidencePath = options["certification-evidence"] ?? null;
 // The ownership census runs verifyDerivedReleaseSurfaces() over exactly these
 // surfaces, so hand-editing one fails CI naming this command.
 if (options["write-release-identity"] === true) {
-  const identityRoot = path.resolve(
-    skillDir ?? path.dirname(fileURLToPath(import.meta.url)),
-    "..",
-  );
+  // `--skill` already names the root. Only the default script location needs
+  // to walk up from scripts/ to the skill root.
+  const identityRoot = skillDir
+    ? path.resolve(skillDir)
+    : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   process.stdout.write(`${JSON.stringify(writeDerivedReleaseSurfaces(identityRoot), null, 2)}\n`);
   process.exit(0);
 }
@@ -492,6 +496,11 @@ function gitIdentity(args, environmentName) {
 
 const sourceCommit = gitIdentity(["rev-parse", "HEAD"], "EXCEL_INFLOW_SOURCE_COMMIT");
 const sourceTree = gitIdentity(["rev-parse", "HEAD^{tree}"], "EXCEL_INFLOW_SOURCE_TREE");
+const sourceReleaseTag = releaseTagForCommit(
+  skillDir,
+  runtimeManifest.skill_version,
+  { commit: sourceCommit ?? "HEAD" },
+);
 const sourceStatusProbe = spawnSync(
   "git",
   ["-C", skillDir, "status", "--porcelain=v1", "--untracked-files=all"],
@@ -2421,6 +2430,9 @@ const manifest = {
   skillVersion: runtimeManifest.skill_version,
   templateVersion: runtimeManifest.template_version,
   sourceStatus: runtimeManifest.status,
+  // Derived from an exact `v<skillVersion>` tag pointing at sourceCommit.
+  // Null is an honest untagged candidate and is refused at production ingress.
+  releaseTag: sourceReleaseTag,
   sourceWorktreeDirty,
   generatedAt,
   centralInstructionsWords: wordCount(centralInstructions),

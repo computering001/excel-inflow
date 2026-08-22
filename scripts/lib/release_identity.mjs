@@ -92,6 +92,39 @@ export function assertSkillVersionShape(value, label = "version") {
   return value;
 }
 
+/** The only release tag that can promote a declared version. */
+export function expectedReleaseTag(version) {
+  return `v${assertSkillVersionShape(version, "release tag version")}`;
+}
+
+/**
+ * Resolve the exact release tag bound to one source commit.
+ *
+ * A nearby tag, a prerelease tag, an environment claim, or a tag on another
+ * commit is not proof. The resulting exact tag is sealed into
+ * release-manifest.json with the source commit and complete package inventory.
+ */
+export function releaseTagForCommit(
+  root,
+  version,
+  {
+    commit = "HEAD",
+  } = {},
+) {
+  const expected = expectedReleaseTag(version);
+  const run = spawnSync(
+    "git",
+    ["-C", root, "tag", "--points-at", String(commit), "--format=%(refname:short)"],
+    { encoding: "utf8" },
+  );
+  if (run.status !== 0) return null;
+  const tags = String(run.stdout)
+    .split(/\r?\n/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return tags.includes(expected) ? expected : null;
+}
+
 function identityFindings(value) {
   const findings = [];
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -480,15 +513,21 @@ export function verifyDerivedReleaseSurfaces(root) {
 }
 
 /* ------------------------------------------------------------------ *
- * A4 — installer ingress. A dev-channel build may sit in an inactive
- * candidate slot, but it can never be installed/promoted as the stable
- * production placement. The refusal is typed so callers branch on code.
+ * A4 — installer ingress. Any declared channel may sit in an inactive
+ * candidate slot. Production additionally requires a stable/candidate channel
+ * and the exact `v<version>` tag bound into the package at compile time; dev
+ * builds and untagged builds receive typed refusals.
  * ------------------------------------------------------------------ */
 
 export const PRODUCTION_ACTIVE_PLACEMENT = "production_active";
 export const INSTALLED_CANDIDATE_PLACEMENT = "installed_candidate";
 
-export function assertChannelAdmission({ channel, target_placement }) {
+export function assertChannelAdmission({
+  channel,
+  target_placement,
+  version = null,
+  release_tag = null,
+}) {
   if (!RELEASE_CHANNELS.includes(channel)) {
     refuse("RELEASE_CHANNEL_UNKNOWN", [
       `package declares release channel ${JSON.stringify(channel)}; expected one of ${RELEASE_CHANNELS.join(", ")}.`,
@@ -508,7 +547,23 @@ export function assertChannelAdmission({ channel, target_placement }) {
       "Install it as an inactive candidate slot instead, or ship a candidate/stable build for the production placement.",
     ]);
   }
-  return Object.freeze({ admitted: true, channel, target_placement });
+  const expectedTag = expectedReleaseTag(version);
+  if (release_tag !== expectedTag) {
+    const code = channel === "candidate"
+      ? "RELEASE_CHANNEL_REFUSAL_UNTAGGED_CANDIDATE"
+      : "RELEASE_CHANNEL_REFUSAL_UNTAGGED_STABLE";
+    refuse(code, [
+      `${channel}-channel build cannot enter production_active without exact tag ${expectedTag} bound to its source commit; read ${JSON.stringify(release_tag)}.`,
+      "Keep it in the inactive candidate slot until the release commit is tagged and the package is rebuilt from that tag.",
+    ]);
+  }
+  return Object.freeze({
+    admitted: true,
+    channel,
+    target_placement,
+    version,
+    release_tag,
+  });
 }
 
 export default {
@@ -517,6 +572,8 @@ export default {
   RELEASE_CHANNELS,
   RELEASE_IDENTITY_WRITER_COMMAND,
   assertSkillVersionShape,
+  expectedReleaseTag,
+  releaseTagForCommit,
   readReleaseIdentity,
   declaredReleaseChannel,
   buildStamp,
