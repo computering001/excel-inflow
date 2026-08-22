@@ -15,9 +15,9 @@
   ],
   "files": {
     "build_dynamic_model.mjs": {
-      "count": 31,
+      "count": 32,
       "families": {
-        "row_topology": 23,
+        "row_topology": 24,
         "economic_values": 2,
         "workbook_state": 6
       },
@@ -155,9 +155,9 @@
       "target_owner": "Runtime governance (Phase 6)"
     },
     "lib/economic_ir.mjs": {
-      "count": 1,
+      "count": 2,
       "families": {
-        "row_topology": 1
+        "row_topology": 2
       },
       "classification": "canonical_writer",
       "concern": "P3.1 canonical Economic IR (shadow; typed values, never gates delivery)",
@@ -548,12 +548,12 @@
       "target_owner": "Statement Authority compiler (Phase 2)"
     },
     "lib/row_plan.mjs": {
-      "count": 80,
+      "count": 81,
       "families": {
         "forecast_authority": 10,
         "forecast_formula": 12,
         "capture_ownership": 10,
-        "row_topology": 38,
+        "row_topology": 39,
         "economic_values": 10
       },
       "classification": "mixed_legacy_writer",
@@ -670,9 +670,9 @@
       "target_owner": "derived view of the Authority selector output (Phase 3)"
     },
     "lib/workflow_state.mjs": {
-      "count": 5,
+      "count": 7,
       "families": {
-        "terminal_status": 5
+        "terminal_status": 7
       },
       "classification": "canonical_writer",
       "concern": "terminal workflow state",
