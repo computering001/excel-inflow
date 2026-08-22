@@ -84,7 +84,7 @@ async function refuses(work, code) {
   });
 }
 
-async function basePackage({ mode, checkout = false }) {
+async function basePackage({ mode, checkout = false, channel = null } = {}) {
   const packageRoot = path.join(SCRATCH, `package-${mode}-${passed.length}-${Date.now()}-${Math.random()}`);
   await fs.mkdir(path.join(packageRoot, "assets"), { recursive: true });
   await fs.mkdir(path.join(packageRoot, "scripts"), { recursive: true });
@@ -109,6 +109,9 @@ async function basePackage({ mode, checkout = false }) {
     skill_version: "fixture",
     status: checkout ? "v2_development" : "compiled_fixture",
     package_mode: checkout ? "development" : mode,
+    // MP2 Phase A (A4): the release channel rides beside the version; a
+    // source checkout is inherently a dev-channel build.
+    release_channel: checkout ? "dev" : (channel ?? "stable"),
     deployment_status: "not_installed",
   });
   if (checkout) {
@@ -167,8 +170,8 @@ async function basePackage({ mode, checkout = false }) {
   };
 }
 
-async function installFixture({ mode = "development", production = false } = {}) {
-  const fixture = await basePackage({ mode });
+async function installFixture({ mode = "development", production = false, channel = null } = {}) {
+  const fixture = await basePackage({ mode, channel });
   const installedAt = new Date(Date.now() - 120_000).toISOString();
   const activatedAt = new Date(Date.now() - 60_000).toISOString();
   const installationBody = {
@@ -535,6 +538,25 @@ await test("MUTATION — caller cannot provide mode status or installation ident
       "UNTRUSTED_RUNTIME_MODE_INPUT",
     );
   }
+});
+
+await test("MUTATION — dev-channel build with production receipts refuses at the installer ingress", async () => {
+  // Every receipt join is honest; the refusal is purely the declared channel
+  // (dev) not being installable_as_stable.
+  const fixture = await installFixture({ mode: "certified", production: true, channel: "dev" });
+  await refuses(
+    () => resolveInstalledRuntimeIdentity({ skillRoot: fixture.packageRoot, installStateRoot: fixture.stateRoot }),
+    "RELEASE_CHANNEL_REFUSAL_DEV_BUILD_AS_STABLE",
+  );
+});
+
+await test("dev-channel build resolves installed_candidate in an inactive slot", async () => {
+  const fixture = await installFixture({ channel: "dev" });
+  const placement = await resolveInstalledRuntimeIdentity({
+    skillRoot: fixture.packageRoot,
+    installStateRoot: fixture.stateRoot,
+  });
+  assert.equal(placement.placement, "installed_candidate");
 });
 
 await fs.rm(SCRATCH, { recursive: true, force: true });

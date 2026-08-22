@@ -18,6 +18,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  RELEASE_IDENTITY_FILE,
+  RELEASE_IDENTITY_WRITER_COMMAND,
+  verifyDerivedReleaseSurfaces,
+} from "./lib/release_identity.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -124,6 +129,7 @@ const FILE_OWNERSHIP = {
   "lib/external_ci_evidence.mjs": { role: "canonical_writer", concern: "externally retained exact-head CI receipts and non-promotional release-candidate attestation", target_owner: "Release/package compiler (Phase 8)" },
   "lib/release_dossier.mjs": { role: "canonical_writer", concern: "P8.7 portable dossier assembly (typed absences; refuses to mint a manifest naming fewer than five classes)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/skill_version_declaration.mjs": { role: "validator", concern: "P8.9 freeze criterion 9 — the single skill-version declaration and the enumerated hard-coded-literal scan; READS the declaration and reports, never writes a version", target_owner: "Release/package compiler (Phase 8)" },
+  "lib/release_identity.mjs": { role: "canonical_writer", concern: "MP2 Phase A — the release-identity leaf: reads the ONE hand-edited declaration, writes every derived release surface (runtime-manifest skill_version/release_channel, doc banners) and verifies them; its writer ingress is compile_skill_release.mjs --write-release-identity", target_owner: "Release/package compiler (Phase 8)" },
   "lib/certified_runtime_code_closure.mjs": { role: "validator", concern: "P8.9 freeze criterion 11 — the certified runtime CODE closure walked from the shipped entry points; computes and compares, never writes the manifest (only the suite's --record flag does)", target_owner: "Release/package compiler (Phase 8)" },
   "lib/solve_order.mjs": { role: "validator", concern: "P4.7 Tarjan + topological derivation; checks the hand-written solve order against the case graph, never reorders it", target_owner: "Schedule/solver layer (Phase 4)" },
   "lib/canonical_model_modules.mjs": { role: "validator", concern: "P4.4 nine-module boundary register + the sealed per-module boundary digest; validates the declared contract against real solver output, never reorders or extracts", target_owner: "Schedule/solver layer (Phase 4)" },
@@ -247,4 +253,26 @@ check(sites.length > 100, "the scan must find a substantial mutation surface (sa
     `raw forecast_capture_* writes outside capture_transition: ${offenders.join(", ")}`);
 }
 
-console.log(JSON.stringify({ status: "PASS", checks, mutation_sites: sites.length, files: Object.keys(byFile).length }));
+// MP2 Phase A (A2) — THE DRIFT GATE. Every derived release surface
+// (runtime-manifest skill_version/release_channel, the RELEASE_NOTES banner,
+// the KNOWN_LIMITATIONS header) must equal what the writer derives from the
+// one hand-edited declaration. A hand edit to any of them fails the census
+// naming the writer command, so a stale or forged surface can never reach CI
+// green. This is why the gate lives in the census: the census already owns the
+// "committed artifacts match their generators" invariant, and release identity
+// is now one of those generated surfaces.
+const drift = verifyDerivedReleaseSurfaces(ROOT);
+check(
+  drift.status === "PASS",
+  `derived release surfaces drifted from ${RELEASE_IDENTITY_FILE}:\n` +
+    drift.violations.map((violation) => `  - ${violation.path}: ${violation.detail}`).join("\n") +
+    `\n  Repair: run ${RELEASE_IDENTITY_WRITER_COMMAND} and commit the stamped surfaces; never hand-edit a derived surface.`,
+);
+
+console.log(JSON.stringify({
+  status: "PASS",
+  checks,
+  mutation_sites: sites.length,
+  files: Object.keys(byFile).length,
+  release_identity_drift: drift.status,
+}));

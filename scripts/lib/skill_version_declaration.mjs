@@ -1,22 +1,22 @@
 /**
- * Freeze criterion 9 — ONE declaration of the skill version.
+ * Freeze criterion 9 — ONE declaration of the skill version. MP2 Phase A moves
+ * the declaration and demotes the old one to a derived copy:
  *
- * The version used to be stated independently in five places: the runtime
- * manifest and four "deliberate tripwire" literals inside registered suites,
- * plus a heading in KNOWN_LIMITATIONS.md. Every one of them had to be edited in
- * the same commit or the registered gate ran red at exact head; the blocker
- * corpus records precisely that happening on the 3.7.5 -> 3.7.6 flip, and the
- * same failure reproduced at head before this module existed.
- *
- * The repair is DERIVATION, not a second copy with an equality guard:
- *
- *   - `assets/runtime-manifest.json#/skill_version` is the ONLY declaration.
- *   - Every consumer calls `declaredSkillVersion()` / `declaredReleaseName()`
- *     and therefore cannot hold a value that can disagree with it.
+ *   - `assets/release-identity.json#/version` is the ONLY hand-edited
+ *     declaration (with its release channel beside it);
+ *   - `assets/runtime-manifest.json#/skill_version` USED TO be the declaration;
+ *     it is now a DERIVED copy stamped by scripts/lib/release_identity.mjs, so
+ *     every installed-host consumer keeps working unchanged;
+ *   - every consumer calls `declaredSkillVersion()` / `declaredReleaseName()`
+ *     and therefore cannot hold a value that can disagree with it;
  *   - `scanForVersionLiterals()` proves the property is still true: it walks a
  *     search space ENUMERATED FROM THE DEPLOYMENT PROFILE AND THE TEST REGISTRY
  *     (never a hand-written path list) and reports any file outside the
- *     declaration site that still carries the declared version string.
+ *     declaration site that still carries the declared version string. The
+ *     derived manifest site is exempt from the uniqueness scan because it is
+ *     WRITTEN, not edited — its agreement with the declaration is enforced by
+ *     the drift checker (`verifyDerivedReleaseSurfaces`) in the ownership
+ *     census, whose violation message says to run the writer.
  *
  * A test that compared two hard-coded copies for equality would leave the
  * duplication in place and merely alarm on it. Nothing in this module lets a
@@ -26,36 +26,44 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  RELEASE_IDENTITY_FILE,
+  RELEASE_VERSION_POINTER,
+  assertSkillVersionShape as assertShape,
+  readReleaseIdentity,
+} from "./release_identity.mjs";
+
 /** The single declaration site, as a portable path and a JSON pointer. */
-export const SKILL_VERSION_DECLARATION_FILE = "assets/runtime-manifest.json";
-export const SKILL_VERSION_DECLARATION_POINTER = "/skill_version";
+export const SKILL_VERSION_DECLARATION_FILE = RELEASE_IDENTITY_FILE;
+export const SKILL_VERSION_DECLARATION_POINTER = RELEASE_VERSION_POINTER;
+/**
+ * Derived version sites: WRITTEN from the declaration by
+ * scripts/lib/release_identity.mjs, never hand-edited. Exempt from the
+ * uniqueness scan; guarded instead by the drift checker in the census.
+ */
+export const DERIVED_VERSION_SITES = Object.freeze([
+  Object.freeze({ file: "assets/runtime-manifest.json", pointer: "/skill_version" }),
+]);
 export const RELEASE_NAME_STEM_FILE = "assets/deployment-profile.json";
 export const RELEASE_NAME_STEM_POINTER = "/release_name";
-
-const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 function readJson(root, relative) {
   return JSON.parse(fs.readFileSync(path.join(root, ...relative.split("/")), "utf8"));
 }
 
-/**
- * A version must be an exact three-part release number. The shape check exists
- * so that a flip to an unparseable value fails at the declaration rather than
- * silently propagating a malformed release name into package identity.
- */
+/** Kept for back-compat: the one shape rule lives in the leaf module. */
 export function assertSkillVersionShape(value, label = "skill_version") {
-  if (typeof value !== "string" || !SEMVER.test(value)) {
-    throw new Error(
-      `${label} must be a three-part release version (major.minor.patch); read ${JSON.stringify(value)} from ${SKILL_VERSION_DECLARATION_FILE}${SKILL_VERSION_DECLARATION_POINTER}.`,
-    );
-  }
-  return value;
+  return assertShape(value, label);
 }
 
 /** The declared version, read from the one place that declares it. */
 export function declaredSkillVersion(root) {
-  const manifest = readJson(root, SKILL_VERSION_DECLARATION_FILE);
-  return assertSkillVersionShape(manifest.skill_version);
+  return readReleaseIdentity(root).version;
+}
+
+/** The declared release channel (stable | candidate | dev). */
+export function declaredReleaseChannel(root) {
+  return readReleaseIdentity(root).channel;
 }
 
 /**
@@ -183,11 +191,17 @@ function versionLiteralPattern(version) {
   return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`);
 }
 
-function jsonBindingSites(value, version, releaseName, pointer = "", key = null) {
+function jsonBindingSites(value, version, releaseName, derivedPointers, pointer = "", key = null) {
   const sites = [];
   if (typeof value === "string") {
+    const isDerivedSite = pointer !== "" && derivedPointers.has(pointer);
     if (key !== null && SKILL_VERSION_BINDING_TOKENS.includes(key) && value === version) {
-      sites.push({ pointer, rule: "A", text: `${key} = ${JSON.stringify(value)}` });
+      // A DERIVED site (written by scripts/lib/release_identity.mjs) is not a
+      // second declaration; its agreement with the declaration is the drift
+      // checker's job, not the uniqueness scan's.
+      if (!isDerivedSite) {
+        sites.push({ pointer, rule: "A", text: `${key} = ${JSON.stringify(value)}` });
+      }
     }
     if (value.includes(releaseName)) {
       sites.push({ pointer, rule: "B", text: JSON.stringify(value).slice(0, 200) });
@@ -195,12 +209,12 @@ function jsonBindingSites(value, version, releaseName, pointer = "", key = null)
     return sites;
   }
   if (Array.isArray(value)) {
-    value.forEach((item, index) => sites.push(...jsonBindingSites(item, version, releaseName, `${pointer}/${index}`, null)));
+    value.forEach((item, index) => sites.push(...jsonBindingSites(item, version, releaseName, derivedPointers, `${pointer}/${index}`, null)));
     return sites;
   }
   if (value && typeof value === "object") {
     for (const [childKey, item] of Object.entries(value)) {
-      sites.push(...jsonBindingSites(item, version, releaseName, `${pointer}/${childKey}`, childKey));
+      sites.push(...jsonBindingSites(item, version, releaseName, derivedPointers, `${pointer}/${childKey}`, childKey));
     }
   }
   return sites;
@@ -217,6 +231,11 @@ export function scanForVersionLiterals({ root, version, releaseName = null, file
   const name = releaseName ?? declaredReleaseName(root);
   const literal = versionLiteralPattern(version);
   const space = files ?? versionLiteralSearchSpace(root);
+  const derivedByFile = new Map();
+  for (const site of DERIVED_VERSION_SITES) {
+    if (!derivedByFile.has(site.file)) derivedByFile.set(site.file, new Set());
+    derivedByFile.get(site.file).add(site.pointer);
+  }
   const findings = [];
   for (const relative of space) {
     if (relative === SKILL_VERSION_DECLARATION_FILE) continue;
@@ -235,7 +254,8 @@ export function scanForVersionLiterals({ root, version, releaseName = null, file
         parsed = null;
       }
       if (parsed !== null) {
-        for (const site of jsonBindingSites(parsed, version, name)) {
+        const derivedPointers = derivedByFile.get(relative) ?? new Set();
+        for (const site of jsonBindingSites(parsed, version, name, derivedPointers)) {
           findings.push({ path: relative, line: null, pointer: site.pointer, rule: site.rule, text: site.text });
         }
         continue;
@@ -259,7 +279,11 @@ export function scanForVersionLiterals({ root, version, releaseName = null, file
  */
 export function verifySingleVersionDeclaration(root) {
   const manifest = readJson(root, SKILL_VERSION_DECLARATION_FILE);
-  const version = assertSkillVersionShape(manifest.skill_version);
+  // Full validation, not just shape: a declaration with an unknown channel or
+  // a broken schema_version is exactly the kind of hand edit this verdict
+  // exists to catch at the source rather than downstream.
+  readReleaseIdentity(root);
+  const version = assertSkillVersionShape(manifest.version);
   const releaseName = declaredReleaseName(root);
   const valueSites = versionValueSites(manifest, version);
   const space = versionLiteralSearchSpace(root);
@@ -291,8 +315,10 @@ export function verifySingleVersionDeclaration(root) {
 export default {
   SKILL_VERSION_DECLARATION_FILE,
   SKILL_VERSION_DECLARATION_POINTER,
+  DERIVED_VERSION_SITES,
   assertSkillVersionShape,
   declaredSkillVersion,
+  declaredReleaseChannel,
   declaredReleaseName,
   versionValueSites,
   versionLiteralSearchSpace,
