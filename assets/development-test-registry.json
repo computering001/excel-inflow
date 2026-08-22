@@ -1265,6 +1265,15 @@
       "test_class": "cross_layer_integration"
     },
     {
+      "id": "generated-artifact-checks",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_generated_artifact_checks.mjs",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "generated-case-cohort",
       "phase": "cohort",
       "runtime": "node",

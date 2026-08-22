@@ -1,0 +1,48 @@
+{
+  "schema_version": "generated-artifact-register/1.0",
+  "invariant": "every generated artifact names its writer and the check that proves it agrees with that writer; mp2-D",
+  "artifacts": [
+    {
+      "artifact_path": "architecture/ownership_census.json",
+      "writer_script": "node scripts/run_ownership_census_tests.mjs --write",
+      "check_invocation": "node scripts/run_ownership_census_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/runtime-manifest.json",
+      "writer_script": "certified-runtime closure digest fields: node scripts/run_certified_code_closure_tests.mjs --record (the only writer); manifest identity incl. skill_version written by the MP2-A release_identity chain (scripts/compile_skill_release.mjs)",
+      "check_invocation": "node scripts/run_certified_code_closure_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/controller-terminal-exit-inventory-v1.json",
+      "hand_owned": true,
+      "writer_script": null,
+      "check_invocation": "node scripts/run_controller_exit_inventory_tests.mjs"
+    },
+    {
+      "artifact_path": "ci/test_registry_census.json",
+      "writer_script": "node scripts/compile_test_registry_census.mjs --out ci/test_registry_census.json",
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs (recompiles to a scratch path and byte-compares against the committed census)"
+    },
+    {
+      "artifact_path": "ci/coercion_inventory.json",
+      "writer_script": "node scripts/run_coercion_ban_tests.mjs --write",
+      "check_invocation": "node scripts/run_coercion_ban_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/critical-invariant-oracle-matrix-v1.json",
+      "writer_script": "python3 scripts/run_critical_invariant_oracle_matrix_tests.py --record-bindings (bindings only; matrix body hand-curated)",
+      "check_invocation": "python3 scripts/run_critical_invariant_oracle_matrix_tests.py --verify-bindings"
+    },
+    {
+      "artifact_path": "assets/workflow-state-contract-v1.json",
+      "hand_owned": true,
+      "writer_script": null,
+      "check_invocation": "node scripts/run_workflow_state_tests.mjs"
+    },
+    {
+      "artifact_path": "assets/runtime-manifest.json#skill_version",
+      "writer_script": "MP2-A release_identity writer (scripts/compile_skill_release.mjs) — declared here because no mp2-D-local writer regenerates the field",
+      "check_invocation": "node scripts/run_generated_artifact_checks.mjs (structural field check; digest fields additionally covered by the certified-closure check above)"
+    }
+  ]
+}

@@ -65,6 +65,26 @@ if "--record-bindings" in sys.argv:
     raise SystemExit(0)
 
 
+# mp2-D: read-only binding check for the generated-artifact register. The two
+# byte bindings are recomputed here WITHOUT the full matrix run (which requires
+# REPRESENTATIVE + SOFFICE resources), so artifact agreement is checkable
+# anywhere. Ordinary execution below remains unchanged and read-only.
+if "--verify-bindings" in sys.argv:
+    candidate = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
+    expected_oracle = sha256(Path(__file__))
+    expected_registry = sha256(REGISTRY_PATH)
+    actual = candidate.get("bindings", {})
+    oracle_ok = actual.get("oracle_sha256") == expected_oracle
+    registry_ok = actual.get("registry_sha256") == expected_registry
+    print(json.dumps({
+        "status": "PASS" if oracle_ok and registry_ok else "FAIL",
+        "mode": "verify_bindings",
+        "oracle_sha256_matches": oracle_ok,
+        "registry_sha256_matches": registry_ok,
+    }, sort_keys=True))
+    raise SystemExit(0 if oracle_ok and registry_ok else 1)
+
+
 matrix = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
 registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 tests = {test["id"]: test for test in registry["tests"]}
