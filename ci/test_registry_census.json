@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 491,
-  "source_commit": "d61b95f301f5cf7513bf7cb8d95245d938e316ad",
-  "source_tree": "b27ca93eb6b8a86b60148fed6644f98679af2fc2",
+  "checks": 503,
+  "source_commit": "ee2a4a86520e3771ecea9f87382c971299790ce1",
+  "source_tree": "b88f3f1dc677223399cafd4d8c140b9e2a8e60e5",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 238
+    "test_count": 244
   },
   "scripts": [
     {
@@ -374,6 +374,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_economic_ir_parity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_economic_ir_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -618,6 +622,22 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_invariant_cash_flow_articulation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_invariant_debt_continuity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_invariant_fx_positivity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_invariant_typed_unresolved_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_large_broker_pack_stress_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -839,6 +859,10 @@
     },
     {
       "script": "run_required_role_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_review_sealing_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
