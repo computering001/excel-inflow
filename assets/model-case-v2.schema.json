@@ -1450,6 +1450,16 @@
       ],
       "anyOf": [
         {
+          "properties": {
+            "mode": {
+              "const": "exclude"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
           "required": [
             "historical_liabilities"
           ]

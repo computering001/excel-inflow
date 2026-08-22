@@ -134,7 +134,11 @@ try {
   await exec(process.execPath, [path.join(ROOT, "scripts", "compare_exact_head_package_builds.mjs"), "--a", comparisonA, "--b", comparisonB, "--out", comparisonOut]);
   check(JSON.parse(await fs.readFile(comparisonOut, "utf8")).status === "PASS", "comparator CLI did not consume independent build receipts");
   const rejected = await exec(process.execPath, [path.join(ROOT, "scripts", "run_exact_head_package_build_ci.mjs"), "--overlay", "x"], { cwd: ROOT }).then(() => null, (error) => error);
-  check(rejected?.code !== 0 && String(rejected?.stderr).includes("Overlay/copy inputs are prohibited"), "single-build CI accepted an overlay/copy argument");
+  const rejectedOutput = `${rejected?.stdout ?? ""}\n${rejected?.stderr ?? ""}`;
+  check(
+    rejected?.code !== 0 && rejectedOutput.includes("Overlay/copy inputs are prohibited"),
+    "single-build CI accepted an overlay/copy argument",
+  );
 
   const lane = { status: "PASS", log_sha256: "a".repeat(64), report_sha256: "b".repeat(64) };
   const archiveBody = {

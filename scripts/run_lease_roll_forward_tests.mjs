@@ -98,6 +98,31 @@ assert.deepEqual(excluded.map((period) => period.ending_total), [0, 0, 0]);
 assert.deepEqual(excluded.map((period) => period.interest), [0, 0, 0]);
 assert.deepEqual(leaseProjectionErrors(excludedCase, excluded), []);
 
+// Explicit exclusion is itself the typed authority: no liability was selected
+// for the model, so a historical/opening balance must not be fabricated merely
+// to satisfy the schedule shape. The carried state is explicit and remains 0.
+const excludedWithoutDeclaredLiability = baseCase({
+  mode: "exclude",
+  principal_repayment: [0, 0, 0],
+  additions: [0, 0, 0],
+  effective_rate: [0, 0, 0],
+  include_in_gross_debt: false,
+  include_in_net_debt: false,
+  include_in_leverage: false,
+});
+const excludedWithoutDeclaredLiabilityForecast = leaseForecast(
+  excludedWithoutDeclaredLiability,
+);
+assert.deepEqual(
+  excludedWithoutDeclaredLiabilityForecast.map((period) => period.opening_total),
+  [0, 0, 0],
+);
+assert.deepEqual(
+  excludedWithoutDeclaredLiabilityForecast.map((period) => period.ending_total),
+  [0, 0, 0],
+);
+assert.deepEqual(validateLeasePolicy(excludedWithoutDeclaredLiability), []);
+
 const usGaapInvalid = baseCase(
   { ...common, mode: "simple_roll_forward", interest_basis: "total_liability" },
   "US_GAAP",

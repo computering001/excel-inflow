@@ -25,7 +25,10 @@ function option(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
-const outPath = option("out", path.join(ROOT, "ci", "test_registry_census.json"));
+// The execution census and registry-classification census are different
+// generated contracts. They must never share a path: otherwise one sanctioned
+// writer can overwrite the artifact owned by the other.
+const outPath = option("out", path.join(ROOT, "ci", "execution_test_census.json"));
 
 let checks = 0;
 function check(condition, message) {

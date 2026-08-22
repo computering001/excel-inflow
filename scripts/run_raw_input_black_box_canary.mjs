@@ -263,7 +263,11 @@ if (options["real-filings-request"]) {
       "maximum_residual_percentage", "restricted_cash", "leverage_basis",
       "minimum_operating_cash", "announced_acquisition",
     ]
-      .filter((key) => clean.filings[key] !== undefined)
+      .filter((key) =>
+        clean.filings[key] !== undefined &&
+        (key !== "reported_lease_liability" ||
+          Number.isFinite(clean.filings[key]))
+      )
       .map((key) => [key, structuredClone(clean.filings[key])]),
   );
   filingFacts.historical_gross_debt = [80, 80, 80];

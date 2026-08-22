@@ -12,9 +12,10 @@
  * closed twice — P7.6a stopped an oracle publishing an empty forbidden-import
  * list as its own evidence, and P5.3 stopped a validator deriving its
  * expectation from the artifact it was checking. D20 is the same shape in the
- * governance layer: `scripts/run_ci_census_tests.mjs` defaults its census
- * output at `ci/test_registry_census.json` and writes it unconditionally, so a
- * CI run regenerates the census it was supposed to verify.
+ * governance layer: the historical `scripts/run_ci_census_tests.mjs` default
+ * pointed at `ci/test_registry_census.json` and wrote it unconditionally, so
+ * a CI run regenerated the census it was supposed to verify. The repaired
+ * execution census is owned separately at `ci/execution_test_census.json`.
  *
  * The repo already holds the correct discipline in two places and this suite
  * pins it rather than inventing a third convention:
@@ -252,7 +253,9 @@ check(wholeTreeFiles.length > requiredSweepFiles.length,
   "the whole-tree sweep must be a strict superset of the four named directories");
 // Non-vacuity again: the sweep must include the artifact D20 is about.
 check(requiredSweepFiles.includes("ci/test_registry_census.json"),
-  "ci/test_registry_census.json MUST be inside the swept set — it is the artifact D20 names");
+  "the registry-classification census MUST remain inside the swept set");
+check(requiredSweepFiles.includes("ci/execution_test_census.json"),
+  "the execution census MUST be inside the swept set owned by run_ci_census_tests.mjs");
 
 for (const script of SUBJECT_GATES) {
   const scriptPath = path.join(ROOT, "scripts", script);
@@ -280,7 +283,7 @@ for (const script of SUBJECT_GATES) {
 // --- 3. Committed-vs-computed drift on the census MUST FAIL -----------------
 
 const censusScript = path.join(ROOT, "scripts", "run_ci_census_tests.mjs");
-const censusArtifact = "ci/test_registry_census.json";
+const censusArtifact = "ci/execution_test_census.json";
 const verifyRoot = await fs.mkdtemp(path.join(os.tmpdir(), "gate-side-effect-verify-"));
 try {
   const computedPath = path.join(verifyRoot, "computed_census.json");
