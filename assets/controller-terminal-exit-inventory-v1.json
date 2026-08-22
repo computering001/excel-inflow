@@ -8,7 +8,7 @@
   "source_exit_counts": {
     "scripts/run_excel_inflow_bootstrap.mjs": 8,
     "scripts/run_excel_inflow_vnext.mjs": 12,
-    "scripts/run_user_flow.mjs": 22
+    "scripts/run_user_flow.mjs": 23
   },
   "source_exit_kinds": {
     "scripts/run_excel_inflow_bootstrap.mjs": {
@@ -22,7 +22,7 @@
       "outer_refusal": 1
     },
     "scripts/run_excel_inflow_vnext.mjs": { "model_finish": 9, "presentation": 2, "outer_internal_failure": 1 },
-    "scripts/run_user_flow.mjs": { "model_finish": 20, "presentation": 1, "outer_internal_failure": 1 }
+    "scripts/run_user_flow.mjs": { "model_finish": 21, "presentation": 1, "outer_internal_failure": 1 }
   },
   "phase_0_source_exit_counts": {
     "scripts/run_excel_inflow_vnext.mjs": 6,
@@ -71,6 +71,7 @@
     { "id": "delegate.pause_build", "controller": "delegate", "signature": "nextStageId(\"build_checks\")", "owner": "LOG", "broker_safe": true },
     { "id": "delegate.review_gate_await_reply", "controller": "delegate", "signature": "awaiting: \"review_gate_reply\",", "owner": "ASK", "broker_safe": true },
     { "id": "delegate.review_change_stop", "controller": "delegate", "signature": "schema_version: \"flow-review-change/1.0\",", "owner": "BLOCK", "broker_safe": true },
+    { "id": "delegate.review_seal_refusal", "controller": "delegate", "signature": "awaiting: \"review_seal_refusal\",", "owner": "BLOCK", "broker_safe": true },
     { "id": "delegate.delivery_attestation", "controller": "delegate", "signature": "delivery_attestation_blocked", "owner": "BLOCK", "broker_safe": true },
     { "id": "delegate.delivered", "controller": "delegate", "signature": "manual_gate: \"native_excel_restoration_and_visual_review\"", "owner": "DELIVER", "broker_safe": true }
   ],
