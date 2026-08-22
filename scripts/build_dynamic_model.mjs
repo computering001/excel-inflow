@@ -1610,7 +1610,7 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
       brokerUnavailable
         ? "DEGRADED — company evidence / forecast waterfall"
         : selection === "Forecast Waterfall"
-          ? "Forecast Waterfall — broker authority used"
+          ? "Forecast Waterfall — compatible-house consensus basis"
           : `${selection} selected`,
     selected_house_count: selectedHouses.length,
     selected_metric_ids: selectedMetricIds,

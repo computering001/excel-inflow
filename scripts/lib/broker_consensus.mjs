@@ -270,10 +270,43 @@ export function compileBrokerConsensusMetric(
   };
 }
 
+// FORECAST WATERFALL IS NOT MODEL CONSENSUS.
+//
+// The visible control names the row's ordinary forecast waterfall as its
+// authority, and the audit history is explicit that the label must consume
+// compatible broker evidence or record what it fell back to — never collapse
+// silently into another mode. `compiled` carries only the sealed membership
+// census and its per-period averages (see compileBrokerConsensusMetric): it
+// holds no behaviour map or per-row waterfall ranking, so a true per-row
+// waterfall composition is NOT derivable inside this slice. Where composition
+// data is absent — today, always — the selection returns the compatible-house
+// consensus values under an explicit `forecast_waterfall` source kind plus a
+// DEGRADE finding, so the fallback is disclosed on every surface that carries
+// the selection (candidate ledger, authority ledger, flow screens).
+// KNOWN_LIMITATIONS.md records the same gap.
+function forecastWaterfallSelection(period) {
+  return {
+    value: period.model_consensus,
+    source_kind: "forecast_waterfall",
+    source_name: `${period.contributor_count} compatible-house consensus under the Forecast Waterfall basis`,
+    contributors: period.included.map((entry) => entry.house_name),
+    excluded: period.excluded,
+    findings: [
+      {
+        id: "broker_selection.forecast_waterfall_consensus_basis",
+        severity: "DEGRADE",
+        message:
+          "Forecast Waterfall has no declared per-row waterfall composition; " +
+          `${period.contributor_count} compatible-house model consensus is the disclosed basis.`,
+      },
+    ],
+  };
+}
+
 function periodSelection(compiled, selection, periodIndex) {
   const period = compiled.periods[periodIndex];
   if (!period) return null;
-  if (selection === "Model Consensus" || selection === "Forecast Waterfall") {
+  if (selection === "Model Consensus") {
     return {
       value: period.model_consensus,
       source_kind: "model_consensus",
@@ -281,6 +314,9 @@ function periodSelection(compiled, selection, periodIndex) {
       contributors: period.included.map((entry) => entry.house_name),
       excluded: period.excluded,
     };
+  }
+  if (selection === "Forecast Waterfall") {
+    return forecastWaterfallSelection(period);
   }
   if (selection === "Provider Consensus") {
     return {

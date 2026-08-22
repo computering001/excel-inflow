@@ -23,6 +23,7 @@ the same failure reproduced at head for the next flip.)
   The iXBRL lane passes inside its harness and probe suites while its production wiring is
   still in progress elsewhere; no installed-host claim rests on it yet.
 - The reviewed five-house broker pack reaches `PASS_DEGRADED`: stale responses are quarantined, and no broker authority or mappings are silently retained.
+- `broker_case: "Forecast Waterfall"` has no per-row waterfall composition to draw on, so its broker rows compose from the compatible-house consensus basis; the selection discloses this as `source_kind: forecast_waterfall` with a DEGRADE finding rather than posing as Model Consensus (mp2-E5).
 - The source branch is intentionally not merged to `main`; `main` remains on the prior v3.7.0 line until the held Rogo/native gates are completed.
 - Existing published source tags, package branches, assets and package bytes remain immutable and have not been overwritten. The audited installed-filings repair remains preserved; this hardening tree is a new development candidate with a separately derived identity.
 - The Rogo installer must verify the actual retained rollback route and identities at installation time. No installed rollback hash is inferred from local package evidence.

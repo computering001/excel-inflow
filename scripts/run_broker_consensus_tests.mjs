@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+import { compileForecastPlan } from "./lib/forecast_candidate_compiler.mjs";
 import {
   brokerConsensusFormula,
   compareDefinitionSignatures,
@@ -192,6 +194,99 @@ check(
   "absent Provider Consensus silently fell back",
 );
 
+// mp2-E5 — Forecast Waterfall is a declared authority in its own right, never
+// a silent identity with Model Consensus. The consensus compiler carries no
+// per-row waterfall composition, so the selection degrades to the compatible-
+// house consensus basis and says so.
+const selectedWaterfall = modelCase({ selection: "Forecast Waterfall" });
+const waterfall = resolveBrokerConsensusSelection(selectedWaterfall, "adjusted_ebitda", 0);
+check(
+  waterfall.source_kind === "forecast_waterfall",
+  `Forecast Waterfall did not disclose its own source kind: ${waterfall.source_kind}`,
+);
+check(
+  waterfall.selected_mode === "Forecast Waterfall",
+  "Forecast Waterfall selection lost its selected mode",
+);
+check(
+  waterfall.value === 102,
+  `Forecast Waterfall fallback drifted from the consensus value: ${waterfall.value}`,
+);
+check(
+  /waterfall/i.test(waterfall.source_name) && /consensus/i.test(waterfall.source_name),
+  `Forecast Waterfall source_name does not name its waterfall basis: ${waterfall.source_name}`,
+);
+const waterfallDegrades = (waterfall.findings ?? []).filter(
+  (finding) => finding.severity === "DEGRADE",
+);
+check(
+  waterfallDegrades.length === 1 &&
+    /consensus/i.test(waterfallDegrades[0].message ?? ""),
+  "Forecast Waterfall fell back to the consensus basis without exactly one DEGRADE finding naming it",
+);
+const modelSelectionForContrast = resolveBrokerConsensusSelection(
+  modelCase({ selection: "Model Consensus" }),
+  "adjusted_ebitda",
+  0,
+);
+check(
+  modelSelectionForContrast.source_kind === "model_consensus" &&
+    (modelSelectionForContrast.findings ?? []).length === 0,
+  "Model Consensus selection was polluted by the Forecast Waterfall split",
+);
+
+// Divergence contract on the pinned standard-maximal-v2 corpus case: under
+// Forecast Waterfall every broker-declared row keeps the identical consensus
+// rung EXCEPT the anchor row, which the accounting identity derives instead.
+const corpusCase = JSON.parse(
+  fs.readFileSync(new URL("../test-fixtures/cases/standard-maximal-v2.json", import.meta.url), "utf8"),
+);
+const brokerDeclaredRowIds = [
+  ...(corpusCase.statement_structure.income_statement ?? []),
+  ...(corpusCase.statement_structure.cash_flow ?? []),
+]
+  .filter((row) => row.broker_metric_id || row.forecast_treatment === "broker")
+  .map((row) => row.row_id);
+const planValuesByMode = (selection) => {
+  const scoped = structuredClone(corpusCase);
+  scoped.controls.broker_case = selection;
+  const plan = compileForecastPlan(scoped, scoped.statement_structure);
+  const byRow = new Map();
+  for (const state of plan.states ?? []) {
+    if (!byRow.has(state.row_id)) byRow.set(state.row_id, { methods: [], values: [] });
+    const entry = byRow.get(state.row_id);
+    entry.methods.push(state.method);
+    entry.values.push(Number.isFinite(Number(state.value)) ? Number(state.value) : null);
+  }
+  return byRow;
+};
+const consensusPlan = planValuesByMode("Model Consensus");
+const waterfallPlan = planValuesByMode("Forecast Waterfall");
+check(consensusPlan.size > 0 && waterfallPlan.size > 0, "forecast plans for the divergence fixture were empty");
+const divergedRows = brokerDeclaredRowIds.filter((rowId) => {
+  const consensusEntry = consensusPlan.get(rowId);
+  const waterfallEntry = waterfallPlan.get(rowId);
+  if (!consensusEntry || !waterfallEntry) return true;
+  return (
+    JSON.stringify(waterfallEntry.methods) !== JSON.stringify(consensusEntry.methods) ||
+    JSON.stringify(waterfallEntry.values) !== JSON.stringify(consensusEntry.values)
+  );
+});
+check(
+  divergedRows.length === 1 && divergedRows[0] === "adjusted_ebitda",
+  `Forecast Waterfall diverged from consensus on unexpected rows: ${divergedRows.join(", ") || "(none)"}`,
+);
+check(
+  (waterfallPlan.get("adjusted_ebitda")?.methods ?? []).every((method) => method === "accounting_identity"),
+  "the anchor row under Forecast Waterfall did not move to the accounting-identity derivation",
+);
+for (const rowId of brokerDeclaredRowIds.filter((id) => id !== "adjusted_ebitda")) {
+  check(
+    JSON.stringify(waterfallPlan.get(rowId)) === JSON.stringify(consensusPlan.get(rowId)),
+    `non-anchor broker row ${rowId} changed under Forecast Waterfall`,
+  );
+}
+
 const stale = modelCase();
 stale.broker_pack.metrics.adjusted_ebitda.consensus_membership.contributors[0].status = "rejected";
 let staleCaught = false;
@@ -215,7 +310,7 @@ check(unsealedCaught, "an absent membership silently inferred all visible houses
 console.log(JSON.stringify({
   status: "PASS",
   assertions,
-  scenarios: 15,
+  scenarios: 17,
   model_provider_separation: true,
   total_violations: 0,
 }, null, 2));
