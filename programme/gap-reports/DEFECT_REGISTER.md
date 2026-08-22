@@ -633,6 +633,19 @@ to the golden. The drift set is LOCKED by
 `scripts/run_never_zero_and_order_invariance_tests.mjs` and fails if it changes in either
 direction. The decision belongs to the fixture's owner.
 
+CLOSED by E9 (`agent/mp2-E9-order-root-cause`, 2026-08-22) — canonicalised, with the fixture
+owner's figure re-agreed TOWARD exactness: measurement showed the naive register-order fold
+was the outlier (9335.505999999998) while the fixture's own declared
+`reported_opening_gross_debt` and the bridge's canonical `explained_total` both say 9335.506.
+Both accumulation sites — `instrument_period_state.mjs:469` and the provenance replay
+(`opening_instrument_provenance.mjs:362`) — now run through `canonical_sum.mjs` in lockstep,
+the sibling lock is inverted into an order-invariance assertion expecting the drift set to be
+empty, and the mechanism (float-addition non-associativity at the final addition; selection,
+Map iteration and sort instability ruled out) is documented with traces in
+`references/order-dependence-root-cause.md`. Same-class solver-side folds
+(`mandatoryRepaymentForPeriod`, definition-basis sums) are declared open there — their
+canonicalisation moves certified economic signatures.
+
 # Wave 7 — P7.9. D33 repaired at source, MG-5's retirement landed, and the class swept.
 
 ## D32 / MG-5 — RETIREMENT LANDED (P7.9), and the epsilon it justified is GONE

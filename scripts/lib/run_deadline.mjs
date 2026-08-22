@@ -49,7 +49,13 @@ import {
  *    mid-run. (Only the four constitutional fatal reasons may block delivery;
  *    a clock is not one of them.) That floor is a BOUNDED, ledger-accounted
  *    debt: it is granted from a finite run-wide allowance, so a kill/retry loop
- *    can no longer mint a fresh 60 seconds on every attempt.
+ *    can no longer mint a fresh 60 seconds on every attempt. Past the spent
+ *    allowance the ceiling is ABSOLUTE: further requests decay to a single
+ *    one-millisecond spawn token (never zero — zero means "no timeout" at a
+ *    spawn) no matter how much compute they ask for, every such grant carries
+ *    its typed overrun receipt, and each receipt surfaces the allowance
+ *    constant alongside the granted debt so an external observer can verify
+ *    ceiling respect from the receipt alone.
  *  - Every recorded interval carries a label so no stretch of wall time is
  *    unattributed in the ledger.
  */
@@ -76,6 +82,15 @@ export const STAGE_FLOOR_MS = 60_000;
  */
 export const STAGE_FLOOR_STAGE_COUNT = Object.keys(USER_FLOW_STAGE_BUDGET_KEYS).length + 1;
 export const STAGE_FLOOR_TOTAL_ALLOWANCE_MS = STAGE_FLOOR_MS * STAGE_FLOOR_STAGE_COUNT;
+
+/**
+ * The grant a stage receives once the ceiling AND the whole floor allowance
+ * are spent: one millisecond. Never zero — at a spawn boundary zero means "no
+ * timeout", which would be unbounded compute — and never more, so the ceiling
+ * is absolute past the allowance. The enforcement layer (runtime_slo.mjs)
+ * tolerates exactly this token in its envelope replay and nothing larger.
+ */
+export const STAGE_FLOOR_SPAWN_TOKEN_MS = 1;
 
 /** Monotonic-vs-wall disagreement above this is disclosed as clock skew. */
 export const CLOCK_SKEW_TOLERANCE_MS = 1_000;
@@ -271,7 +286,14 @@ export function validateRunDeadlineLedger(ledger, { expectedRunId = undefined, p
 }
 
 /** The typed outcome a clock overrun produces, in registry payload shape. */
-export function runtimeBudgetOverrunOutcome({ stage, remainingMs, grantedMs, floorDebtMs = 0 }) {
+export function runtimeBudgetOverrunOutcome({
+  stage,
+  remainingMs,
+  grantedMs,
+  floorDebtMs = 0,
+  floorAllowanceMs = null,
+  floorGrantedMs = null,
+}) {
   return {
     reason_code: RUNTIME_BUDGET_OVERRUN_REASON,
     earliest_responsible_layer: "runtime_governance",
@@ -281,6 +303,12 @@ export function runtimeBudgetOverrunOutcome({ stage, remainingMs, grantedMs, flo
     remaining_ms: nonNegativeInteger(remainingMs),
     granted_ms: nonNegativeInteger(grantedMs),
     floor_debt_ms: nonNegativeInteger(floorDebtMs),
+    // The allowance constant and the debt drawn against it, surfaced ON the
+    // receipt so an external observer can verify the ceiling is absolute
+    // (floor_granted_ms <= floor_allowance_ms, always) without reconstructing
+    // the ledger. Null only when the caller has no ledger in hand.
+    ...(floorAllowanceMs === null ? {} : { floor_allowance_ms: nonNegativeInteger(floorAllowanceMs) }),
+    ...(floorGrantedMs === null ? {} : { floor_granted_ms: nonNegativeInteger(floorGrantedMs) }),
   };
 }
 
@@ -649,6 +677,8 @@ export async function endComputeSpan(state, span, {
         stage,
         remainingMs: remainingComputeMs(state),
         grantedMs: Math.floor(Number(allowanceMs)),
+        floorAllowanceMs: nonNegativeInteger(state.ledger.floor_allowance_ms),
+        floorGrantedMs: nonNegativeInteger(state.ledger.floor_granted_ms),
       }),
       note: "The stage consumed more than the allowance the single clock granted it. The run is not blocked by a clock, but the overrun is typed and visible to the ceiling.",
     });
@@ -682,7 +712,7 @@ export async function boundedOuterTimeoutMs(state, { stage, requestedMs, floorMs
   if (requestedDebt > 0) {
     const availableDebt = remainingFloorAllowanceMs(state);
     const grantedDebt = Math.min(requestedDebt, availableDebt);
-    granted = Math.max(1, remaining + grantedDebt);
+    granted = Math.max(STAGE_FLOOR_SPAWN_TOKEN_MS, remaining + grantedDebt);
     state.ledger.floor_granted_ms = nonNegativeInteger(state.ledger.floor_granted_ms) + grantedDebt;
     state.ledger.deadline_receipts.push({
       kind: "deadline_exceeded",
@@ -697,6 +727,8 @@ export async function boundedOuterTimeoutMs(state, { stage, requestedMs, floorMs
         remainingMs: remaining,
         grantedMs: granted,
         floorDebtMs: grantedDebt,
+        floorAllowanceMs: nonNegativeInteger(state.ledger.floor_allowance_ms),
+        floorGrantedMs: nonNegativeInteger(state.ledger.floor_granted_ms),
       }),
       note: "The global compute ceiling is exhausted; a BOUNDED floor was granted from the run's finite floor allowance so mandatory work can close with receipts instead of terminating. When that allowance is spent, no further floor is minted.",
     });

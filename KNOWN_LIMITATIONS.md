@@ -60,8 +60,13 @@ refactor must preserve behaviour WITHOUT being obliged to preserve these gaps as
 ### Graph and convergence gaps (D29/MG-2, D31/MG-4, D32/MG-5)
 - No debt or lease BALANCE node, so six balance-to-interest edges are undeclared.
 - A `row_type: "header"` row carrying no values is minted into statement values as numeric 0.
-- The opening-debt bridge residual is order-dependent at ~1e-13 relative against a 0.01
-  tolerance — latent, but the residual is not a function of the inputs alone.
+- RESOLVED (P7.9/P7.10, completed by E9): no reported opening-debt magnitude is
+  order-dependent any more. The bridge residual, `reporting_total` and its
+  provenance replay all accumulate through `canonical_sum.mjs`; mechanism and
+  receipts in `references/order-dependence-root-cause.md`. Remaining latent
+  same-class sites inside the solver (`mandatoryRepaymentForPeriod`,
+  definition-basis sums) are declared open there — canonicalising them moves
+  certified economic signatures and needs re-certification authority.
 
 ### Test-infrastructure defects (D21, D22, D24, D25)
 - RESOLVED 2026-08-21 on `agent/mp-C-quarantine-truth`: the four frozen-cohort compiler

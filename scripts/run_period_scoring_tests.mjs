@@ -4,8 +4,9 @@
  *
  * Invariant: forecast-ownership scoring is computed and persisted PER PERIOD
  * (rank vectors on the row and on the sealed evidence, one per forecast
- * period), family scoring aggregates over ALL children (not just the
- * strongest), capture certificates seal inside the period loop, and the
+ * period), family scoring is REALISABLE — the family inherits ONE real
+ * child's whole rank vector, never a synthetic per-dimension composite (E6) —
+ * capture certificates seal inside the period loop, and the
  * recovery pass is a declared, receipt-visible code path — never an
  * environment-variable-only gate.
  *
@@ -240,11 +241,16 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-// 3. Family scoring aggregates over ALL children, not just the strongest.
-//    The strongest child only TIES the parent (stable-id rung); a sibling
-//    contributes the winning freshness dimension, so the family wins.
+// 3. E6 — the family score is REALISABLE: it IS one real child's whole rank
+//    vector, never a synthetic per-dimension composite.
+//    Part A: when the best WHOLE child substantively outranks the parent on
+//    its own evidence, the family still takes ownership (roster + deciding
+//    dimension sealed in the rejection receipt).
+//    Part B: a family whose only win was borrowing one sibling's freshness
+//    onto another sibling's method stays with the parent — that is the
+//    phantom profile this package removes.
 // ---------------------------------------------------------------------------
-function aggregateFixture() {
+function aggregateFixture(freshBestChild = false) {
   const fixture = collapseProofFixture();
   fixture.case_id = "p34_family_aggregate";
   const [parent, marketing, admin] = fixture.statement_structure.cash_flow;
@@ -266,6 +272,7 @@ function aggregateFixture() {
     value: -15 - index,
     material: true,
     note: "child broker selected",
+    ...(freshBestChild ? { as_of_date: "2026-06-30" } : {}),
   }));
   admin.forecast_period_authorities = [0, 1, 2].map((index) => ({
     method: "user_assumption",
@@ -278,12 +285,12 @@ function aggregateFixture() {
   }));
   return fixture;
 }
-const aggregateCase = aggregateFixture();
+const aggregateCase = aggregateFixture(true);
 const aggregateReceipt = resolveSelectedForecastOwnership(aggregateCase);
 assert.deepEqual(
   aggregateReceipt.resolutions.map((item) => item.selected_mode),
   ["children_owned", "children_owned", "children_owned"],
-  "the family aggregate (strongest sibling per dimension) must outrank the parent",
+  "a family whose best REAL child substantively outranks the parent must take ownership",
 );
 checks += 1;
 check(
@@ -310,23 +317,92 @@ check(
   "the parent rejection evidence must exist once per forecast period",
 );
 
-// Aggregate helper law: dimension-wise strongest over EVERY member.
-const aggregateVector = aggregateForecastFamilyRankVector([
+// E6 REPAIR PIN — the defect this law removes. Here only the WEAKER sibling
+// carries freshness; under per-dimension aggregation the family stitched
+// marketing's broker method onto admin's fresher date and overthrew the
+// parent with a profile nobody holds. Realisable scoring keeps the family
+// with its parent: the best whole child (`aaa-broker.marketing`) differs from
+// the parent only on the stable-id rung, which is not substantive evidence.
+const borrowedCase = aggregateFixture(false);
+const borrowedReceipt = resolveSelectedForecastOwnership(borrowedCase);
+assert.deepEqual(
+  borrowedReceipt.resolutions.map((item) => item.selected_mode),
+  ["parent_owned", "parent_owned", "parent_owned"],
+  "a family whose win required borrowing a sibling's dimension must not take ownership",
+);
+checks += 1;
+check(
+  borrowedReceipt.rejected_authorities.every((item) => item.row_id !== "opex_total"),
+  "an unoverthrown parent leaves no rejection evidence behind",
+);
+
+// Aggregate helper law — E6 REALISABILITY: the chosen family profile IS one
+// member's actual rank vector; provenance rides beside it, never inside it.
+const aggregateCandidates = [
   { method: "broker_consensus", source_id: "a" },
   { method: "user_assumption", source_id: "b", as_of_date: "2026-06-30", confidence: 0.4 },
   { method: "historical_average", source_id: "c", confidence: 0.9 },
-]);
+];
+const aggregateVector = aggregateForecastFamilyRankVector(aggregateCandidates);
 check(aggregateVector.aggregated_member_count === 3, "the aggregate must span all children");
 assert.deepEqual(aggregateVector.aggregated_member_stable_ids, ["a", "b", "c"]);
 checks += 1;
-check(aggregateVector.method_priority === 50, "method_priority takes the strongest member");
-check(
-  aggregateVector.freshness_timestamp ===
-    forecastAuthorityRankVector({ method: "user_assumption", source_id: "b", as_of_date: "2026-06-30" }).freshness_timestamp,
-  "freshness takes the freshest member",
+const stripProvenance = ({
+  aggregated_member_count: _count,
+  aggregated_member_stable_ids: _ids,
+  ...rank
+}) => rank;
+// The whole-vector winner here is the broker candidate "a" (strongest method):
+// the family must NOT borrow b's freshness or c's confidence on top of it.
+const wholeVectorWinner = aggregateCandidates.find(
+  (candidate) => candidate.source_id === aggregateVector.stable_id,
 );
-check(aggregateVector.confidence_score === 0.9, "confidence takes the most confident member");
+check(wholeVectorWinner?.source_id === "a", "the family inherits the strongest WHOLE child");
+assert.deepEqual(
+  stripProvenance(aggregateVector),
+  forecastAuthorityRankVector(wholeVectorWinner),
+  "the aggregate's rank dimensions must be exactly one member's actual vector",
+);
+checks += 1;
 check(aggregateForecastFamilyRankVector([]) === null, "an empty family has no aggregate score");
+
+// E6 PROPERTY TEST — for ANY candidate set, the chosen family profile equals
+// ONE member's actual vector. Deterministic pseudo-random sweep (LCG), so a
+// failure reproduces from the seed in the message.
+let propertySeed = 0x2f6e2b1;
+const nextRandom = () => {
+  propertySeed = (propertySeed * 1103515245 + 12345) % 2147483648;
+  return propertySeed / 2147483648;
+};
+const METHOD_POOL = [
+  "actual_plus_remainder", "contractual_commitment", "company_guidance",
+  "company_indication", "broker_consensus", "user_assumption",
+  "driver_formula", "roll_forward", "seasonal_run_rate", "historical_average",
+  "historical_trend", "carry_forward", "explicit_zero",
+];
+const pickFrom = (list) => list[Math.floor(nextRandom() * list.length)];
+for (let iteration = 0; iteration < 250; iteration += 1) {
+  const size = 1 + Math.floor(nextRandom() * 5);
+  const candidates = Array.from({ length: size }, (_, index) => {
+    const candidate = { method: pickFrom(METHOD_POOL), source_id: `prop.${iteration}.${index}` };
+    if (nextRandom() < 0.5) candidate.as_of_date = `20${20 + Math.floor(nextRandom() * 10)}-06-30`;
+    if (nextRandom() < 0.5) candidate.confidence = nextRandom();
+    if (nextRandom() < 0.5) candidate.completeness = nextRandom();
+    if (nextRandom() < 0.5) candidate.period_completeness = nextRandom();
+    for (const flag of ["definition_compatible", "period_compatible", "units_compatible"]) {
+      if (nextRandom() < 0.5) candidate[flag] = nextRandom() < 0.5;
+    }
+    return candidate;
+  });
+  const aggregate = aggregateForecastFamilyRankVector(candidates);
+  check(
+    candidates.some((candidate) => {
+      const vector = forecastAuthorityRankVector(candidate);
+      return Object.keys(vector).every((key) => aggregate[key] === vector[key]);
+    }),
+    `family profile must be realisable (seed ${0x2f6e2b1}, iteration ${iteration})`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 4. Uniform winners stay a strict no-op of the certified behavior: full

@@ -1,4 +1,5 @@
 import { assertCanonicalDebtClass } from "./debt_class.mjs";
+import { canonicalSum } from "./canonical_sum.mjs";
 import { leaseForecast } from "./lease_policy.mjs";
 import {
   OPENING_INSTRUMENT_PROVENANCE_SCHEMA_VERSION,
@@ -468,9 +469,12 @@ export function compileOpeningInstrumentState(modelCase) {
     rows,
     reporting_total:
       errors.length === 0
-        ? rows
-            .filter((row) => row.include_in_gross_debt)
-            .reduce((total, row) => total + row.reporting_amount, 0)
+        ? canonicalSum(
+            rows
+              .filter((row) => row.include_in_gross_debt)
+              .map((row) => row.reporting_amount),
+            "opening instrument reporting_amount",
+          )
         : null,
     errors,
     source_inventory: inventory(asOf),
