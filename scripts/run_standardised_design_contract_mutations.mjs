@@ -1,9 +1,15 @@
-import path from "node:path";
-import { pathToFileURL } from "node:url";
+import assert from "node:assert/strict";
+
+import { createRunner } from "./lib/test_harness.mjs";
 import {
   loadPinnedInputs,
   validateContractObject,
 } from "./validate_standardised_design_contract.mjs";
+
+const run = createRunner({
+  name: "standardised_design_contract_mutations",
+  importMetaUrl: import.meta.url,
+});
 
 function clone(value) {
   return structuredClone(value);
@@ -161,21 +167,22 @@ function main() {
       visited: result.visited,
     };
   });
+  for (const result of results) {
+    run.check(`mutation ${result.mutation} is caught (${result.expected})`, () => {
+      assert.ok(
+        result.caught,
+        `${result.mutation} was accepted; expected finding ${result.expected}`,
+      );
+      return true;
+    });
+  }
   const caught = results.filter((result) => result.caught).length;
-  const report = {
-    status: caught === mutations.length ? "PASS" : "FAIL",
+  run.finish({
     caught,
     total: mutations.length,
     vacuous: results.filter((result) => result.visited === 0).length,
     results,
-  };
-  console.log(JSON.stringify(report, null, 2));
-  process.exit(report.status === "PASS" ? 0 : 1);
+  });
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
-) {
-  main();
-}
+main();

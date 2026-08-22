@@ -10,6 +10,7 @@ import process from "node:process";
 
 import { proposeCaseSource } from "./lib/case_source_proposer.mjs";
 import { compileCase } from "./lib/case_compiler.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
 const [filingsResponseArg, sourceDumpArg, expectationsArg] = process.argv.slice(2);
 if (!filingsResponseArg || !sourceDumpArg || !expectationsArg) {
@@ -19,6 +20,13 @@ if (!filingsResponseArg || !sourceDumpArg || !expectationsArg) {
     "<run-scoped-real-filing-expectations.json>",
   );
 }
+
+// Harness plumbing joins after the bare-usage contract above so an argument
+// error keeps its original uncaught-throw shape on stderr.
+const run = createRunner({
+  name: "real_statement_outcome_regression",
+  importMetaUrl: import.meta.url,
+});
 const filingsResponse = JSON.parse(await fs.readFile(path.resolve(filingsResponseArg), "utf8"));
 const sourceDump = JSON.parse(await fs.readFile(path.resolve(sourceDumpArg), "utf8"));
 const expectations = JSON.parse(await fs.readFile(path.resolve(expectationsArg), "utf8"));
