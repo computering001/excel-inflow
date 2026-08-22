@@ -35,9 +35,9 @@
     "principal_path_spot_checks": "Principal paths for every work package were checked at the implementation commit via git cat-file; all resolved except RELEASE_NOTES.md, which was added by the map-bearing commit listed under work package 8 (consistent with that package's commit list)."
   },
   "attestation_consumability": {
-    "consumer_scan": "No repository script currently reads audit/v379/commit-to-finding-map.json or any D52 closure ledger (scanned *.mjs for 'commit-to-finding-map', 'closure-ledger', 'D52'; sole hit is a governance mutation string naming workflow job '11 - All-needs exact-head D52 attestation').",
-    "workflow_job": ".github/workflows/read-only-development-gate.yml job 'final-aggregate' compiles the all-needs exact-head D52 attestation solely from raw CI job receipts via scripts/compile_exact_head_ci_job_receipt.mjs and scripts/compile_external_ci_evidence.mjs; it does not consume this ledger, so no schema coupling applies.",
-    "shape_contract": "This ledger is therefore free-standing v1: schema_version, generated_at, per-finding entries, and summary counts closed/custody-deferred/open that always sum to total. A future validator can enforce exactly these invariants without code changes; wiring the ledger into compile_external_ci_evidence.mjs would be a code-side change outside this closure pass's file ownership."
+    "consumer_scan": "scripts/compile_external_ci_evidence.mjs reads this ledger through scripts/lib/external_ci_evidence.mjs when compiling the final release-candidate attestation; the default path is audit/v379/d52-closure-ledger.json and an explicit --d52-closure-ledger path is also supported.",
+    "workflow_job": ".github/workflows/read-only-development-gate.yml job 'final-aggregate' (display name '12 - All-needs exact-head D52 attestation') compiles the exact-head release-candidate attestation from the ten prerequisite CI receipt families and this committed ledger's validated digest and summary counts.",
+    "shape_contract": "This v1 ledger is a live attestation input. scripts/lib/external_ci_evidence.mjs validates schema_version, unique finding ids, the closed/custody-deferred/open vocabulary, commit and proof-suite shapes, and summary counts; the final attestation binds the ledger SHA-256 and counts."
   },
   "findings": [
     {

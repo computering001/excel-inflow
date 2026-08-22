@@ -9,7 +9,7 @@
 
 - **Ledger:** [`audit/v379/d52-closure-ledger.json`](./d52-closure-ledger.json) (`excel-inflow-d52-closure-ledger/1.0`)
 - **Source map:** [`audit/v379/commit-to-finding-map.json`](./commit-to-finding-map.json) (`excel-inflow-commit-to-finding-map/1.0`)
-- **Ledger SHA-256:** `eff1f1e968dc47b7b8a71df967bf5c1a1174e712e6413b2c3ec3328808d3a5f5`
+- **Ledger SHA-256:** `7b7d60fec62ef67017a3e997d6746b681852c6e0d1ed5dfdcf3b152822a37ee7`
 - **Ledger generated at:** `2026-08-21T13:42:08Z`
 
 ## Result
