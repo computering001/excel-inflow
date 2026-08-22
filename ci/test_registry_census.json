@@ -9,7 +9,7 @@
     "by_audit_class": {
       "component_integration": 70,
       "cross_layer_integration": 111,
-      "independent_economic_oracle": 5,
+      "independent_economic_oracle": 9,
       "installed_host": 1,
       "real_corpus": 7,
       "unit": 48,
@@ -21,7 +21,7 @@
       "evidence-authority": 49,
       "finance-schedule": 22,
       "forecast-authority": 22,
-      "release-proof": 62,
+      "release-proof": 66,
       "runtime-governance": 38,
       "runtime-performance": 24,
       "semantic-constitution": 14,
@@ -29,10 +29,10 @@
     },
     "by_profile": {
       "custody": 13,
-      "portable": 230
+      "portable": 234
     },
     "self_confirmation_risk": {
-      "false": 14,
+      "false": 18,
       "true": 229
     }
   },
@@ -3438,12 +3438,68 @@
       "phase": "evidence",
       "profile": "portable",
       "self_confirmation_risk": true
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "invariant-fx-positivity",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "invariant-debt-continuity",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "invariant-typed-unresolved",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": false
+    },
+    {
+      "audit_class": "independent_economic_oracle",
+      "declared_test_class": "independent_economic_oracle",
+      "expected_exit_contract": {
+        "BLOCKED": 1,
+        "FAIL": 1,
+        "PASS": 0
+      },
+      "id": "invariant-cash-flow-articulation",
+      "owner": "release-proof",
+      "phase": "proof",
+      "profile": "portable",
+      "self_confirmation_risk": false
     }
   ],
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "a5afa127826c80eebed1f4518790bb10626f536dfb937c6db81180a64d29af83",
-    "test_count": 243
+    "sha256": "3f365637f8ca249a143fa786bd55743051f3a08b2f2b931889846e8e9b4fbf1b",
+    "test_count": 247
   },
   "schema_version": "development-test-classification-census/1.0"
 }

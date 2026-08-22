@@ -2823,6 +2823,42 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
+    },
+    {
+      "id": "invariant-fx-positivity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_fx_positivity_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-debt-continuity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_debt_continuity_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-typed-unresolved",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_typed_unresolved_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "invariant-cash-flow-articulation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_invariant_cash_flow_articulation_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     }
   ]
 }
