@@ -4429,19 +4429,14 @@ function configureOperatingModel(
             ...ordinaryValues.slice(3),
           ]
         : ordinaryValues;
-    // The revolver legs exist only where the forecast waterfall exists. A
-    // history with no sourced draw or repayment has nothing to calculate —
-    // the cells are structurally empty and render grey-blank, never as
-    // white dash-zeros pretending a schedule ran in a year it did not.
+    // The row-plan compiler types a legacy empty-SUM revolver shell as
+    // not_applicable.  That explicit authority, rather than a numeric-zero
+    // heuristic, owns the grey-blank presentation: a sourced zero remains a
+    // genuine historical observation and a non-zero period is never erased.
     const structurallyEmptyHistory =
       presentationEpoch() >= 3 &&
       ["rcf_draw", "rcf_repayment"].includes(definition.semantic_role) &&
-      ![0, 1, 2].some(
-        (index) =>
-          values[index] !== null &&
-          values[index] !== undefined &&
-          Math.abs(Number(values[index])) > 1e-9,
-      );
+      definition.historical_authority === "not_applicable";
     for (let index = 0; index < 3; index += 1) {
       const column = HISTORICAL_COLUMNS[index];
       if (structurallyEmptyHistory) continue;
