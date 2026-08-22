@@ -26,9 +26,9 @@
       "target_owner": "Workbook planner + emitter (Phase 5); late rewrites become plan-time facts"
     },
     "compile_skill_release.mjs": {
-      "count": 6,
+      "count": 7,
       "families": {
-        "terminal_status": 1,
+        "terminal_status": 2,
         "release_identity": 5
       },
       "classification": "canonical_writer",

@@ -378,6 +378,52 @@ const explicitPrivateScriptRoots = deploymentProfile.script_private_roots ?? [];
 if (!Array.isArray(explicitPrivateScriptRoots)) {
   throw new Error("deployment-profile.json script_private_roots must be an array.");
 }
+const developmentTestProfile = deploymentProfile.development_test_profile ?? null;
+if (
+  !developmentTestProfile ||
+  developmentTestProfile.source_only !== true ||
+  !Array.isArray(developmentTestProfile.entry_points) ||
+  developmentTestProfile.entry_points.length === 0 ||
+  !Array.isArray(developmentTestProfile.excluded_members) ||
+  developmentTestProfile.excluded_members.length === 0
+) {
+  throw new Error(
+    "deployment-profile.json must declare a non-empty source-only development_test_profile with entry_points and excluded_members.",
+  );
+}
+const developmentTestEntryPoints = developmentTestProfile.entry_points.map(posix);
+const deploymentExcludedMembers = developmentTestProfile.excluded_members.map(posix);
+if (new Set(developmentTestEntryPoints).size !== developmentTestEntryPoints.length) {
+  throw new Error("development_test_profile.entry_points contains duplicates.");
+}
+if (new Set(deploymentExcludedMembers).size !== deploymentExcludedMembers.length) {
+  throw new Error("development_test_profile.excluded_members contains duplicates.");
+}
+for (const entry of developmentTestEntryPoints) {
+  if (entryPoints.includes(entry) || explicitPrivateScriptRoots.includes(entry)) {
+    throw new Error(`Development-only entry point ${entry} is also a deployment closure root.`);
+  }
+  if (!(await exists(path.join(scriptsDir, ...entry.split("/"))))) {
+    throw new Error(`development_test_profile names missing source entry point scripts/${entry}.`);
+  }
+  if (!deploymentExcludedMembers.includes(`scripts/${entry}`)) {
+    throw new Error(`Development-only entry point scripts/${entry} is absent from excluded_members.`);
+  }
+}
+if (!deploymentExcludedMembers.includes("scripts/lib/test_harness.mjs")) {
+  throw new Error(
+    "development_test_profile.excluded_members must explicitly forbid scripts/lib/test_harness.mjs.",
+  );
+}
+
+function assertDeploymentMembersExcluded(memberNames, label) {
+  const present = deploymentExcludedMembers.filter((member) => memberNames.includes(member));
+  if (present.length > 0) {
+    throw new Error(
+      `${label} contains source-only development/test members: ${present.join(", ")}`,
+    );
+  }
+}
 
 const pythonEntryPoints = requireList("python_entry_points").map(posix);
 const declaredPythonModules = requireList("python_module_allowlist").map(posix);
@@ -645,6 +691,10 @@ for (const entry of scriptClosureRoots) {
 }
 
 const computedScripts = [...closureScripts].sort();
+assertDeploymentMembersExcluded(
+  computedScripts.map((name) => `scripts/${name}`),
+  "Production JavaScript closure",
+);
 const missingFromProfile = computedScripts.filter((name) => !declaredScripts.includes(name));
 const extraInProfile = declaredScripts.filter((name) => !computedScripts.includes(name));
 
@@ -1893,6 +1943,11 @@ for (const name of [...declaredResources].sort()) {
   files.push(await writeReleaseFile(outputDir, path.join(...name.split("/")), contents));
 }
 
+assertDeploymentMembersExcluded(
+  files.map((file) => file.path),
+  "Emitted deployment package",
+);
+
 const vendorRecords = [];
 for (const dependency of vendoredDependencies) {
   if (posix(dependency.source) !== posix(dependency.install_path)) {
@@ -2525,6 +2580,13 @@ const manifest = {
       .map((edge) => `scripts/${edge.from} -> scripts/${edge.to}`)
       .sort(),
   },
+  developmentTestProfile: {
+    sourceOnly: true,
+    entryPoints: developmentTestEntryPoints.map((name) => `scripts/${name}`),
+    excludedMembers: deploymentExcludedMembers,
+    productionClosureAssertion: "PASS",
+    emittedPackageAssertion: "PASS",
+  },
   pythonClosure: {
     method: "ast walk of import / from-import, relative levels resolved; never a regex",
     interpreter: {
@@ -2600,10 +2662,19 @@ if (attestNow) {
   // development or certification attestation is read-only over packageRoot
   // and every output is forced outside it.
   const sealedInventory = await completePackageInventoryIdentity(outputDir);
-  const archive = await createDeterministicPackageArchive({
+  assertDeploymentMembersExcluded(
+    Object.keys(sealedInventory.files),
+    "Sealed complete-package inventory",
+  );
+  const archiveResult = await createDeterministicPackageArchive({
     packageRoot: outputDir,
     archivePath: archiveOutputPath,
   });
+  const { members: archiveMembers, ...archive } = archiveResult;
+  assertDeploymentMembersExcluded(
+    archiveMembers,
+    "Deterministic package archive",
+  );
   const attestation = await buildReleasePackageAttestation({
     packageRoot: outputDir,
     archive,
@@ -2642,6 +2713,11 @@ if (attestNow) {
       complete_package_inventory_sha256: sealedInventory.sha256,
       archive: archiveOutputPath,
       archive_sha256: archive.sha256,
+      excluded_member_assertion: {
+        status: "PASS",
+        forbidden_members: deploymentExcludedMembers.length,
+        archive_members: archiveMembers.length,
+      },
       package_mode: packageMode,
       certification_tier: certificationTierContract?.tier ?? null,
       input_bindings_sha256: inputBindings.sha256,

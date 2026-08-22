@@ -141,6 +141,27 @@ try {
   );
   mutations.push("runtime_member_traversal");
 
+  const forbiddenTestMember = await cloneSkill("forbidden-test-member");
+  await mutateJson(
+    path.join(forbiddenTestMember, "assets", "deployment-profile.json"),
+    (profile) => {
+      profile.script_private_roots.push("lib/test_harness.mjs");
+      profile.script_allowlist.push("lib/test_harness.mjs");
+    },
+  );
+  const forbiddenTestMemberResult = await compile(
+    forbiddenTestMember,
+    "forbidden-test-member",
+  );
+  check(
+    forbiddenTestMemberResult.code !== 0 &&
+      /Production JavaScript closure contains source-only development\/test members: scripts\/lib\/test_harness\.mjs/.test(
+        forbiddenTestMemberResult.stderr,
+      ),
+    "source-only test harness was admitted to the deployment closure",
+  );
+  mutations.push("source_only_test_member");
+
   const missingSchema = await cloneSkill("missing-schema-ref");
   await mutateJson(
     path.join(missingSchema, "assets", "installed-capability-receipt-v1.3.schema.json"),
@@ -172,6 +193,7 @@ try {
     "missing_external_schema_ref",
     "missing_markdown_reference",
     "runtime_member_traversal",
+    "source_only_test_member",
   ];
   check(
     JSON.stringify([...mutations].sort()) === JSON.stringify(expectedMutations),

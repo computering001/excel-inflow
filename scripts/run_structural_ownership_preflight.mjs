@@ -8,13 +8,8 @@ import {
   compileStructuralOwnershipPreflight,
   verifyStructuralOwnershipPreflight,
 } from "./lib/forecast_ownership_resolver.mjs";
-import { createRunner } from "./lib/test_harness.mjs";
 
-const run = createRunner({
-  name: "structural_ownership_preflight",
-  importMetaUrl: import.meta.url,
-});
-const { argv } = run.runCli();
+const argv = process.argv.slice(2);
 
 function parseArgs(argv) {
   const positional = [];

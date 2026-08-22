@@ -3,6 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import {
   brokerIntakeRuntimeClosure,
@@ -11,10 +12,9 @@ import {
 } from "./lib/broker_intake_choice.mjs";
 import { renderBrokerIntakeScreen } from "./lib/flow_screens.mjs";
 import { assertWorkflowState } from "./lib/workflow_state.mjs";
-import { createRunner } from "./lib/test_harness.mjs";
 
-const run = createRunner({ name: "broker_intake", importMetaUrl: import.meta.url });
-const { argv } = run.runCli();
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const argv = process.argv.slice(2);
 
 function parseArgs(argv) {
   const positional = [];
@@ -48,7 +48,7 @@ async function main() {
   const requestPath = path.resolve(positional[0]);
   const outputRoot = path.resolve(String(options.out));
   const request = JSON.parse(await fs.readFile(requestPath, "utf8"));
-  const runtimeClosureSha256 = await brokerIntakeRuntimeClosure(run.ROOT);
+  const runtimeClosureSha256 = await brokerIntakeRuntimeClosure(ROOT);
   const compiled = await compileBrokerIntakeChoice(request, {
     baseDirectory: path.dirname(requestPath),
     runtimeClosureSha256,
