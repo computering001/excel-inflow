@@ -99,6 +99,7 @@ async function buildPackage(mode = "development") {
   });
   await writeJson(path.join(packageRoot, "assets", "runtime-manifest.json"), {
     skill_version: "phase3-fixture", status: "compiled_fixture", package_mode: mode,
+    release_channel: "stable",
     deployment_status: "not_installed",
   });
   const closure = (await captureRuntimeIntegrity(packageRoot)).runtime_code_closure.sha256;
