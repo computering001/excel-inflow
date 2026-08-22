@@ -182,8 +182,9 @@
       "target_owner": "Evidence IR (Phase 1)"
     },
     "lib/evidence_work_graph.mjs": {
-      "count": 1,
+      "count": 4,
       "families": {
+        "terminal_status": 3,
         "release_identity": 1
       },
       "classification": "canonical_writer",
