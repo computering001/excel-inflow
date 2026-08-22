@@ -549,6 +549,25 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
     "FORECAST_WATERFALL",
   );
   const zeroAuthorityModelCase = clone(modelCase);
+  zeroAuthorityModelCase.broker_pack = {
+    metrics: {
+      revenue: {
+        brokers: {
+          "Stale House A": [100, 110, 120],
+          "Stale House B": [102, 112, 122],
+        },
+      },
+    },
+  };
+  sealCaseMemberships(zeroAuthorityModelCase);
+  assert(
+    resolveBrokerForecastSelection(
+      zeroAuthorityModelCase,
+      "revenue",
+      0,
+    ).value === 101,
+    "negative control did not expose the stale selectable broker values",
+  );
   applyBrokerPreviewSelection(
     zeroAuthorityModelCase,
     zeroAuthorityPreview,
@@ -560,6 +579,14 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
       zeroAuthorityModelCase.statement_structure.income_statement[0]
         .forecast_treatment !== "broker",
     "zero-broker selection erased the rejected metric evidence binding or left it as live authority",
+  );
+  assert(
+    resolveBrokerForecastSelection(
+      zeroAuthorityModelCase,
+      "revenue",
+      0,
+    ).value === null,
+    "zero-broker transition left stale pack values selectable",
   );
   assert(
     resolveBrokerForecastSelection(modelCase, "revenue", 0).value === null,

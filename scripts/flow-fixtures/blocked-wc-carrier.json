@@ -1,0 +1,75 @@
+{
+  "fixture_id": "blocked-wc-carrier",
+  "mode": "flow",
+  "extends": "no-questions",
+  "description": "Sanitised incident-derived carrier: the material working-capital row has no usable historical series, validates while provisional broker authority exists, then becomes internally blocked when the broker fallback removes that unsupported authority. No dividend input is changed.",
+  "case_patch": {
+    "operating_metrics": {
+      "change_in_working_capital": {
+        "values": [null, null, null, null, null, null]
+      }
+    }
+  },
+  "statement_row_patch": {
+    "cash_flow": {
+      "change_in_working_capital": {
+        "row_type": "uncalculated",
+        "values": [null, null, null, null, null, null],
+        "semantic_role": "change_in_working_capital",
+        "broker_metric_id": "change_in_working_capital"
+      },
+      "cash_generated_from_operations": {
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_flow_profit_before_tax",
+            "cash_flow_da",
+            "finance_costs_net_addback"
+          ]
+        }
+      }
+    }
+  },
+  "case_source_statement_patch": {
+    "income_statement": {
+      "is.revenue": {
+        "forecast_derive_as": {
+          "operator": "prior_period",
+          "refs": ["revenue"]
+        }
+      }
+    },
+    "cash_flow": {
+      "cf.change_in_working_capital": {
+        "row_id": "change_in_working_capital",
+        "role": "change_in_working_capital",
+        "broker_metric_id": "change_in_working_capital",
+        "parent_source_line_id": null
+      },
+      "cf.capex": {
+        "row_id": "capex",
+        "role": "capex",
+        "broker_metric_id": "capex"
+      },
+      "cf.dividends": {
+        "forecast_derive_as": {
+          "operator": "prior_period",
+          "refs": ["dividends"]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "NEEDS_INTERNAL_WORK",
+    "stage": "decisions",
+    "outcome": "forecast_plan_blocked",
+    "reason_code": "forecast_plan_blocked",
+    "blocker_class": "INTERNAL_WORK",
+    "user_blocking": false,
+    "blocked_state_ids": [
+      "cash_flow.change_in_working_capital.fy1",
+      "cash_flow.change_in_working_capital.fy2",
+      "cash_flow.change_in_working_capital.fy3"
+    ]
+  }
+}

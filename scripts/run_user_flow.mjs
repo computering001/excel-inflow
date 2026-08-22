@@ -2130,6 +2130,10 @@ async function main() {
         forecastPlanPath,
         `${renderForecastPlanScreen(planningCase, forecastPlan)}\n`,
       );
+      const carrier = await persistCurrentCarrier("AWAITING_DECISIONS", {
+        forecast_plan: forecastPlanJsonPath,
+        forecast_plan_status: forecastPlanStatusPath,
+      });
       return finish({
         runDir,
         // Internal capability debt is not rendered as a user decision screen.
@@ -2147,6 +2151,7 @@ async function main() {
           reason_code: "forecast_plan_blocked",
           blocker_class: "INTERNAL_WORK",
           message,
+          carrier: carrier.path,
           forecast_plan: forecastPlanJsonPath,
           forecast_plan_status: forecastPlanStatusPath,
           reused_stages: reusedStages,
