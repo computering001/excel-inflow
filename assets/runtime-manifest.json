@@ -19,7 +19,7 @@
     "visual_review",
     "installed_fresh_session_test"
   ],
-  "certified_runtime_code_closure_sha256": "f5346880117e28cf6d3e1c6d05cf8c9145e7f35df635394e0ffc7cd937e63072",
+  "certified_runtime_code_closure_sha256": "5ecbfc81b6078de2b2dd6f9a04a540795d15dfa6d42ced227e3edaf234967134",
   "certified_runtime_code_closure": {
     "definition": "certified-runtime-code-closure/1.1",
     "roots": "assets/deployment-profile.json#/(script_entry_points+script_private_roots+*-runtime-members.json JavaScript roots)",
