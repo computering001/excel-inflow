@@ -416,13 +416,17 @@ export function resolveSelectedForecastOwnership(modelCase) {
         // the material family is COMPLETE (no absent member) — that is the
         // completeness half of the constitution, enforced above — and the
         // FAMILY AGGREGATE over ALL direct material children substantively
-        // outranks the parent. The aggregate takes each rank dimension from
-        // the family's strongest evidence for that dimension, so a complete
-        // child set competes with its combined strength — never just its
-        // single strongest member — while weaker-but-present siblings still
-        // cannot drag a lawful family below its strongest child (the sealed
-        // contract shape where strong FY1 company evidence owns a complete
-        // child set whose siblings carry weaker-but-present authorities).
+        // outranks the parent. E6 REALISABILITY LAW: the aggregate IS one
+        // real child's whole rank vector (the best member by
+        // compareForecastRankVectors, provenance retained), so a family wins
+        // only with a profile at least one child actually holds — it can no
+        // longer stitch one sibling's method priority onto another sibling's
+        // freshness date and beat the parent with a composite nobody offers.
+        // A complete child set therefore competes exactly as strongly as its
+        // strongest single member, while weaker-but-present siblings still
+        // cannot drag that member below its own vector (the sealed contract
+        // shape where strong FY1 company evidence owns a complete child set
+        // whose siblings carry weaker-but-present authorities).
         const familyAggregate = aggregateForecastFamilyRankVector(
           materialChildStates
             .filter(({ owner_class }) => owner_class === "direct")

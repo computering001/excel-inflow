@@ -166,30 +166,28 @@ export function forecastRankVectorDecidingDimension(winner, rejected) {
 }
 
 /**
- * Family-level aggregate rank vector over ALL independent child candidates,
- * not just the strongest one. Each dimension takes the family's strongest
- * evidence for that dimension (method_priority: lowest number wins; every
- * other dimension: highest wins), so the family competes with the combined
- * strength of its complete child set. The stable identifier is the
- * lexicographically strongest member's, and the member roster is carried so
- * the persisted score proves the aggregation spanned every child.
+ * Family-level aggregate rank vector over ALL independent child candidates.
+ *
+ * E6 — REALISABILITY LAW. The family competes as ONE REAL CHILD, never as a
+ * synthetic composite. The earlier implementation took each dimension from the
+ * family's strongest evidence for that dimension (method_priority: lowest;
+ * everything else: highest), which manufactures a profile NO single child
+ * satisfies — a broker method borrowed from one sibling wearing a freshness
+ * date only another sibling carries — and then let that phantom beat the
+ * parent in the ownership resolver. Here the family inherits exactly the best
+ * WHOLE child vector by compareForecastRankVectors, so every dimension the
+ * family offers is simultaneously held by the member whose stable_id it names.
+ * `aggregated_member_count` / `aggregated_member_stable_ids` are retained for
+ * provenance so a persisted score still proves how many children were spanned;
+ * they sit beside, never inside, the realisable rank dimensions.
  */
 export function aggregateForecastFamilyRankVector(candidates) {
   const members = (candidates ?? []).filter(Boolean);
   if (members.length === 0) return null;
   const vectors = members.map(forecastAuthorityRankVector);
   const strongest = [...vectors].sort(compareForecastRankVectors)[0];
-  const best = (dimension, reducer) =>
-    vectors.map((vector) => Number(vector[dimension] ?? 0)).reduce(reducer);
   return {
-    method_priority: best("method_priority", (a, b) => Math.min(a, b)),
-    definition_score: best("definition_score", (a, b) => Math.max(a, b)),
-    period_score: best("period_score", (a, b) => Math.max(a, b)),
-    units_score: best("units_score", (a, b) => Math.max(a, b)),
-    freshness_timestamp: best("freshness_timestamp", (a, b) => Math.max(a, b)),
-    confidence_score: best("confidence_score", (a, b) => Math.max(a, b)),
-    completeness_score: best("completeness_score", (a, b) => Math.max(a, b)),
-    stable_id: strongest.stable_id,
+    ...strongest,
     aggregated_member_count: vectors.length,
     aggregated_member_stable_ids: vectors.map((vector) => vector.stable_id).sort(),
   };
