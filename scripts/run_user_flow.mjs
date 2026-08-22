@@ -62,9 +62,13 @@ import {
 // The REVIEW gate: the display-only pause between BUILD AND CHECKS and
 // DELIVERY, plus the plain-language translation of its change requests.
 import {
-  compileReviewBriefing,
+  REVIEW_CHANGE_REPLY,
+  recordUserReviewReceipt,
   resolveReviewReply,
   reviewQualityFrom,
+  ReviewSealRefusal,
+  REVIEW_DELIVER_REPLY,
+  sealReviewBriefing,
 } from "./lib/flow_review.mjs";
 import {
   classifyChangeComplaint,
@@ -2499,51 +2503,95 @@ async function main() {
           ? true
           : null,
   });
-  if (reviewReply.mode !== "deliver") {
-    const reviewDir = path.join(runDir, "stages", "review");
-    await fs.mkdir(reviewDir, { recursive: true });
-    let reviewBrokerPreview = brokerPreview;
-    if (!reviewBrokerPreview) {
-      try {
-        reviewBrokerPreview = await readJson(brokerPreviewPath, "Broker preview");
-      } catch {
-        reviewBrokerPreview = null;
-      }
+  // SEALED BRIEFING, VERIFIED AT REPLY TIME. Every arrival at the gate —
+  // pausing, delivering, or requesting a change — renders the briefing from
+  // the artifacts Build persisted (stages/build_checks/build-result.json and
+  // the workbook's solution sidecar) and re-verifies the seal against those
+  // bytes as they are now. A build result edited after the briefing was
+  // sealed is a refusal: the gate never re-solves the case to look past it.
+  const reviewDir = path.join(runDir, "stages", "review");
+  await fs.mkdir(reviewDir, { recursive: true });
+  let reviewBrokerPreview = brokerPreview;
+  if (!reviewBrokerPreview) {
+    try {
+      reviewBrokerPreview = await readJson(brokerPreviewPath, "Broker preview");
+    } catch {
+      reviewBrokerPreview = null;
     }
-    const reviewBriefing = compileReviewBriefing({
+  }
+  let sealedReview;
+  try {
+    sealedReview = await sealReviewBriefing({
+      runDir,
+      workbookPath: workbook,
       modelCase: await readJson(answeredCasePath, "Compiled decision case"),
       quality: reviewQualityFrom({ brokerPreview: reviewBrokerPreview }),
     });
-    const reviewScreen = renderReviewGateScreen(reviewBriefing);
+  } catch (error) {
+    if (!(error instanceof ReviewSealRefusal)) throw error;
+    const refusalScreen = renderFailure({
+      stage: "build_checks",
+      what_failed:
+        "The review gate refuses to brief from, or take a reply against, the recorded build artifacts.",
+      why: error.message,
+      what_would_fix_it: [
+        "Re-run the build stage so stages/build_checks/build-result.json and the workbook's solution sidecar are exactly what this run sealed.",
+        "Never repair the gate by editing a recorded artifact or by recomputing the numbers — the briefing must stay byte-identical to what Build checked in.",
+      ],
+    });
     await writeTextAtomic(
       path.join(reviewDir, "review-gate.txt"),
-      `${reviewScreen}\n`,
+      `${refusalScreen}\n`,
     );
-    if (reviewReply.mode === "blocked") {
-      const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
+    return finish({
+      runDir,
+      screen: refusalScreen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "PAUSED",
+        stage: "build_checks",
+        next_stage: null,
+        awaiting: "review_seal_refusal",
+        message: error.message,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+  const reviewBriefing = sealedReview.briefing;
+  const reviewScreen = renderReviewGateScreen(reviewBriefing);
+  await writeTextAtomic(
+    path.join(reviewDir, "review-gate.txt"),
+    `${reviewScreen}\n`,
+  );
+  if (reviewReply.mode === "blocked") {
+    const carrier = await persistCurrentCarrier("READY_FOR_DELIVERY", {
+      model_case: answeredCasePath,
+      workbook,
+    });
+    return finish({
+      runDir,
+      screen: reviewScreen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "PAUSED",
+        stage: "build_checks",
+        next_stage: nextStageId("build_checks"),
+        awaiting: "review_gate_reply",
+        message:
+          'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
+        carrier: carrier.path,
         model_case: answeredCasePath,
-        workbook,
-      });
-      return finish({
-        runDir,
-        screen: reviewScreen,
-        machine: options.json === true,
-        result: {
-          schema_version: "user-flow-run/1.0",
-          controller_version: FLOW_CONTROLLER_VERSION,
-          run_id: runId,
-          status: "PAUSED",
-          stage: "build_checks",
-          next_stage: nextStageId("build_checks"),
-          awaiting: "review_gate_reply",
-          message:
-            'The review gate is waiting for one reply: --review-deliver, or --review-change "<what to change>".',
-          carrier: carrier.path,
-          model_case: answeredCasePath,
-          reused_stages: reusedStages,
-        },
-      });
-    }
+        reused_stages: reusedStages,
+      },
+    });
+  }
+  if (reviewReply.mode === "change") {
     const reviewClassification = classifyChangeComplaint(reviewReply.complaint);
     const reviewChangeRecord = {
       schema_version: "flow-review-change/1.0",
@@ -2560,6 +2608,15 @@ async function main() {
       path.join(reviewDir, "review-change.json"),
       reviewChangeRecord,
     );
+    // The user's reply is evidence in its own right: one receipt per reply,
+    // chained to the previous receipt this run recorded, bound to the exact
+    // sealed briefing it was made against.
+    await recordUserReviewReceipt({
+      runDir,
+      reply: REVIEW_CHANGE_REPLY,
+      changeClass: reviewChangeRecord.change_types,
+      seal: sealedReview.seal,
+    });
     return finish({
       runDir,
       screen: reviewScreen,
@@ -2577,6 +2634,13 @@ async function main() {
       },
     });
   }
+  // The deliver reply: receipted against the sealed briefing, then the run
+  // continues into the ordinary delivery stage unchanged.
+  await recordUserReviewReceipt({
+    runDir,
+    reply: REVIEW_DELIVER_REPLY,
+    seal: sealedReview.seal,
+  });
 
   // The chat host is not an authority. Before Stage 5 can expose any workbook,
   // independently bind the exact file to this controller, its Stage-4 receipt,

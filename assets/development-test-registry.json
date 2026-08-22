@@ -681,6 +681,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "review-sealing-contracts",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_review_sealing_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "critical-invariant-independent-oracle-matrix",
       "phase": "proof",
       "runtime": "python",
