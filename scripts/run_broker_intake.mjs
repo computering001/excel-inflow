@@ -3,7 +3,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
 import {
   brokerIntakeRuntimeClosure,
@@ -12,8 +11,10 @@ import {
 } from "./lib/broker_intake_choice.mjs";
 import { renderBrokerIntakeScreen } from "./lib/flow_screens.mjs";
 import { assertWorkflowState } from "./lib/workflow_state.mjs";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const run = createRunner({ name: "broker_intake", importMetaUrl: import.meta.url });
+const { argv } = run.runCli();
 
 function parseArgs(argv) {
   const positional = [];
@@ -40,14 +41,14 @@ async function atomicWrite(target, value) {
 }
 
 async function main() {
-  const { positional, options } = parseArgs(process.argv.slice(2));
+  const { positional, options } = parseArgs(argv);
   if (!positional[0] || !options.out) {
     throw new Error("Usage: run_broker_intake.mjs <broker-intake-request.json> --out <folder> [--json]");
   }
   const requestPath = path.resolve(positional[0]);
   const outputRoot = path.resolve(String(options.out));
   const request = JSON.parse(await fs.readFile(requestPath, "utf8"));
-  const runtimeClosureSha256 = await brokerIntakeRuntimeClosure(SKILL_ROOT);
+  const runtimeClosureSha256 = await brokerIntakeRuntimeClosure(run.ROOT);
   const compiled = await compileBrokerIntakeChoice(request, {
     baseDirectory: path.dirname(requestPath),
     runtimeClosureSha256,
