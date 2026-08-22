@@ -83,6 +83,38 @@ refactor must preserve behaviour WITHOUT being obliged to preserve these gaps as
   definition-basis sums) are declared open there — canonicalising them moves
   certified economic signatures and needs re-certification authority.
 
+### Convergence scale envelope (P4.9, disclosed by E6b)
+- The fixed-point convergence criterion is scale-free only INSIDE a declared
+  envelope: `tolerance(state) = min(max(rho*S, nu(state)), ceiling)` with
+  `S` the L-infinity magnitude of the iteration state vector,
+  `rho = absolute_tolerance / 1e3`, `nu` the derived IEEE754 float-noise floor
+  (safety factor 4), and `ceiling = policy.solver.absolute_tolerance` (1e-8).
+- The reference magnitude is CALIBRATED at `1e3` reporting units
+  (`REFERENCE_STATE_MAGNITUDE`, `scripts/lib/solver.mjs`): it is the coarsest
+  power of ten that reproduces the retired absolute tolerance at the scale the
+  repository's own certified fixtures solve at, so not one emitted number
+  moves on either side of the repair; below 1e3 the relative criterion is
+  strictly STRICTER than the retired constant, which is the point.
+- BEYOND S = 1e3 the criterion would become looser than `absolute_tolerance`,
+  which three sealed readers refuse
+  (`fixed_point_constitution.mjs`, `release_nodes.mjs`, P4.7's residual
+  checks); removing the ceiling is a joint re-certification package, not a
+  solver edit. So above the reference magnitude the DECLARED ABSOLUTE CEILING
+  binds instead: convergence stays lawful but stops shrinking with the state,
+  and the criterion publishes `within_declared_envelope: false` /
+  `binding_term: "declared_absolute_ceiling"`.
+- E6b makes that disclosure impossible to miss: every solved period outside
+  the envelope records a typed DEGRADE finding, `scale_envelope_exceeded`
+  (deduped per code/severity/period/scope), naming the constant, the ceiling,
+  the binding term, the measured `state_scale` and the offending period plus
+  the worst iteration node (RCF instrument identified when that node is the
+  revolver's). Nothing numeric reads the findings ledger, so economics are
+  unchanged inside and outside the envelope. The boundary matrix at
+  S = 1e3 ± ε lives in `scripts/run_scale_invariant_convergence_tests.mjs`
+  section B3; the corpus cases known to solve outside the envelope
+  (hyperinflationary reporting/subsidiary, net-cash interest-dominant,
+  standard-maximal-v2) are named there.
+
 ### Test-infrastructure defects (D21, D22, D24, D25)
 - RESOLVED 2026-08-21 on `agent/mp-C-quarantine-truth`: the four frozen-cohort compiler
   defects (unsorted consensus seal; blank working-capital children minted into live
