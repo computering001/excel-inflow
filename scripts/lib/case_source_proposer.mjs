@@ -1,6 +1,7 @@
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import { faceStatementManifestDigest } from "./face_statement_manifest.mjs";
 import { matchEntities } from "./flow_entity.mjs";
+import { isFiniteFinancialNumber } from "./lease_policy.mjs";
 
 const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
@@ -883,9 +884,17 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
     opening_cash: Number(endingCash[2]),
     historical_year_end_cash: endingCash.map(Number),
   };
-  lanes.policy_evidence.lease ??= {
-    opening_liability: Number(filings.reported_lease_liability ?? 0),
-  };
+  const reportedLeaseLiability = filings.reported_lease_liability;
+  if (reportedLeaseLiability !== undefined) {
+    if (!isFiniteFinancialNumber(reportedLeaseLiability)) {
+      throw new Error(
+        "filings.reported_lease_liability must be a finite financial number when supplied; blank, nil, boolean and non-finite values never coerce to zero.",
+      );
+    }
+    lanes.policy_evidence.lease ??= {
+      opening_liability: reportedLeaseLiability,
+    };
+  }
 
   const historicalGrossDebt = Array.isArray(filings.historical_gross_debt) &&
       filings.historical_gross_debt.length === 3 &&

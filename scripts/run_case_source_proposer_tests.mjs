@@ -428,6 +428,49 @@ const firstRunEvidence = {
   broker_pack: {},
   case_evidence: structuredClone(evidence),
 };
+
+// mp2-D1: the filings-to-policy boundary may preserve a genuine number or an
+// absent optional field. It must never manufacture zero from a value that only
+// JavaScript's Number constructor considers numeric.
+const invalidReportedLeaseLiabilities = [
+  null,
+  "",
+  "   ",
+  "0",
+  false,
+  true,
+  [],
+  {},
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+  Number.NEGATIVE_INFINITY,
+];
+for (const invalidLease of invalidReportedLeaseLiabilities) {
+  const invalidRun = structuredClone(firstRunEvidence);
+  invalidRun.filings.reported_lease_liability = invalidLease;
+  assert.throws(
+    () => writeRuntimeEvidenceLanes({ evidence: invalidRun, caseSource: result }),
+    /reported_lease_liability must be a finite financial number/,
+    `The runtime writer accepted invalid reported lease liability ${String(invalidLease)}.`,
+  );
+}
+const absentLeaseRun = structuredClone(firstRunEvidence);
+delete absentLeaseRun.filings.reported_lease_liability;
+writeRuntimeEvidenceLanes({ evidence: absentLeaseRun, caseSource: result });
+assert.equal(
+  absentLeaseRun.case_evidence.lanes.policy_evidence.lease,
+  undefined,
+  "An absent optional filed lease liability was fabricated as zero.",
+);
+const zeroLeaseRun = structuredClone(firstRunEvidence);
+zeroLeaseRun.filings.reported_lease_liability = 0;
+writeRuntimeEvidenceLanes({ evidence: zeroLeaseRun, caseSource: result });
+assert.equal(
+  zeroLeaseRun.case_evidence.lanes.policy_evidence.lease.opening_liability,
+  0,
+  "A genuine filed numeric zero was not preserved as declared lease evidence.",
+);
+
 writeRuntimeEvidenceLanes({ evidence: firstRunEvidence, caseSource: result });
 const runtimeLanes = firstRunEvidence.case_evidence.lanes;
 assert.equal(runtimeLanes.periods.length, 6, "The runtime writer did not author 3H+3F periods.");
@@ -655,4 +698,4 @@ assert.deepEqual(
   "The runtime writer overwrote richer residual-interest evidence.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 59 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 72 }, null, 2));

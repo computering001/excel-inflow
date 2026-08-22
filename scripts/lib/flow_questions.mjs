@@ -75,6 +75,7 @@ import {
 } from "./flow_reconcile.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
 import { plausibilityFindingIds } from "./plausibility_acknowledgements.mjs";
+import { leaseOpeningLiabilityState } from "./lease_policy.mjs";
 import { normalisedCashBuckets, solveCase } from "./solver.mjs";
 
 export const QUESTION_LIMIT = 5;
@@ -532,13 +533,9 @@ const KINDS = [
       ) {
         return [];
       }
-      const leases = Array.isArray(draftCase.lease_policy?.historical_liabilities)
-        ? Number(
-            draftCase.lease_policy.historical_liabilities[
-              draftCase.lease_policy.historical_liabilities.length - 1
-            ],
-          )
-        : Number(draftCase.lease_policy?.opening_liability ?? 0);
+      const leases = leaseOpeningLiabilityState(
+        draftCase.lease_policy ?? {},
+      ).value;
       if (!(leases > 0)) return [];
       const money = formatMoney(leases, draftCase.issuer?.reporting_currency);
       return [

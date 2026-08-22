@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { leaseOpeningLiabilityState } from "./lease_policy.mjs";
 
 export const STANDARDISED_DESIGN_CONTRACT_SHA256 =
   "aea5808b7914cd699cdda42c5d3e09091634fbca5934ccd4141b5a3ffa4e84be";
@@ -139,9 +140,9 @@ export function selectStandardisedProfile(modelCase) {
     (total, item) => total + Number(item.opening_balance_reporting ?? item.opening_balance ?? 0),
     0,
   );
-  const openingLease = Number(
-    modelCase.lease_policy?.historical_liabilities?.[2] ?? 0,
-  );
+  const openingLease = leaseOpeningLiabilityState(
+    modelCase.lease_policy ?? {},
+  ).value;
   const openingCash = Number(modelCase.cash_policy?.opening_cash ?? 0);
   const eligibleCash =
     openingCash * Number(modelCase.cash_policy?.eligible_cash_percentage ?? 1);

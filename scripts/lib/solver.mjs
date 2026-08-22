@@ -10,8 +10,10 @@ import {
   validateBalancingRcf,
 } from "./rcf_policy.mjs";
 import {
+  isFiniteFinancialNumber,
   leaseForecast,
   leaseInterestCashSplitErrors,
+  leaseOpeningLiabilityState,
   validateLeasePolicy,
 } from "./lease_policy.mjs";
 import {
@@ -411,8 +413,17 @@ function asSeries3(value, fallback = 0) {
  */
 export function leaseHistoricalLiabilities(modelCase) {
   const series = modelCase?.lease_policy?.historical_liabilities;
-  if (!Array.isArray(series) || series.length !== 3) return null;
-  return series.map(Number);
+  if (series === undefined) return null;
+  if (
+    !Array.isArray(series) ||
+    series.length !== 3 ||
+    series.some((value) => !isFiniteFinancialNumber(value))
+  ) {
+    throw new Error(
+      "lease_policy.historical_liabilities must contain three finite financial numbers.",
+    );
+  }
+  return [...series];
 }
 
 /**
@@ -421,8 +432,8 @@ export function leaseHistoricalLiabilities(modelCase) {
  */
 export function leaseOpeningLiability(modelCase) {
   const historical = leaseHistoricalLiabilities(modelCase);
-  if (historical) return Number(historical[2]);
-  return Number(modelCase?.lease_policy?.opening_liability ?? 0);
+  if (historical) return historical[2];
+  return leaseOpeningLiabilityState(modelCase?.lease_policy ?? {}).value;
 }
 
 function metricSeries(modelCase, metricId) {
@@ -1877,10 +1888,10 @@ export function validateCaseShape(modelCase) {
     } else if (
       !Array.isArray(historicalLiabilities) ||
       historicalLiabilities.length !== 3 ||
-      historicalLiabilities.some((value) => !Number.isFinite(Number(value)))
+      historicalLiabilities.some((value) => !isFiniteFinancialNumber(value))
     ) {
       errors.push(
-        "lease_policy.historical_liabilities must be three numeric period-end balances.",
+        "lease_policy.historical_liabilities must be three finite financial period-end balances.",
       );
     }
     if (
