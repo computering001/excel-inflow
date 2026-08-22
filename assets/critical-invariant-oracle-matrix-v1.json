@@ -2,9 +2,9 @@
   "schema_version": "critical-invariant-oracle-matrix/2.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "762514c14227c8c34fd53a11f9629066c9f768a1906d385976fac9f6675e6582",
+    "oracle_sha256": "160f8768242a37ef80dad410e999870bb11a8119d90c989f9109dc432b1622f8",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "1ce4e24c1dea57782dc32dfbf0d9a39655ae104c6419d4c58cec48d50d95c239"
+    "registry_sha256": "a5afa127826c80eebed1f4518790bb10626f536dfb937c6db81180a64d29af83"
   },
   "artifact_oracle": {
     "test_id": "emitted-candidate-independent-oracle",

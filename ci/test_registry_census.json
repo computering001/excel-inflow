@@ -1106,16 +1106,10 @@
       "disposition": "ORACLE_MUTATION_HARNESS"
     }
   ],
-  "critical_requirements": [
-    "tax_etr",
-    "runtime_deadline",
-    "forecast_completion",
-    "period_stitching",
-    "inline_xbrl_typed_values",
-    "entity_identity",
-    "package_closure",
-    "installed_host_receipts",
-    "blocker_replay_corpus"
-  ],
-  "generated_at_source_identity_only": true
+  "registry": {
+    "path": "assets/development-test-registry.json",
+    "sha256": "33a07872e5a66ae2ea23f855b2e65026c77b19c5a76bb4fb59d94937051acd28",
+    "test_count": 238
+  },
+  "schema_version": "development-test-classification-census/1.0"
 }

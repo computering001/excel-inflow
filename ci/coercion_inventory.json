@@ -7,7 +7,7 @@
     "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 489,
+  "entry_count": 480,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -217,7 +217,9 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "suspect_value_coercion"
+      "reviewed_by": "mp2-D",
+      "justification": "mp2-D reviewed: B14 degenerate-domain DETECTION scan over DECLARED PIK rates. A nil rate coerced to 0 can never reach the >=200% domain (no false positive possible), and the filtered result feeds only a cell comment and a stderr marker — never a workbook value or solver input.",
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -2217,6 +2219,8 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
+      "reviewed_by": "mp2-D",
+      "justification": "mp2-D reviewed: evidence-quality counter compared against zero to choose VERIFIED vs DEGRADED wording; counts cells set aside, not a money quantity.",
       "classification": "lawful_counter_or_length"
     },
     {
@@ -2227,6 +2231,8 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
+      "reviewed_by": "mp2-D",
+      "justification": "mp2-D reviewed: terminal-screen interpolation of the broker preview's evidence-inventory counters; presentation only, no downstream arithmetic.",
       "classification": "lawful_counter_or_length"
     },
     {
@@ -2277,6 +2283,8 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
+      "reviewed_by": "mp2-D",
+      "justification": "mp2-D reviewed: display counter — remaining question topics rendered on the decision-round screen; never enters financial arithmetic.",
       "classification": "lawful_counter_or_length"
     },
     {
@@ -2628,96 +2636,6 @@
       ],
       "occurrences": 1,
       "classification": "lawful_counter_or_length"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "-(Number(grossInterest ?? 0) -",
-      "fingerprint": "04097a18fec1c88ac222",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": ": [0, 0, Number(policy.opening_liability ?? 0)];",
-      "fingerprint": "b437d6c3de853ae668af",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 2,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "`-(gross interest ${Number(grossInterest ?? 0)} - lease interest ` +",
-      "fingerprint": "23654c856c84fe03fd30",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "`${Number(leaseInterest ?? 0)} - non-cash interest ` +",
-      "fingerprint": "2d0c764fcf7233f05a5d",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "`${Number(nonCashInstrumentInterest ?? 0)}) = ${expected}; the accreted ` +",
-      "fingerprint": "0335e8cb47c15cec0737",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "`${Number(nonCashInterest ?? 0)} - non-cash instrument interest ` +",
-      "fingerprint": "b5083d57f28013e64d88",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "Number(leaseInterest ?? 0) -",
-      "fingerprint": "784548bcfecf7d433157",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "Number(nonCashInstrumentInterest ?? 0));",
-      "fingerprint": "9412bfdafcdca34f1982",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
-    },
-    {
-      "file": "scripts/lib/lease_policy.mjs",
-      "content": "Number(nonCashInterest ?? 0) -",
-      "fingerprint": "6e359f2409c40b2cc360",
-      "patterns": [
-        "js_nullish_zero"
-      ],
-      "occurrences": 1,
-      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/live_delivery_attestation.mjs",

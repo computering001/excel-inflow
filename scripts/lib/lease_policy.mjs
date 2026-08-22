@@ -15,6 +15,38 @@ function series3(value, label, fallback = null) {
   return value.map(Number);
 }
 
+/** D1/D2 (mp2-D): the lease opening liability as a TYPED state, replacing the
+ * bare `[0, 0, Number(policy.opening_liability ?? 0)]` coercion. Exactly one
+ * of three states, mirroring the schedule-typed-states vocabulary:
+ *   declared   — the policy states historical_liabilities or
+ *                opening_liability; value is the finite opening total it
+ *                asserts (a non-finite declaration is refused, not coerced);
+ *   carried    — the policy declares no lease liability anywhere, so the
+ *                zero is a structural carried-forward absence (nothing to
+ *                carry), never a blank silently mapped onto zero;
+ *   unresolved — unreachable here (declared-but-non-finite throws), kept in
+ *                the vocabulary so callers can exhaustive-match.
+ */
+export function leaseOpeningLiabilityState(policy = {}) {
+  if (policy.historical_liabilities) {
+    const series = series3(
+      policy.historical_liabilities,
+      "lease_policy.historical_liabilities",
+    );
+    return { state: "declared", value: series[2] };
+  }
+  if (policy.opening_liability !== undefined) {
+    const value = Number(policy.opening_liability);
+    if (!Number.isFinite(value)) {
+      throw new Error(
+        `lease_policy.opening_liability must be a finite number; received ${JSON.stringify(policy.opening_liability)}. Blank/nil never coerce to zero — declare the liability or omit the field.`,
+      );
+    }
+    return { state: "declared", value };
+  }
+  return { state: "carried", value: 0 };
+}
+
 export function resolvedLeaseInterestBasis(modelCase) {
   const policy = modelCase?.lease_policy ?? {};
   if (policy.mode === "exclude") return "none";
@@ -99,12 +131,14 @@ export function leaseForecast(modelCase) {
   const policy = modelCase.lease_policy;
   const basis = resolvedLeaseInterestBasis(modelCase);
   const interestEnabled = modelCase?.controls?.circularity !== 0;
+  // mp2-D typed state: declared | carried — see leaseOpeningLiabilityState.
+  const openingLiability = leaseOpeningLiabilityState(policy);
   const historicalTotal = policy.historical_liabilities
     ? series3(
         policy.historical_liabilities,
         "lease_policy.historical_liabilities",
       )
-    : [0, 0, Number(policy.opening_liability ?? 0)];
+    : [0, 0, openingLiability.value];
   const principal = series3(
     policy.principal_repayment,
     "lease_policy.principal_repayment",
@@ -218,12 +252,14 @@ export function leaseProjectionErrors(
     "lease_policy.effective_rate",
     [0, 0, 0],
   );
+  // mp2-D typed state: declared | carried — see leaseOpeningLiabilityState.
+  const openingLiability = leaseOpeningLiabilityState(policy);
   const historicalTotal = policy.historical_liabilities
     ? series3(
         policy.historical_liabilities,
         "lease_policy.historical_liabilities",
       )
-    : [0, 0, Number(policy.opening_liability ?? 0)];
+    : [0, 0, openingLiability.value];
   const historicalInterestBearing =
     basis === "separately_supplied"
       ? series3(
@@ -346,19 +382,48 @@ export function leaseInterestCashSplitErrors(
     // there is no split claim to verify.
     return [];
   }
+  // mp2-D typed leg resolution: a leg the producer never published (null,
+  // undefined, or not a finite number) is UNRESOLVED — never zero. Verifying
+  // the identity against fabricated zeros would both mint a drift claim built
+  // on numbers nobody asserted and, when the fabricated identity happens to
+  // match a published zero outflow, let the split PASS vacuously. An
+  // unresolved leg while cash_interest_paid is published therefore refuses
+  // with the named legs instead of computing.
+  const legs = [
+    ["gross_interest", grossInterest],
+    ["lease_interest", leaseInterest],
+    ["non_cash_interest", nonCashInterest],
+    ["non_cash_instrument_interest", nonCashInstrumentInterest],
+  ];
+  const unresolvedLegs = legs
+    .filter(
+      ([, raw]) =>
+        raw === null || raw === undefined || !Number.isFinite(Number(raw)),
+    )
+    .map(([name]) => name);
+  if (unresolvedLegs.length > 0) {
+    return [
+      `cash_interest_paid=${Number(cashInterestPaid)} is published but the ` +
+        `cash-interest split cannot be verified: ${unresolvedLegs.join(", ")} ` +
+        `unresolved (blank/nil/missing never coerce to zero). Publish every ` +
+        `leg of the gross build-up to verify the split.`,
+    ];
+  }
+  const [grossDeclared, leaseDeclared, nonCashDeclared, nonCashInstrumentDeclared] =
+    legs.map(([, raw]) => Number(raw));
   const expected =
-    -(Number(grossInterest ?? 0) -
-      Number(leaseInterest ?? 0) -
-      Number(nonCashInterest ?? 0) -
-      Number(nonCashInstrumentInterest ?? 0));
+    -(grossDeclared -
+      leaseDeclared -
+      nonCashDeclared -
+      nonCashInstrumentDeclared);
   const errors = [];
   if (Math.abs(Number(cashInterestPaid) - expected) > tolerance) {
     errors.push(
       `cash_interest_paid=${Number(cashInterestPaid)} does not equal ` +
-        `-(gross interest ${Number(grossInterest ?? 0)} - lease interest ` +
-        `${Number(leaseInterest ?? 0)} - non-cash interest ` +
-        `${Number(nonCashInterest ?? 0)} - non-cash instrument interest ` +
-        `${Number(nonCashInstrumentInterest ?? 0)}) = ${expected}; the accreted ` +
+        `-(gross interest ${grossDeclared} - lease interest ` +
+        `${leaseDeclared} - non-cash interest ` +
+        `${nonCashDeclared} - non-cash instrument interest ` +
+        `${nonCashInstrumentDeclared}) = ${expected}; the accreted ` +
         `lease share must stay out of cash interest paid.`,
     );
   }
