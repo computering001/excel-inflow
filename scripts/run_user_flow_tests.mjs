@@ -10,10 +10,19 @@ import { promisify } from "node:util";
 
 import {
   inspectScreen,
+  lintScreenLanguage,
   renderBrokerIntakeScreen,
   renderCompanyScreen,
+  renderReviewGateScreen,
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
+import {
+  resolveReviewReply,
+} from "./lib/flow_review.mjs";
+import {
+  classifyChangeComplaint,
+  describeReviseEntry,
+} from "./lib/flow_remediation.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { resolvePythonExecutable } from "./lib/process_tree.mjs";
@@ -409,7 +418,12 @@ await test("tampered stage output invalidates only that stage", async () => {
 await test("question path stops once and never treats action-required as success", async () => {
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
-  assert(first.status === "ACTION_REQUIRED" && first.question_count === 1, JSON.stringify(first));
+  // Card-augmented queue: the acquisition_funding decision card plus the
+  // forecast assumption cards (derived.*). The default baseline produces no
+  // liquidity-stress findings for this fixture, so the consolidated
+  // plausibility card is absent by design (flow_questions.mjs builds it only
+  // when findings exist).
+  assert(first.status === "ACTION_REQUIRED" && first.question_count === 3, JSON.stringify(first));
   assert(
     first.blocker_class === "USER_DECISION" && first.user_blocking === true,
     "action-required result lacks typed user-decision ownership",
@@ -473,7 +487,22 @@ await test("delivery blocker constitution covers every terminal user-flow outcom
 
 await test("supplied answer persists and resumes deterministically", async () => {
   const answers = path.join(out, "acquisition-answers.json");
-  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  await fs.writeFile(
+    answers,
+    `${JSON.stringify(
+      {
+        answers: {
+          acquisition_funding: "debt",
+          // assumption cards surfaced at the decisions stop (no plausibility
+          // findings exist on the default baseline, so no such card is built)
+          "derived.forecast.acquisitions_net_of_cash": "default",
+          "derived.fx.effect": "default",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, [
     "--answers", answers,
@@ -506,7 +535,22 @@ await test("invalid evidence blocks before reconciliation", async () => {
 
 await test("a case edited while the run waited blocks the resume by name", async () => {
   const answers = path.join(out, "pause-mutation-answers.json");
-  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  await fs.writeFile(
+    answers,
+    `${JSON.stringify(
+      {
+        answers: {
+          acquisition_funding: "debt",
+          // assumption cards surfaced at the decisions stop (no plausibility
+          // findings exist on the default baseline, so no such card is built)
+          "derived.forecast.acquisitions_net_of_cash": "default",
+          "derived.fx.effect": "default",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   const runDir = path.join(out, "pause-mutation-run");
   const workspaceToken = "workspace:pause-mutation-fixture";
   const paused = await flow(acquisitionEvidence, runDir, [

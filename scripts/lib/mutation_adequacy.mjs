@@ -440,6 +440,29 @@ export const SCORE_DOCTRINE =
   "The denominator is only what was MEASURED. A suite that reports no mutation count contributes to neither numerator nor denominator; it is a measurement gap with an owner. A self-fixture mutation is counted in its own bucket and can never raise production_mutation_score. production_mutation_score is an UPPER BOUND: static production reach proves a mutation COULD touch production code, not that it did.";
 
 /**
+ * RATCHET — minimum measurement coverage (fraction of registry mutation-class
+ * suites whose own stdout declares a mutation count) that the corpus may ship
+ * with. scripts/run_mutation_adequacy_tests.mjs fails CI when the compiled
+ * artifact's corpus.measurement_coverage falls below this floor, so coverage
+ * can only ratchet UP: a suite losing its count line, or a new mutation-class
+ * suite registered without one, regresses the gate.
+ *
+ * RAISE PROCEDURE: lift the value here ONLY after recompiling the artifact on a
+ * clean tree (`node scripts/compile_mutation_adequacy.mjs --out ci/mutation_survivors.json`),
+ * confirming the measured fraction meets the new floor, and committing both in
+ * the same change. Never lower the floor to make a red gate green; a lower
+ * floor must be justified by a registry change (e.g. a suite retired) and land
+ * with its own review.
+ *
+ * 0.55 was set at mp-I2 close, just below the measured honest coverage of
+ * 0.5607 recorded in ci/mutation_survivors.json (60 of 107 mutation-class
+ * suites reporting count lines), so the gate is green today while still
+ * blocking any regression in measured coverage. Raise it via the procedure
+ * above as more suites land honest {mutations_total, mutations_caught} lines.
+ */
+export const MEASUREMENT_COVERAGE_FLOOR = 0.55;
+
+/**
  * @param registry     parsed assets/development-test-registry.json (READ ONLY)
  * @param executions   [{ id, status, exit_code, report, stdout_tail, duration_ms }]
  * @param scopes       { [id]: productionReachEvidence(...) }

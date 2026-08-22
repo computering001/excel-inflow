@@ -1,0 +1,44 @@
+{
+  "cik": 18230,
+  "entityName": "CATERPILLAR INC",
+  "facts": {
+    "dei": {
+      "EntityCommonStockSharesOutstanding": {
+        "label": "Entity Common Stock, Shares Outstanding",
+        "units": {"shares": [{"end": "2023-12-31", "val": 511000000, "fy": 2023, "fp": "FY", "form": "10-K"}]}
+      }
+    },
+    "us-gaap": {
+      "Assets": {
+        "label": "Assets",
+        "units": {
+          "USD": [
+            {"end": "2022-12-31", "val": 70825000000, "fy": 2022, "fp": "FY", "form": "10-K", "frame": "CY2022Q4I"},
+            {"end": "2023-12-31", "val": 79096000000, "fy": 2023, "fp": "FY", "form": "10-K", "frame": "CY2023Q4I"}
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "label": "Net Income (Loss) Attributable to Parent",
+        "units": {
+          "USD": [
+            {"end": "2023-12-31", "val": 10335000000, "fy": 2023, "fp": "FY", "form": "10-K", "frame": "CY2023"},
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 2018000000, "fy": 2024, "fp": "Q1", "form": "10-Q", "frame": "CY2024Q1"}
+          ]
+        }
+      },
+      "Revenues": {
+        "label": "Revenues",
+        "units": {
+          "USD": [
+            {"end": "2023-12-31", "val": 67060000000, "fy": 2023, "fp": "FY", "form": "10-K", "frame": "CY2023"}
+          ]
+        }
+      },
+      "Goodwill": {
+        "label": "Goodwill (NOT a core concept - must be skipped)",
+        "units": {"USD": [{"end": "2023-12-31", "val": 12345000000, "fy": 2023, "fp": "FY", "form": "10-K"}]}
+      }
+    }
+  }
+}

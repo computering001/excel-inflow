@@ -453,7 +453,7 @@ check(
 );
 const orchestrator = readFileSync(new URL("./orchestrate_release.mjs", import.meta.url), "utf8");
 check(
-  /reused: reusedCheckpoints,\n\s+executed: executedCheckpoints,\n\s+receipts: checkpointReceipts,\n\s+timings_ms: timingsMs,/.test(
+  /reused: \[\.\.\.reusedCheckpoints\]\.sort\(compareCheckpointSequence\),\n\s+executed: \[\.\.\.executedCheckpoints\]\.sort\(compareCheckpointSequence\),\n\s+receipts: checkpointReceipts,\n\s+timings_ms: timingsMs,/.test(
     orchestrator,
   ),
   "stage 4 publishes reused[], executed[] and timings_ms together",

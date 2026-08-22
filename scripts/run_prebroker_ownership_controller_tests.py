@@ -79,6 +79,22 @@ def portable_runtime() -> tuple[str, str]:
     soffice = next((candidate for candidate in soffice_candidates if candidate and Path(candidate).exists()), None)
     require(bool(python), "Portable Stage 4 Python dependencies are unavailable")
     require(bool(soffice), "Portable LibreOffice runtime is unavailable")
+    # The controller redirects HOME into the run's .runtime-home directory, which
+    # hides a user-site install (the macOS CLT interpreter keeps openpyxl/fitz
+    # under ~/Library/Python).  Pin the designated interpreter's user site on
+    # PYTHONPATH so its packages travel with the explicit --python choice.
+    probe = subprocess.run(
+        [str(python), "-c", "import site; print(site.getusersitepackages())"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    user_site = probe.stdout.strip().splitlines()[-1] if probe.returncode == 0 else ""
+    if user_site and Path(user_site).is_dir():
+        existing = os.environ.get("PYTHONPATH")
+        os.environ["PYTHONPATH"] = (
+            f"{user_site}{os.pathsep}{existing}" if existing else user_site
+        )
     return str(python), str(soffice)
 
 
@@ -408,6 +424,9 @@ def neutral_working_capital_controller() -> dict[str, Any]:
             python,
             "--soffice",
             soffice,
+            # The review gate is fail-closed; this scripted caller replays the
+            # user's accept so build-and-delivery can auto-progress.
+            "--review-deliver",
             "--json",
         ])
         elapsed_ms = round((time.monotonic() - relevant_evidence_at) * 1000)

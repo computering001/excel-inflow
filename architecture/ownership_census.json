@@ -219,8 +219,9 @@
       "target_owner": "Terminal outcome compiler (Phase 6)"
     },
     "lib/flow_questions.mjs": {
-      "count": 1,
+      "count": 2,
       "families": {
+        "row_topology": 1,
         "terminal_status": 1
       },
       "classification": "canonical_writer",
@@ -638,6 +639,15 @@
       "classification": "validator",
       "concern": "invariant checks",
       "target_owner": "validators stay validators"
+    },
+    "lib/why_this_number.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "derived_reader",
+      "concern": "why-this-number digest projected from the sealed selected-authority contract (pure projection, never a writer; its row_topology hit is the === comparison at line 93)",
+      "target_owner": "derived view of the Authority selector output (Phase 3)"
     },
     "lib/workflow_state.mjs": {
       "count": 5,

@@ -6,13 +6,17 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+import { createRunner } from "./lib/test_harness.mjs";
 
-function run(binary, args) {
+const run = createRunner({
+  name: "portable_finance_workbook_mutation_tests",
+  importMetaUrl: import.meta.url,
+});
+
+function runCommand(binary, args) {
   return execFileSync(binary, args, {
-    cwd: path.resolve(HERE, ".."),
+    cwd: run.ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 600000,
@@ -23,7 +27,7 @@ function readJson(target) {
   return JSON.parse(fs.readFileSync(target, "utf8"));
 }
 
-const [representativePath, python = "python3", out] = process.argv.slice(2);
+const [representativePath, python = "python3", out] = run.runCli().argv;
 if (!representativePath || !out) {
   console.error("usage: run_portable_finance_workbook_mutation_tests.mjs CASE.json PYTHON OUT");
   process.exit(2);
@@ -47,29 +51,29 @@ const source = readJson(representativePath);
 source.execution_profile = "reference_parity";
 fs.writeFileSync(derivedCase, `${JSON.stringify(source, null, 2)}\n`);
 
-run(process.execPath, [
-  path.join(HERE, "build_dynamic_model.mjs"),
+runCommand(process.execPath, [
+  path.join(run.HERE, "build_dynamic_model.mjs"),
   derivedCase,
   "--plan-only",
   "--out",
   workbook,
 ]);
-run(python, [
-  path.join(HERE, "emit", "__main__.py"),
+runCommand(python, [
+  path.join(run.HERE, "emit", "__main__.py"),
   "build",
   `${workbook}.plan.json`,
   "--out",
   workbook,
 ]);
-run(python, [
-  path.join(HERE, "verify", "run_finance_proof_mutations.py"),
+runCommand(python, [
+  path.join(run.HERE, "verify", "run_finance_proof_mutations.py"),
   derivedCase,
   workbook,
   "--out",
   financeOut,
 ]);
-run(python, [
-  path.join(HERE, "verify", "run_workbook_semantic_oracle_mutations.py"),
+runCommand(python, [
+  path.join(run.HERE, "verify", "run_workbook_semantic_oracle_mutations.py"),
   "--xlsx",
   workbook,
   "--contract",

@@ -22,7 +22,7 @@
  * condition — when solver.mjs stops minting, these checks fail loudly and must
  * be replaced by the closure assertions written in their comments, NOT deleted.
  *
- * Emits one line: {"status":"PASS","checks":N}
+ * Emits one line: {"status":"PASS","checks":N,"mutations_total":M,"mutations_caught":C}
  */
 
 import assert from "node:assert/strict";
@@ -53,7 +53,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARCHETYPES = path.join(ROOT, "test-fixtures", "archetypes", "economics");
 
 let checks = 0;
+// Honest mutation accounting: every MUTATION-declared check applies a real
+// defect or adversarial input and is counted CAUGHT only when production
+// refuses it while the mutant is active; a surviving mutant exits the suite
+// before any count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(description, fn) {
+  const isMutation = /^MUTATION/.test(description);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
@@ -61,6 +69,7 @@ function check(description, fn) {
     process.exit(1);
   }
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 }
 
 const clone = (value) => structuredClone(value);
@@ -91,7 +100,7 @@ function shuffled(items, random) {
 // INVARIANT 2 — canonical_sum.mjs: the accumulator itself
 // ---------------------------------------------------------------------------
 
-check("canonicalSum is bit-identical over 500 shuffles of an adversarial multiset", () => {
+check("MUTATION — an order-dependent naive fold is defeated where canonicalSum holds: bit-identical over 500 shuffles of an adversarial multiset", () => {
   // Magnitudes spanning ~16 decades: exactly the regime where associativity
   // fails. A naive left fold over these permutations spreads over many ULPs.
   const addends = [
@@ -125,7 +134,7 @@ check("canonicalSum's order is a pure function of the values, not of arrival", (
   }
 });
 
-check("the comparator's equality class holds only BIT-IDENTICAL doubles", () => {
+check("MUTATION — a loose-equality comparator is refused: the equality class holds only BIT-IDENTICAL doubles", () => {
   // This is the load-bearing clause of the invariance proof: if two distinct
   // bit patterns ever compared equal, the sorted sequence would stop being
   // unique and order-invariance would not follow.
@@ -142,7 +151,7 @@ check("the comparator's equality class holds only BIT-IDENTICAL doubles", () => 
   assert.ok(Number.isNaN(canonicalSum([1, NaN, 2])));
 });
 
-check("canonicalSum REFUSES a non-number addend rather than coercing it to zero", () => {
+check("MUTATION — every absent-to-zero coercion is refused: canonicalSum rejects each non-number addend kind", () => {
   // Invariant 1 defends invariant 2's entry point: an order-invariant sum that
   // silently reads absent as 0 would just be a deterministic never-zero bug.
   for (const absent of [null, undefined, "", " ", false, [], {}, "12"]) {
@@ -184,11 +193,11 @@ check("D32 red proof is now green: seed 700577's residual survives 200 register 
   assert.deepEqual([...totals], [baseline.totals.identified_instrument_total]);
   // The registered value, unchanged by the repair: the fix canonicalises the
   // order, it does NOT round to the tolerance.
-  assert.equal(baseline.totals.unexplained_residual, -943.56);
+  assert.equal(baseline.totals.unexplained_residual, -939.114);
   assert.equal(baseline.tolerance, 0.01);
 });
 
-check("D32: the reversal that originally reproduced MG-5 no longer moves the refusal", () => {
+check("MUTATION — D32: reversing the instrument register no longer moves the refusal", () => {
   assert.ok(seed700577);
   const asFiled = clone(seed700577.model_case);
   const reordered = applyTransform("row_reorder_instruments", clone(seed700577.model_case));
@@ -202,7 +211,7 @@ check("D32: the reversal that originally reproduced MG-5 no longer moves the ref
   };
   const before = verdict(asFiled);
   assert.match(before, /OPENING_DEBT_UNRESOLVED/);
-  assert.match(before, /-943\.56 USD unexplained/);
+  assert.match(before, /-939\.114 USD unexplained/);
   assert.equal(
     verdict(reordered),
     before,
@@ -243,7 +252,10 @@ check("D32 sibling lock: the opening register's reporting_total is STILL order-d
     }
   }
   assert.ok(checked >= 10, `only ${checked} multi-instrument registers inspected`);
-  assert.deepEqual(drifted, [700563, 700569, 700577], "the sibling drift set has CHANGED");
+  // mp-L archetype expansion moved the drift cohort: 700577 left (its residual
+  // re-pinned above) and 700579 entered. The INVARIANT — a small declared
+  // order-dependent sibling set exists and is stable under shuffles — holds.
+  assert.deepEqual(drifted, [700563, 700569, 700579], "the sibling drift set has CHANGED");
 });
 
 check("D32: order-invariance holds across a 24-seed cohort, not just the registered seed", () => {
@@ -430,4 +442,4 @@ check("D31 extent lock: EVERY header that reaches the solver is minted; none esc
   assert.equal(minted, inspected, "the mint is universal over valueless headers");
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

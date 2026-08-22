@@ -10,8 +10,8 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+
+import { createRunner } from "./lib/test_harness.mjs";
 import { loadSupportEnvelope, classifySupport } from "./lib/support_envelope.mjs";
 import {
   validate as validateJs,
@@ -19,24 +19,19 @@ import {
   SUPPORTED_VERSIONS,
 } from "./lib/generated/support_envelope_contract.mjs";
 
-const exec = promisify(execFile);
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "..");
-function option(name, fallback) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index >= 0 ? process.argv[index + 1] : fallback;
-}
-const python = option("python", "python3");
-
-let checks = 0;
-function check(condition, message) {
-  if (!condition) throw new Error(message);
-  checks += 1;
-}
+const run = createRunner({ name: "canonical_contract_tests", importMetaUrl: import.meta.url });
+const { exec, parsed } = run.runCli(({ option }) => ({ python: option("python", "python3") }));
+const python = parsed.python;
+const HERE = run.HERE;
+const ROOT = run.ROOT;
 
 // 0. Generated artifacts are clean against the definitions (the CI gate).
-await exec(process.execPath, [path.join(HERE, "compile_canonical_contracts.mjs"), "--check"], { cwd: ROOT });
-checks += 1;
+try {
+  await exec(process.execPath, [path.join(HERE, "compile_canonical_contracts.mjs"), "--check"], { cwd: ROOT });
+  run.ok(true, "generated artifacts are clean against the definitions");
+} catch (error) {
+  run.fail(error);
+}
 
 // 1. A REAL producer object (the P0.4 classifier's output plus the envelope
 // identity) validates against the generated JS binding.
@@ -55,7 +50,7 @@ const produced = {
   envelope_sha256: sha256,
   ...classifySupport(contract, baseline),
 };
-check(validateJs(produced).length === 0,
+run.ok(validateJs(produced).length === 0,
   `producer object must validate: ${validateJs(produced)[0] ?? ""}`);
 
 // stopped variant of the union
@@ -65,24 +60,24 @@ const stopped = {
   envelope_sha256: sha256,
   ...classifySupport(contract, { ...baseline, entity_type: "bank" }),
 };
-check(validateJs(stopped).length === 0, "stopped-variant object must validate");
+run.ok(validateJs(stopped).length === 0, "stopped-variant object must validate");
 
 // 2. Negative: unknown version refused, never reinterpreted.
-check(validateJs({ ...produced, contract_version: "0.9.0" })
+run.ok(validateJs({ ...produced, contract_version: "0.9.0" })
   .some((error) => error.includes("unsupported contract_version")),
   "an unknown contract_version must be refused");
-check(SUPPORTED_VERSIONS.includes(CONTRACT_VERSION), "current version is supported");
+run.ok(SUPPORTED_VERSIONS.includes(CONTRACT_VERSION), "current version is supported");
 
 // 3. Negative: a structurally invalid object fails (class outside the enum).
 {
   const broken = structuredClone(produced);
   broken.support_class = "MOSTLY_FINE";
-  check(validateJs(broken).length > 0, "an out-of-enum class must fail validation");
+  run.ok(validateJs(broken).length > 0, "an out-of-enum class must fail validation");
 }
 {
   const broken = structuredClone(stopped);
   broken.early_stop.reason_code = null; // stopped=true demands a typed reason
-  check(validateJs(broken).length > 0, "a stopped union variant without a reason must fail");
+  run.ok(validateJs(broken).length > 0, "a stopped union variant without a reason must fail");
 }
 
 // 4. JavaScript -> Python -> JavaScript round trip: Python validates the same
@@ -91,7 +86,8 @@ check(SUPPORTED_VERSIONS.includes(CONTRACT_VERSION), "current version is support
 const payload = JSON.stringify(produced);
 const payloadPath = path.join(ROOT, "ci", "contract-roundtrip-payload.tmp.json");
 await fs.writeFile(payloadPath, payload, "utf8");
-const py = await exec(python, ["-c", `
+try {
+  const py = await exec(python, ["-c", `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(path.join(ROOT, "scripts", "generated"))})
 from support_envelope_contract import validate, CONTRACT_VERSION
@@ -104,9 +100,12 @@ if not validate(bad):
     raise SystemExit("PY_VERSION_GATE_FAIL")
 print(json.dumps(candidate, sort_keys=False, separators=(",", ":")))
 `, payloadPath]);
-await fs.unlink(payloadPath);
-const roundTripped = JSON.parse(py.stdout.trim());
-check(validateJs(roundTripped).length === 0, "round-tripped object must re-validate in JS");
-check(JSON.stringify(roundTripped) === payload, "round trip must be byte-preserving");
+  await fs.unlink(payloadPath);
+  const roundTripped = JSON.parse(py.stdout.trim());
+  run.ok(validateJs(roundTripped).length === 0, "round-tripped object must re-validate in JS");
+  run.ok(JSON.stringify(roundTripped) === payload, "round trip must be byte-preserving");
+} catch (error) {
+  run.fail(error);
+}
 
-console.log(JSON.stringify({ status: "PASS", checks, contract_version: CONTRACT_VERSION }));
+run.finish({ contract_version: CONTRACT_VERSION });

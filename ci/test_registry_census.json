@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 481,
-  "source_commit": "e8eb91f958e1f7c12007a27ffd01be159799772f",
-  "source_tree": "cd27d731cb74320b54dd3f0cbad4b286d686aee0",
+  "checks": 489,
+  "source_commit": "c8e9c53ff30f5c14ff54e03f3d9670211645ef0a",
+  "source_tree": "ca25e5134c595e5f65f7cc523c25f4cdb3b6195a",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 233
+    "test_count": 237
   },
   "scripts": [
     {
@@ -159,6 +159,10 @@
     },
     {
       "script": "run_broker_pdf_timeout_policy_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_period_grammar_tests.py",
       "disposition": "REGISTERED"
     },
     {
@@ -347,6 +351,10 @@
     },
     {
       "script": "run_disk_space_policy_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_doc_single_source_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -547,6 +555,10 @@
     },
     {
       "script": "run_host_experience_trace_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_html_table_extraction_tests.py",
       "disposition": "REGISTERED"
     },
     {

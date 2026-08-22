@@ -1,0 +1,1454 @@
+{
+  "schema_version": "excel-inflow-d52-closure-ledger/1.0",
+  "generated_at": "2026-08-21T13:42:08Z",
+  "programme": "v3.7.9 bootstrap and installed-filings hardening",
+  "source_map": {
+    "path": "audit/v379/commit-to-finding-map.json",
+    "schema_version": "excel-inflow-commit-to-finding-map/1.0",
+    "audited_base_commit": "e8eb91f958e1f7c12007a27ffd01be159799772f"
+  },
+  "closure_policy": {
+    "closed": "Mapped commit verified in history AND every mapped proof suite resolves to a registered assets/development-test-registry.json entry or an in-repo verifier/runner script; the remediation is demonstrable entirely within the repository.",
+    "custody-deferred": "Local remediation tooling verified as above, but the finding asserts a fact about an environment this repository/workstation cannot produce (hosted GitHub Actions exact-head runs, installed-host receipts); recorded honestly instead of claiming closure.",
+    "open": "A mapped commit is absent, a mapped proof suite cannot be resolved to any registry entry or script, or verification otherwise fails."
+  },
+  "commit_verification": {
+    "implementation_commit": {
+      "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+      "subject": "harden Excel Inflow v3.7.9 candidate",
+      "date": "2026-08-21T07:25:51+01:00",
+      "exists_in_history": true
+    },
+    "exact_head_fixture_commit": {
+      "sha": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+      "subject": "fix exact-head release smoke fixture",
+      "date": "2026-08-21T07:32:53+01:00",
+      "exists_in_history": true
+    },
+    "head_containing_map": {
+      "sha": "eba52045b238d2777167ee0025476728cae00e0a",
+      "subject": "document v3.7.9 candidate audit mapping",
+      "date": "2026-08-21T07:56:39+01:00",
+      "exists_in_history": true,
+      "placeholder_resolution": "Resolves the 'HEAD_CONTAINING_THIS_MAP' token used by work package 8; it is the commit introducing audit/v379/commit-to-finding-map.json."
+    },
+    "principal_path_spot_checks": "Principal paths for every work package were checked at the implementation commit via git cat-file; all resolved except RELEASE_NOTES.md, which was added by the map-bearing commit listed under work package 8 (consistent with that package's commit list)."
+  },
+  "attestation_consumability": {
+    "consumer_scan": "No repository script currently reads audit/v379/commit-to-finding-map.json or any D52 closure ledger (scanned *.mjs for 'commit-to-finding-map', 'closure-ledger', 'D52'; sole hit is a governance mutation string naming workflow job '11 - All-needs exact-head D52 attestation').",
+    "workflow_job": ".github/workflows/read-only-development-gate.yml job 'final-aggregate' compiles the all-needs exact-head D52 attestation solely from raw CI job receipts via scripts/compile_exact_head_ci_job_receipt.mjs and scripts/compile_external_ci_evidence.mjs; it does not consume this ledger, so no schema coupling applies.",
+    "shape_contract": "This ledger is therefore free-standing v1: schema_version, generated_at, per-finding entries, and summary counts closed/custody-deferred/open that always sum to total. A future validator can enforce exactly these invariants without code changes; wiring the ledger into compile_external_ci_evidence.mjs would be a code-side change outside this closure pass's file ownership."
+  },
+  "findings": [
+    {
+      "finding_id": "public_pre_import_failure_seam",
+      "work_package": {
+        "recommended_commit": 1,
+        "name": "public bootstrap core"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "user-flow",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "production-user-flow",
+            "alias_note": "suite label 'user-flow' corresponds to registered test 'production-user-flow'",
+            "script": "scripts/run_user_flow_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "false_liveness_company_screen",
+      "work_package": {
+        "recommended_commit": 1,
+        "name": "public bootstrap core"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "user-flow",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "production-user-flow",
+            "alias_note": "suite label 'user-flow' corresponds to registered test 'production-user-flow'",
+            "script": "scripts/run_user_flow_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "package_bootstrap_missing",
+      "work_package": {
+        "recommended_commit": 1,
+        "name": "public bootstrap core"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "user-flow",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "production-user-flow",
+            "alias_note": "suite label 'user-flow' corresponds to registered test 'production-user-flow'",
+            "script": "scripts/run_user_flow_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "bootstrap_import_failure_not_typed",
+      "work_package": {
+        "recommended_commit": 2,
+        "name": "bootstrap mutation tests"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "packaged-path-acceptance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "packaged-path-acceptance",
+            "script": "scripts/run_packaged_path_acceptance_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "partial_company_screen_escape",
+      "work_package": {
+        "recommended_commit": 2,
+        "name": "bootstrap mutation tests"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "packaged-path-acceptance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "packaged-path-acceptance",
+            "script": "scripts/run_packaged_path_acceptance_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "archive_member_drift",
+      "work_package": {
+        "recommended_commit": 2,
+        "name": "bootstrap mutation tests"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "public-bootstrap",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "public-bootstrap",
+            "script": "scripts/run_public_bootstrap_tests.mjs"
+          }
+        },
+        {
+          "suite": "packaged-path-acceptance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "packaged-path-acceptance",
+            "script": "scripts/run_packaged_path_acceptance_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "url_path_portability",
+      "work_package": {
+        "recommended_commit": 3,
+        "name": "runtime-doctor portability and physical host proof"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-doctor",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-doctor",
+            "script": "scripts/run_runtime_doctor_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-policy",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-policy",
+            "script": "scripts/run_disk_space_policy_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-measurement-builder",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-measurement-builder",
+            "script": "scripts/run_disk_space_measurement_builder_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "permission_only_work_root_probe",
+      "work_package": {
+        "recommended_commit": 3,
+        "name": "runtime-doctor portability and physical host proof"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-doctor",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-doctor",
+            "script": "scripts/run_runtime_doctor_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-policy",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-policy",
+            "script": "scripts/run_disk_space_policy_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-measurement-builder",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-measurement-builder",
+            "script": "scripts/run_disk_space_measurement_builder_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "unmeasured_disk_space",
+      "work_package": {
+        "recommended_commit": 3,
+        "name": "runtime-doctor portability and physical host proof"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-doctor",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-doctor",
+            "script": "scripts/run_runtime_doctor_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-policy",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-policy",
+            "script": "scripts/run_disk_space_policy_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-measurement-builder",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-measurement-builder",
+            "script": "scripts/run_disk_space_measurement_builder_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "late_host_failure",
+      "work_package": {
+        "recommended_commit": 3,
+        "name": "runtime-doctor portability and physical host proof"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-doctor",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-doctor",
+            "script": "scripts/run_runtime_doctor_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-policy",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-policy",
+            "script": "scripts/run_disk_space_policy_tests.mjs"
+          }
+        },
+        {
+          "suite": "disk-space-measurement-builder",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "disk-space-measurement-builder",
+            "script": "scripts/run_disk_space_measurement_builder_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "one_interpreter_closure",
+      "work_package": {
+        "recommended_commit": 4,
+        "name": "compatibility and installed-host capability smoke"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-compatibility",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-compatibility",
+            "script": "scripts/run_runtime_compatibility_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-filings-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-filings-capability",
+            "script": "scripts/run_installed_filings_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "libreoffice-workbook-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "libreoffice-workbook-capability",
+            "script": "scripts/run_libreoffice_workbook_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-inline-xbrl-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-inline-xbrl-capability",
+            "script": "scripts/run_installed_inline_xbrl_probe_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "lazy_fitz_help_smoke",
+      "work_package": {
+        "recommended_commit": 4,
+        "name": "compatibility and installed-host capability smoke"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-compatibility",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-compatibility",
+            "script": "scripts/run_runtime_compatibility_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-filings-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-filings-capability",
+            "script": "scripts/run_installed_filings_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "libreoffice-workbook-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "libreoffice-workbook-capability",
+            "script": "scripts/run_libreoffice_workbook_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-inline-xbrl-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-inline-xbrl-capability",
+            "script": "scripts/run_installed_inline_xbrl_probe_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "libreoffice_exists_not_works",
+      "work_package": {
+        "recommended_commit": 4,
+        "name": "compatibility and installed-host capability smoke"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-compatibility",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-compatibility",
+            "script": "scripts/run_runtime_compatibility_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-filings-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-filings-capability",
+            "script": "scripts/run_installed_filings_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "libreoffice-workbook-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "libreoffice-workbook-capability",
+            "script": "scripts/run_libreoffice_workbook_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-inline-xbrl-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-inline-xbrl-capability",
+            "script": "scripts/run_installed_inline_xbrl_probe_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "inline_xbrl_host_unproven",
+      "work_package": {
+        "recommended_commit": 4,
+        "name": "compatibility and installed-host capability smoke"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-compatibility",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-compatibility",
+            "script": "scripts/run_runtime_compatibility_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-filings-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-filings-capability",
+            "script": "scripts/run_installed_filings_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "libreoffice-workbook-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "libreoffice-workbook-capability",
+            "script": "scripts/run_libreoffice_workbook_capability_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-inline-xbrl-capability",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-inline-xbrl-capability",
+            "script": "scripts/run_installed_inline_xbrl_probe_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "custody-deferred",
+      "closure_basis": "remediation tooling verified locally; final closure withheld because the finding asserts an environment fact this workstation cannot evidence",
+      "deferred_reason": "Probe module and its synthetic test suite are verified locally, but the capability claim itself requires execution on an installed inactive-slot host (map external_evidence_required: 'inactive-slot installation receipt', 'installed-host black-box matrix'). No such host is available to this closure pass."
+    },
+    {
+      "finding_id": "self_attested_host_receipt",
+      "work_package": {
+        "recommended_commit": 5,
+        "name": "independent installed-capability oracle"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "installed-capability-independent-oracle",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-independent-oracle",
+            "script": "scripts/run_installed_capability_oracle_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-capability-receipt-v13",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-receipt-v13",
+            "script": "scripts/run_installed_capability_receipt_v13_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "pointer_hash_unverified",
+      "work_package": {
+        "recommended_commit": 5,
+        "name": "independent installed-capability oracle"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "installed-capability-independent-oracle",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-independent-oracle",
+            "script": "scripts/run_installed_capability_oracle_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-capability-receipt-v13",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-receipt-v13",
+            "script": "scripts/run_installed_capability_receipt_v13_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "installed_inventory_oracle_missing",
+      "work_package": {
+        "recommended_commit": 5,
+        "name": "independent installed-capability oracle"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "installed-capability-independent-oracle",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-independent-oracle",
+            "script": "scripts/run_installed_capability_oracle_tests.mjs"
+          }
+        },
+        {
+          "suite": "installed-capability-receipt-v13",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "installed-capability-receipt-v13",
+            "script": "scripts/run_installed_capability_receipt_v13_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "host_ready_misrepresented_as_production",
+      "work_package": {
+        "recommended_commit": 6,
+        "name": "runtime mode and durable screen-session contract"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-mode",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-mode-derived-installed-identity",
+            "alias_note": "suite label 'runtime-mode' corresponds to registered test 'runtime-mode-derived-installed-identity'",
+            "script": "scripts/run_runtime_mode_tests.mjs"
+          }
+        },
+        {
+          "suite": "screen-session-one-use-binding",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "screen-session-one-use-binding",
+            "script": "scripts/run_screen_session_tests.mjs"
+          }
+        },
+        {
+          "suite": "phase3-runtime-session-integration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "phase3-runtime-session-integration",
+            "script": "scripts/run_phase3_runtime_session_integration_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "temporary_screen_preflight",
+      "work_package": {
+        "recommended_commit": 6,
+        "name": "runtime mode and durable screen-session contract"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-mode",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-mode-derived-installed-identity",
+            "alias_note": "suite label 'runtime-mode' corresponds to registered test 'runtime-mode-derived-installed-identity'",
+            "script": "scripts/run_runtime_mode_tests.mjs"
+          }
+        },
+        {
+          "suite": "screen-session-one-use-binding",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "screen-session-one-use-binding",
+            "script": "scripts/run_screen_session_tests.mjs"
+          }
+        },
+        {
+          "suite": "phase3-runtime-session-integration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "phase3-runtime-session-integration",
+            "script": "scripts/run_phase3_runtime_session_integration_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "cross_session_receipt_reuse",
+      "work_package": {
+        "recommended_commit": 6,
+        "name": "runtime mode and durable screen-session contract"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-mode",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-mode-derived-installed-identity",
+            "alias_note": "suite label 'runtime-mode' corresponds to registered test 'runtime-mode-derived-installed-identity'",
+            "script": "scripts/run_runtime_mode_tests.mjs"
+          }
+        },
+        {
+          "suite": "screen-session-one-use-binding",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "screen-session-one-use-binding",
+            "script": "scripts/run_screen_session_tests.mjs"
+          }
+        },
+        {
+          "suite": "phase3-runtime-session-integration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "phase3-runtime-session-integration",
+            "script": "scripts/run_phase3_runtime_session_integration_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "static_screen_continuation",
+      "work_package": {
+        "recommended_commit": 6,
+        "name": "runtime mode and durable screen-session contract"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "runtime-mode",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "runtime-mode-derived-installed-identity",
+            "alias_note": "suite label 'runtime-mode' corresponds to registered test 'runtime-mode-derived-installed-identity'",
+            "script": "scripts/run_runtime_mode_tests.mjs"
+          }
+        },
+        {
+          "suite": "screen-session-one-use-binding",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "screen-session-one-use-binding",
+            "script": "scripts/run_screen_session_tests.mjs"
+          }
+        },
+        {
+          "suite": "phase3-runtime-session-integration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "phase3-runtime-session-integration",
+            "script": "scripts/run_phase3_runtime_session_integration_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "committed_self_attestation",
+      "work_package": {
+        "recommended_commit": 7,
+        "name": "exact-head CI and external evidence custody"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "sha": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "subject": "fix exact-head release smoke fixture",
+          "date": "2026-08-21T07:32:53+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "ci-governance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "ci-governance-read-only",
+            "alias_note": "suite label 'ci-governance' corresponds to registered test 'ci-governance-read-only'",
+            "script": "scripts/run_ci_governance_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-package-ci",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "independent-exact-head-package-ci",
+            "alias_note": "suite label 'exact-head-package-ci' corresponds to registered test 'independent-exact-head-package-ci'",
+            "script": "scripts/run_exact_head_package_ci_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-ci-job-receipt",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "exact-head-ci-job-receipt-projection",
+            "alias_note": "suite label 'exact-head-ci-job-receipt' corresponds to registered test 'exact-head-ci-job-receipt-projection'",
+            "script": "scripts/run_exact_head_ci_job_receipt_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "custody-deferred",
+      "closure_basis": "remediation tooling verified locally; final closure withheld because the finding asserts an environment fact this workstation cannot evidence",
+      "deferred_reason": "Exact-head CI machinery is verified locally via synthetic suites, but genuine closure requires a real GitHub Actions exact-head run binding external evidence ('GitHub Actions exact-head run and artifact hashes' per map external_evidence_required); no hosted run exists yet."
+    },
+    {
+      "finding_id": "untruthful_exact_head_gate",
+      "work_package": {
+        "recommended_commit": 7,
+        "name": "exact-head CI and external evidence custody"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "sha": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "subject": "fix exact-head release smoke fixture",
+          "date": "2026-08-21T07:32:53+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "ci-governance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "ci-governance-read-only",
+            "alias_note": "suite label 'ci-governance' corresponds to registered test 'ci-governance-read-only'",
+            "script": "scripts/run_ci_governance_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-package-ci",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "independent-exact-head-package-ci",
+            "alias_note": "suite label 'exact-head-package-ci' corresponds to registered test 'independent-exact-head-package-ci'",
+            "script": "scripts/run_exact_head_package_ci_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-ci-job-receipt",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "exact-head-ci-job-receipt-projection",
+            "alias_note": "suite label 'exact-head-ci-job-receipt' corresponds to registered test 'exact-head-ci-job-receipt-projection'",
+            "script": "scripts/run_exact_head_ci_job_receipt_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "custody-deferred",
+      "closure_basis": "remediation tooling verified locally; final closure withheld because the finding asserts an environment fact this workstation cannot evidence",
+      "deferred_reason": "Gate compiler/verifier scripts verified locally; final proof requires the actual hosted exact-head CI run whose receipts the gate now projects ('GitHub Actions exact-head run and artifact hashes' per map external_evidence_required)."
+    },
+    {
+      "finding_id": "package_reproducibility_unproven",
+      "work_package": {
+        "recommended_commit": 7,
+        "name": "exact-head CI and external evidence custody"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "sha": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "subject": "fix exact-head release smoke fixture",
+          "date": "2026-08-21T07:32:53+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "ci-governance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "ci-governance-read-only",
+            "alias_note": "suite label 'ci-governance' corresponds to registered test 'ci-governance-read-only'",
+            "script": "scripts/run_ci_governance_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-package-ci",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "independent-exact-head-package-ci",
+            "alias_note": "suite label 'exact-head-package-ci' corresponds to registered test 'independent-exact-head-package-ci'",
+            "script": "scripts/run_exact_head_package_ci_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-ci-job-receipt",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "exact-head-ci-job-receipt-projection",
+            "alias_note": "suite label 'exact-head-ci-job-receipt' corresponds to registered test 'exact-head-ci-job-receipt-projection'",
+            "script": "scripts/run_exact_head_ci_job_receipt_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "custody-deferred",
+      "closure_basis": "remediation tooling verified locally; final closure withheld because the finding asserts an environment fact this workstation cannot evidence",
+      "deferred_reason": "Double-build comparison tooling verified locally; reproducibility is only proven by a real hosted double build producing matching archive identities ('final reproducible package identities' per map external_evidence_required)."
+    },
+    {
+      "finding_id": "mutation_measurement_omission",
+      "work_package": {
+        "recommended_commit": 7,
+        "name": "exact-head CI and external evidence custody"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "sha": "07779c751d6c41c01d3be3ed7c6defe237382fe4",
+          "subject": "fix exact-head release smoke fixture",
+          "date": "2026-08-21T07:32:53+01:00",
+          "exists_in_history": true
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "ci-governance",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "ci-governance-read-only",
+            "alias_note": "suite label 'ci-governance' corresponds to registered test 'ci-governance-read-only'",
+            "script": "scripts/run_ci_governance_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-package-ci",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "independent-exact-head-package-ci",
+            "alias_note": "suite label 'exact-head-package-ci' corresponds to registered test 'independent-exact-head-package-ci'",
+            "script": "scripts/run_exact_head_package_ci_tests.mjs"
+          }
+        },
+        {
+          "suite": "exact-head-ci-job-receipt",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "exact-head-ci-job-receipt-projection",
+            "alias_note": "suite label 'exact-head-ci-job-receipt' corresponds to registered test 'exact-head-ci-job-receipt-projection'",
+            "script": "scripts/run_exact_head_ci_job_receipt_tests.mjs"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "custody-deferred",
+      "closure_basis": "remediation tooling verified locally; final closure withheld because the finding asserts an environment fact this workstation cannot evidence",
+      "deferred_reason": "Mutation-measurement receipt projection verified locally against synthetic inputs; authoritative survived-mutant measurement must come from the hosted exact-head mutation job ('GitHub Actions exact-head run and artifact hashes' per map external_evidence_required)."
+    },
+    {
+      "finding_id": "candidate_identity_reuse",
+      "work_package": {
+        "recommended_commit": 8,
+        "name": "candidate preparation and immutable predecessor preservation"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "HEAD_CONTAINING_THIS_MAP",
+          "sha": "eba52045b238d2777167ee0025476728cae00e0a",
+          "subject": "document v3.7.9 candidate audit mapping",
+          "date": "2026-08-21T07:56:39+01:00",
+          "exists_in_history": true,
+          "placeholder_resolution": "HEAD_CONTAINING_THIS_MAP resolves to the commit that introduced audit/v379/commit-to-finding-map.json (eba52045b238), consistent with consolidation_policy.mapping_semantics."
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "skill-version-declaration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "skill-version-declaration",
+            "script": "scripts/run_skill_version_declaration_tests.mjs"
+          }
+        },
+        {
+          "suite": "v378-preservation",
+          "verified": true,
+          "resolution": {
+            "source": "scripts/",
+            "reference": "scripts/verify_v378_preservation.mjs",
+            "alias_note": "no development-test-registry entry; standalone verifier script"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "predecessor_package_overwrite",
+      "work_package": {
+        "recommended_commit": 8,
+        "name": "candidate preparation and immutable predecessor preservation"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "HEAD_CONTAINING_THIS_MAP",
+          "sha": "eba52045b238d2777167ee0025476728cae00e0a",
+          "subject": "document v3.7.9 candidate audit mapping",
+          "date": "2026-08-21T07:56:39+01:00",
+          "exists_in_history": true,
+          "placeholder_resolution": "HEAD_CONTAINING_THIS_MAP resolves to the commit that introduced audit/v379/commit-to-finding-map.json (eba52045b238), consistent with consolidation_policy.mapping_semantics."
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "skill-version-declaration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "skill-version-declaration",
+            "script": "scripts/run_skill_version_declaration_tests.mjs"
+          }
+        },
+        {
+          "suite": "v378-preservation",
+          "verified": true,
+          "resolution": {
+            "source": "scripts/",
+            "reference": "scripts/verify_v378_preservation.mjs",
+            "alias_note": "no development-test-registry entry; standalone verifier script"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    },
+    {
+      "finding_id": "candidate_release_notes_missing",
+      "work_package": {
+        "recommended_commit": 8,
+        "name": "candidate preparation and immutable predecessor preservation"
+      },
+      "mapped_commits": [
+        {
+          "mapped_as": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "sha": "d5eea9dee3d6bb04fb7908f64c414f065331809e",
+          "subject": "harden Excel Inflow v3.7.9 candidate",
+          "date": "2026-08-21T07:25:51+01:00",
+          "exists_in_history": true
+        },
+        {
+          "mapped_as": "HEAD_CONTAINING_THIS_MAP",
+          "sha": "eba52045b238d2777167ee0025476728cae00e0a",
+          "subject": "document v3.7.9 candidate audit mapping",
+          "date": "2026-08-21T07:56:39+01:00",
+          "exists_in_history": true,
+          "placeholder_resolution": "HEAD_CONTAINING_THIS_MAP resolves to the commit that introduced audit/v379/commit-to-finding-map.json (eba52045b238), consistent with consolidation_policy.mapping_semantics."
+        }
+      ],
+      "commits_verified": true,
+      "proof_suites": [
+        {
+          "suite": "skill-version-declaration",
+          "verified": true,
+          "resolution": {
+            "source": "assets/development-test-registry.json",
+            "reference": "skill-version-declaration",
+            "script": "scripts/run_skill_version_declaration_tests.mjs"
+          }
+        },
+        {
+          "suite": "v378-preservation",
+          "verified": true,
+          "resolution": {
+            "source": "scripts/",
+            "reference": "scripts/verify_v378_preservation.mjs",
+            "alias_note": "no development-test-registry entry; standalone verifier script"
+          }
+        }
+      ],
+      "suites_verified": true,
+      "local_verification": "pass",
+      "status": "closed",
+      "closure_basis": "mapped consolidated commit present in history; every mapped proof suite resolves to a registered development-test-registry entry or an in-repo verifier script"
+    }
+  ],
+  "summary": {
+    "total": 28,
+    "closed": 23,
+    "custody_deferred": 5,
+    "open": 0
+  }
+}

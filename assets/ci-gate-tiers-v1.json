@@ -7,7 +7,7 @@
     "quarantine_requires_owner_and_expiry": true,
     "quarantine_max_days": 30,
     "quarantine_may_not_target_authoritative_capability": true,
-    "pr_tier_content_frozen_by": "P7.7 — the pull-request tier's lanes, fixtures, representative case and aggregation are unchanged by the tier split; only the tier DECLARATION check was added to it."
+    "pr_tier_content_frozen_by": "P7.7 \u2014 the pull-request tier's lanes, fixtures, representative case and aggregation are unchanged by the tier split; only the tier DECLARATION check was added to it."
   },
   "owners": [
     "runtime-governance",
@@ -81,22 +81,22 @@
     {
       "id": "generated_cohort_volume_300",
       "authoritative": false,
-      "statement": "The registered generated-case cohort suite at its ci_default volume — 300 seeded cases, every declared dimension value reached, seed registry replayed."
+      "statement": "The registered generated-case cohort suite at its ci_default volume \u2014 300 seeded cases, every declared dimension value reached, seed registry replayed."
     },
     {
       "id": "generated_cohort_volume_2500",
       "authoritative": false,
-      "statement": "The generated-case cohort at the declared pr volume — 2,500 seeded cases from the same declared root seed."
+      "statement": "The generated-case cohort at the declared pr volume \u2014 2,500 seeded cases from the same declared root seed."
     },
     {
       "id": "generated_cohort_volume_10000",
       "authoritative": false,
-      "statement": "The generated-case cohort at the declared nightly volume — 10,000 seeded cases."
+      "statement": "The generated-case cohort at the declared nightly volume \u2014 10,000 seeded cases."
     },
     {
       "id": "generated_cohort_volume_25000",
       "authoritative": false,
-      "statement": "The generated-case cohort at the declared weekly volume — 25,000 seeded cases."
+      "statement": "The generated-case cohort at the declared weekly volume \u2014 25,000 seeded cases."
     },
     {
       "id": "frozen_cohort_32_recipe_full_pipeline",
@@ -329,7 +329,7 @@
         }
       ],
       "not_claimed": [
-        "seed rotation — every scheduled tier generates from the SAME declared root seed 7730000, so a deeper volume is a WIDER prefix of one deterministic sequence, not a fresh sample",
+        "seed rotation \u2014 every scheduled tier generates from the SAME declared root seed 7730000, so a deeper volume is a WIDER prefix of one deterministic sequence, not a fresh sample",
         "native Excel behaviour",
         "release readiness"
       ]
@@ -425,7 +425,7 @@
         }
       ],
       "not_claimed": [
-        "seed rotation — the same declared root seed 7730000 is used, so this is the widest prefix of one deterministic sequence",
+        "seed rotation \u2014 the same declared root seed 7730000 is used, so this is the widest prefix of one deterministic sequence",
         "native Excel behaviour",
         "release readiness"
       ]
@@ -433,7 +433,8 @@
   ],
   "quarantine": {
     "statement": "A quarantined job still RUNS and still retains its evidence; only its verdict is non-blocking, and only until the declared expiry. On or after the expiry the tier check refuses, which fails the pull-request gate. An authoritative capability can never be quarantined.",
-    "entries": [
+    "entries": [],
+    "retired": [
       {
         "id": "frozen-cohort-compiler-membership-order",
         "target_kind": "tier_job",
@@ -443,7 +444,10 @@
         "expires": "2026-09-17",
         "reason": "Un-darkening scripts/run_frozen_cohort.mjs surfaced pre-existing, seed-independent defects that make the frozen 32-recipe cohort UNCOMPILABLE at HEAD, so the nightly job is red on its first run. Defect 1: scripts/compile_synthetic_cohort.mjs:1041 seals consensus contributors in the fixed house order [Northstar Securities, Harbour Lane Research, Moorland Capital] while scripts/lib/broker_consensus.mjs:85-92 requires them unique AND canonically sorted, so every case fails validateCaseShape with 'Broker consensus membership contributors must be unique and canonically ordered'. Defect 2, proved by re-running the compiler with defect 1 patched in a throwaway probe copy: C1 then fails forecast-authority validation with 'change_in_working_capital has mixed aggregate forecast ownership in period 1: parent method broker_consensus coexists with live children wc_receivables:explicit_zero, wc_inventory:explicit_zero, wc_payables:explicit_zero'. Both are in scripts/compile_synthetic_cohort.mjs, which P7.7 may not edit. The job is WIRED and RUNS; only its verdict is non-blocking, and only until the declared expiry.",
         "repair": "At least two independent repairs in scripts/compile_synthetic_cohort.mjs, REPORTED not performed: (1) sort the contributor list at :1041 ([...names].sort()) so the seal satisfies broker_consensus.mjs:85-92; (2) stop the compiler emitting explicit_zero working-capital children under a broker_consensus change_in_working_capital parent (either give the parent derived_from_children authority or leave the children unstated). Defect 2 is not a one-liner and is the reason this quarantine exists rather than a same-package fix.",
-        "tracking": "programme/P7.7_issue_card.md"
+        "tracking": "programme/P7.7_issue_card.md",
+        "retired": "2026-08-21",
+        "retired_by": "agent/mp-C-quarantine-truth",
+        "receipt": "RETIRED 2026-08-21 by agent/mp-C-quarantine-truth after the frozen 32-recipe cohort compiled clean end to end (node scripts/run_ci_gate_tier_tests.mjs --emit-frozen-manifest, then node scripts/compile_synthetic_cohort.mjs <manifest> --bases test-fixtures/cases: status PASS, expected 32, emitted 32, schema_valid 32, coverage_ready 32, solver_pass 32, descriptor_conformance 32). Repairs performed in scripts/compile_synthetic_cohort.mjs: (1) defect 1 as reported - makeThreeHouseBrokerPack sorts the house roster once so the sealed contributor list satisfies scripts/lib/broker_consensus.mjs unique+canonically-sorted membership; consensus maths averages included houses, so ordering never moves a synthesised value. (2) defect 2 as reported - addWorkingChildren's reported-parent branch now declares explicit stand-down forecast authorities (method not_applicable, source_kind none) on each visible working-capital child instead of leaving blanks for the legacy inference to mint into live explicit_zero forecasts under a broker_consensus parent. (3) BEYOND THE REPORTED SCOPE, surfaced only after (1)+(2): the loss-restatement overlay stood its component children down under an accounting_identity combined parent, which forecast-authority validation refuses as incomplete children-owned forecast authority; repaired by leaving each component child live with a revenue-scaled roll-forward (forecast_treatment formula, prior_period_scaled_by [own row_id, revenue]) so the family stays child-owned and the restated combined total reconciles exactly. (4) BEYOND THE REPORTED SCOPE, first failure at C22: the multi-category-capex overlay had mixed ownership of the same family - broker_consensus-reported_parent capex coexisting with live explicit_zero children capex_maintenance/capex_growth/capex_intangible; repaired with the same explicit stand-down-authority declaration as (2). No further member of this defect family surfaced: C23-C32 compiled clean on the next run. COSMETIC CORRECTION to the reason text: it says the cohort fails at C1 with the change_in_working_capital error once defect 1 is patched; the actual first failure after patching defect 1 was C3 (C1 and C2 pass), same error signature. The defects were seed-independent as claimed. The nightly job's verdict returns to blocking on its next scheduled run."
       }
     ]
   }

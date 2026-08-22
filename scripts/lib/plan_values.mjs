@@ -78,6 +78,9 @@ function columnNameOf(number) {
 
 const FUNCTIONS = new Set([
   "IF", "IFERROR", "AND", "OR", "SUM", "AVERAGE", "COUNT", "MIN", "MAX", "ROUND", "ABS", "DATE",
+  // B11 n/m guard: leverage ratios render IF(N(denominator)=0, "n/m", ...) —
+  // N() coerces a blank/text cell to 0 so the zero-denominator test is exact.
+  "N", "ISNUMBER",
 ]);
 
 // A reference, with an optional quoted sheet name and an optional second
@@ -492,6 +495,19 @@ class Evaluator {
     if (name === "ABS") {
       const value = toNumber(this.evaluate(args[0], sheetName));
       return isError(value) ? value : Math.abs(value);
+    }
+    if (name === "N") {
+      // Excel N(): a number passes through; text, booleans-as-text and blanks
+      // coerce to 0. Used by the B11 n/m guard so the zero-denominator test is
+      // exact against blank cells.
+      const value = this.evaluate(args[0], sheetName);
+      if (isError(value)) return value;
+      if (value === EMPTY) return 0;
+      return typeof value === "number" ? value : 0;
+    }
+    if (name === "ISNUMBER") {
+      const value = this.evaluate(args[0], sheetName);
+      return isError(value) ? value : typeof value === "number";
     }
     // SUM, MIN and MAX take ranges and ignore text, blanks and booleans inside
     // them — Excel's own rule, and the one that keeps a label in a summed

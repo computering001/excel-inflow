@@ -1,7 +1,6 @@
 # Excel Inflow runtime core
 
 ## Outcome
-
 Build a formula-driven corporate debt-overlay workbook with exactly **three historical and three forecast years**. The output must follow one of two standardised design profiles: maximal for full debt, lease, RCF, interest and optional acquisition topology; net cash only for a simple opening-net-cash issuer with no more than two instruments and acquisition off.
 
 ### Non-bypassable end-user route
@@ -39,7 +38,6 @@ The package contains the design contract, style tokens and renderer, but no work
 Deliver a model, not a populated form. Totals, ratios, roll-forwards, pro forma outputs and cross-sheet values are formulas. Hardcode only sourced or expressly supplied inputs. Use blue font for hardcodes, black for same-sheet formulas, green for links to another sheet and white for section titles. Grey fill means intentionally not calculated, never zero and never forecast generally.
 
 ## Production architecture
-
 Run one deterministic graph:
 
 `normalise evidence -> classify issuer rows -> compile semantic graph -> coverage gate -> solve economics -> compile row plan -> emit -> recalculate -> terminal patch -> verify -> render -> deliver`
@@ -199,7 +197,6 @@ Read only the reference needed for the current stage:
 - `validation.md` before interpreting or reporting a validation result.
 
 ## Scope
-
 Always include visible controls, company-specific income-statement and cash-flow rows required by the debt overlay, adjusted EBITDA, free cash flow, instrument-level debt, RCF liquidity, interest, leases when relevant, leverage and an optional lightweight acquisition case.
 
 Use exactly three historical periods and three forecast periods. Do not add ratings analysis, a full balance sheet, a central checks sheet, detailed working-capital schedules, a central source register, debt-issuance-cost roll-forwards or target net debt for acquisitions.
@@ -207,7 +204,6 @@ Use exactly three historical periods and three forecast periods. Do not add rati
 The model is flexible in semantic rows and instrument count, not in presentation grammar. It may handle IFRS or US GAAP labels, net cash or levered issuers, fixed or floating debt, multi-currency instruments, predecessor combinations, calendarisation, restatements, large cash-flow statements, unusual working-capital splits, unusual debt cash-flow splits and RCF capacity stress.
 
 ## User flow and evidence
-
 ### Ordinary chat invocation
 
 **Strict fresh-chat isolation.** On an exact bare `run excel inflow` request,
@@ -699,7 +695,6 @@ node scripts/flow_cli.mjs deliver <answered-case.json> --out <delivery-result.js
 ```
 
 ## Build rules
-
 Select the profile from the normalised case. Net cash requires opening debt plus lease liabilities less eligible cash below zero, no more than two instruments and acquisition off; otherwise use maximal. Expand semantic rows only inside the selected profile's zones.
 
 Use issuer-reported rows where material. Preserve unusual impairment, restructuring, pension, working-capital, tax, investing and financing lines rather than forcing generic labels. A cash-flow impairment reversal is distinct from an income-statement impairment charge even when wording overlaps. Aggregate detailed working-capital and debt cash-flow components into visible parent rows only when every child remains represented in the semantic graph and the parent formula closes.
@@ -775,7 +770,6 @@ screen; a dirty one stops once at the COMPILE FINDINGS screen with the
 complete list, nothing serial.
 
 ## Validation and certification
-
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.
 
 An ordinary production company run invokes only the public
@@ -886,7 +880,6 @@ Once issuer identity is known, filings sourcing, DCS parsing and broker-native p
 Every user-visible run writes an `experience-trace/1.0`. Time is classified as `excel_inflow_active`, `known_external_wait` or `unknown`. Known Rogo/model-host/source-retrieval waits remain visible in end-user wall time but are not treated as unowned Excel Inflow work. Initial release coverage is at least 95% classified, with 98% the engineering target. Unknown gaps above 30 seconds warn, above 120 seconds require investigation and above 300 seconds block certification unless reclassified from evidence as a known external/platform wait. These thresholds never justify skipping validation.
 
 ## Completion
-
 Deliver one workbook, its normalised case, its evidence-run receipt and a concise
 summary naming the selected standardised profile, broker anchor, assumptions,
 unresolved gaps and validation status. The case file is the rebuild carrier;

@@ -62,6 +62,7 @@ export const FORMULA_FUNCTIONS = Object.freeze([
   "COUNT",
   "ISNUMBER",
   "DATE",
+  "N",
 ]);
 
 /** Closed binary-operator vocabulary, with Excel's precedence levels. */
@@ -733,4 +734,139 @@ export function parseExpressionExactly(text) {
     );
   }
   return node;
+}
+
+// ---------------------------------------------------------------------------
+// CELL-REFERENCE STRING BUILDING (decomposition slice 1).
+//
+// Moved verbatim from `build_dynamic_model.mjs`: the A1 column arithmetic and
+// the reference-compaction helpers that turn an ordered set of cells into the
+// shortest faithful SUM expression. They sit beside the AST primitives because
+// that is what they emit through — `cellTermAst` and the `sumCell*` family are
+// thin, total constructors over `ref`/`opaqueRef`/`range`/`call` above. Pure
+// functions over their arguments only; nothing here closes over build state.
+// ---------------------------------------------------------------------------
+
+export function columnName(number) {
+  let value = number;
+  let result = "";
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+  return result;
+}
+
+export function columnNumber(name) {
+  let value = 0;
+  for (const character of name) {
+    value = value * 26 + (character.charCodeAt(0) - 64);
+  }
+  return value;
+}
+
+// Keep visible aggregation formulas as short as their semantic membership
+// permits. The row plan already decides WHICH cells belong to a total; this
+// helper changes only how that exact ordered set is written. Consecutive A1
+// references in the same column become one range, while gaps and expression
+// terms remain explicit. It therefore never pulls an intervening mechanics row
+// into a subtotal merely because that row sits between two selected balances.
+export const A1_ADDRESS_PATTERN = /^\$?[A-Z]+\$?[0-9]+$/;
+
+export function compactCellReferences(cells) {
+  const parse = (value) => {
+    const text = String(value);
+    const match = /^(\$?)([A-Z]+)(\$?)(\d+)$/.exec(text);
+    return match
+      ? {
+          text,
+          columnAbsolute: match[1],
+          column: match[2],
+          rowAbsolute: match[3],
+          row: Number(match[4]),
+        }
+      : null;
+  };
+  const terms = [];
+  for (let index = 0; index < cells.length; ) {
+    const first = parse(cells[index]);
+    if (!first) {
+      terms.push(String(cells[index]));
+      index += 1;
+      continue;
+    }
+    let last = first;
+    let next = index + 1;
+    while (next < cells.length) {
+      const candidate = parse(cells[next]);
+      if (
+        !candidate ||
+        candidate.column !== first.column ||
+        candidate.columnAbsolute !== first.columnAbsolute ||
+        candidate.rowAbsolute !== first.rowAbsolute ||
+        candidate.row !== last.row + 1
+      ) {
+        break;
+      }
+      last = candidate;
+      next += 1;
+    }
+    terms.push(last === first ? first.text : `${first.text}:${last.text}`);
+    index = next;
+  }
+  return terms;
+}
+
+/**
+ * One compacted term as a NODE (P5.2).
+ *
+ * `compactCellReferences` yields three shapes and only three: an A1 address, a
+ * contiguous `from:to` run it just folded, and a term this file was handed
+ * already formed and could not parse. Each gets the node that says which it is,
+ * so the join below is a call with arguments rather than a string with commas.
+ */
+export function cellTermAst(term) {
+  const text = String(term);
+  const colon = text.indexOf(":");
+  if (colon > 0) {
+    return range(cellTermAst(text.slice(0, colon)), cellTermAst(text.slice(colon + 1)));
+  }
+  return A1_ADDRESS_PATTERN.test(text) ? ref(text) : opaqueRef(text);
+}
+
+export function sumCellExpressionAst(cells) {
+  const terms = compactCellReferences(cells);
+  if (terms.length === 0) return literal(0);
+  if (terms.length === 1 && cells.length === 1) return cellTermAst(terms[0]);
+  return call("SUM", terms.map((term) => cellTermAst(term)));
+}
+
+export function sumCellExpression(cells) {
+  return renderExpression(sumCellExpressionAst(cells));
+}
+
+export function sumCellFormula(cells) {
+  return renderFormula(sumCellExpressionAst(cells));
+}
+
+// Expand an A1 range into its individual cell addresses. Used by the provenance
+// registry, which is keyed per cell because a range write and a cell write have
+// to be able to contradict each other in either order.
+export function rangeCells(address) {
+  const [first, last = first] = address.split(":");
+  const start = /^([A-Z]+)(\d+)$/.exec(first);
+  const end = /^([A-Z]+)(\d+)$/.exec(last);
+  if (!start || !end) return [];
+  const firstColumn = columnNumber(start[1]);
+  const lastColumn = columnNumber(end[1]);
+  const firstRow = Number(start[2]);
+  const lastRow = Number(end[2]);
+  const cells = [];
+  for (let column = Math.min(firstColumn, lastColumn); column <= Math.max(firstColumn, lastColumn); column += 1) {
+    for (let row = Math.min(firstRow, lastRow); row <= Math.max(firstRow, lastRow); row += 1) {
+      cells.push(`${columnName(column)}${row}`);
+    }
+  }
+  return cells;
 }

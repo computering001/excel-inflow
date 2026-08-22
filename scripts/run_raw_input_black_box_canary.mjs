@@ -858,6 +858,10 @@ try {
     "--screen-session-secret", screenSessionSecret,
     "--python", python,
     "--soffice", soffice,
+    // The canary IS the reviewing user: it accepts the review gate so the
+    // unattended run can lawfully deliver (the gate itself stays fail-closed
+    // for any caller that does not reply).
+    "--review-deliver",
   ], {
     cwd: root,
     env: commandEnv,

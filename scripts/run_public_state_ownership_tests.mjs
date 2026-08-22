@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRunner } from "./lib/test_harness.mjs";
 import { assertPublicStateOwnership } from "./lib/workflow_state.mjs";
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-assert.throws(() => assertPublicStateOwnership({ status: "ACTION_REQUIRED", blocker_class: "INTERNAL_WORK", user_blocking: false }));
-assert.throws(() => assertPublicStateOwnership({ status: "NEEDS_INTERNAL_WORK", blocker_class: "INTERNAL_WORK", user_blocking: true }));
-assert.doesNotThrow(() => assertPublicStateOwnership({ status: "ACTION_REQUIRED", blocker_class: "USER_DECISION", user_blocking: true }));
+
+const run = createRunner({ name: "public_state_ownership_tests", importMetaUrl: import.meta.url });
+run.throws(() => assertPublicStateOwnership({ status: "ACTION_REQUIRED", blocker_class: "INTERNAL_WORK", user_blocking: false }), undefined, "INTERNAL_WORK cannot own ACTION_REQUIRED");
+run.throws(() => assertPublicStateOwnership({ status: "NEEDS_INTERNAL_WORK", blocker_class: "INTERNAL_WORK", user_blocking: true }), undefined, "NEEDS_INTERNAL_WORK cannot be user-blocking");
+run.ok(assertPublicStateOwnership({ status: "ACTION_REQUIRED", blocker_class: "USER_DECISION", user_blocking: true }), "USER_DECISION owns ACTION_REQUIRED");
 // A text-proximity scan is a PROXY for the property, not the property. It fails
 // on any file where the two tokens land within 220 characters of each other --
 // including the correct ternary in run_user_flow.mjs that routes an internal
@@ -24,16 +24,16 @@ assert.doesNotThrow(() => assertPublicStateOwnership({ status: "ACTION_REQUIRED"
 const RISKY = /ACTION_REQUIRED[\s\S]{0,220}INTERNAL_WORK|INTERNAL_WORK[\s\S]{0,220}ACTION_REQUIRED/;
 let enforcingFiles = 0;
 for (const relative of ["scripts/run_excel_inflow_vnext.mjs", "scripts/run_user_flow.mjs", "scripts/lib/flow.mjs"]) {
-  const content = fs.readFileSync(path.join(root, relative), "utf8");
+  const content = fs.readFileSync(path.join(run.ROOT, relative), "utf8");
   const enforces =
     /\bassertPublicStateOwnership\b/.test(content) &&
     /assertPublicStateOwnership\s*\(/.test(content.replace(/import\s*\{[\s\S]*?\}\s*from[^;]*;/g, ""));
   if (enforces) enforcingFiles += 1;
-  assert.ok(enforces || !RISKY.test(content), relative);
+  run.ok(enforces || !RISKY.test(content), relative);
 }
 // run_user_flow.mjs enforces at its single result boundary, finish(). If that
 // call is deleted the count drops and this fails -- the enforcement cannot be
 // removed to make the proximity scan pass again.
-assert.ok(enforcingFiles >= 1, "at least one controller must ENFORCE public-state ownership, not merely avoid the string");
+run.ok(enforcingFiles >= 1, "at least one controller must ENFORCE public-state ownership, not merely avoid the string");
 
-console.log(JSON.stringify({ status: "PASS", checks: 7, enforcing_files: enforcingFiles }));
+run.finish({ enforcing_files: enforcingFiles });

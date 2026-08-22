@@ -58,6 +58,12 @@ const FIXTURES = path.join(REPO, "test-fixtures", "cases");
 const ARCHETYPES = path.join(REPO, "test-fixtures", "archetypes", "economics");
 
 let checks = 0;
+// Honest mutation accounting: every mutation() call applies a real defect to
+// a copy of the subject or an adversarial input, and is counted CAUGHT only
+// when production refuses it while the mutant is active. A surviving mutant
+// lands in `failures`, fails the suite, and no count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 const failures = [];
 function check(label, fn) {
   checks += 1;
@@ -66,6 +72,16 @@ function check(label, fn) {
   } catch (error) {
     failures.push(`${label}: ${error.message}`);
   }
+}
+function mutation(label, fn) {
+  mutations_total += 1;
+  try {
+    fn();
+  } catch (error) {
+    failures.push(`MUTATION ${label}: ${error.message}`);
+    return;
+  }
+  mutations_caught += 1;
 }
 
 const readCase = (file, { productionUnlock = false } = {}) => {
@@ -196,7 +212,7 @@ check("circularity OFF declares an empty vector and no iteration", () => {
   assert.equal(vectorOff.agrees, true);
 });
 
-check("MUTATION — a literal missing one SCC node is refused", () => {
+mutation("MUTATION — a literal missing one SCC node is refused", () => {
   const mutant = {
     ...literalOn,
     state_vector: literalOn.state_vector.slice(1),
@@ -206,7 +222,7 @@ check("MUTATION — a literal missing one SCC node is refused", () => {
   assert.equal(result.missing.length, 1);
 });
 
-check("MUTATION — a literal carrying a node outside the SCC is refused", () => {
+mutation("MUTATION — a literal carrying a node outside the SCC is refused", () => {
   // P4.10 — `statement.net_income` used to be the witness here and is now a
   // real member of the fixed point. `statement.ebit` replaces it: it is a
   // genuine source of the component and can never be inside it, because
@@ -226,7 +242,7 @@ check("MUTATION — a literal carrying a node outside the SCC is refused", () =>
   assert.deepEqual(result.extra, ["statement.ebit"]);
 });
 
-check("MUTATION — a literal with a wrong tolerance class is refused", () => {
+mutation("MUTATION — a literal with a wrong tolerance class is refused", () => {
   const mutant = {
     ...literalOn,
     state_vector: literalOn.state_vector.map((component, index) =>
@@ -238,7 +254,7 @@ check("MUTATION — a literal with a wrong tolerance class is refused", () => {
   assert.equal(result.tolerance_class_mismatches.length, 1);
 });
 
-check("MUTATION — a literal that duplicates a node is refused", () => {
+mutation("MUTATION — a literal that duplicates a node is refused", () => {
   const mutant = {
     ...literalOn,
     state_vector: [...literalOn.state_vector, literalOn.state_vector[0]],
@@ -582,7 +598,7 @@ check("TEETH — a repayment capped by the opening balance is named as such", ()
 // ---------------------------------------------------------------------------
 
 // M1 — a cycle introduced into the graph must be caught.
-check("M1 — an edge that drags a further node into the interest SCC is caught", () => {
+mutation("M1 — an edge that drags a further node into the interest SCC is caught", () => {
   // P4.10 — the old witness for this mutation was
   // `statement.net_income -> statement.cash_flow_start`, which is now a
   // DECLARED production edge because the solver has always walked it. The
@@ -607,7 +623,7 @@ check("M1 — an edge that drags a further node into the interest SCC is caught"
   assert.equal(result.agrees, false, "the solver's 17-entry vector survived a bigger SCC");
 });
 
-check("M1 — a self-loop introduced on a node is caught as a cyclic component", () => {
+mutation("M1 — a self-loop introduced on a node is caught as a cyclic component", () => {
   const mutant = structuredClone(EQUATION_GRAPH);
   mutant.edges.push({
     id: "edge.mutant_self_loop",
@@ -623,7 +639,7 @@ check("M1 — a self-loop introduced on a node is caught as a cyclic component",
     ), JSON.stringify(derived.cyclic_components));
 });
 
-check("M1 — a SECOND cycle, wholly outside the interest SCC, is still caught", () => {
+mutation("M1 — a SECOND cycle, wholly outside the interest SCC, is still caught", () => {
   // Reversing the debt-schedule aggregation closes a two-node loop that never
   // touches the interest feedback: the graph now has TWO components to
   // iterate, and a solver declaring one is no longer describing it.
@@ -654,7 +670,7 @@ check("M1 — a SECOND cycle, wholly outside the interest SCC, is still caught",
   assert.deepEqual(result.missing, ["debt.mandatory_repayment", "debt.maturity_repayment"]);
 });
 
-check("M1 — the case's OWN solve refuses a graph whose SCC no longer matches", () => {
+mutation("M1 — the case's OWN solve refuses a graph whose SCC no longer matches", () => {
   // The same mutation, but through the seam the solve actually runs: the
   // literal vector check inside `solveCase` is what stands between a mutated
   // graph and a silently-iterated wrong state vector.
@@ -682,7 +698,7 @@ check("M1 — the case's OWN solve refuses a graph whose SCC no longer matches",
 });
 
 // M2 — a non-converging case must be caught.
-check("M2 — a case that cannot converge in the allowed iterations is refused typed", () => {
+mutation("M2 — a case that cannot converge in the allowed iterations is refused typed", () => {
   const modelCase = readCase(path.join(FIXTURES, "standard-maximal-v2.json"), {
     productionUnlock: true,
   });
@@ -699,7 +715,7 @@ check("M2 — a case that cannot converge in the allowed iterations is refused t
   assert.equal(thrown.iterations, 1);
 });
 
-check("M2 — non-convergence never reaches a solution object", () => {
+mutation("M2 — non-convergence never reaches a solution object", () => {
   const modelCase = readCase(path.join(FIXTURES, "standard-maximal-v2.json"), {
     productionUnlock: true,
   });
@@ -712,7 +728,7 @@ check("M2 — non-convergence never reaches a solution object", () => {
   assert.equal(solution, null, "a non-converged solve returned a solution");
 });
 
-check("M2 — the convergence trace shows a residual above tolerance on every failed sweep", () => {
+mutation("M2 — the convergence trace shows a residual above tolerance on every failed sweep", () => {
   const modelCase = readCase(path.join(FIXTURES, "standard-maximal-v2.json"), {
     productionUnlock: true,
   });
@@ -738,7 +754,7 @@ check("M2 — TEETH: a solved corpus case would fail the same guard if its resid
 });
 
 // M3 — an oscillating case must be caught.
-check("M3 — a two-cycle iterate stream is classified as oscillating", () => {
+mutation("M3 — a two-cycle iterate stream is classified as oscillating", () => {
   // A loop with gain -1: the sweep flips between two points forever. The
   // STEP residual is pinned at 4 and never shrinks, which is exactly what a
   // stall looks like; only the TWO-CYCLE residual, which collapses to zero,
@@ -761,7 +777,7 @@ check("M3 — a two-cycle iterate stream is classified as oscillating", () => {
   assert.ok(verdict.two_cycle_detections > 30);
 });
 
-check("M3 — detectTwoCycle fires on a real oscillating iterate stream", () => {
+mutation("M3 — detectTwoCycle fires on a real oscillating iterate stream", () => {
   const iterates = [];
   let state = [1, 5];
   for (let index = 0; index < 6; index += 1) {
@@ -789,7 +805,7 @@ check("M3 — a monotonically converging stream is NOT called oscillating", () =
   assert.equal(verdict.converged, true);
 });
 
-check("M3 — a diverging stream is classified as diverging, not oscillating", () => {
+mutation("M3 — a diverging stream is classified as diverging, not oscillating", () => {
   const trace = [];
   let residual = 1e-3;
   for (let index = 0; index < 20; index += 1) {
@@ -799,7 +815,7 @@ check("M3 — a diverging stream is classified as diverging, not oscillating", (
   assert.equal(classifyIterationTrace(trace, 1e-8).classification, "diverging");
 });
 
-check("M3 — a stalled stream is classified as stalled", () => {
+mutation("M3 — a stalled stream is classified as stalled", () => {
   // Identical flat step residual to the oscillation above; the two-cycle
   // residual is what separates them.
   const trace = Array.from({ length: 20 }, (unused, index) => ({
@@ -849,7 +865,7 @@ check("M4 — every solved period sits at a zero residual of its OWN cash loop",
   }
 });
 
-check("M4 — a perturbed draw is rejected by the fixed-point residual", () => {
+mutation("M4 — a perturbed draw is rejected by the fixed-point residual", () => {
   for (const { label, solution } of solvedCases) {
     for (const period of solution.forecast) {
       const loop = period.graph_driven_solve.cash_loop;
@@ -862,7 +878,7 @@ check("M4 — a perturbed draw is rejected by the fixed-point residual", () => {
   }
 });
 
-check("M4 — a perturbed repayment is rejected by the fixed-point residual", () => {
+mutation("M4 — a perturbed repayment is rejected by the fixed-point residual", () => {
   for (const { label, solution } of solvedCases) {
     for (const period of solution.forecast) {
       const loop = period.graph_driven_solve.cash_loop;
@@ -875,7 +891,7 @@ check("M4 — a perturbed repayment is rejected by the fixed-point residual", ()
   }
 });
 
-check("M4 — a perturbed ending balance is rejected", () => {
+mutation("M4 — a perturbed ending balance is rejected", () => {
   for (const { solution } of solvedCases) {
     const loop = solution.forecast[0].graph_driven_solve.cash_loop;
     const mutant = { ...loop, ending_rcf_native: loop.ending_rcf_native + 1e-3 };
@@ -883,7 +899,7 @@ check("M4 — a perturbed ending balance is rejected", () => {
   }
 });
 
-check("M4 — a perturbed ending cash is rejected", () => {
+mutation("M4 — a perturbed ending cash is rejected", () => {
   for (const { solution } of solvedCases) {
     const loop = solution.forecast[0].graph_driven_solve.cash_loop;
     const mutant = { ...loop, ending_cash: loop.ending_cash + 1e-3 };
@@ -891,7 +907,7 @@ check("M4 — a perturbed ending cash is rejected", () => {
   }
 });
 
-check("M4 — both revolver legs positive at once is rejected", () => {
+mutation("M4 — both revolver legs positive at once is rejected", () => {
   for (const { solution } of solvedCases) {
     const loop = solution.forecast[0].graph_driven_solve.cash_loop;
     const mutant = { ...loop, draw_native: 5, repayment_native: 5 };
@@ -900,7 +916,7 @@ check("M4 — both revolver legs positive at once is rejected", () => {
   }
 });
 
-check("M4 — a draw taken while cash is already above the floor is rejected", () => {
+mutation("M4 — a draw taken while cash is already above the floor is rejected", () => {
   const loop = {
     minimum_cash: 100,
     cash_after_mandatory: 500,
@@ -925,7 +941,7 @@ check("M4 — a draw taken while cash is already above the floor is rejected", (
   assert.ok(residual.findings.includes("draw_without_cash_need"));
 });
 
-check("M4 — a capacity breach is rejected", () => {
+mutation("M4 — a capacity breach is rejected", () => {
   const loop = {
     minimum_cash: 100,
     cash_after_mandatory: -400,
@@ -989,4 +1005,4 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

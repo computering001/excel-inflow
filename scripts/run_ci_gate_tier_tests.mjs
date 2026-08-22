@@ -150,7 +150,14 @@ const live = validateRegister({ register, workflowTexts, registryTestIds });
 assert.deepEqual(live.violations, [], `CI_TIER_FAIL:\n${live.violations.join("\n")}`);
 checks += live.checks;
 
+// Honest mutation accounting: each mutate() applies one real defect to a
+// copy of the register and is counted CAUGHT only when the tier validator
+// refuses it while the mutant is active; a surviving mutant throws and no
+// count line is printed.
+let mutations_total = 0;
+let mutations_caught = 0;
 const mutate = (label, transform, expected) => {
+  mutations_total += 1;
   const mutated = transform({
     register: structuredClone(register),
     workflowTexts: new Map(workflowTexts),
@@ -167,10 +174,36 @@ const mutate = (label, transform, expected) => {
     `mutation "${label}" escaped the tier validator; expected a violation containing ${JSON.stringify(expected)}, got:\n${violations.join("\n") || "(none)"}`,
   );
   checks += 1;
+  mutations_caught += 1;
 };
 
 const tierOf = (state, id) => state.register.tiers.find((tier) => tier.id === id);
 const firstQuarantine = (state) => state.register.quarantine.entries[0];
+// The battery mutates a LIVE quarantine entry to prove the validator refuses
+// broken ones. A register whose every entry is retired WITH a receipt carries
+// no live entry by design; absence is the healthy state there. Seed a valid
+// synthetic live entry into the CLONED state only, so every quarantine
+// mutation keeps exercising the validator against a real live entry without
+// demanding that the shipped register keep a quarantine alive for ever.
+const ensureLiveQuarantine = (state) => {
+  if ((state.register.quarantine.entries ?? []).length > 0) return;
+  if (!Array.isArray(state.register.quarantine.entries)) {
+    state.register.quarantine.entries = [];
+  }
+  const dayMs = 86400000;
+  const iso = (time) => new Date(time).toISOString().slice(0, 10);
+  const now = state.now.getTime();
+  state.register.quarantine.entries.push({
+    id: "mutation-battery-seed",
+    target_kind: "tier_job",
+    target: "nightly-frozen-cohort",
+    owner: register.owners[0],
+    opened: iso(now - dayMs),
+    expires: iso(now + 10 * dayMs),
+    reason: "Synthetic live entry seeded so this mutation keeps exercising the validator.",
+    tracking: "mutation-battery-seed",
+  });
+};
 const deepGateFile = register.workflows.find((entry) => entry.role === "scheduled_deep_gate").file;
 
 // 1. A tier that defers something UNDECLARED must be caught.
@@ -199,18 +232,21 @@ mutate("coverage claimed with no job providing it", (state) => {
 
 // 5. A quarantine WITHOUT AN OWNER must be refused.
 mutate("quarantine without an owner", (state) => {
+  ensureLiveQuarantine(state);
   delete firstQuarantine(state).owner;
   return state;
 }, "nothing may be quarantined without an owner");
 
 // 6. A quarantine WITHOUT AN EXPIRY must be refused.
 mutate("quarantine without an expiry", (state) => {
+  ensureLiveQuarantine(state);
   delete firstQuarantine(state).expires;
   return state;
 }, "nothing may be quarantined without an expiry");
 
 // 7. An EXPIRED quarantine must be refused.
 mutate("expired quarantine", (state) => {
+  ensureLiveQuarantine(state);
   firstQuarantine(state).opened = "2026-01-01";
   firstQuarantine(state).expires = "2026-01-20";
   return state;
@@ -218,30 +254,35 @@ mutate("expired quarantine", (state) => {
 
 // 8. Time passing must expire it — the same entry, judged from after its date.
 mutate("live quarantine judged after its expiry date", (state) => {
+  ensureLiveQuarantine(state);
   state.now = new Date(`${firstQuarantine(state).expires}T00:00:01Z`);
   return state;
 }, "an expired quarantine is refused, not extended");
 
 // 9. A quarantine window may not exceed the declared maximum.
 mutate("quarantine window beyond the declared maximum", (state) => {
+  ensureLiveQuarantine(state);
   firstQuarantine(state).expires = "2027-08-20";
   return state;
 }, "beyond the declared");
 
 // 10. The owner must be a real declared owner, not a free-text alias.
 mutate("quarantine owner off the declared roster", (state) => {
+  ensureLiveQuarantine(state);
   firstQuarantine(state).owner = "somebody";
   return state;
 }, "not on the declared owner roster");
 
 // 11. An authoritative capability can never be quarantined.
 mutate("quarantine targeting an authoritative job", (state) => {
+  ensureLiveQuarantine(state);
   firstQuarantine(state).target = "final-aggregate";
   return state;
 }, "targets a job covering authoritative capability");
 
 // 12. A quarantine must target something that exists.
 mutate("quarantine targeting a job that does not exist", (state) => {
+  ensureLiveQuarantine(state);
   firstQuarantine(state).target = "no-such-job";
   return state;
 }, "which is not a declared tier job");
@@ -361,4 +402,4 @@ if (declarationOut) {
   });
 }
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

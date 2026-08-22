@@ -1,19 +1,16 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { createRunner } from "./lib/test_harness.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import { ReleaseCheckpointStore } from "./lib/release_checkpoint_store.mjs";
 
+const run = createRunner({ name: "phase15_fault_injection_tests", importMetaUrl: import.meta.url });
+
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-phase15-faults-"));
-let checks = 0;
 let mutations = 0;
-const check = (value, message) => {
-  assert.ok(value, message);
-  checks += 1;
-};
 
 async function killNamedProcess(label) {
   const script = path.join(root, `${label}.mjs`);
@@ -29,10 +26,10 @@ async function killNamedProcess(label) {
     terminationGraceMs: 100,
     survivorVerificationMs: 2_000,
   });
-  check(result.timed_out === true, `${label} did not reach the forced timeout`);
-  check(result.termination_verified === true, `${label} process tree custody was not verified`);
-  check((result.survivor_pids ?? []).length === 0, `${label} left an orphan process`);
-  check(/descendant/.test(result.stdout), `${label} lost bounded process evidence`);
+  run.ok(result.timed_out === true, `${label} did not reach the forced timeout`);
+  run.ok(result.termination_verified === true, `${label} process tree custody was not verified`);
+  run.ok((result.survivor_pids ?? []).length === 0, `${label} left an orphan process`);
+  run.match(result.stdout, /descendant/, `${label} lost bounded process evidence`);
 }
 
 try {
@@ -40,11 +37,12 @@ try {
   await killNamedProcess("libreoffice");
   mutations += 2;
 
-  await assert.rejects(
-    () => resolvePythonExecutable(path.join(root, "missing-python"), { cwd: root, timeout: 500 }),
-    /Python|executable|ENOENT|available/i,
-  );
-  checks += 1;
+  try {
+    await resolvePythonExecutable(path.join(root, "missing-python"), { cwd: root, timeout: 500 });
+    run.ok(false, "a missing python executable resolved without error");
+  } catch (error) {
+    run.match(String(error?.message ?? error), /Python|executable|ENOENT|available/i, "a missing python executable failed with a classified error");
+  }
   mutations += 1;
 
   const runDir = path.join(root, "checkpoint-run");
@@ -59,7 +57,7 @@ try {
     outputs: { workbook: output },
   };
   await store.persist({ ...declaration, status: "success" });
-  check((await store.inspect(declaration)).reusable === true, "clean checkpoint did not reuse");
+  run.ok((await store.inspect(declaration)).reusable === true, "clean checkpoint did not reuse");
 
   const receiptPath = store.receiptPath("emit");
   const cleanReceipt = await fs.readFile(receiptPath, "utf8");
@@ -75,8 +73,8 @@ try {
     await fs.writeFile(receiptPath, cleanReceipt);
     await corrupt();
     const inspected = await store.inspect(declaration);
-    check(inspected.reusable === false, "corrupt checkpoint was reused");
-    check((inspected.reasons ?? []).length > 0, "corrupt checkpoint had no classified reason");
+    run.ok(inspected.reusable === false, "corrupt checkpoint was reused");
+    run.ok((inspected.reasons ?? []).length > 0, "corrupt checkpoint had no classified reason");
   }
   mutations += corruptionCases.length;
 
@@ -84,17 +82,15 @@ try {
     ...declaration,
     inputHashes: { case: "b".repeat(64) },
   });
-  check(wrongInput.reusable === false, "changed checkpoint input was reused");
+  run.ok(wrongInput.reusable === false, "changed checkpoint input was reused");
   mutations += 1;
 
-  console.log(JSON.stringify({
+  run.finish({
     schema_version: "phase15-portable-fault-injection/1.0",
-    status: "PASS",
-    checks,
     mutations_rejected: mutations,
     orphan_processes: 0,
     unclassified_failures: 0,
-  }, null, 2));
+  });
 } finally {
   await fs.rm(root, { recursive: true, force: true });
 }

@@ -7,8 +7,11 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { createRunner } from "./lib/test_harness.mjs";
 import { planQuestions } from "./lib/flow_questions.mjs";
 import { sealForecastAuthorityLedger } from "./lib/forecast_authority_ledger.mjs";
+
+const run = createRunner({ name: "decision_round_tests", importMetaUrl: import.meta.url });
 
 const supplied = process.argv[2] ?? process.env.DECISION_ROUND_CASE;
 let fixture;
@@ -95,11 +98,11 @@ if (process.env.DECISION_ROUND_DEBUG === "1") {
   process.stderr.write(`${JSON.stringify({ status: plan.status, detected: plan.detected, candidates: plan.candidates, blocked: plan.blocked, assumptions: plan.assumptions, survivors: plan.survivors.map((entry) => entry.id) }, null, 2)}\n`);
 }
 const maturityQuestions = (plan.detected ?? []).filter((entry) => entry.kind === "refinance_at_maturity");
-if (maturityQuestions.length !== 0) throw new Error("toggle-covered maturities still produced questions");
-if ((plan.survivors ?? []).some((entry) => entry.kind === "refinance_at_maturity")) {
-  throw new Error("toggle-covered maturities survived deterministic pruning");
-}
-if ((plan.pending_questions ?? []).some((id) => id.startsWith("refinance_at_maturity:"))) {
-  throw new Error("toggle-covered maturities leaked into a second decision round");
-}
-process.stdout.write(`${JSON.stringify({ status: "PASS", maturity_question_count: 0, pending_maturity_question_count: 0, total_violation_count: 0 })}\n`);
+run.ok(maturityQuestions.length === 0, "toggle-covered maturities still produced questions");
+run.ok(!(plan.survivors ?? []).some((entry) => entry.kind === "refinance_at_maturity"), "toggle-covered maturities survived deterministic pruning");
+run.ok(!(plan.pending_questions ?? []).some((id) => id.startsWith("refinance_at_maturity:")), "toggle-covered maturities leaked into a second decision round");
+run.finish({
+  maturity_question_count: 0,
+  pending_maturity_question_count: 0,
+  total_violation_count: 0,
+});

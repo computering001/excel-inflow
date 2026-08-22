@@ -14,7 +14,14 @@ the same failure reproduced at head for the next flip.)
 - Installed-host custody remains external and pending for the current candidate. No Rogo installation receipt, installed-package identity, active-pointer readback, or second-fresh-session evidence exists for these bytes.
 - Native Microsoft Excel control-matrix execution, full recalculation/save/reopen evidence and the native all-cell error scan remain pending.
 - Portable automated workbook inventory and rendered-review evidence are release-custody evidence only; native Excel visual review remains pending and must be bound to the installed bytes.
-- The public filing corpus evidence is honest rather than laundered: one document reaches `EXTRACTION_PASS`, five require extraction review, and two HTML inputs remain unsupported.
+- The public filing corpus outcome was restated on 2026-08-21 after repairs `0401fb4`,
+  `af0e522`, `71a8c82` and `16d36e0`: the corpus now extracts 8 of 8 documents at
+  `EXTRACTION_PASS` with zero blocked documents (6 PDFs through the production filing
+  extractor; 2 HTML filings through the Inline XBRL structured lane), superseding the
+  earlier honest-but-stale state of one pass / five review / two unsupported. The custody
+  receipt is `test-fixtures/real-filings-custody-v1/corpus-extraction-outcomes.json`.
+  The iXBRL lane passes inside its harness and probe suites while its production wiring is
+  still in progress elsewhere; no installed-host claim rests on it yet.
 - The reviewed five-house broker pack reaches `PASS_DEGRADED`: stale responses are quarantined, and no broker authority or mappings are silently retained.
 - The source branch is intentionally not merged to `main`; `main` remains on the prior v3.7.0 line until the held Rogo/native gates are completed.
 - Existing published source tags, package branches, assets and package bytes remain immutable and have not been overwritten. The audited installed-filings repair remains preserved; this hardening tree is a new development candidate with a separately derived identity.
@@ -56,9 +63,13 @@ refactor must preserve behaviour WITHOUT being obliged to preserve these gaps as
   tolerance — latent, but the residual is not a function of the inputs alone.
 
 ### Test-infrastructure defects (D21, D22, D24, D25)
-- The frozen 32-recipe cohort does not merely fail to run in CI, it FAILS: consensus
-  contributors are sealed unsorted against a validator that requires sorting, and C1 then fails
-  forecast ownership. Carried by an EXPIRING quarantine so the nightly fails loudly.
+- RESOLVED 2026-08-21 on `agent/mp-C-quarantine-truth`: the four frozen-cohort compiler
+  defects (unsorted consensus seal; blank working-capital children minted into live
+  `explicit_zero` forecasts; the loss-restatement identity parent standing its component
+  children down; the multi-category-capex family with mixed ownership) are repaired in
+  `scripts/compile_synthetic_cohort.mjs`, the 32-recipe cohort compiles clean end to end,
+  and the quarantine `frozen-cohort-compiler-membership-order` is retired with a receipt in
+  `assets/ci-gate-tiers-v1.json`. The nightly verdict returns to blocking.
 - The mutation-adequacy compiler can register its own measuring suite as a survivor when that
   suite is transiently red. Self-correcting on recompile; can manufacture a false survivor.
 - `compileBrokerPreview` throws on the CLEAN fixture and a catch installs the forecast-waterfall
@@ -72,3 +83,33 @@ refactor must preserve behaviour WITHOUT being obliged to preserve these gaps as
   freeze commit, so p50/p95 are measured on the reachable portion.
 - The custody-cohort equivalence run is a KNOWN RED with pinned totals (55/98/1/0/0); the frozen
   pre-contract packs need migration adapters, which is the P1.2/P1.3 remainder.
+
+### Undeclared contract-vocabulary gaps (declared 2026-08-21)
+
+Beyond D15-D19 above, corpus review found real filing constructs the case contract can neither
+express nor classify. They are NOT modelled, NOT mapped to terminal reason codes, and were not
+declared before now; they are recorded here so Phase 9's refactor inherits an honest list rather
+than silent holes:
+
+- Day-count conventions (30/360, actual/365, actual/actual) are not representable; interest
+  accrues on a single implicit convention.
+- Payment frequency (annual / semi-annual / quarterly coupons) has no field; schedules cannot
+  distinguish them.
+- Swapped or hedged interest rates (fixed-for-floating swaps, caps, collars) have no vocabulary;
+  only a single declared coupon rate is representable.
+- Convertible debt (conversion features, diluted-share interaction, beneficial conversion
+  features) is unmapped.
+- Subordination tiers inside a capital structure (senior / mezzanine / junior ranking) have no
+  representation.
+- Export-credit facilities and agency-backed financing (ECA guarantees, tied-support terms)
+  are unmapped.
+- Private placements (restricted covenants, PIPE terms) are indistinguishable from ordinary
+  bank debt.
+- Debtor-in-possession and super-priority financing (Chapter 11 constructs) have no vocabulary.
+- Deferred tax and valuation allowances are not separable in the tax ledger beyond the
+  non-cash `cf_deferred_tax` presentation row.
+- Section 163(j) interest-limitation disallowance has no field; full deductibility is assumed
+  whenever a rate exists.
+- Restricted cash and its reconciliation to reported ending cash are unrepresentable.
+- IAS 38 development-cost capitalisation (and its amortisation) has no vocabulary distinct from
+  generic capex.

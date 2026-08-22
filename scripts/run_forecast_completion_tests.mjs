@@ -10,6 +10,7 @@
 
 import assert from "node:assert/strict";
 
+import { createRunner } from "./lib/test_harness.mjs";
 import {
   LAWFUL_DISPOSITIONS,
   compileForecastCompletionCensus,
@@ -17,11 +18,10 @@ import {
   verifyEconomicStageParity,
 } from "./lib/forecast_completion_constitution.mjs";
 
-let checks = 0;
-function check(condition, message) {
-  assert.ok(condition, message);
-  checks += 1;
-}
+const run = createRunner({
+  name: "forecast_completion_tests",
+  importMetaUrl: import.meta.url,
+});
 
 const authority = (method, extra = {}) => ({ method, ...extra });
 const row = (row_id, overrides = {}) => ({ row_id, row_type: "input", values: [1, 2, 3, null, null, null], ...overrides });
@@ -53,20 +53,50 @@ const completeCase = {
 // 1. a complete case: PASS, every cell lawful, dispositions well typed
 {
   const census = compileForecastCompletionCensus(completeCase);
-  check(census.status === "PASS", "a complete case must pass the census");
+  run.check("a complete case must pass the census", () => {
+    assert.ok(census.status === "PASS", "a complete case must pass the census");
+    return true;
+  });
   // P3.2 cardinality: 18 statement cells (6 rows x 3 periods) PLUS the 66
   // economically-owned schedule cells (22 debt/interest/lease/RCF/acquisition/
   // leverage definitions x 3 periods) the census previously never enumerated.
-  check(census.cell_count === 84, "every row x period is enumerated");
-  check(census.coverage.statement_cells === 18 && census.coverage.schedule_cells === 66,
-    "the census covers the statements AND the whole schedule surface");
-  check(census.producer_witness_counts.unwitnessed === 0,
-    "every cell's ownership rests on an executable producer witness");
-  check(census.cells.every((cell) => LAWFUL_DISPOSITIONS.includes(cell.disposition)),
-    "every cell carries a lawful disposition");
-  check(census.disposition_counts.role_policy_owned === 3, "the tax policy periods are typed role_policy_owned");
-  check(census.disposition_counts.captured_by_parent === 3, "captured detail is typed captured_by_parent");
-  check(census.disposition_counts.schedule_owned === 3, "schedule links are typed schedule_owned");
+  run.check("every row x period is enumerated", () => {
+    assert.ok(census.cell_count === 84, "every row x period is enumerated");
+    return true;
+  });
+  run.check("the census covers the statements AND the whole schedule surface", () => {
+    assert.ok(
+      census.coverage.statement_cells === 18 && census.coverage.schedule_cells === 66,
+      "the census covers the statements AND the whole schedule surface",
+    );
+    return true;
+  });
+  run.check("every cell's ownership rests on an executable producer witness", () => {
+    assert.ok(
+      census.producer_witness_counts.unwitnessed === 0,
+      "every cell's ownership rests on an executable producer witness",
+    );
+    return true;
+  });
+  run.check("every cell carries a lawful disposition", () => {
+    assert.ok(
+      census.cells.every((cell) => LAWFUL_DISPOSITIONS.includes(cell.disposition)),
+      "every cell carries a lawful disposition",
+    );
+    return true;
+  });
+  run.check("the tax policy periods are typed role_policy_owned", () => {
+    assert.ok(census.disposition_counts.role_policy_owned === 3, "the tax policy periods are typed role_policy_owned");
+    return true;
+  });
+  run.check("captured detail is typed captured_by_parent", () => {
+    assert.ok(census.disposition_counts.captured_by_parent === 3, "captured detail is typed captured_by_parent");
+    return true;
+  });
+  run.check("schedule links are typed schedule_owned", () => {
+    assert.ok(census.disposition_counts.schedule_owned === 3, "schedule links are typed schedule_owned");
+    return true;
+  });
 }
 
 // 2. an unresolved material cell ESCALATES with a named reason — no silent pass
@@ -74,26 +104,51 @@ const completeCase = {
   const broken = structuredClone(completeCase);
   broken.statement_structure.cash_flow[1].forecast_period_authorities[1] = { method: "unresolved" };
   const census = compileForecastCompletionCensus(broken);
-  check(census.status === "ESCALATE", "an unresolved material cell escalates");
-  check(census.escalations.length === 1 && census.escalations[0].row_id === "dividends",
-    "the escalation names the exact cell");
-  check(census.cells.some((cell) => cell.disposition === "unresolved"), "the census does not hide the state");
+  run.check("an unresolved material cell escalates", () => {
+    assert.ok(census.status === "ESCALATE", "an unresolved material cell escalates");
+    return true;
+  });
+  run.check("the escalation names the exact cell", () => {
+    assert.ok(
+      census.escalations.length === 1 && census.escalations[0].row_id === "dividends",
+      "the escalation names the exact cell",
+    );
+    return true;
+  });
+  run.check("the census does not hide the state", () => {
+    assert.ok(census.cells.some((cell) => cell.disposition === "unresolved"), "the census does not hide the state");
+    return true;
+  });
 }
 
 // 3. parity: seals a complete case, binds the identity, refuses an incomplete one
 {
   const receipt = sealEconomicStageParity(completeCase);
-  check(receipt.status === "PASS" && /^[0-9a-f]{64}$/.test(receipt.receipt_sha256), "parity receipt seals");
-  check(verifyEconomicStageParity(completeCase, receipt).length === 0, "the receipt verifies against the same case");
+  run.check("parity receipt seals", () => {
+    assert.ok(receipt.status === "PASS" && /^[0-9a-f]{64}$/.test(receipt.receipt_sha256), "parity receipt seals");
+    return true;
+  });
+  run.check("the receipt verifies against the same case", () => {
+    assert.ok(verifyEconomicStageParity(completeCase, receipt).length === 0, "the receipt verifies against the same case");
+    return true;
+  });
   const mutated = structuredClone(completeCase);
   mutated.statement_structure.income_statement[0].values[3] = 999;
-  check(verifyEconomicStageParity(mutated, receipt).includes("model_case_sha256"),
-    "a mutated case fails parity verification");
+  run.check("a mutated case fails parity verification", () => {
+    assert.ok(
+      verifyEconomicStageParity(mutated, receipt).includes("model_case_sha256"),
+      "a mutated case fails parity verification",
+    );
+    return true;
+  });
   const broken = structuredClone(completeCase);
   broken.statement_structure.income_statement[0].forecast_period_authorities = undefined;
   let refused = false;
   try { sealEconomicStageParity(broken); } catch { refused = true; }
-  check(refused, "parity refuses an incomplete economic graph");
+  run.check("parity refuses an incomplete economic graph", () => {
+    assert.ok(refused, "parity refuses an incomplete economic graph");
+    return true;
+  });
 }
 
-console.log(JSON.stringify({ checks, status: "PASS" }));
+run.finish();

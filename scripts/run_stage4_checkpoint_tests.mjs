@@ -126,6 +126,7 @@ await run(process.execPath, [
 
 const runDir = path.join(out, "interrupted-run");
 const paused = await flow(evidence, runDir, ["--stop-after", "decisions"]);
+
 assert(paused.status === "PAUSED" && paused.stage === "decisions", `Could not establish Stage 3: ${JSON.stringify(paused)}`);
 
 const slowSoffice = path.join(out, "slow-soffice");
@@ -204,6 +205,9 @@ await fs.access(path.join(receiptDir, "recalculate.json")).then(
 const recovered = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  // The review gate is fail-closed; the recovery pass replays the user's
+  // accept so delivery can complete.
+  "--review-deliver",
 ]);
 assert(recovered.status === "PASS_PENDING_MANUAL" && recovered.stage === "delivery", `Recovery did not deliver: ${JSON.stringify(recovered)}`);
 const recoveredBuild = JSON.parse(await fs.readFile(path.join(runDir, "stages", "build_checks", "build-result.json"), "utf8"));
@@ -228,6 +232,7 @@ await fs.rename(emittedWorkbook, `${emittedWorkbook}.missing-output-test`);
 const scratchReuse = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   scratchReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",
@@ -239,6 +244,7 @@ await fs.rename(workbook, `${workbook}.missing-output-test`);
 const repaired = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(repaired.status === "PASS_PENDING_MANUAL", `Missing-output repair did not deliver: ${JSON.stringify(repaired)}`);
 const repairedBuild = JSON.parse(await fs.readFile(path.join(runDir, "stages", "build_checks", "build-result.json"), "utf8"));
@@ -274,6 +280,7 @@ await fs.rename(workbook, `${workbook}.render-leaf-test`);
 const renderLeafRepair = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   renderLeafRepair.status === "PASS_PENDING_MANUAL",
@@ -304,6 +311,7 @@ assert(
 const finalReuse = await flow(evidence, runDir, [
   "--python", python,
   "--soffice", soffice,
+  "--review-deliver",
 ]);
 assert(
   finalReuse.reused_stages.join(",") === "inputs,evidence_review,decisions,build_checks,delivery",

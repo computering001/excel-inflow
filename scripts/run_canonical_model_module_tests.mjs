@@ -85,6 +85,19 @@ const root = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)));
 const CERTIFIED = ["standard-maximal-v2", "standard-net-cash-v2"];
 
 let checks = 0;
+// Honest mutation accounting (section G): every MUTATION applies a real defect
+// to a COPY of the subject — a withdrawn write, a contested node, a moved
+// number, a relabelled invariant, a bumped version — and is counted CAUGHT only
+// when production's own validators refuse the copy while the mutant is active.
+// A surviving mutant throws before its catch is counted, so this count can
+// never claim a kill the suite did not observe.
+let mutations_total = 0;
+let mutations_caught = 0;
+function mutation(label, fn) {
+  mutations_total += 1;
+  fn();
+  mutations_caught += 1;
+}
 const failures = [];
 function check(condition, label) {
   checks += 1;
@@ -597,7 +610,7 @@ for (const name of CERTIFIED) {
     `D: ${name} resolved ${carriers.filter((c) => c.bound).length} carriers; 37 expected (cash.noncash_interest_addback is P4.6 row_absent on both certified fixtures)`,
   );
   const writes = artifact.modules.flatMap((module) => module.writes);
-  check(writes.length === 94, `D: ${name} declared ${writes.length} write paths`);
+  check(writes.length === 95, `D: ${name} declared ${writes.length} write paths`);
   check(
     writes
       .filter((write) => write.presence === "always")
@@ -672,7 +685,9 @@ for (const file of fs.readdirSync(archetypeDirectory).sort()) {
     `E: ${file} census ${JSON.stringify(solverFieldCensusErrors(solution).slice(0, 3))}`,
   );
 }
-check(swept === 31, `E: swept ${swept} archetypes, expected 31`);
+// 39 of the 41 fixtures solve (the two adversarial refusals are typed); the
+// eight adversarial archetypes from mp-L raised the count from 31.
+check(swept === 39, `E: swept ${swept} archetypes, expected 39`);
 check(
   typedRefusals.length === 2 && typedRefusals.every(([, code]) => Boolean(code)),
   `E: refusals are not both typed: ${JSON.stringify(typedRefusals)}`,
@@ -709,6 +724,7 @@ check(
 // ===========================================================================
 
 function mutationCatches(label, mutate, expectedCode, mode = "conformance") {
+  mutations_total += 1;
   const boundaries = cloneBoundaries();
   mutate(boundaries);
   let errors;
@@ -726,6 +742,7 @@ function mutationCatches(label, mutate, expectedCode, mode = "conformance") {
     errors.some((error) => error.includes(expectedCode)),
     `G/${label}: expected ${expectedCode}, got ${JSON.stringify(errors.slice(0, 3))}`,
   );
+  mutations_caught += 1;
 }
 
 // One mutation per module boundary.
@@ -833,7 +850,7 @@ mutationCatches(
   },
   "MODULE_VERSION_UNBUMPED",
 );
-{
+mutation("module_version_bumped_without_reseal", () => {
   const boundaries = cloneBoundaries();
   boundaries.leases.module_version = "2.0.1";
   const errors = validateModuleContractConformance({ boundaries });
@@ -841,10 +858,10 @@ mutationCatches(
     errors.some((error) => error.includes("MODULE_VERSION_DISAGREEMENT")),
     "G/module_version_bumped_without_reseal: a bare version bump was accepted",
   );
-}
+});
 
 // The relabelling guard: an unvalidated invariant cannot be marked proven.
-{
+mutation("relabel_proven", () => {
   const relabelled = JSON.parse(JSON.stringify(GRAPH_INVARIANT_DECLARATIONS));
   relabelled.unit_compatible_edges = {
     status: "proven",
@@ -857,8 +874,8 @@ mutationCatches(
     ),
     "G/relabel_proven: unit_compatible_edges was silently promoted to proven",
   );
-}
-{
+});
+mutation("strip_reason", () => {
   const stripped = JSON.parse(JSON.stringify(GRAPH_INVARIANT_DECLARATIONS));
   delete stripped.unit_compatible_edges.why;
   check(
@@ -867,8 +884,8 @@ mutationCatches(
     ),
     "G/strip_reason: a partial invariant kept its status with no reason",
   );
-}
-{
+});
+mutation("proven_with_remainder", () => {
   const contradictory = JSON.parse(JSON.stringify(GRAPH_INVARIANT_DECLARATIONS));
   contradictory.single_writer.what_is_unprovable = "some of it, actually";
   check(
@@ -877,8 +894,8 @@ mutationCatches(
     ),
     "G/proven_with_remainder: a proven invariant kept an undeclared remainder",
   );
-}
-{
+});
+mutation("drop_declaration", () => {
   const dropped = JSON.parse(JSON.stringify(GRAPH_INVARIANT_DECLARATIONS));
   delete dropped.single_writer;
   check(
@@ -887,7 +904,7 @@ mutationCatches(
     ),
     "G/drop_declaration: a contract invariant with no status was accepted",
   );
-}
+});
 
 // No vacuous pass: the circularity-off invariant refuses without evidence.
 check(
@@ -898,7 +915,7 @@ check(
 );
 
 // The carrier binding has teeth against a moved number.
-{
+mutation("moved_number", () => {
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const tampered = JSON.parse(JSON.stringify(solution));
   tampered.forecast[0].gross_interest += 1;
@@ -907,8 +924,8 @@ check(
     failures.some((failure) => failure.includes("gross_expense_decomposes")),
     "G/moved_number: a perturbed gross interest did not break the interest boundary",
   );
-}
-{
+});
+mutation("moved_instrument", () => {
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const tampered = JSON.parse(JSON.stringify(solution));
   tampered.forecast[1].instrument_results[0].ending_native += 0.5;
@@ -918,8 +935,8 @@ check(
     ),
     "G/moved_instrument: a broken roll-forward did not break the debt boundary",
   );
-}
-{
+});
+mutation("sweep", () => {
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const tampered = JSON.parse(JSON.stringify(solution));
   tampered.forecast[0].rcf_draw = 10;
@@ -929,8 +946,8 @@ check(
     ),
     "G/sweep: a draw with cash above the floor did not break the cash boundary",
   );
-}
-{
+});
+mutation("provenance", () => {
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const tampered = JSON.parse(JSON.stringify(solution));
   tampered.opening_debt_bridge.lines[0].source_ref = "";
@@ -940,8 +957,8 @@ check(
     ),
     "G/provenance: an opening balance without provenance was accepted",
   );
-}
-{
+});
+mutation("retarget", () => {
   // A carrier retargeted onto another real row must disagree with its mirror.
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const artifact = JSON.parse(JSON.stringify(bound.get("standard-maximal-v2")));
@@ -956,8 +973,8 @@ check(
     ),
     "G/retarget: a carrier moved onto a foreign row was accepted",
   );
-}
-{
+});
+mutation("contested_row", () => {
   // Two nodes claiming one statement row — the delegated single-writer channel.
   const { modelCase, solution } = solved.get("standard-maximal-v2");
   const artifact = JSON.parse(JSON.stringify(bound.get("standard-maximal-v2")));
@@ -977,8 +994,8 @@ check(
     ),
     "G/contested_row: two economic nodes claimed one statement row",
   );
-}
-{
+});
+mutation("new_field", () => {
   // A new solver field must be classified, not absorbed.
   const { solution } = solved.get("standard-maximal-v2");
   const extended = JSON.parse(JSON.stringify(solution));
@@ -989,8 +1006,8 @@ check(
     ),
     "G/new_field: a new solver output slipped past the census",
   );
-}
-{
+});
+mutation("digest_drift", () => {
   // A boundary digest that drifts under a binding artifact is reported.
   const { modelCase, solution } = solved.get("standard-net-cash-v2");
   const artifact = JSON.parse(JSON.stringify(bound.get("standard-net-cash-v2")));
@@ -1001,7 +1018,7 @@ check(
     ),
     "G/digest_drift: a drifted boundary digest was accepted on a binding",
   );
-}
+});
 
 // ===========================================================================
 
@@ -1011,4 +1028,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 assert.equal(failures.length, 0);
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

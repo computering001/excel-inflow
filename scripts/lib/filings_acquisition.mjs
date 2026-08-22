@@ -16,6 +16,10 @@ import path from "node:path";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { canonicalise } from "./run_store.mjs";
 import {
+  EXTRACTOR_VERSION,
+  lookupExtraction,
+} from "./extraction_cache.mjs";
+import {
   DEFAULT_REMOTE_INGRESS_AUTHORITY,
   fetchOfficialFile,
   hostAllowed,
@@ -119,6 +123,7 @@ export async function acquireFilingsSources({
   outDir,
   extractionRequestSchema,
   sourceRegistrySchema = null,
+  extractionCacheRoot = null,
 }) {
   const errors = acquisitionErrors(request);
   if (errors.length > 0) throw new Error(`Filings acquisition request is invalid: ${errors.join("; ")}`);
@@ -189,6 +194,29 @@ export async function acquireFilingsSources({
     });
   }
   materialised.sort(sourceOrder);
+  // Optional content-addressed extraction-cache probe. Acquisition binds raw
+  // bytes by SHA-256, so each materialised document can be probed for an
+  // existing extraction result keyed by (raw SHA-256, extractor version); the
+  // downstream extraction stage consults this annotation to skip re-extracting
+  // unchanged bytes. Without the option this is a no-op and the returned
+  // object carries no extraction_cache key at all.
+  const extractionCacheProbe = extractionCacheRoot
+    ? await Promise.all(materialised.map(async (source) => {
+      const lookup = await lookupExtraction({
+        cacheRoot: extractionCacheRoot,
+        documentSha256: source.raw_sha256,
+        extractorVersion: EXTRACTOR_VERSION,
+      });
+      return {
+        attachment_id: source.attachment_id,
+        document_id: source.document_id,
+        raw_sha256: source.raw_sha256,
+        hit: lookup.hit === true,
+        key: lookup.key,
+        ...(lookup.hit ? { result_sha256: lookup.result_sha256 } : { reason: lookup.reason ?? null }),
+      };
+    }))
+    : null;
   const filingFacts = structuredClone(request.filing_facts);
   filingFacts.entity_name = request.company.name;
   if (request.company.identifiers) filingFacts.entity_identifiers = structuredClone(request.company.identifiers);
@@ -270,7 +298,18 @@ export async function acquireFilingsSources({
   }
   const registryPath = path.join(root, "filings-source-registry.json");
   await atomicWrite(registryPath, canonicalBytes(registry));
-  return { extractionRequest, extractionRequestPath, registry, registryPath };
+  return {
+    extractionRequest,
+    extractionRequestPath,
+    registry,
+    registryPath,
+    ...(extractionCacheProbe ? {
+      extraction_cache: {
+        extractor_version: EXTRACTOR_VERSION,
+        documents: extractionCacheProbe,
+      },
+    } : {}),
+  };
 }
 
 export default { acquireFilingsSources };

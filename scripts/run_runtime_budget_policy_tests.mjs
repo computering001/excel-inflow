@@ -7,13 +7,17 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  AGGRESSIVE_RUNTIME_BUDGETS_MS,
   boundedStageTimeout,
   compileOwnershipPreflightControllerAction,
   compileRuntimeBudgetReceipt,
   DEFAULT_RUNTIME_BUDGETS_MS,
+  mandatorySequentialBudgetMs,
   ownershipFailureCancellationPlan,
   remainingRuntimeMs,
   resolveRuntimeBudgetPolicy,
+  resolveRuntimeBudgets,
+  RUNTIME_BUDGET_PROFILES,
   validateRuntimeBudgetPolicy,
   validateRuntimeBudgetReceipt,
 } from "./lib/runtime_budget_policy.mjs";
@@ -43,6 +47,40 @@ check(policy.budgets_ms.ownership_resolution_after_evidence === 120_000, "owners
 const overridden = resolveRuntimeBudgetPolicy({ solver: 90_000 });
 check(overridden.budgets_ms.solver === 90_000, "lawful override was ignored");
 check(overridden.policy_sha256 !== policy.policy_sha256, "override did not alter policy identity");
+
+// --- Budget profiles: default | aggressive ---------------------------------
+check(resolveRuntimeBudgets() === DEFAULT_RUNTIME_BUDGETS_MS, "the no-arg profile is not the shipped default declaration");
+check(resolveRuntimeBudgets("default") === DEFAULT_RUNTIME_BUDGETS_MS, "profile 'default' is not the shipped default declaration");
+const aggressive = resolveRuntimeBudgets("aggressive");
+for (const [stage, expected] of Object.entries(AGGRESSIVE_RUNTIME_BUDGETS_MS)) {
+  check(aggressive[stage] === expected, `aggressive ${stage} drifted from its declared tightening`);
+}
+check(
+  ["broker_native_extraction_per_document", "broker_semantic_recovery_per_frontier", "broker_global",
+    "end_to_end_target", "end_to_end_hard_ceiling", "heartbeat_interval", "ownership_resolution_after_evidence"]
+    .every((key) => aggressive[key] === DEFAULT_RUNTIME_BUDGETS_MS[key]),
+  "aggressive must tighten only the mandatory path and inherit every other declared budget",
+);
+check(Object.keys(RUNTIME_BUDGET_PROFILES).sort().join(",") === "aggressive,default", "unexpected runtime budget profiles appeared");
+
+// The ceiling reconciliation holds for BOTH profiles by construction.
+const aggressiveMandatory = mandatorySequentialBudgetMs(aggressive);
+check(aggressiveMandatory === 780_000, `aggressive mandatory sequential path is ${aggressiveMandatory}, expected 780000`);
+check(mandatorySequentialBudgetMs(DEFAULT_RUNTIME_BUDGETS_MS) === 1_410_000, "default mandatory sequential path drifted");
+check(
+  aggressiveMandatory <= aggressive.end_to_end_target && aggressive.end_to_end_target <= aggressive.end_to_end_hard_ceiling,
+  "the aggressive path does not reconcile against its own target and ceiling",
+);
+const aggressivePolicy = resolveRuntimeBudgetPolicy(structuredClone(JSON.parse(JSON.stringify(aggressive))));
+check(validateRuntimeBudgetPolicy(aggressivePolicy).length === 0, "the aggressive policy did not validate clean");
+check(aggressivePolicy.policy_sha256 !== policy.policy_sha256, "the aggressive policy shares the default policy identity");
+check(boundedStageTimeout({ policy: aggressivePolicy, stage: "solver", requestedMs: 300_000, controllerStartedEpochMs: 0, nowEpochMs: 0 }) === 60_000,
+  "the aggressive solver budget was not enforced through the standard bounding rule");
+
+assert.throws(() => resolveRuntimeBudgets("turbo"), /Unknown runtime budget profile/);
+checks += 1;
+assert.throws(() => resolveRuntimeBudgets(7), /must be a string/);
+checks += 1;
 
 const started = 1_000_000;
 check(remainingRuntimeMs({ policy, controllerStartedEpochMs: started, nowEpochMs: started + 10_000 }) === 1_490_000, "hard deadline remaining time is wrong");

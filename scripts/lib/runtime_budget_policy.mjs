@@ -56,6 +56,50 @@ export function mandatorySequentialBudgetMs(budgets) {
 }
 
 /**
+ * The aggressive stage-budget profile: the SAME mandatory sequential path with
+ * tighter per-stage clocks for hosts where the certified path is known to fit.
+ * Only the seven additive stages are tightened; per-document, per-frontier,
+ * broker, heartbeat and ceiling keys stay at their declared defaults, so every
+ * reconciliation rule that guards DEFAULT_RUNTIME_BUDGETS_MS applies unchanged.
+ */
+export const AGGRESSIVE_RUNTIME_BUDGETS_MS = Object.freeze({
+  source_acquisition: 60_000,
+  filing_extraction: 240_000,
+  case_compilation_and_ownership: 60_000,
+  solver: 60_000,
+  workbook_build: 120_000,
+  recalculation: 150_000,
+  validation: 90_000,
+});
+
+/**
+ * Named budget profiles. `default` IS the shipped declaration object (same
+ * frozen reference); `aggressive` layers the tightened mandatory path over it.
+ */
+export const RUNTIME_BUDGET_PROFILES = Object.freeze({
+  default: DEFAULT_RUNTIME_BUDGETS_MS,
+  aggressive: Object.freeze({ ...DEFAULT_RUNTIME_BUDGETS_MS, ...AGGRESSIVE_RUNTIME_BUDGETS_MS }),
+});
+
+/**
+ * Resolve a named profile to its complete budgets object. Unknown names are a
+ * typed refusal, never a silent fall-back to the default: a typo'd profile
+ * would otherwise quietly re-inflate every stage clock.
+ */
+export function resolveRuntimeBudgets(profile = "default") {
+  if (typeof profile !== "string") {
+    throw new Error(`Runtime budget profile must be a string, got ${typeof profile}.`);
+  }
+  const budgets = RUNTIME_BUDGET_PROFILES[profile];
+  if (!budgets) {
+    throw new Error(
+      `Unknown runtime budget profile ${JSON.stringify(profile)}. Known profiles: ${Object.keys(RUNTIME_BUDGET_PROFILES).sort().join(", ")}.`,
+    );
+  }
+  return budgets;
+}
+
+/**
  * A stage budget DERIVED from the one remaining deadline: a stage may never be
  * offered more than the run has left, whatever its stage-local number says.
  */

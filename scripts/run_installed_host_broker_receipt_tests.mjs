@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { createRunner } from "./lib/test_harness.mjs";
 import { verifyInstalledHostBrokerReceipt } from "./verify_installed_host_broker_canary.mjs";
+
+const run = createRunner({ name: "installed_host_broker_receipt_tests", importMetaUrl: import.meta.url });
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "installed-host-receipt-contract-"));
 const rawPdf = Buffer.from("%PDF-1.7\n%%EOF\n");
@@ -55,7 +57,18 @@ const verify = (candidate) => {
   fs.writeFileSync(receiptPath, `${JSON.stringify(candidate, null, 2)}\n`);
   return verifyInstalledHostBrokerReceipt(receiptPath, { activeSourceIdentity });
 };
-assert.equal((await verify(receipt)).status, "PASS");
+const shortMessage = (error) => String(error?.message ?? error).split("\n")[0];
+async function expectRejection(fn, regexp, desc) {
+  try {
+    await fn();
+    run.ok(false, desc);
+  } catch (error) {
+    const message = shortMessage(error);
+    if (regexp && !regexp.test(message)) run.ok(false, `${desc}: unexpected error ${message}`);
+    else run.ok(true, desc);
+  }
+}
+run.eq((await verify(receipt)).status, "PASS", "a faithful receipt did not verify");
 
 const mutations = [
   (value) => { delete value.raw_pdf_sha256; },
@@ -72,14 +85,14 @@ const mutations = [
 for (const mutate of mutations) {
   const candidate = structuredClone(receipt);
   mutate(candidate);
-  await assert.rejects(() => verify(candidate));
+  await expectRejection(() => verify(candidate), null, "mutated receipt was accepted by the verifier");
 }
 fs.writeFileSync(path.join(root, "broker.pdf"), Buffer.from("%PDF-tampered\n"));
-await assert.rejects(() => verify(receipt), /hash mismatch/);
+await expectRejection(() => verify(receipt), /hash mismatch/, "tampered raw PDF bytes were accepted");
 fs.writeFileSync(path.join(root, "broker.pdf"), rawPdf);
 fs.symlinkSync("broker.pdf", path.join(root, "broker-link.pdf"));
 const symlinkMutation = structuredClone(receipt);
 symlinkMutation.artifacts.raw_pdf = "broker-link.pdf";
-await assert.rejects(() => verify(symlinkMutation), /symbolic link/);
+await expectRejection(() => verify(symlinkMutation), /symbolic link/, "a symlinked artifact path was accepted");
 
-console.log(JSON.stringify({ status: "PASS", checks: 13, mutations_caught: 12 }));
+run.finish({ mutations_caught: 12 });

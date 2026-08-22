@@ -699,6 +699,15 @@ function evalCall(ast, ctxSheet) {
       return isErr(v) && v.__err === "#N/A" ? scalar(1) : v;
     }
     case "ISNUMBER": { const v = scalar(0); return typeof v === "number"; }
+    case "N": {
+      // Excel N(): number -> number, boolean -> 1/0, anything else (text,
+      // blank, error) -> 0. Mirrors plan_values.mjs; added alongside the B11
+      // leverage guards that emit IF(N(cell)=0, "n/m", ...).
+      const v = scalar(0);
+      if (typeof v === "number") return v;
+      if (typeof v === "boolean") return v ? 1 : 0;
+      return 0;
+    }
     case "ISBLANK": { const v = scalar(0); return v === BLANK; }
     case "ISERROR": { const v = scalar(0); return isErr(v); }
     case "ISTEXT": { const v = scalar(0); return typeof v === "string"; }
@@ -1096,7 +1105,7 @@ const printBucket = (title, rows, limit = PRINT_LIMIT) => {
     console.log(
       `  ${`${m.sheet}!${m.cell}`.padEnd(24)} ${String(m.label).slice(0, 34).padEnd(36)}` +
         ` cached=${fmt(m.cached ?? 0).padStart(16)}  formula=${fmt(m.computed ?? 0).padStart(16)}` +
-        `  delta=${m.delta === null ? "n/a" : Number(m.delta.toPrecision(8))}` +
+        `  delta=${m.delta == null ? "n/a" : Number(m.delta.toPrecision(8))}` +
         `${m.cascaded ? "  [cascaded]" : m.cascaded === false ? "  [PRIMARY]" : ""}`,
     );
     console.log(`      = ${String(m.formula).slice(0, 150)}`);

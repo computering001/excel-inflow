@@ -1,8 +1,15 @@
 #!/usr/bin/env node
+
+import { createRunner } from "./lib/test_harness.mjs";
 import {
   applyExcelComparison,
   compareExcelValues,
 } from "./lib/excel_value_semantics.mjs";
+
+const run = createRunner({
+  name: "excel_value_semantics_tests",
+  importMetaUrl: import.meta.url,
+});
 
 const BLANK = Symbol("blank");
 const options = { isBlank: (value) => value === BLANK };
@@ -23,21 +30,13 @@ const cases = [
   ["boolean numeric convention remains stable", true, 1, "=", true],
 ];
 
-const failures = [];
 for (const [name, left, right, operator, expected] of cases) {
-  const actual = applyExcelComparison(left, right, operator, options);
-  if (actual !== expected) failures.push({ name, expected, actual });
+  run.check(name, () => applyExcelComparison(left, right, operator, options) === expected);
 }
-if (compareExcelValues(BLANK, "", options) !== 0) {
-  failures.push({ name: "three-way blank/empty comparison", expected: 0 });
-}
+run.check("three-way blank/empty comparison", () => compareExcelValues(BLANK, "", options) === 0);
 
-const report = {
+run.finish({
   kind: "excel-value-semantics-tests/1.0",
-  status: failures.length ? "FAIL" : "PASS",
   total: cases.length + 1,
-  violations: failures.length,
-  failures,
-};
-console.log(JSON.stringify(report, null, 2));
-process.exitCode = failures.length ? 1 : 0;
+  violations: 0,
+});

@@ -8,6 +8,7 @@
  * reuse those checkpoints only when the immutable run identity and
  * workspace/session token match; the outer run carrier owns fresh-chat handoff.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -55,6 +56,24 @@ let ACTIVE_RUN_GUARD = null;
 let ACTIVE_STAGE4_BUDGET = null;
 let ACTIVE_STAGE4_BUDGET_TOKEN = null;
 let ACTIVE_STAGE4_BUDGET_RECEIPT_PATH = null;
+/**
+ * Per-checkpoint budget context for CONCURRENT checkpoints. The module-global
+ * ACTIVE_STAGE4_BUDGET_TOKEN is a single slot: two checkpoints running at once
+ * would overwrite each other's token, and every `command()` underneath them
+ * would bound its timeout against the wrong clock and attribute its process
+ * result to the wrong stage. Each checkpoint action therefore runs inside this
+ * context carrying ITS OWN token; `command()` reads the context first and only
+ * falls back to the global slot, so serial callers behave exactly as before.
+ */
+const STAGE4_BUDGET_CONTEXT = new AsyncLocalStorage();
+/**
+ * N14 render verification converts one PDF per visible sheet through
+ * LibreOffice. scripts/render/soffice.py documents that THREE simultaneous
+ * isolated `-env:UserInstallation` profiles were verified safe in the tenant,
+ * and every check_render.py process creates its own throwaway profile per
+ * conversion — so this DECLARED number, not the sheet count, caps the pool.
+ */
+const RENDER_VERIFICATION_CONCURRENCY = 3;
 const CHECKPOINT_ORDER = Object.freeze([
   "semantic_gates",
   "plan",
@@ -114,9 +133,12 @@ async function json(target) {
 
 async function command(binary, args, options = {}) {
   let timeout = options.timeout ?? 180000;
-  const stage = ACTIVE_STAGE4_BUDGET_TOKEN?.stage ?? null;
+  // A concurrent checkpoint carries its own budget token in the async context;
+  // serial callers have no context and keep using the module-global slot.
+  const activeToken = STAGE4_BUDGET_CONTEXT.getStore()?.budgetToken ?? ACTIVE_STAGE4_BUDGET_TOKEN;
+  const stage = activeToken?.stage ?? null;
   if (stage && ACTIVE_STAGE4_BUDGET) {
-    const activeElapsed = Math.max(0, Date.now() - ACTIVE_STAGE4_BUDGET_TOKEN.started);
+    const activeElapsed = Math.max(0, Date.now() - activeToken.started);
     const remaining = Math.max(0, ACTIVE_STAGE4_BUDGET.remaining(stage) - activeElapsed);
     timeout = Math.max(1, Math.min(Number(timeout), remaining));
   }
@@ -173,6 +195,51 @@ async function visibleWorkbookSheets(python, workbook) {
 
 function renderLeafId(index) {
   return `render_sheet_${String(index + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Bounded-order map: at most `limit` workers, results ALWAYS in input order.
+ * The shared cursor advances synchronously before any await, so two workers
+ * can never take the same index; determinism comes from the ordered result
+ * array, never from whichever worker happened to finish first.
+ */
+async function mapBoundedOrder(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.max(1, Math.min(Number(limit), items.length)) }, async () => {
+    for (;;) {
+      const index = next;
+      next += 1;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index], index);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
+}
+
+/**
+ * The declared pipeline position of a checkpoint id. Render leaves sit where
+ * "render" sits in CHECKPOINT_ORDER, ordered among themselves by their sheet
+ * number — so bookkeeping recorded under CONCURRENCY can be re-emitted in one
+ * deterministic sequence instead of completion order. The aggregate "render"
+ * checkpoint consumes every rendered sheet's output, so it records AFTER all
+ * of its leaves, matching the declared order in `checkpointing.order`.
+ */
+function checkpointSequenceRank(id) {
+  const leaf = /^render_sheet_(\d+)$/.exec(String(id));
+  if (leaf) return [CHECKPOINT_ORDER.indexOf("render"), Number(leaf[1])];
+  const index = CHECKPOINT_ORDER.indexOf(String(id));
+  return [
+    index === -1 ? CHECKPOINT_ORDER.length : index,
+    String(id) === "render" ? Number.POSITIVE_INFINITY : 0,
+  ];
+}
+
+function compareCheckpointSequence(left, right) {
+  const [leftRank, leftTie] = checkpointSequenceRank(left);
+  const [rightRank, rightTie] = checkpointSequenceRank(right);
+  return leftRank - rightRank || leftTie - rightTie || String(left).localeCompare(String(right));
 }
 
 async function resolveSoffice(explicit) {
@@ -661,7 +728,10 @@ async function main() {
     const started = process.hrtime.bigint();
     let result;
     try {
-      result = await action(store.workDir(id));
+      // The context makes this checkpoint's budget token visible to every
+      // `command()` beneath it — including when several checkpoints run at
+      // once, where each must bound its timeouts against its OWN clock.
+      result = await STAGE4_BUDGET_CONTEXT.run({ budgetToken }, () => action(store.workDir(id)));
     } catch (error) {
       result = fail(`Checkpoint ${id} threw before its gate completed.`, { error: error.stack ?? error.message });
     } finally {
@@ -692,8 +762,10 @@ async function main() {
           checkpoint: id,
           checkpointing: {
             controller: RELEASE_CHECKPOINT_CONTROLLER,
-            reused: reusedCheckpoints,
-            executed: executedCheckpoints,
+            // Concurrent render lanes complete out of order; the recorded
+            // sequence is the DECLARED pipeline order, never completion order.
+            reused: [...reusedCheckpoints].sort(compareCheckpointSequence),
+            executed: [...executedCheckpoints].sort(compareCheckpointSequence),
             receipts: checkpointReceipts,
           },
         },
@@ -1105,70 +1177,86 @@ async function main() {
   const baselineCase = { maximal: "standard-maximal", net_cash: "standard-net-cash" }[rowMap.authority_profile];
   if (!baselineCase) return fail("N14 is BLOCKED: the row map does not resolve to an approved reusable visual authority.", { authority_profile: rowMap.authority_profile ?? null });
   const visibleSheets = await visibleWorkbookSheets(python, patchedWorkbook);
-  const renderLeafIds = [];
-  const renderLeafDirectories = [];
-  for (let index = 0; index < visibleSheets.length; index += 1) {
-    const sheetName = visibleSheets[index];
-    const leafId = renderLeafId(index);
-    const leafDir = store.workDir(leafId);
-    const leafIndex = path.join(leafDir, "render-evidence-index.json");
-    step = await checkpoint({
-      id: leafId,
-      recipe: "release-structural-render-sheet/1.0",
-      inputs: {
-        workbook: await hashFile(patchedWorkbook),
-        row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
-        verify_receipt: checkpointReceipts.verify_aggregate,
-        code: source.render,
-        render_mode: hashValue("structural-only-no-pixel-baseline"),
-        baseline_case: hashValue(baselineCase),
-        sheet: hashValue(sheetName),
-        python: python.identity,
-        soffice: soffice.identity,
-      },
-      outputs: { render_directory: { path: leafDir, kind: "directory" } },
-      action: async (workDir) => {
-        const rendered = await command(python.path, [
-          path.join(HERE, "render", "check_render.py"),
-          patchedWorkbook,
-          "--out", workDir,
-          "--sheet", sheetName,
-          "--baseline-case", baselineCase,
-          "--structural-only",
-          "--soffice", soffice.path,
-          "--timeout", String(Math.max(60, Math.floor(executionPolicy.timeout_ms / 1000))),
-        ], { timeout: executionPolicy.timeout_ms + 60_000 });
-        if (!rendered.ok) {
-          return fail(`N14 render validation failed for ${sheetName}.`, {
-            stdout: rendered.stdout.slice(-4000),
-            stderr: rendered.stderr.slice(-4000),
-          });
-        }
-        const indexReport = await json(leafIndex);
-        const entry = (indexReport.cases ?? [])[0];
-        if (
-          (indexReport.cases ?? []).length !== 1 ||
-          entry?.verdict !== "PASS" ||
-          JSON.stringify(entry?.sheets_examined ?? []) !== JSON.stringify([sheetName])
-        ) {
-          return fail(`N14 render evidence did not prove exactly ${sheetName}.`, {
-            cases: indexReport.cases ?? [],
-          });
-        }
-        return {
-          status: "PASS",
-          detail: {
-            sheet: sheetName,
-            page_count: entry.page_count_total ?? entry.page_count ?? null,
-            execution: executionPolicy,
-          },
-        };
-      },
-    });
-    if (!step.ok) return step.result;
-    renderLeafIds.push(leafId);
-    renderLeafDirectories.push({ id: leafId, sheet: sheetName, path: leafDir });
-  }
+  // N14 render POOL: up to RENDER_VERIFICATION_CONCURRENCY sheets convert at
+  // once, each through its own throwaway soffice profile inside its own
+  // check_render.py process. Every sheet still goes through the SAME
+  // content-addressed checkpoint(), so reuse/resume/custody semantics are
+  // byte-identical to the serial loop; only wall-clock overlap is new.
+  const renderFailures = new Map();
+  const renderLeafDirectories = await mapBoundedOrder(
+    visibleSheets,
+    RENDER_VERIFICATION_CONCURRENCY,
+    async (sheetName, index) => {
+      // A failed sheet stops NEW launches but lets in-flight lanes drain, so
+      // the pool never orphans a running soffice process.
+      if (renderFailures.size > 0) return null;
+      const leafId = renderLeafId(index);
+      const leafDir = store.workDir(leafId);
+      const leafIndex = path.join(leafDir, "render-evidence-index.json");
+      const step = await checkpoint({
+        id: leafId,
+        recipe: "release-structural-render-sheet/1.0",
+        inputs: {
+          workbook: await hashFile(patchedWorkbook),
+          row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
+          verify_receipt: checkpointReceipts.verify_aggregate,
+          code: source.render,
+          render_mode: hashValue("structural-only-no-pixel-baseline"),
+          baseline_case: hashValue(baselineCase),
+          sheet: hashValue(sheetName),
+          python: python.identity,
+          soffice: soffice.identity,
+        },
+        outputs: { render_directory: { path: leafDir, kind: "directory" } },
+        action: async (workDir) => {
+          const rendered = await command(python.path, [
+            path.join(HERE, "render", "check_render.py"),
+            patchedWorkbook,
+            "--out", workDir,
+            "--sheet", sheetName,
+            "--baseline-case", baselineCase,
+            "--structural-only",
+            "--soffice", soffice.path,
+            "--timeout", String(Math.max(60, Math.floor(executionPolicy.timeout_ms / 1000))),
+          ], { timeout: executionPolicy.timeout_ms + 60_000 });
+          if (!rendered.ok) {
+            return fail(`N14 render validation failed for ${sheetName}.`, {
+              stdout: rendered.stdout.slice(-4000),
+              stderr: rendered.stderr.slice(-4000),
+            });
+          }
+          const indexReport = await json(leafIndex);
+          const entry = (indexReport.cases ?? [])[0];
+          if (
+            (indexReport.cases ?? []).length !== 1 ||
+            entry?.verdict !== "PASS" ||
+            JSON.stringify(entry?.sheets_examined ?? []) !== JSON.stringify([sheetName])
+          ) {
+            return fail(`N14 render evidence did not prove exactly ${sheetName}.`, {
+              cases: indexReport.cases ?? [],
+            });
+          }
+          return {
+            status: "PASS",
+            detail: {
+              sheet: sheetName,
+              page_count: entry.page_count_total ?? entry.page_count ?? null,
+              execution: executionPolicy,
+            },
+          };
+        },
+      });
+      if (!step.ok) {
+        renderFailures.set(index, step.result);
+        return null;
+      }
+      return { id: leafId, sheet: sheetName, path: leafDir };
+    },
+  );
+  // Report the LOWEST-index failure so the blocked release names the same
+  // sheet no matter which lane happened to finish first.
+  if (renderFailures.size > 0) return renderFailures.get(Math.min(...renderFailures.keys()));
+  const renderLeafIds = renderLeafDirectories.map((leaf) => leaf.id);
   const renderDir = store.workDir("render");
   const renderIndex = path.join(renderDir, "render-evidence-index.json");
   step = await checkpoint({
@@ -1361,8 +1449,11 @@ async function main() {
         ...renderLeafIds,
         ...CHECKPOINT_ORDER.slice(CHECKPOINT_ORDER.indexOf("render")),
       ],
-      reused: reusedCheckpoints,
-      executed: executedCheckpoints,
+      // Render leaves run under a bounded pool, so `executed`/`reused` are
+      // re-emitted in the declared pipeline order rather than whichever lane
+      // finished first.
+      reused: [...reusedCheckpoints].sort(compareCheckpointSequence),
+      executed: [...executedCheckpoints].sort(compareCheckpointSequence),
       receipts: checkpointReceipts,
       timings_ms: timingsMs,
     },

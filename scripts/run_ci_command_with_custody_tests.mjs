@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 
-import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { createRunner } from "./lib/test_harness.mjs";
 
-const exec = promisify(execFile);
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const RUNNER = path.join(HERE, "run_ci_command_with_custody.mjs");
+const run = createRunner({ name: "ci_command_with_custody_tests", importMetaUrl: import.meta.url });
+const { exec } = run.runCli(() => ({}));
+const RUNNER = path.join(run.HERE, "run_ci_command_with_custody.mjs");
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "ci-command-custody-tests-"));
-let checks = 0;
 
 async function invoke(label, code, timeoutMs = 5000) {
   const out = path.join(root, label);
@@ -38,26 +34,26 @@ async function invoke(label, code, timeoutMs = 5000) {
 
 try {
   const pass = await invoke("pass", "process.stdout.write('ok'); process.stderr.write('note')");
-  assert.equal(pass.exitCode, 0); checks += 1;
-  assert.equal(pass.receipt.outcome.status, "PASS"); checks += 1;
-  assert.equal(await fs.readFile(path.join(pass.out, "test-logs/pass.stdout.log"), "utf8"), "ok"); checks += 1;
-  assert.equal(pass.receipt.logs.stdout.bytes, 2); checks += 1;
+  run.eq(pass.exitCode, 0, "a passing command exits 0");
+  run.eq(pass.receipt.outcome.status, "PASS");
+  run.eq(await fs.readFile(path.join(pass.out, "test-logs/pass.stdout.log"), "utf8"), "ok");
+  run.eq(pass.receipt.logs.stdout.bytes, 2);
 
   const fail = await invoke("fail", "process.stderr.write('bad'); process.exit(7)");
-  assert.equal(fail.exitCode, 7); checks += 1;
-  assert.equal(fail.receipt.outcome.status, "FAIL"); checks += 1;
-  assert.equal(fail.receipt.outcome.exit_code, 7); checks += 1;
+  run.eq(fail.exitCode, 7, "the child's failing exit code propagates");
+  run.eq(fail.receipt.outcome.status, "FAIL");
+  run.eq(fail.receipt.outcome.exit_code, 7);
 
   const timeout = await invoke("timeout", "setInterval(() => {}, 1000)", 100);
-  assert.notEqual(timeout.exitCode, 0); checks += 1;
-  assert.equal(timeout.receipt.outcome.status, "TIMEOUT"); checks += 1;
-  assert.equal(timeout.receipt.outcome.timed_out, true); checks += 1;
+  run.ne(timeout.exitCode, 0, "a timed-out command must not report success");
+  run.eq(timeout.receipt.outcome.status, "TIMEOUT");
+  run.eq(timeout.receipt.outcome.timed_out, true);
 
   const tampered = structuredClone(pass.receipt);
   tampered.logs.stdout.sha256 = "0".repeat(64);
-  assert.notEqual(tampered.logs.stdout.sha256, pass.receipt.logs.stdout.sha256); checks += 1;
-
-  process.stdout.write(`${JSON.stringify({ status: "PASS", checks, mutations_caught: 3 })}\n`);
+  run.ne(tampered.logs.stdout.sha256, pass.receipt.logs.stdout.sha256, "the tampered digest differs before verification");
 } finally {
   await fs.rm(root, { recursive: true, force: true });
 }
+
+run.finish({ mutations_caught: 3 });

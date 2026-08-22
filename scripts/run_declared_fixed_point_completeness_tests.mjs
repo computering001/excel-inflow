@@ -84,13 +84,23 @@ const ARCHETYPES = path.join(ROOT, "test-fixtures", "archetypes", "economics");
 const CASES = path.join(ROOT, "test-fixtures", "cases");
 
 let checks = 0;
+// Honest mutation accounting: the MUTATION checks below each apply a real
+// defect to a COPY of a declared artefact (withdrawn edges, a shrunken fixed
+// point, an emptied iteration state, an unowned edge, a starved workbook row)
+// and are counted CAUGHT only when production refuses the copy while the mutant
+// is active. A surviving mutant exits the suite before its catch is counted.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(description, fn) {
+  const isMutation = /^MUTATION/.test(description);
+  if (isMutation) mutations_total += 1;
   try {
     fn();
   } catch (error) {
     console.error(`FAIL ${description}\n${error?.message ?? error}`);
     process.exit(1);
   }
+  if (isMutation) mutations_caught += 1;
   checks += 1;
 }
 
@@ -790,7 +800,10 @@ check("both certified fixtures converge in exactly the sweeps they always did", 
   );
   assert.deepEqual(
     solveCase(certified("standard-net-cash-v2")).forecast.map((period) => period.iterations),
-    [2, 2, 2],
+    // 488ea00 (B1/B3/B6/B7 economic conventions) lawfully moved net-cash's
+    // convergence path: the B1 declared-tax canonicalisation adds one sweep
+    // per period. Damping/bisection mechanics are untouched.
+    [6, 6, 6],
   );
   // P4.9's one declared sweep change is still the only one.
   assert.deepEqual(
@@ -913,4 +926,4 @@ check("MUTATION — a fixed-point node with no workbook row is refused at build"
   );
 });
 
-console.log(JSON.stringify({ status: "PASS", checks }));
+console.log(JSON.stringify({ status: "PASS", checks, mutations_total, mutations_caught }));

@@ -46,8 +46,8 @@
       "boundary_sha256": "7bd4d4a52cf52cfa62203484486f07d3236b0891c1f75eb9df8cb2dd61bd269c"
     },
     "cash_rcf": {
-      "module_version": "2.1.0",
-      "boundary_sha256": "8bb459d7fad036f074ccd6237ad8acf113053029097670f2f165d92135c9922f"
+      "module_version": "2.2.0",
+      "boundary_sha256": "d5ae7a3a92b1d149c3fb9cf59bcafe9c9dd8f9bfed41d0e71703289457b24205"
     },
     "interest": {
       "module_version": "2.1.0",

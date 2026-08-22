@@ -13,3 +13,11 @@ audit/v360/
 # never in the index.
 fixtures/external/
 scripts/fixtures/external/
+
+# EDGAR/XBRL/PDF corpus local custody (assets/corpus-plan.json tooling).
+# Real filing bytes fetched from sec.gov/data.sec.gov land here. Custody
+# CONTENT is public documents but stays out of the index by design: only
+# sha256 hashes, locators and candidate inventories derived from it are ever
+# referenced by the repository.
+corpus-custody/
+

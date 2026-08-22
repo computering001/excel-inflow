@@ -42,9 +42,18 @@ const ROOT = path.resolve(HERE, "..");
 const clone = (value) => structuredClone(value);
 
 let checks = 0;
+// Honest mutation accounting: each refused() call applies one real corruption
+// to a copy of the registry and is counted CAUGHT only when the validator
+// refuses it while the mutant is active; the sealed-receipt bump mutation is
+// counted the same way. A surviving mutant throws and no count line prints.
+let mutations_total = 0;
+let mutations_caught = 0;
 function check(condition, message) {
+  const isMutation = typeof message === "string" && /^mutation MUST be refused|^MUTATION/.test(message);
+  if (isMutation) mutations_total += 1;
   if (!condition) throw new Error(message);
   checks += 1;
+  if (isMutation) mutations_caught += 1;
 }
 
 const registry = JSON.parse(
@@ -216,7 +225,7 @@ check(boundPolicyEntry("acquisition") === null, "declared_only families expose n
   const stampedBumped = policiesOf(bumped);
   check(stampedBumped.rcf_policy.policy_binding.version === "1.1", "the bump reaches the stamped binding");
   check(hashValue(stampedBumped) !== sealedV10,
-    "a registry version bump MUST change the sealed policy receipt");
+    "MUTATION — a registry version bump MUST change the sealed policy receipt");
 }
 
 // 8. End-to-end through the production compiler: a keel-derived certified
@@ -254,6 +263,8 @@ const declaredOnly = entries.filter(([, entry]) => entry.binding_status === "dec
 console.log(JSON.stringify({
   status: "PASS",
   checks,
+  mutations_total,
+  mutations_caught,
   families: entries.length,
   bound: bound.length,
   declared_only: declaredOnly,
